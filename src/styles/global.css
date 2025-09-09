@@ -1,38 +1,39 @@
 /* Importar fuentes */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&display=swap');
 
 /* Importar animaciones */
 @import './animations.css';
 
-/* Variables CSS para la paleta de colores */
+/* Variables CSS para la paleta de colores - Basada en la identidad visual */
 :root {
-  /* Colores principales */
-  --color-primary: #02254D;
-  --color-secondary: #961112;
-  --color-accent: #F2B648;
-  --color-error: #961112;
-  --color-info: #02254D;
-  --color-success: #F2B648;
-  --color-warning: #F0D29B;
+  /* Colores principales - Paleta del sistema */
+  --color-primary: #A81C22;        /* Rojo principal */
+  --color-secondary: #1F355C;      /* Azul oscuro */
+  --color-accent: #E0B04F;         /* Amarillo dorado */
+  --color-error: #A81C22;          /* Rojo para errores */
+  --color-info: #1F355C;           /* Azul oscuro para información */
+  --color-success: #4CAF50;        /* Verde para éxito */
+  --color-warning: #E0B04F;        /* Amarillo dorado para advertencias */
   
   /* Colores de superficie */
-  --color-surface: #EDEDED;
-  --color-background: #F0D29B;
-  --color-black: #010101;
-  --color-white: #FFFFFF;
+  --color-surface: #E0E0E0;        /* Gris claro */
+  --color-background: #FFFFFF;     /* Blanco */
+  --color-black: #000000;          /* Negro */
+  --color-white: #FFFFFF;          /* Blanco */
   
   /* Colores de texto */
-  --text-primary: #010101;
-  --text-secondary: #666666;
-  --text-disabled: #999999;
-  --text-on-primary: #FFFFFF;
-  --text-on-secondary: #FFFFFF;
+  --text-primary: #000000;          /* Negro */
+  --text-secondary: #1F355C;        /* Azul oscuro */
+  --text-disabled: #999999;         /* Gris */
+  --text-on-primary: #FFFFFF;       /* Blanco sobre rojo */
+  --text-on-secondary: #FFFFFF;     /* Blanco sobre azul */
   
   /* Sombras */
-  --shadow-sm: 0 2px 4px rgba(2, 37, 77, 0.1);
-  --shadow-md: 0 4px 12px rgba(2, 37, 77, 0.15);
-  --shadow-lg: 0 8px 25px rgba(2, 37, 77, 0.2);
-  --shadow-xl: 0 15px 35px rgba(2, 37, 77, 0.25);
+  --shadow-sm: 0 2px 4px rgba(168, 28, 34, 0.1);
+  --shadow-md: 0 4px 12px rgba(168, 28, 34, 0.15);
+  --shadow-lg: 0 8px 25px rgba(168, 28, 34, 0.2);
+  --shadow-xl: 0 15px 35px rgba(168, 28, 34, 0.25);
   
   /* Bordes redondeados */
   --radius-sm: 4px;
@@ -52,6 +53,10 @@
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Tipografía */
+  --font-primary: 'Montserrat', sans-serif;
+  --font-secondary: 'Open Sans', sans-serif;
 }
 
 /* Reset y estilos base */
@@ -62,7 +67,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-primary);
   font-size: 16px;
   line-height: 1.6;
   color: var(--text-primary);
@@ -78,7 +83,7 @@ html, body {
 
 /* Tipografía */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   line-height: 1.3;
   margin: 0 0 var(--spacing-md) 0;
@@ -95,6 +100,7 @@ h6 { font-size: 1.125rem; }
 p {
   margin: 0 0 var(--spacing-md) 0;
   color: var(--text-secondary);
+  font-family: var(--font-secondary);
 }
 
 /* Enlaces */
@@ -115,7 +121,7 @@ a:hover {
   border: none;
   border-radius: var(--radius-md);
   padding: var(--spacing-sm) var(--spacing-lg);
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 500;
   font-size: 0.875rem;
   cursor: pointer;
@@ -135,7 +141,7 @@ a:hover {
   border: none;
   border-radius: var(--radius-md);
   padding: var(--spacing-sm) var(--spacing-lg);
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 500;
   font-size: 0.875rem;
   cursor: pointer;
@@ -182,7 +188,7 @@ a:hover {
   padding: var(--spacing-sm) var(--spacing-md);
   border: 2px solid var(--color-surface);
   border-radius: var(--radius-md);
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-primary);
   font-size: 0.875rem;
   transition: all var(--transition-fast);
   background-color: var(--color-white);
@@ -228,6 +234,10 @@ a:hover {
 .text-center { text-align: center; }
 .text-left { text-align: left; }
 .text-right { text-align: right; }
+
+/* Utilidades de tipografía */
+.font-primary { font-family: var(--font-primary); }
+.font-secondary { font-family: var(--font-secondary); }
 
 .mb-0 { margin-bottom: 0; }
 .mb-1 { margin-bottom: var(--spacing-xs); }

@@ -26,7 +26,8 @@ Un sistema web completo desarrollado con Vue 3, Vite y Vuetify para la gestión 
 - **ExcelJS**: Exportación de datos a Excel
 - **jsPDF**: Generación de documentos PDF
 - **HTML2Canvas**: Captura de pantalla y conversión
-- **Poppins**: Tipografía moderna y legible
+- **Montserrat**: Tipografía moderna y profesional (fuente principal)
+- **Open Sans**: Tipografía legible y clara (fuente secundaria)
 - **CSS Animations**: Sistema completo de animaciones personalizadas
 - **CSS Variables**: Variables CSS para consistencia de diseño
 
@@ -169,7 +170,7 @@ El sistema incluye varios usuarios de prueba con diferentes roles:
 
 ### Paleta de Colores
 
-El sistema utiliza la paleta de colores estándar de Material Design:
+El sistema utiliza una paleta de colores personalizada basada en la identidad visual del proyecto:
 
 ```javascript
 theme: {
@@ -177,17 +178,97 @@ theme: {
   themes: {
     light: {
       colors: {
-        primary: '#1976D2',        // Blue - Color principal
-        secondary: '#424242',      // Gray - Color secundario
-        accent: '#82B1FF',         // Light Blue - Acentos
-        error: '#FF5252',          // Red - Errores
-        info: '#2196F3',           // Info Blue - Información
-        success: '#4CAF50',        // Green - Éxito
-        warning: '#FFC107',        // Yellow - Advertencias
+        primary: '#A81C22',        // Rojo principal - Color principal
+        secondary: '#1F355C',      // Azul oscuro - Color secundario
+        accent: '#E0B04F',         // Amarillo dorado - Acentos
+        error: '#A81C22',          // Rojo - Errores
+        info: '#1F355C',           // Azul oscuro - Información
+        success: '#4CAF50',        // Verde - Éxito
+        warning: '#E0B04F',        // Amarillo dorado - Advertencias
+        surface: '#FFFFFF',        // Blanco - Superficies
+        background: '#FFFFFF',     // Blanco - Fondo
       },
     },
   },
 }
+```
+
+**Colores de la identidad visual:**
+- **Rojo principal**: `#A81C22` - Color corporativo principal
+- **Azul oscuro**: `#1F355C` - Color secundario profesional
+- **Amarillo dorado**: `#E0B04F` - Color de acento y destacados
+- **Gris claro**: `#E0E0E0` - Color de superficie y bordes
+- **Negro**: `#000000` - Texto principal
+- **Blanco**: `#FFFFFF` - Fondos y superficies
+
+### Identidad Visual
+
+El sistema implementa una identidad visual corporativa completa:
+
+- **Isotipo**: `icon-adaptableV2.svg` - Logo corporativo integrado en navegación y login
+- **Tipografía**: Sistema dual con Montserrat (principal) y Open Sans (secundaria) para máxima legibilidad
+- **Aplicación consistente**: El isotipo se utiliza en todos los puntos de entrada del sistema
+- **Paleta corporativa**: Colores basados en la identidad visual del proyecto
+
+### Diseño de Interfaz
+
+El sistema utiliza un diseño moderno inspirado en dashboards profesionales:
+
+- **Header**: Color blanco (#FFFFFF) con texto negro para máximo contraste
+- **Sidebar**: Color azul oscuro (#1F355C) con texto blanco para navegación clara
+- **Logo dual**: Aplicado tanto en header como en sidebar para consistencia visual
+- **Contraste optimizado**: El logo es visible y legible en ambos fondos
+- **Diseño responsive**: Se adapta perfectamente a diferentes tamaños de pantalla
+
+### Layout del Dashboard
+
+El sistema implementa un layout moderno y profesional:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Header Blanco (Logo + Título + Menú Usuario)           │
+├─────────────┬───────────────────────────────────────────┤
+│             │                                           │
+│ Sidebar     │ Contenido Principal                       │
+│ Azul Oscuro │ (Cards, Gráficos, Tablas)                │
+│ (Logo +     │                                           │
+│  Navegación)│                                           │
+│             │                                           │
+└─────────────┴───────────────────────────────────────────┘
+```
+
+**Características del Layout:**
+- **Header fijo**: Siempre visible con navegación principal
+- **Sidebar colapsible**: Navegación lateral que se puede ocultar
+- **Área de contenido**: Espacio principal para dashboards y formularios
+- **Responsive**: Se adapta a móviles con sidebar superpuesto
+
+### Sistema Tipográfico
+
+El sistema utiliza un enfoque dual de tipografías para optimizar la legibilidad:
+
+**Montserrat (Fuente Principal):**
+- **Uso**: Títulos, botones, navegación, elementos destacados
+- **Características**: Moderna, geométrica, profesional
+- **Pesos**: 300, 400, 500, 600, 700, 800
+- **Aplicación**: H1-H6, botones, menús, cards principales
+
+**Open Sans (Fuente Secundaria):**
+- **Uso**: Párrafos, texto de contenido, descripciones
+- **Características**: Legible, clara, optimizada para lectura
+- **Pesos**: 300, 400, 500, 600, 700, 800
+- **Aplicación**: Párrafos, texto de formularios, contenido secundario
+
+**Variables CSS:**
+```css
+--font-primary: 'Montserrat', sans-serif;
+--font-secondary: 'Open Sans', sans-serif;
+```
+
+**Clases Utilitarias:**
+```css
+.font-primary { font-family: var(--font-primary); }
+.font-secondary { font-family: var(--font-secondary); }
 ```
 
 ### Componentes Personalizados
@@ -683,6 +764,18 @@ Puedes servir los archivos estáticos con cualquier servidor web:
 5. **Error de importación de servicios**
    - El sistema ahora usa autenticación simplificada sin dependencias externas
    - No deberían aparecer errores de importación de userService.js
+
+6. **Problemas de diseño visual**
+   - El header es blanco con texto negro para mejor contraste
+   - El sidebar es azul oscuro (#1F355C) con texto blanco
+   - El logo se muestra tanto en header como en sidebar
+   - Si el logo no se ve bien, verificar que el archivo icon-adaptableV2.svg esté en la carpeta assets
+
+7. **Problemas de tipografía**
+   - Montserrat se usa para títulos y elementos destacados
+   - Open Sans se usa para párrafos y texto de contenido
+   - Si las fuentes no cargan, verificar conexión a internet (Google Fonts)
+   - Usar clases .font-primary y .font-secondary para aplicar fuentes específicas
 
 ## 📚 Recursos Adicionales
 

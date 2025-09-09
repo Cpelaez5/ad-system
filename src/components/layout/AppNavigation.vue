@@ -1,19 +1,26 @@
 <template>
   <v-app-bar
-    color="primary"
+    color="white"
     dark
     prominent
     elevation="2"
     class="animate-slide-in-down"
+    style="border-bottom: 1px solid #E0E0E0;"
   >
     <!-- Logo y título -->
     <v-app-bar-nav-icon 
       @click="drawer = !drawer"
       class="animate-micro-bounce"
+      color="primary"
     ></v-app-bar-nav-icon>
     
-    <v-toolbar-title class="text-h5 font-weight-bold animate-fade-in animate-delay-200">
-      <v-icon left class="animate-micro-rotate">mdi-calculator-variant</v-icon>
+    <v-toolbar-title class="text-h5 font-weight-bold animate-fade-in animate-delay-200" style="color: #000000;">
+      <img 
+        src="@/assets/icon-adaptableV2.svg" 
+        alt="Logo" 
+        class="logo-icon animate-micro-rotate"
+        style="width: 32px; height: 32px; margin-right: 12px;"
+      />
       Sistema Contable
     </v-toolbar-title>
 
@@ -25,7 +32,7 @@
         <v-btn
           icon
           v-bind="props"
-          color="white"
+          color="primary"
           class="animate-hover-pulse animate-delay-300"
         >
           <v-icon>mdi-account-circle</v-icon>
@@ -50,9 +57,21 @@
   <v-navigation-drawer
     v-model="drawer"
     temporary
-    color="grey-lighten-5"
+    color="#1F355C"
     class="animate-slide-in-left"
+    dark
   >
+    <!-- Header del sidebar con logo -->
+    <div class="sidebar-header" style="padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+      <img 
+        src="@/assets/icon-adaptableV2.svg" 
+        alt="Logo" 
+        class="logo-icon animate-micro-rotate"
+        style="width: 40px; height: 40px; margin-bottom: 10px;"
+      />
+      <h3 style="color: white; margin: 0; font-size: 18px; font-weight: 600;">Sistema Contable</h3>
+    </div>
+    
     <v-list>
       <!-- Dashboard -->
       <v-list-item

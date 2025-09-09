@@ -4,7 +4,12 @@
       <div class="login-card animate-slide-in-up">
         <div class="login-header">
           <div class="icon-container animate-micro-rotate">
-            <i class="mdi mdi-calculator-variant"></i>
+            <img 
+              src="@/assets/icon-adaptableV2.svg" 
+              alt="Logo" 
+              class="logo-icon"
+              style="width: 48px; height: 48px;"
+            />
           </div>
           <h1 class="login-title animate-fade-in animate-delay-200">Sistema Contable</h1>
           <p class="login-subtitle animate-fade-in animate-delay-300">
@@ -232,7 +237,7 @@ export default {
 .icon-container {
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #1976D2, #42A5F5);
+  background: linear-gradient(135deg, #A81C22, #E0B04F);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -245,7 +250,7 @@ export default {
 .login-title {
   font-size: 28px;
   font-weight: 700;
-  color: #1976D2;
+  color: #A81C22;
   margin: 0 0 10px 0;
 }
 
@@ -302,8 +307,8 @@ export default {
 }
 
 .password-toggle:hover {
-  color: #1976D2;
-  background: rgba(25, 118, 210, 0.1);
+  color: #A81C22;
+  background: rgba(168, 28, 34, 0.1);
 }
 
 .form-input {
@@ -319,8 +324,8 @@ export default {
 
 .form-input:focus {
   outline: none;
-  border-color: #1976D2;
-  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+  border-color: #A81C22;
+  box-shadow: 0 0 0 3px rgba(168, 28, 34, 0.1);
   transform: scale(1.02);
 }
 
@@ -338,7 +343,7 @@ export default {
   margin-right: 10px;
   width: 18px;
   height: 18px;
-  accent-color: #1976D2;
+  accent-color: #A81C22;
 }
 
 .checkbox-label {
@@ -349,7 +354,7 @@ export default {
 .login-button {
   width: 100%;
   padding: 14px;
-  background: linear-gradient(135deg, #1976D2, #42A5F5);
+  background: linear-gradient(135deg, #A81C22, #E0B04F);
   color: white;
   border: none;
   border-radius: 8px;
@@ -362,7 +367,7 @@ export default {
 
 .login-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(25, 118, 210, 0.3);
+  box-shadow: 0 8px 25px rgba(168, 28, 34, 0.3);
 }
 
 .login-button:disabled {
@@ -400,7 +405,7 @@ export default {
 .forgot-password {
   background: none;
   border: none;
-  color: #1976D2;
+  color: #A81C22;
   font-size: 14px;
   cursor: pointer;
   text-decoration: underline;
@@ -408,7 +413,7 @@ export default {
 }
 
 .forgot-password:hover {
-  color: #1565C0;
+  color: #8B1A1F;
   transform: scale(1.05);
 }
 
