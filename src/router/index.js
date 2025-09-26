@@ -68,6 +68,18 @@ const routes = [
     name: 'Usuarios',
     component: Usuarios,
     meta: { requiresAuth: true, title: 'Gestión de Usuarios', roles: ['admin'] }
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: Dashboard, // Temporalmente usar Dashboard
+    meta: { requiresAuth: true, title: 'Mi Perfil' }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Dashboard, // Temporalmente usar Dashboard
+    meta: { requiresAuth: true, title: 'Configuración' }
   }
 ]
 

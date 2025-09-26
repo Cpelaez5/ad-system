@@ -1,11 +1,9 @@
 <template>
   <v-app-bar
     color="white"
-    dark
-    prominent
     elevation="2"
-    class="animate-slide-in-down"
-    style="border-bottom: 1px solid #E0E0E0;"
+    class="app-bar"
+    style="border-bottom: 1px solid #E0E0E0; z-index: 1000;"
   >
     <!-- Logo y título -->
     <v-app-bar-nav-icon 
@@ -21,32 +19,37 @@
         class="logo-icon animate-micro-rotate"
         style="width: 32px; height: 32px; margin-right: 12px;"
       />
-      Sistema Contable
+      Business Group
     </v-toolbar-title>
 
     <v-spacer></v-spacer>
 
     <!-- Menú de usuario -->
-    <v-menu offset-y>
-      <template v-slot:activator="{ props }">
-        <v-btn
-          icon
-          v-bind="props"
-          color="primary"
-          class="animate-hover-pulse animate-delay-300"
-        >
-          <v-icon>mdi-account-circle</v-icon>
-        </v-btn>
-      </template>
-      <v-list class="animate-scale-in">
-        <v-list-item class="animate-slide-in-left animate-delay-100">
-          <v-list-item-title>Perfil</v-list-item-title>
+    <v-btn 
+      id="user-menu-btn"
+      color="primary"
+      variant="text"
+      @click="handleUserButtonClick"
+    >
+      <v-icon>mdi-account-circle</v-icon>
+      <span class="ml-2 d-none d-md-inline">{{ currentUser?.firstName || 'Usuario' }}</span>
+    </v-btn>
+    
+    <v-menu activator="#user-menu-btn">
+      <v-list>
+        <v-list-item>
+          <v-list-item-title>{{ currentUser?.firstName || 'Usuario' }} {{ currentUser?.lastName || '' }}</v-list-item-title>
+          <v-list-item-subtitle>{{ getRoleName(currentUser?.role) }}</v-list-item-subtitle>
         </v-list-item>
-        <v-list-item class="animate-slide-in-left animate-delay-200">
+        <v-divider></v-divider>
+        <v-list-item @click="goToProfile">
+          <v-list-item-title>Mi Perfil</v-list-item-title>
+        </v-list-item>
+        <v-list-item @click="goToSettings">
           <v-list-item-title>Configuración</v-list-item-title>
         </v-list-item>
         <v-divider></v-divider>
-        <v-list-item @click="logout" class="animate-slide-in-left animate-delay-300">
+        <v-list-item @click="logout">
           <v-list-item-title>Cerrar Sesión</v-list-item-title>
         </v-list-item>
       </v-list>
@@ -167,20 +170,57 @@ export default {
       drawer: false
     }
   },
+  computed: {
+    currentUser() {
+      try {
+        return JSON.parse(localStorage.getItem('currentUser') || '{}')
+      } catch (error) {
+        console.error('Error obteniendo usuario:', error)
+        return {}
+      }
+    }
+  },
   methods: {
+    handleUserButtonClick() {
+      console.log('🔵 Botón de usuario clickeado')
+      console.log('🔵 Usuario actual:', this.currentUser)
+    },
+    
     logout() {
+      console.log('🔴 Cerrando sesión...')
       // Limpiar datos de sesión
       localStorage.removeItem('usuarioAutenticado')
       localStorage.removeItem('currentUser')
       localStorage.removeItem('authToken')
       
-      console.log('Cerrando sesión...')
       this.$router.push('/login')
+    },
+    
+    goToProfile() {
+      console.log('🟢 Navegando al perfil...')
+      this.$router.push('/profile')
+    },
+    
+    goToSettings() {
+      console.log('🟡 Navegando a configuración...')
+      this.$router.push('/settings')
+    },
+    
+    getRoleName(role) {
+      const roleNames = {
+        admin: 'Administrador',
+        contador: 'Contador',
+        auditor: 'Auditor',
+        facturador: 'Facturador',
+        operador: 'Operador',
+        consultor: 'Consultor'
+      }
+      return roleNames[role] || 'Usuario'
     },
     
     hasPermission(permission) {
       try {
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+        const currentUser = this.currentUser
         if (!currentUser.role) return false
         
         // Permisos básicos por rol (fallback)
@@ -204,6 +244,29 @@ export default {
 </script>
 
 <style scoped>
+/* ========================================
+   APP BAR STYLES
+   ======================================== */
+.app-bar {
+  z-index: 1000 !important;
+}
+
+/* ========================================
+   USER MENU BUTTON STYLES
+   ======================================== */
+.v-btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 1001 !important;
+}
+
+.v-menu {
+  z-index: 2000 !important;
+}
+
+/* ========================================
+   NAVIGATION DRAWER STYLES
+   ======================================== */
 .v-navigation-drawer {
   border-right: 1px solid #e0e0e0;
 }
@@ -211,9 +274,58 @@ export default {
 .v-list-item {
   margin: 4px 8px;
   border-radius: 8px;
+  transition: all 0.3s ease;
 }
 
 .v-list-item:hover {
-  background-color: rgba(25, 118, 210, 0.08);
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(4px);
+}
+
+.v-list-item.v-list-item--active {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-left: 3px solid #E0B04F;
+}
+
+/* ========================================
+   RESPONSIVE STYLES
+   ======================================== */
+@media (max-width: 768px) {
+  .user-menu {
+    min-width: 180px;
+  }
+  
+  .user-name {
+    font-size: 0.8rem;
+  }
+  
+  .user-role {
+    font-size: 0.7rem;
+  }
+}
+
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+.v-list-item {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.user-menu .v-list-item {
+  transition: background-color 0.2s ease;
+}
+
+/* ========================================
+   ACCESSIBILITY
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  .v-list-item,
+  .user-menu .v-list-item {
+    transition: none;
+  }
+  
+  .v-list-item:hover {
+    transform: none;
+  }
 }
 </style>

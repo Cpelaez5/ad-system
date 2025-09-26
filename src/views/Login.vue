@@ -137,51 +137,18 @@ export default {
       this.cargando = true
       
       try {
-        // Simular delay de API
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        // Datos de usuarios válidos
-        const usuariosValidos = [
-          { username: 'admin', password: 'admin123', role: 'admin' },
-          { username: 'contador', password: 'contador123', role: 'contador' },
-          { username: 'auditor', password: 'auditor123', role: 'auditor' },
-          { username: 'facturador', password: 'facturador123', role: 'facturador' },
-          { username: 'operador', password: 'operador123', role: 'operador' },
-          { username: 'consultor', password: 'consultor123', role: 'consultor' }
-        ]
-        
-        // Buscar usuario válido
-        const usuarioValido = usuariosValidos.find(u => 
-          u.username === this.credenciales.usuario && 
-          u.password === this.credenciales.password
-        )
-        
-        if (usuarioValido) {
-          // Crear objeto de usuario
-          const user = {
-            id: 1,
-            username: usuarioValido.username,
-            email: `${usuarioValido.username}@sistema.com`,
-            firstName: usuarioValido.username.charAt(0).toUpperCase() + usuarioValido.username.slice(1),
-            lastName: 'Usuario',
-            role: usuarioValido.role,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString()
-          }
-          
-          // Guardar información de sesión
+        const { userService } = await import('@/services/userService')
+        const result = await userService.login({
+          username: this.credenciales.usuario,
+          password: this.credenciales.password
+        })
+        if (result.success) {
           localStorage.setItem('usuarioAutenticado', 'true')
-          localStorage.setItem('currentUser', JSON.stringify(user))
-          localStorage.setItem('authToken', `token-${user.id}-${Date.now()}`)
-          
-          console.log('Usuario autenticado:', user)
-          
-          // Redirigir al dashboard
+          localStorage.setItem('currentUser', JSON.stringify(result.user))
+          if (result.token) localStorage.setItem('authToken', result.token)
           this.$router.push('/dashboard')
         } else {
-          // Mostrar error
-          alert('Usuario o contraseña incorrectos')
+          alert(result.message || 'Usuario o contraseña incorrectos')
         }
       } catch (error) {
         console.error('Error al iniciar sesión:', error)

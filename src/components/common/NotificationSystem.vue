@@ -127,12 +127,15 @@ export default {
   
   mounted() {
     // Hacer los métodos disponibles globalmente
-    this.$app.config.globalProperties.$notify = {
-      show: this.showNotification,
-      success: this.success,
-      error: this.error,
-      warning: this.warning,
-      info: this.info
+    const app = this.$app || this.$root
+    if (app && app.config && app.config.globalProperties) {
+      app.config.globalProperties.$notify = {
+        show: this.showNotification,
+        success: this.success,
+        error: this.error,
+        warning: this.warning,
+        info: this.info
+      }
     }
   }
 }

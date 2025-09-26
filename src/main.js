@@ -54,6 +54,9 @@ const vuetify = createVuetify({
     VBtn: {
       style: 'text-transform: none; font-weight: 500;',
     },
+    VMenu: {
+      zIndex: 2000,
+    },
   },
 })
 

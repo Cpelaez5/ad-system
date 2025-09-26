@@ -1,5 +1,6 @@
 // Servicio de gestión de usuarios y roles
-// En el futuro, este servicio se conectará a una API real
+// Ahora se conecta a la API backend cuando VITE_API_BASE_URL está definido
+import api from './api'
 
 // Datos de prueba para usuarios
 const mockUsers = [
@@ -172,31 +173,30 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 export const userService = {
   // Autenticación
   async login(credentials) {
-    await delay(1000) // Simular delay de API
-    
-    const user = mockUsers.find(u => 
-      u.username === credentials.username && 
+    // Si hay API, usamos backend; si no, fallback a mock local
+    if (import.meta.env.VITE_API_BASE_URL) {
+      const { data } = await api.post('/auth/login', {
+        username: credentials.username,
+        password: credentials.password
+      })
+      // Persistir token
+      localStorage.setItem('authToken', data.token)
+      return { success: true, user: data.user, token: data.token }
+    }
+    await delay(400)
+    const user = mockUsers.find(u =>
+      u.username === credentials.username &&
       u.password === credentials.password &&
       u.isActive
     )
-    
     if (user) {
-      // Actualizar último login
       user.lastLogin = new Date().toISOString()
-      
-      // Retornar usuario sin password
       const { password, ...userWithoutPassword } = user
-      return {
-        success: true,
-        user: userWithoutPassword,
-        token: `mock-token-${user.id}-${Date.now()}`
-      }
+      const token = `mock-token-${user.id}-${Date.now()}`
+      localStorage.setItem('authToken', token)
+      return { success: true, user: userWithoutPassword, token }
     }
-    
-    return {
-      success: false,
-      message: 'Credenciales inválidas'
-    }
+    return { success: false, message: 'Credenciales inválidas' }
   },
 
   // Obtener todos los usuarios
