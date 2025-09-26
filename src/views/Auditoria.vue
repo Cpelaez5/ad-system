@@ -1,17 +1,5 @@
 <template>
   <v-container fluid class="pa-4">
-    <!-- Título de la página -->
-    <v-row class="mb-4">
-      <v-col cols="12">
-        <h1 class="text-h4 font-weight-bold text-primary">
-          <v-icon left size="large">mdi-shield-search</v-icon>
-          Auditoría
-        </h1>
-        <p class="text-subtitle-1 text-grey-darken-1 mt-2">
-          Trazabilidad y logs del sistema contable
-        </p>
-      </v-col>
-    </v-row>
 
     <!-- Tarjetas de resumen -->
     <v-row class="mb-6">

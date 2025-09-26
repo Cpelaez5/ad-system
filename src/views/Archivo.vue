@@ -1,64 +1,56 @@
 <template>
   <v-container fluid class="pa-4">
-    <!-- Título de la página -->
-    <v-row class="mb-4">
-      <v-col cols="12">
-        <h1 class="text-h4 font-weight-bold text-primary">
-          <v-icon left size="large">mdi-folder-multiple</v-icon>
-          Archivo Digital
-        </h1>
-        <p class="text-subtitle-1 text-grey-darken-1 mt-2">
-          Gestiona y organiza tus documentos digitales
-        </p>
-      </v-col>
-    </v-row>
 
     <!-- Tarjetas de resumen -->
     <v-row class="mb-6">
       <v-col cols="12" sm="6" md="3">
-        <v-card color="primary" variant="tonal" class="pa-4">
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-file-document-multiple</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">{{ resumen.totalDocumentos }}</div>
-              <div class="text-body-2">Documentos Archivados</div>
-            </div>
+        <v-card
+          class="pa-6 stats-card"
+          height="120"
+          style="background-color: #02254d;"
+        >
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 text-white mb-4">Documentos Archivados</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ resumen.totalDocumentos }}</div>
           </div>
         </v-card>
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
-        <v-card color="success" variant="tonal" class="pa-4">
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-folder-open</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">{{ resumen.carpetas }}</div>
-              <div class="text-body-2">Carpetas Creadas</div>
-            </div>
+        <v-card
+          class="pa-6 stats-card"
+          height="120"
+          style="background-color: #961112;"
+        >
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 text-white mb-4">Carpetas Creadas</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ resumen.carpetas }}</div>
           </div>
         </v-card>
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
-        <v-card color="info" variant="tonal" class="pa-4">
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-harddisk</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">{{ formatearTamaño(resumen.espacioUsado) }}</div>
-              <div class="text-body-2">Espacio Usado</div>
-            </div>
+        <v-card
+          class="pa-6 stats-card"
+          height="120"
+          style="background-color: #f2b648;"
+        >
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 mb-4" style="color: #010101;">Espacio Usado</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ formatearTamaño(resumen.espacioUsado) }}</div>
           </div>
         </v-card>
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
-        <v-card color="warning" variant="tonal" class="pa-4">
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-upload</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">{{ resumen.subidasHoy }}</div>
-              <div class="text-body-2">Subidas Hoy</div>
-            </div>
+        <v-card
+          class="pa-6 stats-card"
+          height="120"
+          style="background-color: #f0d29b;"
+        >
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 mb-4" style="color: #010101;">Subidas Hoy</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ resumen.subidasHoy }}</div>
           </div>
         </v-card>
       </v-col>

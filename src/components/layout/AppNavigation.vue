@@ -12,14 +12,8 @@
       color="primary"
     ></v-app-bar-nav-icon>
     
-    <v-toolbar-title class="text-h5 font-weight-bold animate-fade-in animate-delay-200" style="color: #000000;">
-      <img 
-        src="@/assets/icon-adaptableV2.svg" 
-        alt="Logo" 
-        class="logo-icon animate-micro-rotate"
-        style="width: 32px; height: 32px; margin-right: 12px;"
-      />
-      Business Group
+    <v-toolbar-title class="text-h5 font-weight-bold animate-fade-in animate-delay-200" style="color: #000000; font-weight: 800 !important;">
+      {{ getCurrentPageTitle() }}
     </v-toolbar-title>
 
     <v-spacer></v-spacer>
@@ -181,6 +175,23 @@ export default {
     }
   },
   methods: {
+    getCurrentPageTitle() {
+      const routeName = this.$route.name
+      const pageTitles = {
+        'Dashboard': 'Dashboard',
+        'Clientes': 'Clientes',
+        'Facturacion': 'Facturación',
+        'Contabilidad': 'Contabilidad',
+        'Auditoria': 'Auditoría',
+        'Archivo': 'Archivo Digital',
+        'Usuarios': 'Usuarios',
+        'Profile': 'Mi Perfil',
+        'Settings': 'Configuración',
+        'Login': 'Iniciar Sesión'
+      }
+      return pageTitles[routeName] || 'Sistema Contable'
+    },
+    
     handleUserButtonClick() {
       console.log('🔵 Botón de usuario clickeado')
       console.log('🔵 Usuario actual:', this.currentUser)
