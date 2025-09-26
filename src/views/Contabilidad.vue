@@ -16,49 +16,53 @@
     <!-- Tarjetas de resumen -->
     <v-row class="mb-6">
       <v-col cols="12" sm="6" md="3">
-        <v-card color="primary" variant="tonal" class="pa-4">
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-calculator</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">{{ resumen.asientosMes }}</div>
-              <div class="text-body-2">Asientos Este Mes</div>
-            </div>
+        <v-card
+          class="pa-6 stats-card"
+          height="120"
+          style="background-color: #02254d;"
+        >
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 text-white mb-4">Asientos Este Mes</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ resumen.asientosMes }}</div>
           </div>
         </v-card>
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
-        <v-card color="success" variant="tonal" class="pa-4">
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-trending-up</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">${{ resumen.ingresos.toLocaleString() }}</div>
-              <div class="text-body-2">Ingresos Totales</div>
-            </div>
+        <v-card
+          class="pa-6 stats-card"
+          height="120"
+          style="background-color: #961112;"
+        >
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 text-white mb-4">Ingresos Totales</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">${{ resumen.ingresos.toLocaleString() }}</div>
           </div>
         </v-card>
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
-        <v-card color="error" variant="tonal" class="pa-4">
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-trending-down</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">${{ resumen.egresos.toLocaleString() }}</div>
-              <div class="text-body-2">Egresos Totales</div>
-            </div>
+        <v-card
+          class="pa-6 stats-card"
+          height="120"
+          style="background-color: #f2b648;"
+        >
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 mb-4" style="color: #010101;">Egresos Totales</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">${{ resumen.egresos.toLocaleString() }}</div>
           </div>
         </v-card>
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
-        <v-card color="info" variant="tonal" class="pa-4">
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-scale-balance</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">${{ resumen.utilidad.toLocaleString() }}</div>
-              <div class="text-body-2">Utilidad Neta</div>
-            </div>
+        <v-card
+          class="pa-6 stats-card"
+          height="120"
+          style="background-color: #f0d29b;"
+        >
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 mb-4" style="color: #010101;">Utilidad Neta</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">${{ resumen.utilidad.toLocaleString() }}</div>
           </div>
         </v-card>
       </v-col>
