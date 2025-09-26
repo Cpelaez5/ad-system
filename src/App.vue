@@ -38,12 +38,7 @@ export default {
 </script>
 
 <style>
-/* Estilos globales */
-html, body {
-  margin: 0;
-  padding: 0;
-  font-family: 'Roboto', sans-serif;
-}
+/* Estilos globales - Los estilos principales están en global.css */
 
 /* Estilos para el scrollbar */
 ::-webkit-scrollbar {

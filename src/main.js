@@ -33,7 +33,7 @@ const vuetify = createVuetify({
           success: '#4CAF50',        /* Verde para éxito */
           warning: '#E0B04F',        /* Amarillo dorado para advertencias */
           surface: '#FFFFFF',        /* Blanco */
-          background: '#FFFFFF',     /* Blanco */
+          background: '#efefef',     /* Gris claro para fondo de aplicación */
         },
       },
     },
