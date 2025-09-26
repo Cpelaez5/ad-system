@@ -458,6 +458,9 @@ export default {
   box-sizing: border-box;
 }
 
+[data-swapy-item] {
+  transition: opacity 0.2s ease;
+}
 /* Asegurar que los border-radius se mantengan durante el drag */
 [data-swapy-item][data-swapy-dragging] .v-card {
   border-radius: 20px !important;
@@ -469,6 +472,7 @@ export default {
 
 [data-swapy-slot] {
   border-radius: 20px !important;
+  transition: background 0.2s ease;
 }
 
 [data-swapy-slot] .v-card {
@@ -483,7 +487,7 @@ export default {
 
 /* Estilo para slot destacado */
 [data-swapy-slot][data-swapy-highlighted] {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(128, 128, 128, 0.1);
   transition: background 0.2s ease;
 }
 
