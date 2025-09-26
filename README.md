@@ -26,6 +26,7 @@ Un sistema web completo desarrollado con Vue 3, Vite y Vuetify para la gestión 
 - **ExcelJS**: Exportación de datos a Excel
 - **jsPDF**: Generación de documentos PDF
 - **HTML2Canvas**: Captura de pantalla y conversión
+- **Swapy**: Librería de drag & drop para reorganización de elementos
 - **Montserrat**: Tipografía moderna y profesional (fuente principal)
 - **Open Sans**: Tipografía legible y clara (fuente secundaria)
 - **CSS Animations**: Sistema completo de animaciones personalizadas
@@ -126,8 +127,12 @@ El sistema incluye varios usuarios de prueba con diferentes roles:
 
 ### 1. Dashboard
 - Resumen general del sistema
-- Estadísticas principales
-- Accesos rápidos a funciones comunes
+- Estadísticas principales (4 cards fijas)
+- Accesos rápidos a funciones comunes (fijo)
+- Gráficos y análisis (cards individuales arrastrables)
+- Actividad reciente (arrastrable)
+- Estado del sistema (arrastrable)
+- **Funcionalidad Drag & Drop**: Reorganiza las cards individuales arrastrándolas
 
 ### 2. Gestión de Clientes
 - Registro de contribuyentes
@@ -296,6 +301,15 @@ El sistema incluye componentes reutilizables avanzados:
 - **Accesibilidad**: Soporte para preferencias de movimiento reducido
 - **Clases utilitarias**: Delays, duraciones, iteraciones personalizables
 
+### 🖱️ Sistema de Drag & Drop (Dashboard)
+- **Librería Swapy**: Integración completa para reorganización de cards individuales
+- **Cards arrastrables**: Gráfico de Barras, Gráfico de Pastel, Actividad Reciente, Estado del Sistema
+- **Secciones fijas**: Las 4 tarjetas de estadísticas y Accesos Rápidos permanecen en su posición
+- **Configuración optimizada**: Animación spring, auto-scroll, arrastre vertical
+- **Efectos visuales**: Hover, drag y drop con animaciones suaves y border-radius preservado
+- **Eventos de consola**: Logs detallados para debugging y seguimiento
+- **Responsive**: Funciona perfectamente en todos los dispositivos
+
 ### 📊 Gráficos Interactivos
 - **Dashboard con visualizaciones**: Gráficos de barras y pastel con animaciones
 - **Análisis financiero**: Comparación de ingresos vs egresos
@@ -407,6 +421,40 @@ El sistema incluye componentes reutilizables avanzados:
 - **AnimatedTable**: Tablas con efectos hover y animaciones de filas
 - **PageTransition**: Transiciones entre páginas con múltiples efectos
 - **LoadingSpinner**: 6 tipos diferentes de spinner (circular, dots, pulse, bars, ring, wave)
+
+## 🖱️ Guía del Sistema de Drag & Drop
+
+### Cómo Usar el Drag & Drop en el Dashboard
+
+El Dashboard incluye funcionalidad de drag & drop para reorganizar las secciones:
+
+#### Cards Arrastrables
+- **Gráfico de Barras**: Gráfico de ingresos vs egresos
+- **Gráfico de Pastel**: Distribución de gastos
+- **Actividad Reciente**: Lista de actividades del sistema
+- **Estado del Sistema**: Indicadores de almacenamiento y respaldos
+
+#### Secciones Fijas
+- **4 Cards de Estadísticas**: Permanecen siempre en la parte superior
+- **Accesos Rápidos**: Sección con botones de acceso rápido
+
+#### Cómo Arrastrar
+1. **Identifica las cards arrastrables**: Las cards individuales son arrastrables
+2. **Haz clic y arrastra**: Mantén presionado el botón del mouse sobre la card
+3. **Suelta en la nueva posición**: Las cards se reorganizarán automáticamente
+4. **Efectos visuales**: Durante el arrastre verás efectos de hover, rotación y escala
+
+#### Características Técnicas
+- **Librería**: Swapy v1.0.3 con configuración estándar
+- **Layout**: Grid CSS 2x2 (1fr 1fr) en desktop, 1 columna en móvil
+- **Animación**: Dynamic (por defecto) para transiciones formales
+- **Modo de intercambio**: Hover para intercambio inmediato
+- **Auto-scroll**: Scroll automático durante el arrastre
+- **Eje de arrastre**: Ambas direcciones (horizontal y vertical)
+- **Border-radius preservado**: Los estilos se mantienen durante el arrastre
+- **Eventos**: Logs en consola para debugging
+- **Responsive**: Funciona en todos los dispositivos
+- **Accesibilidad**: Respeta las preferencias de movimiento reducido
 
 ### Agregar Nuevas Rutas
 

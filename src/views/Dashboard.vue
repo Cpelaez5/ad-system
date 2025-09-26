@@ -56,7 +56,7 @@
       </v-col>
     </v-row>
 
-    <!-- Accesos rápidos -->
+    <!-- Accesos rápidos (NO arrastrable) -->
     <v-row class="mb-6">
       <v-col cols="12">
         <h2 class="text-h5 font-weight-bold mb-4">Accesos Rápidos</h2>
@@ -100,119 +100,171 @@
       </v-col>
     </v-row>
 
-    <!-- Gráficos y análisis -->
-    <v-row class="mb-6">
-      <v-col cols="12" md="8">
-        <v-card>
-          <v-card-title>
-            <v-icon left>mdi-chart-bar</v-icon>
-            Ingresos vs Egresos (Últimos 6 meses)
-          </v-card-title>
-          <v-card-text>
-            <BarChart
-              :data="chartData"
-              :options="chartOptions"
-              height="300"
-            />
-          </v-card-text>
-        </v-card>
-      </v-col>
+    <!-- Contenedor de Drag & Drop para cards individuales -->
+    <div ref="container" class="dashboard-drag-container">
+      <!-- Gráfico de Barras -->
+      <div data-swapy-slot="grafico-barras" class="dashboard-slot">
+        <div data-swapy-item="grafico-barras">
+          <v-card>
+            <v-card-title>
+              <v-icon left>mdi-chart-bar</v-icon>
+              Ingresos vs Egresos (Últimos 6 meses)
+            </v-card-title>
+            <v-card-text>
+              <BarChart
+                :data="chartData"
+                :options="chartOptions"
+                height="300"
+              />
+            </v-card-text>
+          </v-card>
+        </div>
+      </div>
 
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-title>
-            <v-icon left>mdi-chart-pie</v-icon>
-            Distribución de Gastos
-          </v-card-title>
-          <v-card-text>
-            <PieChart
-              :data="pieChartData"
-              :options="pieChartOptions"
-              height="300"
-            />
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+      <!-- Gráfico de Pastel -->
+      <div data-swapy-slot="grafico-pastel" class="dashboard-slot">
+        <div data-swapy-item="grafico-pastel">
+          <v-card>
+            <v-card-title>
+              <v-icon left>mdi-chart-pie</v-icon>
+              Distribución de Gastos
+            </v-card-title>
+            <v-card-text>
+              <PieChart
+                :data="pieChartData"
+                :options="pieChartOptions"
+                height="300"
+              />
+            </v-card-text>
+          </v-card>
+        </div>
+      </div>
 
-    <!-- Actividad reciente -->
-    <v-row>
-      <v-col cols="12" md="8">
-        <v-card>
-          <v-card-title>
-            <v-icon left>mdi-history</v-icon>
-            Actividad Reciente
-          </v-card-title>
-          <v-card-text>
-            <v-list>
-              <v-list-item
-                v-for="actividad in actividadesRecientes"
-                :key="actividad.id"
-                :prepend-icon="actividad.icono"
-              >
-                <v-list-item-title>{{ actividad.descripcion }}</v-list-item-title>
-                <v-list-item-subtitle>{{ actividad.fecha }}</v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-col>
+      <!-- Actividad Reciente -->
+      <div data-swapy-slot="actividad-reciente" class="dashboard-slot">
+        <div data-swapy-item="actividad-reciente">
+          <v-card>
+            <v-card-title>
+              <v-icon left>mdi-history</v-icon>
+              Actividad Reciente
+            </v-card-title>
+            <v-card-text>
+              <v-list>
+                <v-list-item
+                  v-for="actividad in actividadesRecientes"
+                  :key="actividad.id"
+                  :prepend-icon="actividad.icono"
+                >
+                  <v-list-item-title>{{ actividad.descripcion }}</v-list-item-title>
+                  <v-list-item-subtitle>{{ actividad.fecha }}</v-list-item-subtitle>
+                </v-list-item>
+              </v-list>
+            </v-card-text>
+          </v-card>
+        </div>
+      </div>
 
-      <v-col cols="12" md="4">
-        <v-card>
-          <v-card-title>
-            <v-icon left>mdi-chart-line</v-icon>
-            Estado del Sistema
-          </v-card-title>
-          <v-card-text>
-            <div class="mb-3">
-              <div class="d-flex justify-space-between">
-                <span>Almacenamiento</span>
-                <span>75%</span>
+      <!-- Estado del Sistema -->
+      <div data-swapy-slot="estado-sistema" class="dashboard-slot">
+        <div data-swapy-item="estado-sistema">
+          <v-card>
+            <v-card-title>
+              <v-icon left>mdi-chart-line</v-icon>
+              Estado del Sistema
+            </v-card-title>
+            <v-card-text>
+              <div class="mb-3">
+                <div class="d-flex justify-space-between">
+                  <span>Almacenamiento</span>
+                  <span>75%</span>
+                </div>
+                <v-progress-linear
+                  color="primary"
+                  height="8"
+                  :model-value="75"
+                  rounded
+                ></v-progress-linear>
               </div>
-              <v-progress-linear
-                color="primary"
-                height="8"
-                :model-value="75"
-                rounded
-              ></v-progress-linear>
-            </div>
-            
-            <div class="mb-3">
-              <div class="d-flex justify-space-between">
-                <span>Respaldos</span>
-                <span>100%</span>
+              
+              <div class="mb-3">
+                <div class="d-flex justify-space-between">
+                  <span>Respaldos</span>
+                  <span>100%</span>
+                </div>
+                <v-progress-linear
+                  color="success"
+                  height="8"
+                  :model-value="100"
+                  rounded
+                ></v-progress-linear>
               </div>
-              <v-progress-linear
-                color="success"
-                height="8"
-                :model-value="100"
-                rounded
-              ></v-progress-linear>
-            </div>
 
-            <div class="text-center mt-4">
-              <v-chip color="success" variant="tonal">
-                <v-icon left>mdi-check-circle</v-icon>
-                Sistema Operativo
-              </v-chip>
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+              <div class="text-center mt-4">
+                <v-chip color="success" variant="tonal">
+                  <v-icon left>mdi-check-circle</v-icon>
+                  Sistema Operativo
+                </v-chip>
+              </div>
+            </v-card-text>
+          </v-card>
+        </div>
+      </div>
+    </div>
   </v-container>
 </template>
 
 <script>
 import BarChart from '../components/chart/BarChart.vue'
 import PieChart from '../components/chart/PieChart.vue'
+import { createSwapy } from 'swapy'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 export default {
   name: 'Dashboard',
   components: {
     BarChart,
     PieChart
+  },
+  setup() {
+    const swapy = ref(null)
+    const container = ref()
+
+    onMounted(() => {
+      // Si el contenedor está cargado
+      if (container.value) {
+        swapy.value = createSwapy(container.value, {
+          animation: 'dynamic', // Animación por defecto más formal
+          enabled: true,
+          swapMode: 'hover', // Intercambio al hacer hover
+          autoScrollOnDrag: true, // Auto-scroll durante el arrastre
+          dragOnHold: false, // Arrastre inmediato
+          dragAxis: 'both' // Arrastre en ambas direcciones
+        })
+
+        // Event listeners
+        swapy.value.onSwap(event => {
+          console.log('🔄 Elementos intercambiados:', event)
+        })
+
+        swapy.value.onSwapStart(event => {
+          console.log('🚀 Inicio de drag:', event)
+        })
+
+        swapy.value.onSwapEnd(event => {
+          console.log('✅ Fin de drag:', event)
+        })
+      }
+    })
+
+    onUnmounted(() => {
+      // Destruir la instancia de Swapy al desmontar el componente
+      swapy.value?.destroy()
+    })
+
+    return {
+      swapy,
+      container
+    }
   },
   data() {
     return {
@@ -370,5 +422,87 @@ export default {
   font-size: 2rem;
   font-weight: 300;
   line-height: 1.2;
+}
+
+/* Estilos para el contenedor de drag & drop */
+.dashboard-drag-container {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 24px;
+  margin-bottom: 24px;
+  max-width: 100%;
+}
+
+/* Estilos para los slots del dashboard */
+.dashboard-slot {
+  min-height: 400px;
+  width: 100%;
+}
+
+/* Responsive grid */
+@media (max-width: 960px) {
+  .dashboard-drag-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+    gap: 16px;
+  }
+}
+
+/* Asegurar que las cards no se salgan del contenedor */
+.dashboard-slot .v-card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Estilos para elementos arrastrables */
+[data-swapy-item] {
+  cursor: grab;
+  transition: all 0.3s ease;
+}
+
+[data-swapy-item]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+[data-swapy-item]:active {
+  cursor: grabbing;
+}
+
+/* Estilos para slots destacados durante el drag - usando data-swapy-highlighted */
+[data-swapy-slot][data-swapy-highlighted] {
+  background-color: rgba(168, 28, 34, 0.05) !important;
+  border: 2px dashed #A81C22 !important;
+  border-radius: 20px !important;
+  transition: all 0.3s ease;
+  padding: 8px !important;
+}
+
+/* Estilos para elementos siendo arrastrados - usando data-swapy-dragging */
+[data-swapy-item][data-swapy-dragging] {
+  opacity: 0.7 !important;
+  transform: rotate(2deg) scale(1.02) !important;
+  z-index: 1000 !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25) !important;
+  border-radius: 20px !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Asegurar que los border-radius se mantengan durante el drag */
+[data-swapy-item][data-swapy-dragging] .v-card {
+  border-radius: 20px !important;
+}
+
+[data-swapy-slot][data-swapy-highlighted] .v-card {
+  border-radius: 20px !important;
+}
+
+/* Mejorar la experiencia visual durante el hover */
+[data-swapy-item]:hover .v-card {
+  border-radius: 20px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
 }
 </style>
