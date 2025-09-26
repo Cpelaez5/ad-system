@@ -233,7 +233,7 @@ export default {
       // Si el contenedor está cargado
       if (container.value) {
         swapy.value = createSwapy(container.value, {
-          animation: 'dynamic', // Animación por defecto más formal
+          animation: 'dynamic', // Animación spring más suave y profesional
           enabled: true,
           swapMode: 'hover', // Intercambio al hacer hover
           autoScrollOnDrag: true, // Auto-scroll durante el arrastre
@@ -441,6 +441,7 @@ export default {
   width: 100%;
 }
 
+
 /* Responsive grid */
 @media (max-width: 960px) {
   .dashboard-drag-container {
@@ -457,52 +458,34 @@ export default {
   box-sizing: border-box;
 }
 
-/* Estilos para elementos arrastrables */
-[data-swapy-item] {
-  cursor: grab;
-  transition: all 0.3s ease;
-}
-
-[data-swapy-item]:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-[data-swapy-item]:active {
-  cursor: grabbing;
-}
-
-/* Estilos para slots destacados durante el drag - usando data-swapy-highlighted */
-[data-swapy-slot][data-swapy-highlighted] {
-  background-color: rgba(168, 28, 34, 0.05) !important;
-  border: 2px dashed #A81C22 !important;
-  border-radius: 20px !important;
-  transition: all 0.3s ease;
-  padding: 8px !important;
-}
-
-/* Estilos para elementos siendo arrastrados - usando data-swapy-dragging */
-[data-swapy-item][data-swapy-dragging] {
-  opacity: 0.7 !important;
-  transform: rotate(2deg) scale(1.02) !important;
-  z-index: 1000 !important;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25) !important;
-  border-radius: 20px !important;
-  transition: all 0.2s ease !important;
-}
-
 /* Asegurar que los border-radius se mantengan durante el drag */
 [data-swapy-item][data-swapy-dragging] .v-card {
   border-radius: 20px !important;
 }
 
-[data-swapy-slot][data-swapy-highlighted] .v-card {
+[data-swapy-item][data-swapy-dragging] {
   border-radius: 20px !important;
 }
 
-/* Mejorar la experiencia visual durante el hover */
-[data-swapy-item]:hover .v-card {
+[data-swapy-slot] {
   border-radius: 20px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
 }
+
+[data-swapy-slot] .v-card {
+  border-radius: 20px !important;
+}
+
+/* Estilo para elemento siendo arrastrado */
+[data-swapy-item][data-swapy-dragging] {
+  opacity: 0.6 !important;
+  transition: opacity 0.2s ease;
+}
+
+/* Estilo para slot destacado */
+[data-swapy-slot][data-swapy-highlighted] {
+  background: rgba(255, 255, 255, 0.2);
+  transition: background 0.2s ease;
+}
+
+
 </style>
