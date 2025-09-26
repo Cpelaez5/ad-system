@@ -1,0 +1,84 @@
+/* Sobrescribir estilos de Vuetify para usar Montserrat */
+/* Este archivo se carga después de vuetify/styles */
+
+/* Aplicar Montserrat a toda la aplicación Vuetify */
+.v-application {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+.v-application * {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+/* Componentes específicos de Vuetify */
+.v-btn,
+.v-btn *,
+.v-card,
+.v-card *,
+.v-text-field,
+.v-text-field *,
+.v-select,
+.v-select *,
+.v-textarea,
+.v-textarea *,
+.v-list,
+.v-list *,
+.v-list-item,
+.v-list-item *,
+.v-menu,
+.v-menu *,
+.v-dialog,
+.v-dialog *,
+.v-sheet,
+.v-sheet *,
+.v-chip,
+.v-chip *,
+.v-avatar,
+.v-avatar *,
+.v-badge,
+.v-badge *,
+.v-tooltip,
+.v-tooltip *,
+.v-alert,
+.v-alert *,
+.v-snackbar,
+.v-snackbar *,
+.v-navigation-drawer,
+.v-navigation-drawer *,
+.v-app-bar,
+.v-app-bar *,
+.v-toolbar,
+.v-toolbar *,
+.v-toolbar-title,
+.v-toolbar-title *,
+.v-list-item-title,
+.v-list-item-title *,
+.v-list-item-subtitle,
+.v-list-item-subtitle *,
+.v-field,
+.v-field *,
+.v-input,
+.v-input *,
+.v-label,
+.v-label *,
+.v-messages,
+.v-messages *,
+.v-counter,
+.v-counter * {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+/* Elementos HTML básicos */
+h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select,
+h1 *, h2 *, h3 *, h4 *, h5 *, h6 *, p *, span *, div *, a *, button *, input *, textarea *, select * {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+/* Forzar en elementos específicos que Vuetify sobrescribe */
+.v-application .v-application--wrap {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+.v-application .v-application--wrap * {
+  font-family: 'Montserrat', sans-serif !important;
+}

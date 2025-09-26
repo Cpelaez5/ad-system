@@ -273,7 +273,8 @@ export default {
 
 .v-list-item {
   margin: 4px 8px;
-  border-radius: 8px;
+  border-radius: 20px;
+  padding: 20px;
   transition: all 0.3s ease;
 }
 

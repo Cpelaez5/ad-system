@@ -17,68 +17,52 @@
     <v-row class="mb-6">
       <v-col cols="12" sm="6" md="3">
         <v-card
-          color="primary"
-          variant="tonal"
-          class="pa-4"
+          class="pa-6. stats-card"
           height="120"
+          style="background-color: #02254d;"
         >
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-account-group</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">{{ estadisticas.totalClientes }}</div>
-              <div class="text-body-2">Clientes Activos</div>
-            </div>
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 text-white mb-4">Clientes Activos</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ estadisticas.totalClientes }}</div>
           </div>
         </v-card>
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
         <v-card
-          color="success"
-          variant="tonal"
-          class="pa-4"
+          class="pa-6 stats-card"
           height="120"
+          style="background-color: #961112;"
         >
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-receipt</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">{{ estadisticas.facturasMes }}</div>
-              <div class="text-body-2">Facturas Este Mes</div>
-            </div>
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 text-white mb-4">Facturas Este Mes</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ estadisticas.facturasMes }}</div>
           </div>
         </v-card>
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
         <v-card
-          color="info"
-          variant="tonal"
-          class="pa-4"
+          class="pa-6 stats-card"
           height="120"
+          style="background-color: #f2b648;"
         >
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-currency-usd</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">${{ estadisticas.ingresosMes.toLocaleString() }}</div>
-              <div class="text-body-2">Ingresos Este Mes</div>
-            </div>
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 mb-4" style="color: #010101;">Ingresos Este Mes</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">${{ estadisticas.ingresosMes.toLocaleString() }}</div>
           </div>
         </v-card>
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
         <v-card
-          color="warning"
-          variant="tonal"
-          class="pa-4"
+          class="pa-6 stats-card"
           height="120"
+          style="background-color: #f0d29b;"
         >
-          <div class="d-flex align-center">
-            <v-icon size="40" class="mr-3">mdi-file-document-multiple</v-icon>
-            <div>
-              <div class="text-h4 font-weight-bold">{{ estadisticas.documentos }}</div>
-              <div class="text-body-2">Documentos Archivados</div>
-            </div>
+          <div class="d-flex flex-column justify-center h-100">
+            <div class="text-body-2 mb-4" style="color: #010101;">Documentos Archivados</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ estadisticas.documentos }}</div>
           </div>
         </v-card>
       </v-col>
@@ -374,5 +358,29 @@ export default {
 
 .v-progress-linear {
   border-radius: 4px;
+}
+
+/* Estilos específicos para las tarjetas de estadísticas */
+.stats-card {
+  border-radius: 20px !important;
+  box-shadow: none !important;
+  padding: 20px !important;
+}
+
+.stats-card .d-flex {
+  text-align: left;
+  align-items: flex-start;
+}
+
+.stats-card .text-body-2 {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.stats-card .text-h4 {
+  font-size: 2rem;
+  font-weight: 300;
+  line-height: 1.2;
 }
 </style>
