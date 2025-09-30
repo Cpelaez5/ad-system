@@ -15,6 +15,26 @@
       </v-col>
       <v-col cols="12" md="6" class="text-right">
         <v-btn
+          color="warning"
+          variant="outlined"
+          size="small"
+          prepend-icon="mdi-bug"
+          @click="debugLocalStorage"
+          class="mr-2"
+        >
+          Debug
+        </v-btn>
+        <v-btn
+          color="secondary"
+          variant="outlined"
+          size="large"
+          prepend-icon="mdi-refresh"
+          @click="resetData"
+          class="mr-2"
+        >
+          Reset Datos
+        </v-btn>
+        <v-btn
           color="primary"
           size="large"
           prepend-icon="mdi-plus"
@@ -117,8 +137,39 @@
           style="background-color: #f0d29b;"
         >
           <div class="d-flex flex-column justify-center h-100">
-            <div class="text-body-2 mb-4" style="color: #010101;">Monto Total</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ formatCurrency(stats.totalAmount) }}</div>
+            <div class="d-flex align-center justify-space-between mb-4">
+              <div class="text-body-2" style="color: #010101;">Monto Total</div>
+              <v-btn
+                :color="currencyDisplay === 'VES' ? 'primary' : 'success'"
+                variant="tonal"
+                size="x-small"
+                @click="toggleCurrency"
+                class="currency-toggle-btn"
+                :class="{ 'currency-changing': isChangingCurrency }"
+              >
+                <div class="currency-icon-container">
+                  <svg 
+                    class="currency-icon"
+                    :class="{ 'ves-mode': currencyDisplay === 'VES', 'usd-mode': currencyDisplay === 'USD' }"
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 48 48"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M44,7.1V14a2,2,0,0,1-2,2H35a2,2,0,0,1-2-2.3A2.1,2.1,0,0,1,35.1,12h2.3A18,18,0,0,0,6.1,22.2a2,2,0,0,1-2,1.8h0a2,2,0,0,1-2-2.2A22,22,0,0,1,40,8.9V7a2,2,0,0,1,2.3-2A2.1,2.1,0,0,1,44,7.1Z"/>
+                    <path d="M4,40.9V34a2,2,0,0,1,2-2h7a2,2,0,0,1,2,2.3A2.1,2.1,0,0,1,12.9,36H10.6A18,18,0,0,0,41.9,25.8a2,2,0,0,1,2-1.8h0a2,2,0,0,1,2,2.2A22,22,0,0,1,8,39.1V41a2,2,0,0,1-2.3,2A2.1,2.1,0,0,1,4,40.9Z"/>
+                    <path d="M24.7,22c-3.5-.7-3.5-1.3-3.5-1.8s.2-.6.5-.9a3.4,3.4,0,0,1,1.8-.4,6.3,6.3,0,0,1,3.3.9,1.8,1.8,0,0,0,2.7-.5,1.9,1.9,0,0,0-.4-2.8A9.1,9.1,0,0,0,26,15.3V13a2,2,0,0,0-4,0v2.2c-3,.5-5,2.5-5,5.2s3.3,4.9,6.5,5.5,3.3,1.3,3.3,1.8-1.1,1.4-2.5,1.4h0a6.7,6.7,0,0,1-4.1-1.3,2,2,0,0,0-2.8.6,1.8,1.8,0,0,0,.3,2.6A10.9,10.9,0,0,0,22,32.8V35a2,2,0,0,0,4,0V32.8a6.3,6.3,0,0,0,3-1.3,4.9,4.9,0,0,0,2-4h0C31,23.8,27.6,22.6,24.7,22Z"/>
+                  </svg>
+                </div>
+              </v-btn>
+            </div>
+            <div 
+              class="text-h4 amount-display" 
+              :class="{ 'amount-changing': isChangingCurrency }"
+              style="color: #010101; font-size: 2.6rem !important;"
+            >
+              {{ formatCurrency(displayTotalAmount, currencyDisplay) }}
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -160,7 +211,12 @@
 
         <!-- Columna de total -->
         <template v-slot:item.total="{ item }">
-          {{ formatCurrency(item.financial.totalSales) }}
+          <div 
+            class="total-amount-display"
+            :class="{ 'amount-changing': isChangingCurrency }"
+          >
+            {{ formatCurrency(getDisplayAmount(item.financial.totalSales), currencyDisplay) }}
+          </div>
         </template>
 
         <!-- Columna de estado -->
@@ -296,6 +352,7 @@
 
 <script>
 import { invoiceService } from '../services/invoiceService.js';
+import { bcvService } from '../services/bcvService.js';
 import InvoiceForm from '../components/forms/InvoiceForm.vue';
 
 export default {
@@ -313,6 +370,8 @@ export default {
         byStatus: {},
         totalAmount: 0
       },
+      currencyDisplay: 'VES', // Moneda de visualización por defecto
+      isChangingCurrency: false, // Estado de cambio de moneda
       
       // Filtros
       searchQuery: '',
@@ -350,6 +409,15 @@ export default {
       ]
     };
   },
+  computed: {
+    displayTotalAmount() {
+      if (this.currencyDisplay === 'USD') {
+        // Convertir VES a USD usando la tasa del BCV
+        return this.convertAmountToUSD(this.stats.totalAmount);
+      }
+      return this.stats.totalAmount;
+    }
+  },
   async mounted() {
     await this.loadInvoices();
     await this.loadStats();
@@ -358,11 +426,17 @@ export default {
     async loadInvoices() {
       try {
         this.loading = true;
+        console.log('🔄 Cargando facturas...');
+        
         const response = await invoiceService.getInvoices();
+        console.log('📊 Respuesta del servicio:', response);
+        
         this.invoices = response.data || [];
+        console.log('📋 Facturas cargadas:', this.invoices.length);
+        
         this.applyFilters();
       } catch (error) {
-        console.error('Error al cargar facturas:', error);
+        console.error('❌ Error al cargar facturas:', error);
         // Mostrar notificación de error
       } finally {
         this.loading = false;
@@ -371,10 +445,13 @@ export default {
     
     async loadStats() {
       try {
+        console.log('📊 Cargando estadísticas...');
         const response = await invoiceService.getInvoiceStats();
+        console.log('📈 Respuesta de estadísticas:', response);
         this.stats = response.data || { total: 0, byStatus: {}, totalAmount: 0 };
+        console.log('📊 Estadísticas cargadas:', this.stats);
       } catch (error) {
-        console.error('Error al cargar estadísticas:', error);
+        console.error('❌ Error al cargar estadísticas:', error);
       }
     },
     
@@ -478,8 +555,17 @@ export default {
       return new Date(date).toLocaleDateString('es-ES');
     },
     
-    formatCurrency(amount) {
+    formatCurrency(amount, currency = 'VES') {
       if (!amount) return '0,00';
+      
+      if (currency === 'USD') {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2
+        }).format(amount);
+      }
+      
       return new Intl.NumberFormat('es-ES', {
         style: 'currency',
         currency: 'VES',
@@ -497,6 +583,116 @@ export default {
         'ANULADA': 'error'
       };
       return colors[status] || 'grey';
+    },
+    
+    async resetData() {
+      try {
+        console.log('🔄 Reseteando datos...');
+        
+        // Verificar estado actual del localStorage
+        const currentInvoices = localStorage.getItem('sistema_contabilidad_invoices');
+        const currentClients = localStorage.getItem('sistema_contabilidad_clients');
+        
+        console.log('📋 Facturas actuales en localStorage:', currentInvoices ? JSON.parse(currentInvoices).length : 0);
+        console.log('👥 Clientes actuales en localStorage:', currentClients ? JSON.parse(currentClients).length : 0);
+        
+        // Limpiar localStorage
+        localStorage.removeItem('sistema_contabilidad_invoices');
+        localStorage.removeItem('sistema_contabilidad_clients');
+        
+        console.log('✅ localStorage limpiado');
+        
+        // Recargar la página para reinicializar los servicios
+        location.reload();
+      } catch (error) {
+        console.error('❌ Error al resetear datos:', error);
+      }
+    },
+    
+    debugLocalStorage() {
+      console.log('🔍 DEBUG - Estado del localStorage:');
+      console.log('📋 Facturas:', localStorage.getItem('sistema_contabilidad_invoices'));
+      console.log('👥 Clientes:', localStorage.getItem('sistema_contabilidad_clients'));
+      console.log('📊 Estado actual de la vista:');
+      console.log('- Invoices:', this.invoices);
+      console.log('- Filtered Invoices:', this.filteredInvoices);
+      console.log('- Stats:', this.stats);
+    },
+    
+    async toggleCurrency() {
+      try {
+        console.log('🔄 Cambiando moneda de visualización...');
+        
+        // Activar animación de cambio
+        this.isChangingCurrency = true;
+        
+        // Pequeña pausa para mostrar la animación
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        if (this.currencyDisplay === 'VES') {
+          // Cambiar a USD - necesitamos obtener la tasa del BCV
+          const bcvResponse = await bcvService.getCurrentRate();
+          if (bcvResponse.success && bcvResponse.data.dollar) {
+            this.currencyDisplay = 'USD';
+            console.log('✅ Cambiado a USD con tasa:', bcvResponse.data.dollar);
+          } else {
+            console.warn('⚠️ No se pudo obtener la tasa del BCV, manteniendo VES');
+          }
+        } else {
+          // Cambiar a VES
+          this.currencyDisplay = 'VES';
+          console.log('✅ Cambiado a VES');
+        }
+        
+        // Desactivar animación después de un breve momento
+        setTimeout(() => {
+          this.isChangingCurrency = false;
+        }, 200);
+        
+      } catch (error) {
+        console.error('❌ Error al cambiar moneda:', error);
+        // En caso de error, mantener VES
+        this.currencyDisplay = 'VES';
+        this.isChangingCurrency = false;
+      }
+    },
+    
+    convertAmountToUSD(amountVES) {
+      try {
+        // Obtener la tasa del BCV desde el cache (más eficiente)
+        const cachedRate = bcvService.getCachedRate();
+        if (cachedRate && cachedRate.dollar) {
+          return amountVES / cachedRate.dollar;
+        }
+        
+        // Si no hay tasa en cache, usar tasa por defecto
+        const defaultRate = bcvService.getConfiguredDefaultRate();
+        return amountVES / defaultRate;
+      } catch (error) {
+        console.error('Error al convertir a USD:', error);
+        return amountVES;
+      }
+    },
+    
+    getDisplayAmount(amountVES) {
+      if (this.currencyDisplay === 'USD') {
+        return this.convertAmountToUSD(amountVES);
+      }
+      return amountVES;
+    },
+    
+    async convertToUSD(amountVES) {
+      try {
+        const bcvResponse = await bcvService.getCurrentRate();
+        if (bcvResponse.success && bcvResponse.data.dollar) {
+          const rate = bcvResponse.data.dollar;
+          return amountVES / rate;
+        }
+        return amountVES; // Si no hay tasa, devolver el monto original
+      } catch (error) {
+        console.error('Error al convertir a USD:', error);
+        return amountVES;
+      }
     }
   }
 };
@@ -533,5 +729,168 @@ export default {
   font-size: 2rem;
   font-weight: 300;
   line-height: 1.2;
+}
+
+/* Estilos para el botón de cambio de moneda */
+.currency-toggle-btn {
+  min-width: 50px !important;
+  height: 28px !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  border-radius: 14px !important;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.currency-toggle-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.currency-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+/* Contenedor del icono */
+.currency-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform: translateY(-2px); /* Mover el icono hacia arriba */
+}
+
+/* Icono SVG personalizado */
+.currency-icon {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  fill: currentColor;
+  transform-origin: center;
+}
+
+/* Modo VES - icono normal */
+.currency-icon.ves-mode {
+  transform: scale(1) rotate(0deg);
+}
+
+.currency-icon.ves-mode:hover {
+  transform: rotate(180deg) scale(1.05);
+}
+
+/* Modo USD - icono rotado */
+.currency-icon.usd-mode {
+  transform: scale(1) rotate(180deg);
+}
+
+.currency-icon.usd-mode:hover {
+  transform: rotate(360deg) scale(1.05);
+}
+
+/* Animación durante el cambio de moneda */
+.currency-changing {
+  animation: currencyPulse 0.4s ease-in-out;
+}
+
+.currency-changing .currency-icon {
+  animation: currencySpin 0.4s ease-in-out;
+}
+
+/* Animación para los números */
+.amount-display {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+
+.amount-changing {
+  animation: amountChange 0.5s ease-in-out;
+}
+
+/* Keyframes para las animaciones */
+@keyframes currencyPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.2);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0);
+  }
+}
+
+@keyframes currencySpin {
+  0% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: rotate(180deg) scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes amountChange {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02) translateY(-2px);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Efecto de brillo al hacer hover */
+.currency-toggle-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.4s ease;
+}
+
+.currency-toggle-btn:hover::before {
+  left: 100%;
+}
+
+/* Estilos para los totales en la tabla */
+.total-amount-display {
+  transition: all 0.3s ease;
+  transform-origin: center;
+}
+
+.total-amount-display.amount-changing {
+  animation: tableAmountChange 0.4s ease-in-out;
+}
+
+@keyframes tableAmountChange {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 </style>

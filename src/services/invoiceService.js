@@ -10,32 +10,464 @@ class InvoiceService {
   // Inicializar datos de ejemplo en localStorage
   initializeStorage() {
     const existingData = localStorage.getItem(this.storageKey);
-    if (!existingData) {
+    const existingInvoices = existingData ? JSON.parse(existingData) : [];
+    
+    // Si no hay datos o hay muy pocos (menos de 5), cargar datos de ejemplo
+    if (!existingData || existingInvoices.length < 5) {
       const sampleInvoices = [
         {
           id: 1,
-          invoiceNumber: 'F-00126',
+          invoiceNumber: 'F-2024-001',
           controlNumber: '00-0008966',
           documentType: 'FACTURA',
-          issueDate: '2023-12-04',
-          dueDate: '2023-12-04',
-          status: 'ANULADA',
+          issueDate: '2024-01-15',
+          dueDate: '2024-02-15',
+          status: 'PAGADA',
           
           issuer: {
-            companyName: 'LA CASA DEL ACEITE RB C.A.',
-            rif: 'J404710183',
-            taxpayerType: 'Ordinario',
-            address: 'Dirección del emisor',
-            phone: '000-000-0000',
-            email: 'info@empresa.com'
+            companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
+            rif: 'J-41234567-8',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Francisco de Miranda, Torre Parque Cristal, Piso 15, Caracas',
+            phone: '+58 212 555-0100',
+            email: 'ventas@tav.com.ve',
+            website: 'www.tav.com.ve'
           },
           
           client: {
-            companyName: 'ANULADA',
-            rif: '',
-            address: '',
-            phone: '',
-            email: ''
+            companyName: 'CONSTRUCTORA DEL CARIBE S.A.',
+            rif: 'J-30123456-7',
+            taxpayerType: 'JURIDICA',
+            address: 'Zona Industrial de Valencia, Edificio Principal, Valencia',
+            phone: '+58 241 555-0200',
+            email: 'compras@constructoracaribe.com',
+            contactPerson: 'María González'
+          },
+          
+          financial: {
+            totalSales: 125000.00,
+            nonTaxableSales: 0,
+            taxableSales: 107758.62,
+            taxDebit: 17241.38,
+            ivaRetention: 0,
+            islrRetention: 0,
+            municipalRetention: 0,
+            igtf: 0,
+            currency: 'VES',
+            exchangeRate: 1
+          },
+          
+          items: [
+            {
+              description: 'Servicios de Consultoría Tecnológica',
+              quantity: 40,
+              unitPrice: 2500.00,
+              total: 100000.00
+            },
+            {
+              description: 'Licencias de Software Empresarial',
+              quantity: 5,
+              unitPrice: 5000.00,
+              total: 25000.00
+            }
+          ],
+          attachments: [],
+          
+          createdBy: 'admin',
+          createdAt: '2024-01-15T09:00:00Z',
+          updatedAt: '2024-01-15T09:00:00Z',
+          notes: 'Proyecto de digitalización empresarial - Fase 1'
+        },
+        {
+          id: 2,
+          invoiceNumber: 'F-2024-002',
+          controlNumber: '00-0008967',
+          documentType: 'FACTURA',
+          issueDate: '2024-01-20',
+          dueDate: '2024-02-20',
+          status: 'EMITIDA',
+          
+          issuer: {
+            companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
+            rif: 'J-41234567-8',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Francisco de Miranda, Torre Parque Cristal, Piso 15, Caracas',
+            phone: '+58 212 555-0100',
+            email: 'ventas@tav.com.ve',
+            website: 'www.tav.com.ve'
+          },
+          
+          client: {
+            companyName: 'DISTRIBUIDORA NACIONAL DE ALIMENTOS C.A.',
+            rif: 'J-40123456-9',
+            taxpayerType: 'JURIDICA',
+            address: 'Carretera Panamericana, Km 15, Maracay',
+            phone: '+58 243 555-0300',
+            email: 'administracion@dinalimentos.com',
+            contactPerson: 'Carlos Rodríguez'
+          },
+          
+          financial: {
+            totalSales: 87500.00,
+            nonTaxableSales: 0,
+            taxableSales: 75431.03,
+            taxDebit: 12068.97,
+            ivaRetention: 0,
+            islrRetention: 0,
+            municipalRetention: 0,
+            igtf: 0,
+            currency: 'VES',
+            exchangeRate: 1
+          },
+          
+          items: [
+            {
+              description: 'Sistema de Gestión de Inventarios',
+              quantity: 1,
+              unitPrice: 50000.00,
+              total: 50000.00
+            },
+            {
+              description: 'Capacitación del Personal',
+              quantity: 20,
+              unitPrice: 1500.00,
+              total: 30000.00
+            },
+            {
+              description: 'Mantenimiento Anual',
+              quantity: 1,
+              unitPrice: 7500.00,
+              total: 7500.00
+            }
+          ],
+          attachments: [],
+          
+          createdBy: 'admin',
+          createdAt: '2024-01-20T10:30:00Z',
+          updatedAt: '2024-01-20T10:30:00Z',
+          notes: 'Implementación de sistema ERP para gestión de inventarios'
+        },
+        {
+          id: 3,
+          invoiceNumber: 'F-2024-003',
+          controlNumber: '00-0008968',
+          documentType: 'FACTURA',
+          issueDate: '2024-01-25',
+          dueDate: '2024-02-25',
+          status: 'ENVIADA',
+          
+          issuer: {
+            companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
+            rif: 'J-41234567-8',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Francisco de Miranda, Torre Parque Cristal, Piso 15, Caracas',
+            phone: '+58 212 555-0100',
+            email: 'ventas@tav.com.ve',
+            website: 'www.tav.com.ve'
+          },
+          
+          client: {
+            companyName: 'CLÍNICA ESPECIALIZADA DEL ESTE C.A.',
+            rif: 'J-30123456-8',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Libertador, Edificio Médico Los Palos Grandes, Caracas',
+            phone: '+58 212 555-0400',
+            email: 'administracion@clinicaeste.com',
+            contactPerson: 'Dra. Ana Martínez'
+          },
+          
+          financial: {
+            totalSales: 156000.00,
+            nonTaxableSales: 0,
+            taxableSales: 134482.76,
+            taxDebit: 21517.24,
+            ivaRetention: 0,
+            islrRetention: 0,
+            municipalRetention: 0,
+            igtf: 0,
+            currency: 'VES',
+            exchangeRate: 1
+          },
+          
+          items: [
+            {
+              description: 'Sistema de Historia Clínica Digital',
+              quantity: 1,
+              unitPrice: 80000.00,
+              total: 80000.00
+            },
+            {
+              description: 'Módulo de Citas Médicas',
+              quantity: 1,
+              unitPrice: 25000.00,
+              total: 25000.00
+            },
+            {
+              description: 'Sistema de Facturación Médica',
+              quantity: 1,
+              unitPrice: 30000.00,
+              total: 30000.00
+            },
+            {
+              description: 'Capacitación Médica',
+              quantity: 15,
+              unitPrice: 1400.00,
+              total: 21000.00
+            }
+          ],
+          attachments: [],
+          
+          createdBy: 'admin',
+          createdAt: '2024-01-25T14:15:00Z',
+          updatedAt: '2024-01-25T14:15:00Z',
+          notes: 'Digitalización completa del sistema médico - Proyecto integral'
+        },
+        {
+          id: 4,
+          invoiceNumber: 'F-2024-004',
+          controlNumber: '00-0008969',
+          documentType: 'FACTURA',
+          issueDate: '2024-02-01',
+          dueDate: '2024-03-01',
+          status: 'BORRADOR',
+          
+          issuer: {
+            companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
+            rif: 'J-41234567-8',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Francisco de Miranda, Torre Parque Cristal, Piso 15, Caracas',
+            phone: '+58 212 555-0100',
+            email: 'ventas@tav.com.ve',
+            website: 'www.tav.com.ve'
+          },
+          
+          client: {
+            companyName: 'HOTEL PLAYA DORADA C.A.',
+            rif: 'J-40123456-0',
+            taxpayerType: 'JURIDICA',
+            address: 'Playa El Agua, Isla de Margarita, Nueva Esparta',
+            phone: '+58 295 555-0500',
+            email: 'gerencia@hotelplayadorada.com',
+            contactPerson: 'Roberto Silva'
+          },
+          
+          financial: {
+            totalSales: 95000.00,
+            nonTaxableSales: 0,
+            taxableSales: 81982.76,
+            taxDebit: 13017.24,
+            ivaRetention: 0,
+            islrRetention: 0,
+            municipalRetention: 0,
+            igtf: 0,
+            currency: 'VES',
+            exchangeRate: 1
+          },
+          
+          items: [
+            {
+              description: 'Sistema de Reservas Online',
+              quantity: 1,
+              unitPrice: 45000.00,
+              total: 45000.00
+            },
+            {
+              description: 'Módulo de Gestión de Habitaciones',
+              quantity: 1,
+              unitPrice: 25000.00,
+              total: 25000.00
+            },
+            {
+              description: 'Sistema de Facturación Hotelera',
+              quantity: 1,
+              unitPrice: 20000.00,
+              total: 20000.00
+            },
+            {
+              description: 'Capacitación del Personal',
+              quantity: 10,
+              unitPrice: 500.00,
+              total: 5000.00
+            }
+          ],
+          attachments: [],
+          
+          createdBy: 'admin',
+          createdAt: '2024-02-01T11:00:00Z',
+          updatedAt: '2024-02-01T11:00:00Z',
+          notes: 'Sistema integral de gestión hotelera - En desarrollo'
+        },
+        {
+          id: 5,
+          invoiceNumber: 'F-2024-005',
+          controlNumber: '00-0008970',
+          documentType: 'FACTURA',
+          issueDate: '2024-02-05',
+          dueDate: '2024-03-05',
+          status: 'VENCIDA',
+          
+          issuer: {
+            companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
+            rif: 'J-41234567-8',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Francisco de Miranda, Torre Parque Cristal, Piso 15, Caracas',
+            phone: '+58 212 555-0100',
+            email: 'ventas@tav.com.ve',
+            website: 'www.tav.com.ve'
+          },
+          
+          client: {
+            companyName: 'TRANSPORTE RÁPIDO DEL CENTRO C.A.',
+            rif: 'J-30123456-9',
+            taxpayerType: 'JURIDICA',
+            address: 'Terminal de Pasajeros, Maracay, Aragua',
+            phone: '+58 243 555-0600',
+            email: 'administracion@transrapido.com',
+            contactPerson: 'Luis Herrera'
+          },
+          
+          financial: {
+            totalSales: 68000.00,
+            nonTaxableSales: 0,
+            taxableSales: 58620.69,
+            taxDebit: 9379.31,
+            ivaRetention: 0,
+            islrRetention: 0,
+            municipalRetention: 0,
+            igtf: 0,
+            currency: 'VES',
+            exchangeRate: 1
+          },
+          
+          items: [
+            {
+              description: 'Sistema de Control de Flota',
+              quantity: 1,
+              unitPrice: 35000.00,
+              total: 35000.00
+            },
+            {
+              description: 'Módulo de Ventas de Boletos',
+              quantity: 1,
+              unitPrice: 20000.00,
+              total: 20000.00
+            },
+            {
+              description: 'Sistema de Monitoreo GPS',
+              quantity: 1,
+              unitPrice: 13000.00,
+              total: 13000.00
+            }
+          ],
+          attachments: [],
+          
+          createdBy: 'admin',
+          createdAt: '2024-02-05T16:45:00Z',
+          updatedAt: '2024-02-05T16:45:00Z',
+          notes: 'Sistema de gestión para empresa de transporte - Vencida por falta de pago'
+        },
+        {
+          id: 6,
+          invoiceNumber: 'F-2024-006',
+          controlNumber: '00-0008971',
+          documentType: 'FACTURA',
+          issueDate: '2024-02-10',
+          dueDate: '2024-03-10',
+          status: 'PAGADA',
+          
+          issuer: {
+            companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
+            rif: 'J-41234567-8',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Francisco de Miranda, Torre Parque Cristal, Piso 15, Caracas',
+            phone: '+58 212 555-0100',
+            email: 'ventas@tav.com.ve',
+            website: 'www.tav.com.ve'
+          },
+          
+          client: {
+            companyName: 'COLEGIO SANTA MARÍA C.A.',
+            rif: 'J-30123456-0',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Universidad, Edificio Educativo, Caracas',
+            phone: '+58 212 555-0700',
+            email: 'administracion@colegiosantamaria.edu.ve',
+            contactPerson: 'Prof. Carmen López'
+          },
+          
+          financial: {
+            totalSales: 75000.00,
+            nonTaxableSales: 0,
+            taxableSales: 64655.17,
+            taxDebit: 10344.83,
+            ivaRetention: 0,
+            islrRetention: 0,
+            municipalRetention: 0,
+            igtf: 0,
+            currency: 'VES',
+            exchangeRate: 1
+          },
+          
+          items: [
+            {
+              description: 'Sistema de Gestión Académica',
+              quantity: 1,
+              unitPrice: 40000.00,
+              total: 40000.00
+            },
+            {
+              description: 'Módulo de Notas y Calificaciones',
+              quantity: 1,
+              unitPrice: 15000.00,
+              total: 15000.00
+            },
+            {
+              description: 'Sistema de Comunicación Padres',
+              quantity: 1,
+              unitPrice: 10000.00,
+              total: 10000.00
+            },
+            {
+              description: 'Capacitación Docente',
+              quantity: 25,
+              unitPrice: 400.00,
+              total: 10000.00
+            }
+          ],
+          attachments: [],
+          
+          createdBy: 'admin',
+          createdAt: '2024-02-10T13:20:00Z',
+          updatedAt: '2024-02-10T13:20:00Z',
+          notes: 'Digitalización del sistema educativo - Proyecto completado exitosamente'
+        },
+        {
+          id: 7,
+          invoiceNumber: 'F-2024-007',
+          controlNumber: '00-0008972',
+          documentType: 'FACTURA',
+          issueDate: '2024-02-15',
+          dueDate: '2024-03-15',
+          status: 'ANULADA',
+          
+          issuer: {
+            companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
+            rif: 'J-41234567-8',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Francisco de Miranda, Torre Parque Cristal, Piso 15, Caracas',
+            phone: '+58 212 555-0100',
+            email: 'ventas@tav.com.ve',
+            website: 'www.tav.com.ve'
+          },
+          
+          client: {
+            companyName: 'RESTAURANTE EL BUEN SABOR C.A.',
+            rif: 'J-40123456-1',
+            taxpayerType: 'JURIDICA',
+            address: 'Calle Real de Sabana Grande, Caracas',
+            phone: '+58 212 555-0800',
+            email: 'gerencia@buensabor.com',
+            contactPerson: 'José Mendoza'
           },
           
           financial: {
@@ -55,41 +487,44 @@ class InvoiceService {
           attachments: [],
           
           createdBy: 'admin',
-          createdAt: '2023-12-04T10:00:00Z',
-          updatedAt: '2023-12-04T10:00:00Z',
-          notes: 'Factura anulada'
+          createdAt: '2024-02-15T09:30:00Z',
+          updatedAt: '2024-02-15T09:30:00Z',
+          notes: 'Factura anulada por cancelación del proyecto - Cliente decidió no continuar'
         },
         {
-          id: 2,
-          invoiceNumber: 'F-00127',
-          controlNumber: '00-0008967',
+          id: 8,
+          invoiceNumber: 'F-2024-008',
+          controlNumber: '00-0008973',
           documentType: 'FACTURA',
-          issueDate: '2023-12-04',
-          dueDate: '2023-12-04',
+          issueDate: '2024-02-20',
+          dueDate: '2024-03-20',
           status: 'EMITIDA',
           
           issuer: {
-            companyName: 'LA CASA DEL ACEITE RB C.A.',
-            rif: 'J404710183',
-            taxpayerType: 'Ordinario',
-            address: 'Dirección del emisor',
-            phone: '000-000-0000',
-            email: 'info@empresa.com'
+            companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
+            rif: 'J-41234567-8',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Francisco de Miranda, Torre Parque Cristal, Piso 15, Caracas',
+            phone: '+58 212 555-0100',
+            email: 'ventas@tav.com.ve',
+            website: 'www.tav.com.ve'
           },
           
           client: {
-            companyName: 'SERVICIOS OJEDA ,C.A.',
-            rif: 'J-07016766-1',
-            address: 'Dirección del cliente',
-            phone: '000-000-0000',
-            email: 'cliente@empresa.com'
+            companyName: 'FARMACIA SALUD TOTAL C.A.',
+            rif: 'J-30123456-1',
+            taxpayerType: 'JURIDICA',
+            address: 'Av. Bolívar, Centro Comercial, Valencia',
+            phone: '+58 241 555-0900',
+            email: 'administracion@saludtotal.com',
+            contactPerson: 'Dra. Patricia Ruiz'
           },
           
           financial: {
-            totalSales: 17540.94,
+            totalSales: 45000.00,
             nonTaxableSales: 0,
-            taxableSales: 15121.50,
-            taxDebit: 2419.44,
+            taxableSales: 38793.10,
+            taxDebit: 6206.90,
             ivaRetention: 0,
             islrRetention: 0,
             municipalRetention: 0,
@@ -98,60 +533,32 @@ class InvoiceService {
             exchangeRate: 1
           },
           
-          items: [],
+          items: [
+            {
+              description: 'Sistema de Gestión de Inventario Farmacéutico',
+              quantity: 1,
+              unitPrice: 30000.00,
+              total: 30000.00
+            },
+            {
+              description: 'Módulo de Control de Vencimientos',
+              quantity: 1,
+              unitPrice: 10000.00,
+              total: 10000.00
+            },
+            {
+              description: 'Capacitación del Personal',
+              quantity: 5,
+              unitPrice: 1000.00,
+              total: 5000.00
+            }
+          ],
           attachments: [],
           
           createdBy: 'admin',
-          createdAt: '2023-12-04T10:00:00Z',
-          updatedAt: '2023-12-04T10:00:00Z',
-          notes: 'Factura de servicios'
-        },
-        {
-          id: 3,
-          invoiceNumber: 'F-00128',
-          controlNumber: '00-0008968',
-          documentType: 'FACTURA',
-          issueDate: '2023-12-26',
-          dueDate: '2023-12-26',
-          status: 'EMITIDA',
-          
-          issuer: {
-            companyName: 'LA CASA DEL ACEITE RB C.A.',
-            rif: 'J404710183',
-            taxpayerType: 'Ordinario',
-            address: 'Dirección del emisor',
-            phone: '000-000-0000',
-            email: 'info@empresa.com'
-          },
-          
-          client: {
-            companyName: 'ALVARO SALAZAR',
-            rif: 'V-14.904.858',
-            address: 'Dirección del cliente',
-            phone: '000-000-0000',
-            email: 'cliente@empresa.com'
-          },
-          
-          financial: {
-            totalSales: 4476.32,
-            nonTaxableSales: 0,
-            taxableSales: 3858.90,
-            taxDebit: 617.42,
-            ivaRetention: 0,
-            islrRetention: 0,
-            municipalRetention: 0,
-            igtf: 0,
-            currency: 'VES',
-            exchangeRate: 1
-          },
-          
-          items: [],
-          attachments: [],
-          
-          createdBy: 'admin',
-          createdAt: '2023-12-26T10:00:00Z',
-          updatedAt: '2023-12-26T10:00:00Z',
-          notes: 'Factura individual'
+          createdAt: '2024-02-20T15:10:00Z',
+          updatedAt: '2024-02-20T15:10:00Z',
+          notes: 'Sistema de gestión farmacéutica - Control de inventarios y vencimientos'
         }
       ];
       
@@ -162,14 +569,18 @@ class InvoiceService {
   // Obtener todas las facturas
   async getInvoices(filters = {}) {
     try {
-      // Si hay API disponible, usar el backend
-      if (api.defaults.baseURL) {
-        const response = await api.get('/invoices', { params: filters });
-        return response.data;
-      }
+      console.log('🔄 Obteniendo facturas desde localStorage...');
       
-      // Fallback a localStorage
-      const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      // Usar solo localStorage (MVP sin backend)
+      let invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      
+      // Si no hay facturas, forzar la inicialización
+      if (invoices.length === 0) {
+        console.log('⚠️ No hay facturas en localStorage, forzando inicialización...');
+        this.initializeStorage();
+        invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+        console.log('✅ Facturas inicializadas:', invoices.length);
+      }
       
       let filteredInvoices = [...invoices];
       
@@ -221,13 +632,9 @@ class InvoiceService {
   // Obtener factura por ID
   async getInvoiceById(id) {
     try {
-      // Si hay API disponible, usar el backend
-      if (api.defaults.baseURL) {
-        const response = await api.get(`/invoices/${id}`);
-        return response.data;
-      }
+      console.log('🔄 Obteniendo factura por ID desde localStorage...');
       
-      // Fallback a localStorage
+      // Usar solo localStorage (MVP sin backend)
       const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
       const invoice = invoices.find(inv => inv.id === parseInt(id));
       
@@ -248,13 +655,9 @@ class InvoiceService {
   // Crear nueva factura
   async createInvoice(invoiceData) {
     try {
-      // Si hay API disponible, usar el backend
-      if (api.defaults.baseURL) {
-        const response = await api.post('/invoices', invoiceData);
-        return response.data;
-      }
+      console.log('🔄 Creando factura en localStorage...');
       
-      // Fallback a localStorage
+      // Usar solo localStorage (MVP sin backend)
       const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
       
       const newInvoice = {
@@ -282,13 +685,9 @@ class InvoiceService {
   // Actualizar factura
   async updateInvoice(id, invoiceData) {
     try {
-      // Si hay API disponible, usar el backend
-      if (api.defaults.baseURL) {
-        const response = await api.put(`/invoices/${id}`, invoiceData);
-        return response.data;
-      }
+      console.log('🔄 Actualizando factura en localStorage...');
       
-      // Fallback a localStorage
+      // Usar solo localStorage (MVP sin backend)
       const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
       const invoiceIndex = invoices.findIndex(inv => inv.id === parseInt(id));
       
@@ -320,13 +719,9 @@ class InvoiceService {
   // Eliminar factura
   async deleteInvoice(id) {
     try {
-      // Si hay API disponible, usar el backend
-      if (api.defaults.baseURL) {
-        const response = await api.delete(`/invoices/${id}`);
-        return response.data;
-      }
+      console.log('🔄 Eliminando factura en localStorage...');
       
-      // Fallback a localStorage
+      // Usar solo localStorage (MVP sin backend)
       const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
       const invoiceIndex = invoices.findIndex(inv => inv.id === parseInt(id));
       
@@ -351,20 +746,9 @@ class InvoiceService {
   // Extraer datos de imagen/PDF (simulado)
   async extractDataFromFile(file) {
     try {
-      // Si hay API disponible, usar el backend
-      if (api.defaults.baseURL) {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const response = await api.post('/invoices/extract-data', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-        return response.data;
-      }
+      console.log('🔄 Extrayendo datos de archivo (simulado)...');
       
-      // Fallback: simular extracción de datos
+      // Simular extracción de datos (MVP sin backend)
       return new Promise((resolve) => {
         setTimeout(() => {
           const mockExtractedData = {
@@ -435,20 +819,9 @@ class InvoiceService {
   // Subir archivo adjunto
   async uploadAttachment(invoiceId, file) {
     try {
-      // Si hay API disponible, usar el backend
-      if (api.defaults.baseURL) {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const response = await api.post(`/invoices/${invoiceId}/upload`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-        return response.data;
-      }
+      console.log('🔄 Subiendo archivo adjunto (simulado)...');
       
-      // Fallback: simular subida de archivo
+      // Simular subida de archivo (MVP sin backend)
       return new Promise((resolve) => {
         setTimeout(() => {
           const attachment = {
@@ -477,25 +850,48 @@ class InvoiceService {
   // Obtener estadísticas de facturas
   async getInvoiceStats() {
     try {
-      const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      let invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      
+      // Si no hay facturas, forzar la inicialización
+      if (invoices.length === 0) {
+        console.log('⚠️ No hay facturas para estadísticas, forzando inicialización...');
+        this.initializeStorage();
+        invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+        console.log('✅ Facturas inicializadas para estadísticas:', invoices.length);
+      }
       
       const stats = {
         total: invoices.length,
-        byStatus: {},
+        byStatus: {
+          BORRADOR: 0,
+          EMITIDA: 0,
+          ENVIADA: 0,
+          PAGADA: 0,
+          VENCIDA: 0,
+          ANULADA: 0
+        },
         byMonth: {},
-        totalAmount: 0
+        totalAmount: 0,
+        paidAmount: 0
       };
       
       invoices.forEach(invoice => {
         // Por estado
-        stats.byStatus[invoice.status] = (stats.byStatus[invoice.status] || 0) + 1;
+        if (stats.byStatus.hasOwnProperty(invoice.status)) {
+          stats.byStatus[invoice.status] += 1;
+        }
         
         // Por mes
         const month = invoice.issueDate.substring(0, 7); // YYYY-MM
         stats.byMonth[month] = (stats.byMonth[month] || 0) + 1;
         
-        // Monto total
+        // Monto total (todas las facturas)
         stats.totalAmount += invoice.financial.totalSales || 0;
+        
+        // Monto pagado (solo facturas pagadas)
+        if (invoice.status === 'PAGADA') {
+          stats.paidAmount += invoice.financial.totalSales || 0;
+        }
       });
       
       return {
