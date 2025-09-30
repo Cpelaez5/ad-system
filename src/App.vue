@@ -8,11 +8,11 @@
     
     <!-- Contenido principal -->
     <v-main>
-      <PageTransition name="fade" mode="out-in">
-        <router-view v-slot="{ Component }">
+      <router-view v-slot="{ Component }">
+        <PageTransition name="fade" mode="out-in">
           <component :is="Component" />
-        </router-view>
-      </PageTransition>
+        </PageTransition>
+      </router-view>
     </v-main>
     
     <!-- Footer -->

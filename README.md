@@ -141,10 +141,42 @@ El sistema incluye varios usuarios de prueba con diferentes roles:
 - Búsqueda y filtrado
 
 ### 3. Facturación
-- Creación de facturas electrónicas
-- Gestión de productos/servicios
-- Estados de facturación
-- Envío y descarga
+
+## 4. Integración BCV (Banco Central de Venezuela)
+
+### 🏦 Servicio BCVService
+- **API del BCV**: https://bcv-api.rafnixg.dev/rates/
+- **Tasa en tiempo real**: Obtención automática de la tasa de cambio USD/VES
+- **Cache inteligente**: 5 minutos de cache local para optimizar rendimiento
+- **Manejo de errores**: Tasas por defecto cuando la API no está disponible
+- **Conversión automática**: USD ↔ VES con cálculos precisos
+
+### 💱 Componentes de Conversión
+- **BCVRateDisplay**: Muestra la tasa actual del BCV con actualización automática
+- **CurrencyConverter**: Conversor interactivo USD ↔ VES integrado en facturas
+- **Formateo venezolano**: Números y monedas según estándares locales
+- **Actualización automática**: Cada 5 minutos en tiempo real
+
+### 🔄 Integración en Facturas
+- **Conversión automática** de montos al cambiar moneda
+- **Cálculos precisos** usando tasas oficiales del BCV
+- **Historial de tasas** para fechas específicas
+- **Validación de montos** con tasas actualizadas
+
+## 5. Facturación
+- **Sistema completo de facturación** con modelo de datos flexible
+- **Facturas generales** (sin necesidad de especificar productos)
+- **Autocompletado desde archivos** PDF/imagen con extracción simulada
+- **CRUD completo** con localStorage para MVP sin base de datos
+- **Filtros y búsqueda avanzada** por número, cliente, fecha, estado
+- **Estadísticas en tiempo real** de facturas y montos
+- **Vista detallada** de facturas con información completa
+- **Soporte multi-moneda** (VES, USD, EUR)
+- **Estados de factura**: Borrador, Emitida, Enviada, Pagada, Vencida, Anulada
+- **Campos financieros completos**: totales, impuestos, retenciones, IGTF
+- **Archivos adjuntos** y notas adicionales
+- **Formulario modular** reutilizable (InvoiceForm.vue)
+- **Integración backend** con endpoints documentados
 
 ### 4. Contabilidad
 - Registro de asientos contables
@@ -340,6 +372,24 @@ El sistema incluye componentes reutilizables avanzados:
 - **Diseño responsive**: Funciona perfectamente en todos los dispositivos
 - **UX optimizada**: Interfaz intuitiva y accesible
 
+### 📄 Sistema de Facturación Completo
+- **Modelo de datos flexible**: Soporte para facturas internacionales y locales
+- **Facturas generales**: Sin necesidad de especificar productos individuales
+- **Autocompletado inteligente**: Carga de archivos PDF/imagen con extracción simulada
+- **CRUD completo**: Crear, leer, actualizar y eliminar facturas
+- **Almacenamiento local**: localStorage para MVP sin base de datos
+- **Filtros avanzados**: Por estado, fecha, cliente, número de factura
+- **Búsqueda en tiempo real**: Búsqueda instantánea en todos los campos
+- **Estadísticas dinámicas**: Contadores y totales actualizados automáticamente
+- **Vista detallada**: Modal con información completa de la factura
+- **Soporte multi-moneda**: VES, USD, EUR con tasas de cambio
+- **Estados de factura**: 6 estados diferentes con colores distintivos
+- **Campos financieros**: Totales, impuestos, retenciones, IGTF
+- **Archivos adjuntos**: Subida y gestión de documentos relacionados
+- **Formulario modular**: Componente reutilizable InvoiceForm.vue
+- **Integración backend**: Endpoints API documentados en Swagger
+- **Responsive design**: Funciona perfectamente en móviles y desktop
+
 ### 🛠️ Correcciones y Optimizaciones del Sistema
 - **Menú de usuario completamente funcional**: Implementado con patrón activator por ID
 - **Consola limpia**: Eliminación de todos los warnings de Vue y Vuetify
@@ -363,6 +413,159 @@ El sistema incluye componentes reutilizables avanzados:
 - **Feedback visual**: Respuesta inmediata a acciones del usuario
 - **Transiciones suaves**: Entre estados y páginas
 - **Animaciones de carga**: Elegantes y no intrusivas
+
+## 📄 Guía del Sistema de Facturación
+
+### Cómo Usar el Sistema de Facturación
+
+El sistema de facturación está diseñado para ser intuitivo y flexible, permitiendo tanto facturas generales como detalladas.
+
+#### 1. Crear Nueva Factura
+1. **Acceder**: Ve a la sección "Facturación" en el menú lateral
+2. **Nueva Factura**: Haz clic en el botón "Nueva Factura"
+3. **Cargar Archivo** (Opcional): 
+   - Expande la sección "Cargar y Autocompletar desde Archivo"
+   - Selecciona un archivo PDF o imagen
+   - Haz clic en "Extraer Datos" para autocompletar el formulario
+4. **Completar Información**:
+   - Información básica de la factura (número, fecha, tipo)
+   - Datos del emisor (empresa, RIF, dirección)
+   - Datos del cliente (razón social, RIF, contacto)
+   - Información financiera (totales, impuestos, retenciones)
+5. **Items Detallados** (Opcional):
+   - Expande la sección "Items Detallados"
+   - Agrega productos/servicios con códigos, descripciones y precios
+6. **Guardar**: Haz clic en "Crear Factura"
+
+#### 2. Gestionar Facturas Existentes
+- **Ver**: Haz clic en el ícono del ojo para ver detalles completos
+- **Editar**: Haz clic en el ícono del lápiz para modificar
+- **Descargar**: Haz clic en el ícono de descarga (preparado para PDF)
+- **Eliminar**: Haz clic en el ícono de basura (con confirmación)
+
+#### 3. Filtros y Búsqueda
+- **Búsqueda**: Escribe en el campo de búsqueda para filtrar por número, cliente o emisor
+- **Filtro por Estado**: Selecciona un estado específico (Borrador, Emitida, etc.)
+- **Filtro por Fecha**: Establece rango de fechas de emisión
+- **Limpiar Filtros**: Botón para resetear todos los filtros
+
+#### 4. Estadísticas
+Las tarjetas superiores muestran:
+- **Total Facturas**: Número total de facturas en el sistema
+- **Emitidas**: Facturas oficialmente emitidas
+- **Pagadas**: Facturas que han sido pagadas
+- **Monto Total**: Suma de todos los montos de facturas
+
+### Modelo de Datos
+
+#### Estructura de Factura
+```javascript
+{
+  id: 1,
+  invoiceNumber: "F-00127",
+  controlNumber: "00-0008967",
+  documentType: "FACTURA",
+  issueDate: "2023-12-04",
+  dueDate: "2023-12-04",
+  status: "EMITIDA",
+  
+  // Información del emisor
+  issuer: {
+    companyName: "LA CASA DEL ACEITE RB C.A.",
+    rif: "J404710183",
+    taxpayerType: "Ordinario",
+    address: "Dirección del emisor",
+    phone: "000-000-0000",
+    email: "info@empresa.com"
+  },
+  
+  // Información del cliente
+  client: {
+    companyName: "SERVICIOS OJEDA ,C.A.",
+    rif: "J-07016766-1",
+    address: "Dirección del cliente",
+    phone: "000-000-0000",
+    email: "cliente@empresa.com"
+  },
+  
+  // Información financiera
+  financial: {
+    totalSales: 17540.94,
+    nonTaxableSales: 0,
+    taxableSales: 15121.50,
+    taxDebit: 2419.44,
+    ivaRetention: 0,
+    islrRetention: 0,
+    municipalRetention: 0,
+    igtf: 0,
+    currency: "VES",
+    exchangeRate: 1
+  },
+  
+  // Items detallados (opcional)
+  items: [
+    {
+      code: "BFCOT",
+      description: "BASE PARA FOTOCELDA/CABLE",
+      quantity: 6.00,
+      unitPrice: 583.20,
+      total: 3499.22
+    }
+  ],
+  
+  // Archivos adjuntos
+  attachments: [],
+  
+  // Metadatos
+  createdBy: "admin",
+  createdAt: "2023-12-04T10:00:00Z",
+  updatedAt: "2023-12-04T10:00:00Z",
+  notes: "Factura de servicios"
+}
+```
+
+#### Estados de Factura
+- **BORRADOR**: Factura en proceso de creación
+- **EMITIDA**: Factura oficialmente emitida
+- **ENVIADA**: Factura enviada al cliente
+- **PAGADA**: Factura pagada por el cliente
+- **VENCIDA**: Factura vencida sin pago
+- **ANULADA**: Factura anulada/cancelada
+
+#### Tipos de Documento
+- **FACTURA**: Factura estándar
+- **NOTA DE CRÉDITO**: Nota de crédito
+- **NOTA DE DÉBITO**: Nota de débito
+- **FORMA LIBRE**: Forma libre
+- **COMPROBANTE**: Comprobante
+
+#### Campos Financieros
+- **totalSales**: Total de ventas
+- **nonTaxableSales**: Ventas no gravadas
+- **taxableSales**: Ventas gravadas
+- **taxDebit**: Débito fiscal (IVA)
+- **ivaRetention**: Retención de IVA
+- **islrRetention**: Retención de ISLR
+- **municipalRetention**: Retención municipal
+- **igtf**: Impuesto a Grandes Transacciones Financieras
+
+### Integración con Backend
+
+El sistema está preparado para trabajar tanto con localStorage (MVP) como con el backend real:
+
+#### Endpoints API
+- `GET /api/invoices` - Obtener todas las facturas
+- `GET /api/invoices/:id` - Obtener factura por ID
+- `POST /api/invoices` - Crear nueva factura
+- `PUT /api/invoices/:id` - Actualizar factura
+- `DELETE /api/invoices/:id` - Eliminar factura
+- `POST /api/invoices/:id/upload` - Subir archivo adjunto
+- `POST /api/invoices/extract-data` - Extraer datos de archivo
+
+#### Documentación API
+- **Swagger UI**: http://localhost:3001/api-docs
+- **Esquemas completos**: Documentación automática de todos los endpoints
+- **Ejemplos de uso**: Request/response para cada endpoint
 
 ## 🎨 Guía del Sistema de Animaciones
 

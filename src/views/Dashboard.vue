@@ -72,7 +72,7 @@
               <BarChart
                 :data="chartData"
                 :options="chartOptions"
-                height="300"
+                :height="300"
               />
             </v-card-text>
           </v-card>
@@ -91,7 +91,7 @@
               <PieChart
                 :data="pieChartData"
                 :options="pieChartOptions"
-                height="300"
+                :height="300"
               />
             </v-card-text>
           </v-card>
@@ -175,6 +175,7 @@
         </div>
       </div>
 
+
       <!-- Nueva Card - Reportes -->
       <div data-swapy-slot="reportes" class="dashboard-slot">
         <div data-swapy-item="reportes">
@@ -215,6 +216,7 @@
           </v-card>
         </div>
       </div>
+
     </div>
   </v-container>
 </template>
@@ -505,7 +507,7 @@ export default {
 @media (max-width: 960px) {
   .dashboard-drag-container {
     grid-template-columns: 1fr;
-    grid-template-rows: 400px 400px 400px 400px 400px;
+    grid-template-rows: 400px 400px 400px 400px;
     gap: 16px;
   }
   

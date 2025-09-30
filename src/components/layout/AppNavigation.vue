@@ -18,6 +18,27 @@
 
     <v-spacer></v-spacer>
 
+    <!-- Tasa del BCV -->
+    <div class="bcv-rate-display mr-4">
+      <v-chip
+        :color="getBCVChipColor()"
+        variant="tonal"
+        size="small"
+        class="animate-fade-in animate-delay-300"
+      >
+        <v-icon size="16" class="mr-1">mdi-currency-usd</v-icon>
+        <span class="font-weight-medium">{{ getBCVRate() }}</span>
+        <v-icon 
+          size="12" 
+          class="ml-1 cursor-pointer" 
+          @click="refreshBCVRate"
+          :class="{ 'animate-spin': bcvLoading }"
+        >
+          mdi-refresh
+        </v-icon>
+      </v-chip>
+    </div>
+
     <!-- Menú de usuario -->
     <v-btn 
       id="user-menu-btn"
@@ -157,11 +178,16 @@
 </template>
 
 <script>
+import { bcvService } from '../../services/bcvService.js';
+
 export default {
   name: 'AppNavigation',
   data() {
     return {
-      drawer: false
+      drawer: false,
+      bcvRate: null,
+      bcvLoading: false,
+      bcvError: false
     }
   },
   computed: {
@@ -172,6 +198,18 @@ export default {
         console.error('Error obteniendo usuario:', error)
         return {}
       }
+    }
+  },
+  async mounted() {
+    await this.loadBCVRate();
+    // Actualizar cada 10 minutos para reducir spam en consola
+    this.bcvInterval = setInterval(() => {
+      this.loadBCVRate();
+    }, 10 * 60 * 1000);
+  },
+  beforeUnmount() {
+    if (this.bcvInterval) {
+      clearInterval(this.bcvInterval);
     }
   },
   methods: {
@@ -249,6 +287,47 @@ export default {
         console.error('Error verificando permisos:', error)
         return false
       }
+    },
+    
+    async loadBCVRate() {
+      try {
+        this.bcvLoading = true;
+        this.bcvError = false;
+        
+        const response = await bcvService.getCurrentRate();
+        
+        if (response.success) {
+          this.bcvRate = response.data;
+        } else {
+          this.bcvError = true;
+          this.bcvRate = null;
+        }
+      } catch (error) {
+        console.error('Error al cargar tasa del BCV:', error);
+        this.bcvError = true;
+        this.bcvRate = null;
+      } finally {
+        this.bcvLoading = false;
+      }
+    },
+    
+    async refreshBCVRate() {
+      bcvService.clearCache();
+      await this.loadBCVRate();
+    },
+    
+    getBCVRate() {
+      if (this.bcvError) return 'Error';
+      if (!this.bcvRate) return 'Cargando...';
+      return `${this.bcvRate.dollar} VES`;
+    },
+    
+    getBCVChipColor() {
+      if (this.bcvError) return 'error';
+      if (this.bcvLoading) return 'warning';
+      if (this.bcvRate?.source === 'BCV') return 'success'; // Verde para tasa real del BCV
+      if (this.bcvRate?.source === 'DEFAULT') return 'info'; // Azul para tasa por defecto
+      return 'warning';
     }
   }
 }
@@ -260,6 +339,35 @@ export default {
    ======================================== */
 .app-bar {
   z-index: 1000 !important;
+}
+
+/* ========================================
+   BCV RATE DISPLAY STYLES
+   ======================================== */
+.bcv-rate-display {
+  display: flex;
+  align-items: center;
+}
+
+.bcv-rate-display .v-chip {
+  transition: all 0.3s ease;
+}
+
+.bcv-rate-display .v-chip:hover {
+  transform: scale(1.05);
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* ========================================
