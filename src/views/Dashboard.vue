@@ -56,49 +56,7 @@
       </v-col>
     </v-row>
 
-    <!-- Accesos rápidos (NO arrastrable) -->
-    <v-row class="mb-6">
-      <v-col cols="12">
-        <h2 class="text-h5 font-weight-bold mb-4">Accesos Rápidos</h2>
-        <v-row>
-          <v-col cols="12" sm="6" md="4">
-            <v-card
-              class="pa-4 text-center"
-              hover
-              @click="$router.push('/clientes')"
-            >
-              <v-icon size="48" color="primary" class="mb-2">mdi-account-plus</v-icon>
-              <h3 class="text-h6">Nuevo Cliente</h3>
-              <p class="text-body-2 text-grey">Registrar nuevo contribuyente</p>
-            </v-card>
-          </v-col>
-
-          <v-col cols="12" sm="6" md="4">
-            <v-card
-              class="pa-4 text-center"
-              hover
-              @click="$router.push('/facturacion')"
-            >
-              <v-icon size="48" color="success" class="mb-2">mdi-receipt-plus</v-icon>
-              <h3 class="text-h6">Nueva Factura</h3>
-              <p class="text-body-2 text-grey">Crear factura electrónica</p>
-            </v-card>
-          </v-col>
-
-          <v-col cols="12" sm="6" md="4">
-            <v-card
-              class="pa-4 text-center"
-              hover
-              @click="$router.push('/archivo')"
-            >
-              <v-icon size="48" color="info" class="mb-2">mdi-upload</v-icon>
-              <h3 class="text-h6">Subir Documento</h3>
-              <p class="text-body-2 text-grey">Archivar soportes digitales</p>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-col>
-    </v-row>
+    
 
     <!-- Contenedor de Drag & Drop para cards individuales -->
     <div ref="container" class="dashboard-drag-container">
@@ -148,17 +106,24 @@
               <v-icon left>mdi-history</v-icon>
               Actividad Reciente
             </v-card-title>
-            <v-card-text>
-              <v-list>
+            <v-card-text class="pa-3">
+              <v-list density="compact" class="pa-0">
                 <v-list-item
-                  v-for="actividad in actividadesRecientes"
+                  v-for="actividad in actividadesRecientes.slice(0, 2)"
                   :key="actividad.id"
                   :prepend-icon="actividad.icono"
+                  class="px-0 py-1"
+                  min-height="32"
                 >
-                  <v-list-item-title>{{ actividad.descripcion }}</v-list-item-title>
-                  <v-list-item-subtitle>{{ actividad.fecha }}</v-list-item-subtitle>
+                  <v-list-item-title class="text-caption">{{ actividad.descripcion }}</v-list-item-title>
+                  <v-list-item-subtitle class="text-caption">{{ actividad.fecha }}</v-list-item-subtitle>
                 </v-list-item>
               </v-list>
+              <div v-if="actividadesRecientes.length > 2" class="text-center mt-1">
+                <v-chip size="x-small" color="primary" variant="tonal">
+                  +{{ actividadesRecientes.length - 2 }} más
+                </v-chip>
+              </div>
             </v-card-text>
           </v-card>
         </div>
@@ -204,6 +169,47 @@
                   <v-icon left>mdi-check-circle</v-icon>
                   Sistema Operativo
                 </v-chip>
+              </div>
+            </v-card-text>
+          </v-card>
+        </div>
+      </div>
+
+      <!-- Nueva Card - Reportes -->
+      <div data-swapy-slot="reportes" class="dashboard-slot">
+        <div data-swapy-item="reportes">
+          <v-card>
+            <v-card-title>
+              <v-icon left>mdi-file-document-multiple</v-icon>
+              Reportes Generados
+            </v-card-title>
+            <v-card-text>
+              <div class="mb-3">
+                <div class="d-flex justify-space-between align-center">
+                  <span>Reportes del Mes</span>
+                  <v-chip color="primary" size="small">12</v-chip>
+                </div>
+              </div>
+              
+              <div class="mb-3">
+                <div class="d-flex justify-space-between align-center">
+                  <span>Pendientes</span>
+                  <v-chip color="warning" size="small">3</v-chip>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <div class="d-flex justify-space-between align-center">
+                  <span>Completados</span>
+                  <v-chip color="success" size="small">9</v-chip>
+                </div>
+              </div>
+
+              <div class="text-center mt-4">
+                <v-btn color="primary" variant="tonal" size="small">
+                  <v-icon left>mdi-plus</v-icon>
+                  Nuevo Reporte
+                </v-btn>
               </div>
             </v-card-text>
           </v-card>
@@ -428,16 +434,69 @@ export default {
 .dashboard-drag-container {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-rows: 400px 400px;
   gap: 24px;
   margin-bottom: 24px;
   max-width: 100%;
 }
 
+/* Primera fila: 3 elementos */
+.dashboard-drag-container > :nth-child(1) {
+  grid-column: 1 / 3;
+  grid-row: 1 / 2;
+}
+
+.dashboard-drag-container > :nth-child(2) {
+  grid-column: 3 / 4;
+  grid-row: 1 / 2;
+}
+
+.dashboard-drag-container > :nth-child(3) {
+  grid-column: 4 / 5;
+  grid-row: 1 / 2;
+}
+
+/* Segunda fila: 2 elementos de 50% cada uno */
+.dashboard-drag-container > :nth-child(4) {
+  grid-column: 1 / 3;
+  grid-row: 2 / 3;
+}
+
+.dashboard-drag-container > :nth-child(5) {
+  grid-column: 3 / 5;
+  grid-row: 2 / 3;
+}
+
 /* Estilos para los slots del dashboard */
 .dashboard-slot {
-  min-height: 400px;
+  height: 100%;
+  width: 100%;
+  min-width: 100%;
+  display: flex;
+  flex: 1;
+}
+
+.dashboard-slot .v-card {
+  height: 100%;
+  width: 100%;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.dashboard-slot .v-card .v-card-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 0;
+}
+
+.dashboard-slot .v-card .v-card-title {
+  flex-shrink: 0;
   width: 100%;
 }
 
@@ -446,16 +505,36 @@ export default {
 @media (max-width: 960px) {
   .dashboard-drag-container {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto;
+    grid-template-rows: 400px 400px 400px 400px 400px;
     gap: 16px;
+  }
+  
+  .dashboard-drag-container > :nth-child(4),
+  .dashboard-drag-container > :nth-child(5) {
+    grid-column: span 1;
   }
 }
 
 /* Asegurar que las cards no se salgan del contenedor */
 .dashboard-slot .v-card {
-  width: 100%;
-  max-width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 100% !important;
   box-sizing: border-box;
+  flex: 1;
+}
+
+/* Forzar estiramiento completo */
+.dashboard-slot {
+  width: 100% !important;
+  min-width: 100% !important;
+  flex: 1;
+}
+
+.dashboard-slot > div {
+  width: 100% !important;
+  min-width: 100% !important;
+  flex: 1;
 }
 
 [data-swapy-item] {
