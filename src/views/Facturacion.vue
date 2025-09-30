@@ -34,6 +34,45 @@
         >
           Reset Datos
         </v-btn>
+        <v-menu>
+          <template v-slot:activator="{ props }">
+            <v-btn
+              color="success"
+              variant="outlined"
+              size="large"
+              prepend-icon="mdi-download"
+              v-bind="props"
+              class="mr-2"
+              :disabled="filteredInvoices.length === 0"
+            >
+              Exportar Tabla
+              <v-icon right>mdi-chevron-down</v-icon>
+            </v-btn>
+          </template>
+          <v-list>
+            <v-list-item @click="exportTable('csv', 'all')">
+              <v-list-item-title>
+                <v-icon left>mdi-file-delimited</v-icon>
+                Exportar Todo (CSV)
+              </v-list-item-title>
+              <v-list-item-subtitle>{{ filteredInvoices.length }} registros</v-list-item-subtitle>
+            </v-list-item>
+            <v-list-item @click="exportTable('csv', 'filtered')">
+              <v-list-item-title>
+                <v-icon left>mdi-file-delimited</v-icon>
+                Solo Filtrados (CSV)
+              </v-list-item-title>
+              <v-list-item-subtitle>{{ filteredInvoices.length }} registros</v-list-item-subtitle>
+            </v-list-item>
+            <v-divider></v-divider>
+            <v-list-item @click="showExportDialog = true">
+              <v-list-item-title>
+                <v-icon left>mdi-cog</v-icon>
+                Opciones Avanzadas
+              </v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
         <v-btn
           color="primary"
           size="large"
@@ -253,8 +292,8 @@
             size="small"
             color="success"
             variant="text"
-            @click="downloadInvoice(item)"
-            title="Descargar"
+            @click="exportInvoice(item)"
+            title="Exportar factura"
           ></v-btn>
           <v-btn
             icon="mdi-delete"
@@ -347,12 +386,95 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Diálogo de opciones avanzadas de exportación -->
+    <v-dialog v-model="showExportDialog" max-width="600px">
+      <v-card>
+        <v-card-title>
+          <v-icon left>mdi-download</v-icon>
+          Opciones de Exportación
+        </v-card-title>
+        <v-card-text>
+          <v-form>
+            <v-row>
+              <v-col cols="12">
+                <v-select
+                  v-model="exportOptions.format"
+                  :items="['CSV', 'Excel (Próximamente)']"
+                  label="Formato de archivo"
+                  variant="outlined"
+                  readonly
+                ></v-select>
+              </v-col>
+              <v-col cols="12">
+                <v-select
+                  v-model="exportOptions.scope"
+                  :items="[
+                    { title: 'Todos los registros', value: 'all' },
+                    { title: 'Solo registros filtrados', value: 'filtered' }
+                  ]"
+                  label="Alcance de exportación"
+                  variant="outlined"
+                ></v-select>
+              </v-col>
+              <v-col cols="12">
+                <v-select
+                  v-model="exportOptions.currency"
+                  :items="[
+                    { title: 'Bolívares (VES)', value: 'VES' },
+                    { title: 'Dólares (USD)', value: 'USD' }
+                  ]"
+                  label="Moneda para exportación"
+                  variant="outlined"
+                ></v-select>
+              </v-col>
+              <v-col cols="12">
+                <v-checkbox
+                  v-model="exportOptions.includeItems"
+                  label="Incluir items detallados"
+                  color="primary"
+                ></v-checkbox>
+              </v-col>
+              <v-col cols="12">
+                <v-checkbox
+                  v-model="exportOptions.includeMetadata"
+                  label="Incluir metadatos (fechas de creación, etc.)"
+                  color="primary"
+                ></v-checkbox>
+              </v-col>
+            </v-row>
+          </v-form>
+          
+          <v-alert
+            type="info"
+            variant="tonal"
+            class="mt-4"
+          >
+            <strong>Resumen de exportación:</strong><br>
+            • Registros a exportar: {{ getExportRecordCount() }}<br>
+            • Moneda: {{ exportOptions.currency }}<br>
+            • Formato: {{ exportOptions.format }}
+          </v-alert>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey" variant="text" @click="showExportDialog = false">
+            Cancelar
+          </v-btn>
+          <v-btn color="success" @click="exportWithOptions">
+            <v-icon left>mdi-download</v-icon>
+            Exportar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script>
 import { invoiceService } from '../services/invoiceService.js';
 import { bcvService } from '../services/bcvService.js';
+import { exportService } from '../services/exportService.js';
 import InvoiceForm from '../components/forms/InvoiceForm.vue';
 
 export default {
@@ -383,11 +505,21 @@ export default {
       invoiceDialog: false,
       deleteDialog: false,
       viewDialog: false,
+      showExportDialog: false,
       
       // Datos para edición/eliminación
       editingInvoice: null,
       invoiceToDelete: null,
       viewingInvoice: null,
+      
+      // Opciones de exportación
+      exportOptions: {
+        format: 'CSV',
+        scope: 'filtered',
+        currency: 'VES',
+        includeItems: true,
+        includeMetadata: true
+      },
       
       // Configuración de la tabla
       headers: [
@@ -544,10 +676,84 @@ export default {
       this.editingInvoice = null;
     },
     
-    downloadInvoice(invoice) {
-      // Implementar descarga de factura
-      console.log('Descargar factura:', invoice);
-      // Aquí se podría generar un PDF o descargar el archivo original
+    exportInvoice(invoice) {
+      try {
+        console.log('📤 Exportando factura individual:', invoice.invoiceNumber);
+        const result = exportService.exportInvoice(invoice, 'csv');
+        
+        if (result.success) {
+          console.log('✅ Factura exportada exitosamente:', result.filename);
+          // Aquí podrías mostrar una notificación de éxito
+        } else {
+          console.error('❌ Error al exportar factura:', result.message);
+          // Aquí podrías mostrar una notificación de error
+        }
+      } catch (error) {
+        console.error('❌ Error al exportar factura:', error);
+      }
+    },
+    
+    exportTable(format = 'csv', scope = 'filtered') {
+      try {
+        console.log('📤 Exportando tabla...', { format, scope });
+        
+        // Determinar qué datos exportar
+        const dataToExport = scope === 'all' ? this.invoices : this.filteredInvoices;
+        const currency = this.currencyDisplay;
+        
+        const result = exportService.exportTable(dataToExport, currency, format.toLowerCase());
+        
+        if (result.success) {
+          console.log('✅ Tabla exportada exitosamente:', result.filename);
+          console.log('📊 Registros exportados:', result.recordCount);
+          
+          // Generar resumen de exportación
+          const summary = exportService.generateExportSummary(dataToExport, currency);
+          console.log('📈 Resumen de exportación:', summary);
+          
+          // Aquí podrías mostrar una notificación de éxito con el resumen
+        } else {
+          console.error('❌ Error al exportar tabla:', result.message);
+          // Aquí podrías mostrar una notificación de error
+        }
+      } catch (error) {
+        console.error('❌ Error al exportar tabla:', error);
+      }
+    },
+    
+    exportWithOptions() {
+      try {
+        console.log('📤 Exportando con opciones avanzadas...', this.exportOptions);
+        
+        // Determinar qué datos exportar
+        const dataToExport = this.exportOptions.scope === 'all' ? this.invoices : this.filteredInvoices;
+        const currency = this.exportOptions.currency;
+        
+        const result = exportService.exportTable(dataToExport, currency, this.exportOptions.format.toLowerCase());
+        
+        if (result.success) {
+          console.log('✅ Exportación avanzada exitosa:', result.filename);
+          console.log('📊 Registros exportados:', result.recordCount);
+          
+          // Generar resumen de exportación
+          const summary = exportService.generateExportSummary(dataToExport, currency);
+          console.log('📈 Resumen de exportación:', summary);
+          
+          // Cerrar diálogo
+          this.showExportDialog = false;
+          
+          // Aquí podrías mostrar una notificación de éxito con el resumen
+        } else {
+          console.error('❌ Error al exportar con opciones:', result.message);
+          // Aquí podrías mostrar una notificación de error
+        }
+      } catch (error) {
+        console.error('❌ Error al exportar con opciones:', error);
+      }
+    },
+    
+    getExportRecordCount() {
+      return this.exportOptions.scope === 'all' ? this.invoices.length : this.filteredInvoices.length;
     },
     
     formatDate(date) {
