@@ -1,5 +1,8 @@
 <template>
   <v-app>
+    <!-- Favicon dinámico según el tema -->
+    <ThemeFavicon />
+    
     <!-- Sistema de notificaciones -->
     <NotificationSystem />
     
@@ -25,6 +28,7 @@ import AppNavigation from './components/layout/AppNavigation.vue'
 import AppFooter from './components/layout/AppFooter.vue'
 import NotificationSystem from './components/common/NotificationSystem.vue'
 import PageTransition from './components/common/PageTransition.vue'
+import ThemeFavicon from './components/common/ThemeFavicon.vue'
 
 export default {
   name: 'App',
@@ -32,7 +36,8 @@ export default {
     AppNavigation,
     AppFooter,
     NotificationSystem,
-    PageTransition
+    PageTransition,
+    ThemeFavicon
   }
 }
 </script>

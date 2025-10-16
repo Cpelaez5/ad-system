@@ -6,6 +6,9 @@ import App from './App.vue'
 // Inicializar tenant al cargar la aplicación
 import './utils/initTenant.js'
 
+// Inicializar favicon manager
+import './utils/faviconManager.js'
+
 // Vuetify
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'

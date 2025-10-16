@@ -2,12 +2,58 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    
+    <!-- Favicon dinámico - será manejado por JavaScript -->
+    <link rel="icon" type="image/svg+xml" href="/src/assets/icon-adaptableV2.svg" id="dynamic-favicon" />
+    
+    <!-- Favicon para navegadores que no soportan SVG -->
+    <link rel="icon" type="image/png" href="/src/assets/logo-thumb.png" />
+    
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sistema de Contabilidad, Auditoría, Archivo y Facturación</title>
   </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
+    
+    <!-- Script para inicializar el favicon manager inmediatamente -->
+    <script>
+      // Inicializar favicon manager tan pronto como sea posible
+      document.addEventListener('DOMContentLoaded', function() {
+        // Función simple para cambiar favicon
+        function setFavicon(iconPath) {
+          let favicon = document.querySelector('#dynamic-favicon')
+          if (favicon) {
+            favicon.href = iconPath + '?v=' + Date.now()
+          }
+        }
+        
+        // Detectar tema inicial
+        function getCurrentTheme() {
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return 'dark'
+          }
+          return 'light'
+        }
+        
+        // Establecer favicon inicial
+        const theme = getCurrentTheme()
+        const iconPath = theme === 'dark' ? '/src/assets/icon-dark.svg' : '/src/assets/icon-light.svg'
+        setFavicon(iconPath)
+        
+        console.log('🎨 Favicon inicial establecido para tema:', theme)
+        
+        // Escuchar cambios de tema
+        if (window.matchMedia) {
+          const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+          mediaQuery.addEventListener('change', function(e) {
+            const newTheme = e.matches ? 'dark' : 'light'
+            const newIconPath = newTheme === 'dark' ? '/src/assets/icon-dark.svg' : '/src/assets/icon-light.svg'
+            setFavicon(newIconPath)
+            console.log('🎨 Favicon cambiado automáticamente a tema:', newTheme)
+          })
+        }
+      })
+    </script>
   </body>
 </html>

@@ -1,6 +1,6 @@
 # Sistema de Contabilidad, Auditoría, Archivo y Facturación
 
-Un sistema web completo desarrollado con Vue 3, Vite y Vuetify para la gestión contable y tributaria.
+Un sistema web completo desarrollado con Vue 3, Vite y Vuetify para la gestión contable y tributaria, integrado con Supabase como backend completo con arquitectura multi-tenant.
 
 ## 🚀 Características Principales
 
@@ -15,12 +15,11 @@ Un sistema web completo desarrollado con Vue 3, Vite y Vuetify para la gestión 
 
 ## 🛠️ Tecnologías Utilizadas
 
+### Frontend
 - **Vue 3**: Framework JavaScript progresivo
 - **Vite**: Herramienta de construcción rápida
 - **Vuetify**: Biblioteca de componentes Material Design
 - **Vue Router**: Enrutamiento del lado del cliente
-- **Pinia**: Gestión de estado
-- **Axios**: Cliente HTTP
 - **Chart.js**: Gráficos interactivos y visualizaciones
 - **Vue Date Picker**: Selector de fechas avanzado
 - **ExcelJS**: Exportación de datos a Excel
@@ -30,7 +29,13 @@ Un sistema web completo desarrollado con Vue 3, Vite y Vuetify para la gestión 
 - **Montserrat**: Tipografía moderna y profesional (fuente principal)
 - **Open Sans**: Tipografía legible y clara (fuente secundaria)
 - **CSS Animations**: Sistema completo de animaciones personalizadas
-- **CSS Variables**: Variables CSS para consistencia de diseño
+
+### Backend
+- **Supabase**: Backend-as-a-Service completo
+- **PostgreSQL**: Base de datos con Row Level Security (RLS)
+- **Supabase Auth**: Autenticación con JWT
+- **Supabase Storage**: Almacenamiento de archivos
+- **Multi-tenancy**: Aislamiento completo de datos por organización
 
 ## 📁 Estructura del Proyecto
 
@@ -82,14 +87,22 @@ src/
    npm install
    ```
 
-3. **Ejecutar en modo desarrollo**
+3. **Configurar Supabase**
+   - Crear archivo `.env.local` en la raíz del proyecto
+   - Agregar las credenciales de Supabase:
+     ```
+     VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
+     VITE_SUPABASE_ANON_KEY=tu-clave-anonima
+     ```
+
+4. **Ejecutar en modo desarrollo**
    ```bash
    npm run dev
    ```
 
-4. **Configurar API Backend (opcional para login real)**
-   - Crear `.env` y definir `VITE_API_BASE_URL` (por ejemplo `http://localhost:3001/api`)
-   - El login usará `/api/auth/login` del backend si esta variable está presente
+5. **Configurar Base de Datos**
+   - Ejecutar `supabase-schema.sql` en el SQL Editor de Supabase
+   - Ejecutar `supabase-seed-data.sql` para datos de prueba
 
 ## 🔐 Credenciales de Acceso
 
@@ -99,12 +112,12 @@ El sistema incluye varios usuarios de prueba con diferentes roles:
 
 | Usuario | Contraseña | Rol | Descripción |
 |---------|------------|-----|-------------|
-| `admin` | `admin123` | Administrador | Acceso completo al sistema |
-| `contador` | `contador123` | Contador | Gestión contable y financiera |
-| `auditor` | `auditor123` | Auditor | Revisión y auditoría |
-| `facturador` | `facturador123` | Facturador | Gestión de facturación |
-| `operador` | `operador123` | Operador | Operaciones básicas |
-| `consultor` | `consultor123` | Consultor | Solo lectura y consultas |
+| `admin@sistema.local` | `admin123` | Administrador | Acceso completo al sistema |
+| `contador@sistema.local` | `contador123` | Contador | Gestión contable y financiera |
+| `auditor@sistema.local` | `auditor123` | Auditor | Revisión y auditoría |
+| `facturador@sistema.local` | `facturador123` | Facturador | Gestión de facturación |
+| `operador@sistema.local` | `operador123` | Operador | Operaciones básicas |
+| `consultor@sistema.local` | `consultor123` | Consultor | Solo lectura y consultas |
 
 ### Roles y Permisos
 
@@ -191,10 +204,12 @@ El sistema incluye varios usuarios de prueba con diferentes roles:
 - Respaldos del sistema
 
 ### 6. Archivo Digital
-- Subida de documentos
+- Subida de documentos a Supabase Storage
 - Organización por categorías
 - Búsqueda y descarga
 - Gestión de carpetas
+- Eliminación robusta (BD + Storage)
+- Nombres únicos para evitar conflictos
 
 ### 7. Gestión de Usuarios
 - Sistema completo de roles y permisos
@@ -981,39 +996,40 @@ Content-Type: application/json
 
 ## ✅ Estado Actual del Sistema
 
-### Correcciones Implementadas (Última Actualización)
+### 🎉 Sistema Completamente Funcional
 
-El sistema ha sido completamente optimizado y corregido para funcionar sin errores:
+El sistema ha sido **completamente migrado a Supabase** y está funcionando perfectamente:
 
-#### 🔧 Correcciones Técnicas
-- **Menú de usuario funcional**: Implementado con patrón `activator="#id"` de Vuetify
-- **Consola limpia**: Eliminados todos los warnings de Vue y Vuetify
-- **NotificationSystem corregido**: Configuración segura de `$app` y `globalProperties`
-- **Router-view optimizado**: Implementación correcta con slot props en transiciones
-- **Z-index optimizado**: VMenu (2000), AppBar (1000) para overlays correctos
-- **Configuración Vuetify mejorada**: Defaults globales para mejor rendimiento
+#### 🚀 Características Implementadas
+- ✅ **Backend Supabase**: Completamente integrado
+- ✅ **Multi-tenancy**: Aislamiento completo de datos por organización
+- ✅ **Autenticación**: Supabase Auth funcionando
+- ✅ **Base de datos**: PostgreSQL con RLS
+- ✅ **Storage**: Archivos con eliminación robusta
+- ✅ **Datos reales**: Todos los módulos muestran datos reales
 
-#### 🛠️ Mejoras de Estabilidad
-- **Navegación estable**: Sin conflictos entre componentes
-- **Rutas completas**: Perfil y configuración añadidas al sistema
-- **Debug implementado**: Logs de diagnóstico para desarrollo
-- **Patrón estándar**: Uso del patrón `activator="#id"` de Vuetify
+#### 🛠️ Módulos Operativos
+- ✅ **Dashboard**: Estadísticas en tiempo real
+- ✅ **Facturación**: CRUD completo con Supabase
+- ✅ **Clientes**: Gestión completa
+- ✅ **Archivo**: Subida/eliminación robusta
+- ✅ **Usuarios**: Gestión de usuarios
+- ✅ **Auditoría**: Logs de actividad
 
-#### 🎯 Funcionalidades Verificadas
-- ✅ **Login**: Funciona perfectamente con toggle de contraseña
-- ✅ **Menú de usuario**: Se abre y cierra correctamente
-- ✅ **Navegación**: Todas las rutas funcionan sin errores
-- ✅ **Notificaciones**: Sistema de notificaciones operativo
-- ✅ **Responsive**: Funciona en todos los dispositivos
-- ✅ **Consola**: Sin warnings ni errores
+#### 🔧 Funcionalidades Avanzadas
+- ✅ **Subida múltiple**: Sin conflictos
+- ✅ **Eliminación robusta**: BD + Storage
+- ✅ **Nombres únicos**: Sin duplicados
+- ✅ **Limpieza automática**: Sin archivos huérfanos
+- ✅ **Logging detallado**: Para debugging
 
 ### 🚀 Estado de Desarrollo
 
-El sistema está **completamente funcional** y listo para:
+El sistema está **100% funcional** y listo para:
+- Uso en producción
 - Desarrollo de nuevas funcionalidades
-- Pruebas de usuario
-- Despliegue en producción
-- Integración con backend real
+- Escalabilidad multi-tenant
+- Integración con sistemas externos
 
 ## 🚀 Despliegue
 
