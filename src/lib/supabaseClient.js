@@ -17,12 +17,24 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+// Debug: Mostrar todas las variables de entorno disponibles
+console.log('🔍 Variables de entorno disponibles:', {
+  VITE_SUPABASE_URL: supabaseUrl,
+  VITE_SUPABASE_ANON_KEY: supabaseAnonKey ? 'Cargada' : 'No cargada',
+  allEnv: import.meta.env
+})
+
 // Validar que las variables de entorno estén configuradas
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('⚠️ Variables de entorno de Supabase no encontradas. El sistema funcionará en modo fallback.')
   console.warn('📝 Para habilitar Supabase, crea un archivo .env.local con:')
   console.warn('   VITE_SUPABASE_URL=https://tu-proyecto.supabase.co')
   console.warn('   VITE_SUPABASE_ANON_KEY=tu-clave-anonima')
+  console.warn('🔧 Variables actuales:', { supabaseUrl, supabaseAnonKey })
+} else {
+  console.log('✅ Variables de entorno de Supabase cargadas correctamente')
+  console.log('🔗 URL:', supabaseUrl)
+  console.log('🔑 Key:', supabaseAnonKey ? 'Cargada' : 'No cargada')
 }
 
 // Crear el cliente de Supabase con configuración optimizada

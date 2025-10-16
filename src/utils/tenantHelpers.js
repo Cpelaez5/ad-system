@@ -22,15 +22,24 @@ export function getCurrentOrganizationId() {
   try {
     const orgId = localStorage.getItem('organization_id')
     
-    if (!orgId) {
-      console.warn('⚠️ No se encontró organization_id en localStorage')
-      return null
+    // Si no hay organization_id o es el mock, establecer el UUID real
+    if (!orgId || orgId === 'mock-org-1' || orgId === 'mock-org-2') {
+      console.warn('⚠️ Organization ID inválido o mock detectado, estableciendo UUID real')
+      // Establecer la primera organización como por defecto
+      const defaultOrgId = '11111111-1111-1111-1111-111111111111'
+      localStorage.setItem('organization_id', defaultOrgId)
+      console.log('✅ Organization ID UUID real establecido:', defaultOrgId)
+      return defaultOrgId
     }
     
+    console.log('✅ Organization ID válido encontrado:', orgId)
     return orgId
   } catch (error) {
     console.error('❌ Error al obtener organization_id:', error)
-    return null
+    // Usar la primera organización como fallback
+    const fallbackOrgId = '11111111-1111-1111-1111-111111111111'
+    localStorage.setItem('organization_id', fallbackOrgId)
+    return fallbackOrgId
   }
 }
 

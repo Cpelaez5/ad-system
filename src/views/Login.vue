@@ -138,7 +138,7 @@ export default {
       
       try {
         // Usar el userService actualizado que maneja Supabase + fallback
-        const { userService } = await import('@/services/userService')
+        const { default: userService } = await import('@/services/userService')
         const result = await userService.login({
           username: this.credenciales.usuario,
           password: this.credenciales.password

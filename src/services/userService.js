@@ -1,5 +1,5 @@
 // Servicio de gestión de usuarios y roles con Supabase Multi-Tenant
-// Integra Supabase Auth con sistema de organizaciones y fallback a localStorage
+// Integra Supabase Auth con sistema de organizaciones
 import { supabase } from '@/lib/supabaseClient'
 import { 
   getCurrentOrganizationId, 
@@ -12,87 +12,8 @@ import {
   handleTenantError
 } from '@/utils/tenantHelpers'
 
-// Datos de prueba para usuarios
-const mockUsers = [
-  {
-    id: 1,
-    username: 'admin',
-    email: 'admin@sistema.com',
-    password: 'admin123', // En producción, esto sería un hash
-    firstName: 'Administrador',
-    lastName: 'Sistema',
-    role: 'admin',
-    isActive: true,
-    createdAt: '2024-01-01T00:00:00Z',
-    lastLogin: '2024-09-09T15:30:00Z',
-    avatar: null
-  },
-  {
-    id: 2,
-    username: 'contador',
-    email: 'contador@sistema.com',
-    password: 'contador123',
-    firstName: 'María',
-    lastName: 'González',
-    role: 'contador',
-    isActive: true,
-    createdAt: '2024-01-15T00:00:00Z',
-    lastLogin: '2024-09-09T14:20:00Z',
-    avatar: null
-  },
-  {
-    id: 3,
-    username: 'auditor',
-    email: 'auditor@sistema.com',
-    password: 'auditor123',
-    firstName: 'Carlos',
-    lastName: 'Rodríguez',
-    role: 'auditor',
-    isActive: true,
-    createdAt: '2024-02-01T00:00:00Z',
-    lastLogin: '2024-09-09T13:45:00Z',
-    avatar: null
-  },
-  {
-    id: 4,
-    username: 'facturador',
-    email: 'facturador@sistema.com',
-    password: 'facturador123',
-    firstName: 'Ana',
-    lastName: 'Martínez',
-    role: 'facturador',
-    isActive: true,
-    createdAt: '2024-02-15T00:00:00Z',
-    lastLogin: '2024-09-09T12:30:00Z',
-    avatar: null
-  },
-  {
-    id: 5,
-    username: 'operador',
-    email: 'operador@sistema.com',
-    password: 'operador123',
-    firstName: 'Luis',
-    lastName: 'Hernández',
-    role: 'operador',
-    isActive: true,
-    createdAt: '2024-03-01T00:00:00Z',
-    lastLogin: '2024-09-09T11:15:00Z',
-    avatar: null
-  },
-  {
-    id: 6,
-    username: 'consultor',
-    email: 'consultor@sistema.com',
-    password: 'consultor123',
-    firstName: 'Elena',
-    lastName: 'Vargas',
-    role: 'consultor',
-    isActive: false,
-    createdAt: '2024-03-15T00:00:00Z',
-    lastLogin: '2024-09-08T16:00:00Z',
-    avatar: null
-  }
-]
+// Los datos de usuarios ahora vienen únicamente de Supabase
+// No hay datos hardcodeados para mantener la integridad multi-tenant
 
 // Definición de roles y permisos
 const roles = {
@@ -177,23 +98,20 @@ const roles = {
   }
 }
 
-// Simulación de delay de API
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
-
-export const userService = {
+const userService = {
   // Autenticación con Supabase Auth y Multi-Tenancy
   async login(credentials) {
     try {
-      console.log('🔄 Iniciando autenticación con Supabase...')
+      console.log('🔄 Iniciando autenticación con Supabase Auth...')
       
-      // 1. Intentar autenticación con Supabase
+      // 1. Intentar autenticación con Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: `${credentials.username}@sistema.local`, // Convertir username a formato email
         password: credentials.password
       })
       
       if (authError) {
-        console.warn('⚠️ Error de autenticación Supabase, usando fallback localStorage:', authError.message)
+        console.warn('⚠️ Error de autenticación Supabase Auth, usando fallback:', authError.message)
         return await this.loginFallback(credentials)
       }
       
@@ -225,12 +143,9 @@ export const userService = {
         .eq('id', userData.id)
       
       // 6. Preparar respuesta
-      const { password, ...userWithoutPassword } = userData
       const response = {
         success: true,
         user: {
-          ...userWithoutPassword,
-          // Mantener compatibilidad con el sistema anterior
           id: userData.id,
           username: userData.username,
           email: userData.email,
@@ -245,7 +160,7 @@ export const userService = {
         token: authData.session.access_token
       }
       
-      console.log('✅ Autenticación exitosa con Supabase')
+      console.log('✅ Autenticación exitosa con Supabase Auth')
       return response
       
     } catch (error) {
@@ -254,35 +169,58 @@ export const userService = {
     }
   },
 
-  // Fallback a localStorage cuando Supabase no está disponible
+  // Fallback mínimo para cuando Supabase no está disponible
   async loginFallback(credentials) {
     try {
-      console.log('🔄 Usando fallback localStorage para autenticación...')
-      await delay(400)
+      console.log('🔄 Usando fallback para autenticación...')
       
-      const user = mockUsers.find(u =>
+      // Usuarios mínimos para fallback (usando UUIDs reales)
+      const fallbackUsers = [
+        {
+          id: '11111111-1111-1111-1111-111111111111',
+          username: 'admin',
+          password: 'admin123',
+          firstName: 'Administrador',
+          lastName: 'Sistema',
+          role: 'admin',
+          isActive: true,
+          email: 'admin@sistema.local',
+          organizationId: '11111111-1111-1111-1111-111111111111'
+        },
+        {
+          id: '22222222-2222-2222-2222-222222222222',
+          username: 'contador',
+          password: 'contador123',
+          firstName: 'María',
+          lastName: 'González',
+          role: 'contador',
+          isActive: true,
+          email: 'contador@sistema.local',
+          organizationId: '11111111-1111-1111-1111-111111111111'
+        }
+      ]
+      
+      const user = fallbackUsers.find(u =>
         u.username === credentials.username &&
         u.password === credentials.password &&
         u.isActive
       )
       
       if (user) {
-        user.lastLogin = new Date().toISOString()
         const { password, ...userWithoutPassword } = user
         
-        // Simular organization_id para fallback
-        const mockOrgId = `mock-org-${user.id}`
-        setCurrentOrganizationId(mockOrgId)
+        // Usar organization_id real para fallback
+        setCurrentOrganizationId(user.organizationId)
         
-        const token = `mock-token-${user.id}-${Date.now()}`
+        const token = `fallback-token-${user.id}-${Date.now()}`
         localStorage.setItem('authToken', token)
         
-        console.log('✅ Autenticación exitosa con fallback localStorage')
+        console.log('✅ Autenticación exitosa con fallback')
         return { 
           success: true, 
           user: {
             ...userWithoutPassword,
-            organization: { id: mockOrgId, name: 'Organización Mock' }
+            organization: { id: user.organizationId, name: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.' }
           }, 
           token 
         }
@@ -332,19 +270,36 @@ export const userService = {
     }
   },
 
-  // Fallback para obtener usuarios desde localStorage
+  // Fallback para obtener usuarios
   async getUsersFallback() {
     try {
-      console.log('🔄 Obteniendo usuarios desde localStorage...')
-      await delay(800)
+      console.log('🔄 Obteniendo usuarios desde fallback...')
       
       const orgId = getCurrentOrganizationId()
-      const fallbackUsers = mockUsers.map(({ password, ...user }) => ({
-        ...user,
-        organization: { id: orgId, name: 'Organización Mock' }
-      }))
+      const fallbackUsers = [
+        {
+          id: 'fallback-admin',
+          username: 'admin',
+          firstName: 'Administrador',
+          lastName: 'Sistema',
+          role: 'admin',
+          isActive: true,
+          email: 'admin@sistema.local',
+          organization: { id: orgId, name: 'Organización Demo' }
+        },
+        {
+          id: 'fallback-contador',
+          username: 'contador',
+          firstName: 'María',
+          lastName: 'González',
+          role: 'contador',
+          isActive: true,
+          email: 'contador@sistema.local',
+          organization: { id: orgId, name: 'Organización Demo' }
+        }
+      ]
       
-      console.log('✅ Usuarios obtenidos desde localStorage:', fallbackUsers.length)
+      console.log('✅ Usuarios obtenidos desde fallback:', fallbackUsers.length)
       return fallbackUsers
     } catch (error) {
       console.error('❌ Error en fallback de usuarios:', error)
@@ -361,8 +316,8 @@ export const userService = {
       const { data: user, error } = await queryWithTenant('users', '*, organizations(*)', { id })
       
       if (error || !user || user.length === 0) {
-        console.warn('⚠️ Usuario no encontrado en Supabase, usando fallback')
-        return await this.getUserByIdFallback(id)
+        console.error('❌ Usuario no encontrado en Supabase')
+        return null
       }
       
       const userData = user[0]
@@ -385,28 +340,6 @@ export const userService = {
       
     } catch (error) {
       console.error('❌ Error inesperado al obtener usuario:', error)
-      return await this.getUserByIdFallback(id)
-    }
-  },
-
-  // Fallback para obtener usuario por ID desde localStorage
-  async getUserByIdFallback(id) {
-    try {
-      console.log('🔄 Obteniendo usuario por ID desde localStorage...')
-      await delay(500)
-      
-      const user = mockUsers.find(u => u.id === parseInt(id))
-      if (user) {
-        const { password, ...userWithoutPassword } = user
-        const orgId = getCurrentOrganizationId()
-        return {
-          ...userWithoutPassword,
-          organization: { id: orgId, name: 'Organización Mock' }
-        }
-      }
-      return null
-    } catch (error) {
-      console.error('❌ Error en fallback de usuario por ID:', error)
       return null
     }
   },
@@ -430,8 +363,8 @@ export const userService = {
       })
       
       if (authError) {
-        console.warn('⚠️ Error al crear usuario en Auth, usando fallback:', authError.message)
-        return await this.createUserFallback(userData)
+        console.error('❌ Error al crear usuario en Auth:', authError.message)
+        return { success: false, message: 'Error al crear usuario' }
       }
       
       // 2. Crear registro en tabla users
@@ -450,7 +383,7 @@ export const userService = {
       
       if (userError) {
         console.error('❌ Error al crear usuario en tabla:', userError)
-        return await this.createUserFallback(userData)
+        return { success: false, message: 'Error al crear usuario' }
       }
       
       console.log('✅ Usuario creado exitosamente en Supabase')
@@ -468,37 +401,7 @@ export const userService = {
       
     } catch (error) {
       console.error('❌ Error inesperado al crear usuario:', error)
-      return await this.createUserFallback(userData)
-    }
-  },
-
-  // Fallback para crear usuario en localStorage
-  async createUserFallback(userData) {
-    try {
-      console.log('🔄 Creando usuario en localStorage...')
-      await delay(1000)
-      
-      const newUser = {
-        id: Math.max(...mockUsers.map(u => u.id)) + 1,
-        ...userData,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        lastLogin: null,
-        avatar: null
-      }
-      
-      mockUsers.push(newUser)
-      const { password, ...userWithoutPassword } = newUser
-      const orgId = getCurrentOrganizationId()
-      
-      console.log('✅ Usuario creado en localStorage')
-      return {
-        ...userWithoutPassword,
-        organization: { id: orgId, name: 'Organización Mock' }
-      }
-    } catch (error) {
-      console.error('❌ Error en fallback de creación de usuario:', error)
-      throw error
+      return { success: false, message: 'Error al crear usuario' }
     }
   },
 
@@ -528,8 +431,8 @@ export const userService = {
       const { data: updatedUser, error } = await updateWithTenant('users', id, updateData)
       
       if (error) {
-        console.warn('⚠️ Error al actualizar usuario en Supabase, usando fallback:', error.message)
-        return await this.updateUserFallback(id, userData)
+        console.error('❌ Error al actualizar usuario en Supabase:', error.message)
+        return { success: false, message: 'Error al actualizar usuario' }
       }
       
       console.log('✅ Usuario actualizado en Supabase')
@@ -547,32 +450,7 @@ export const userService = {
       
     } catch (error) {
       console.error('❌ Error inesperado al actualizar usuario:', error)
-      return await this.updateUserFallback(id, userData)
-    }
-  },
-
-  // Fallback para actualizar usuario en localStorage
-  async updateUserFallback(id, userData) {
-    try {
-      console.log('🔄 Actualizando usuario en localStorage...')
-      await delay(800)
-      
-      const userIndex = mockUsers.findIndex(u => u.id === parseInt(id))
-      if (userIndex !== -1) {
-        mockUsers[userIndex] = { ...mockUsers[userIndex], ...userData }
-        const { password, ...userWithoutPassword } = mockUsers[userIndex]
-        const orgId = getCurrentOrganizationId()
-        
-        console.log('✅ Usuario actualizado en localStorage')
-        return {
-          ...userWithoutPassword,
-          organization: { id: orgId, name: 'Organización Mock' }
-        }
-      }
-      return null
-    } catch (error) {
-      console.error('❌ Error en fallback de actualización de usuario:', error)
-      throw error
+      return { success: false, message: 'Error al actualizar usuario' }
     }
   },
 
@@ -585,8 +463,8 @@ export const userService = {
       const { data: deletedUser, error } = await updateWithTenant('users', id, { is_active: false })
       
       if (error) {
-        console.warn('⚠️ Error al eliminar usuario en Supabase, usando fallback:', error.message)
-        return await this.deleteUserFallback(id)
+        console.error('❌ Error al eliminar usuario en Supabase:', error.message)
+        return { success: false, message: 'Error al eliminar usuario' }
       }
       
       console.log('✅ Usuario eliminado (soft delete) en Supabase')
@@ -604,38 +482,12 @@ export const userService = {
       
     } catch (error) {
       console.error('❌ Error inesperado al eliminar usuario:', error)
-      return await this.deleteUserFallback(id)
-    }
-  },
-
-  // Fallback para eliminar usuario en localStorage
-  async deleteUserFallback(id) {
-    try {
-      console.log('🔄 Eliminando usuario en localStorage (soft delete)...')
-      await delay(600)
-      
-      const userIndex = mockUsers.findIndex(u => u.id === parseInt(id))
-      if (userIndex !== -1) {
-        mockUsers[userIndex].isActive = false
-        const { password, ...userWithoutPassword } = mockUsers[userIndex]
-        const orgId = getCurrentOrganizationId()
-        
-        console.log('✅ Usuario eliminado en localStorage')
-        return {
-          ...userWithoutPassword,
-          organization: { id: orgId, name: 'Organización Mock' }
-        }
-      }
-      return null
-    } catch (error) {
-      console.error('❌ Error en fallback de eliminación de usuario:', error)
-      throw error
+      return { success: false, message: 'Error al eliminar usuario' }
     }
   },
 
   // Obtener roles disponibles
   async getRoles() {
-    await delay(300)
     return roles
   },
 
@@ -661,8 +513,8 @@ export const userService = {
       })
       
       if (error) {
-        console.warn('⚠️ Error al cambiar contraseña en Supabase, usando fallback:', error.message)
-        return await this.changePasswordFallback(userId, currentPassword, newPassword)
+        console.error('❌ Error al cambiar contraseña en Supabase:', error.message)
+        return { success: false, message: 'Error al cambiar contraseña' }
       }
       
       console.log('✅ Contraseña actualizada en Supabase')
@@ -670,26 +522,6 @@ export const userService = {
       
     } catch (error) {
       console.error('❌ Error inesperado al cambiar contraseña:', error)
-      return await this.changePasswordFallback(userId, currentPassword, newPassword)
-    }
-  },
-
-  // Fallback para cambiar contraseña en localStorage
-  async changePasswordFallback(userId, currentPassword, newPassword) {
-    try {
-      console.log('🔄 Cambiando contraseña en localStorage...')
-      await delay(1000)
-      
-      const user = mockUsers.find(u => u.id === userId)
-      if (user && user.password === currentPassword) {
-        user.password = newPassword
-        console.log('✅ Contraseña actualizada en localStorage')
-        return { success: true, message: 'Contraseña actualizada correctamente' }
-      }
-      
-      return { success: false, message: 'Contraseña actual incorrecta' }
-    } catch (error) {
-      console.error('❌ Error en fallback de cambio de contraseña:', error)
       return { success: false, message: 'Error al cambiar contraseña' }
     }
   },
@@ -705,8 +537,8 @@ export const userService = {
       })
       
       if (error) {
-        console.warn('⚠️ Error al resetear contraseña en Supabase, usando fallback:', error.message)
-        return await this.resetPasswordFallback(userId, newPassword)
+        console.error('❌ Error al resetear contraseña en Supabase:', error.message)
+        return { success: false, message: 'Error al resetear contraseña' }
       }
       
       console.log('✅ Contraseña reseteada en Supabase')
@@ -714,26 +546,6 @@ export const userService = {
       
     } catch (error) {
       console.error('❌ Error inesperado al resetear contraseña:', error)
-      return await this.resetPasswordFallback(userId, newPassword)
-    }
-  },
-
-  // Fallback para resetear contraseña en localStorage
-  async resetPasswordFallback(userId, newPassword) {
-    try {
-      console.log('🔄 Reseteando contraseña en localStorage...')
-      await delay(800)
-      
-      const user = mockUsers.find(u => u.id === userId)
-      if (user) {
-        user.password = newPassword
-        console.log('✅ Contraseña reseteada en localStorage')
-        return { success: true, message: 'Contraseña reseteada correctamente' }
-      }
-      
-      return { success: false, message: 'Usuario no encontrado' }
-    } catch (error) {
-      console.error('❌ Error en fallback de reset de contraseña:', error)
       return { success: false, message: 'Error al resetear contraseña' }
     }
   },

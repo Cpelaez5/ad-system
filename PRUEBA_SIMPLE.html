@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba Simple</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico de la Aplicación</h1>
+        
+        <div class="status info">
+            <strong>📋 Instrucciones:</strong><br>
+            1. Abre la aplicación en <a href="http://localhost:5173" target="_blank">http://localhost:5173</a><br>
+            2. Abre DevTools (F12) y ve a la pestaña Console<br>
+            3. Ejecuta los comandos de diagnóstico que aparecen abajo
+        </div>
+
+        <h2>🔧 Comandos de Diagnóstico</h2>
+        
+        <div class="status info">
+            <strong>1. Verificar variables de entorno:</strong><br>
+            <code>console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL)</code><br>
+            <code>console.log('Supabase Key:', import.meta.env.VITE_SUPABASE_ANON_KEY)</code>
+        </div>
+
+        <div class="status info">
+            <strong>2. Verificar conexión con Supabase:</strong><br>
+            <code>import('@/lib/supabaseClient').then(({ testSupabaseConnection }) => { testSupabaseConnection().then(result => console.log('Conexión:', result)) })</code>
+        </div>
+
+        <div class="status info">
+            <strong>3. Verificar datos de clientes:</strong><br>
+            <code>import('@/services/clientService').then(({ default: clientService }) => { clientService.getClients().then(clients => console.log('Clientes:', clients)) })</code>
+        </div>
+
+        <div class="status info">
+            <strong>4. Verificar datos de facturas:</strong><br>
+            <code>import('@/services/invoiceService').then(({ default: invoiceService }) => { invoiceService.getInvoices().then(invoices => console.log('Facturas:', invoices)) })</code>
+        </div>
+
+        <h2>🔑 Credenciales de Prueba</h2>
+        
+        <div class="status success">
+            <strong>Organización 1:</strong><br>
+            Usuario: <code>admin</code> | Contraseña: <code>admin123</code><br>
+            Usuario: <code>contador</code> | Contraseña: <code>contador123</code>
+        </div>
+
+        <div class="status success">
+            <strong>Organización 2:</strong><br>
+            Usuario: <code>auditor</code> | Contraseña: <code>auditor123</code><br>
+            Usuario: <code>facturador</code> | Contraseña: <code>facturador123</code>
+        </div>
+
+        <h2>📊 Estado Esperado</h2>
+        
+        <div class="status success">
+            <strong>✅ Aplicación funcionando:</strong><br>
+            - URL: http://localhost:5173<br>
+            - Página de login visible<br>
+            - Sin errores en consola<br>
+            - Variables de entorno cargadas
+        </div>
+
+        <div class="status success">
+            <strong>✅ Supabase conectado:</strong><br>
+            - Conexión exitosa<br>
+            - Datos de prueba disponibles<br>
+            - 8 clientes y 5 facturas
+        </div>
+
+        <div class="status success">
+            <strong>✅ Login funcional:</strong><br>
+            - Credenciales de prueba funcionan<br>
+            - Redirección al dashboard<br>
+            - Datos reales visibles
+        </div>
+
+        <h2>🚨 Posibles Problemas</h2>
+        
+        <div class="status error">
+            <strong>❌ Variables de entorno no cargadas:</strong><br>
+            - Síntoma: Consola muestra undefined<br>
+            - Solución: Reiniciar aplicación
+        </div>
+
+        <div class="status error">
+            <strong>❌ Supabase no conecta:</strong><br>
+            - Síntoma: Error de conexión<br>
+            - Solución: Verificar credenciales
+        </div>
+
+        <div class="status error">
+            <strong>❌ Datos no cargan:</strong><br>
+            - Síntoma: Arrays vacíos<br>
+            - Solución: Verificar seed data
+        </div>
+
+        <div class="status error">
+            <strong>❌ Router no funciona:</strong><br>
+            - Síntoma: Página en blanco<br>
+            - Solución: Verificar errores en consola
+        </div>
+
+        <h2>🎯 Próximos Pasos</h2>
+        
+        <div class="status info">
+            1. <strong>Ejecutar comandos de diagnóstico</strong><br>
+            2. <strong>Verificar cada paso</strong><br>
+            3. <strong>Reportar resultados</strong><br>
+            4. <strong>Solucionar problemas encontrados</strong>
+        </div>
+
+        <button onclick="window.open('http://localhost:5173', '_blank')">
+            🚀 Abrir Aplicación
+        </button>
+
+        <button onclick="alert('Abre DevTools (F12) y ejecuta los comandos de diagnóstico en la consola')">
+            📋 Ver Instrucciones
+        </button>
+    </div>
+</body>
+</html>

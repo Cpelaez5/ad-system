@@ -472,9 +472,9 @@
 </template>
 
 <script>
-import { invoiceService } from '../services/invoiceService.js';
-import { bcvService } from '../services/bcvService.js';
-import { exportService } from '../services/exportService.js';
+import invoiceService from '../services/invoiceService.js';
+import bcvService from '../services/bcvService.js';
+import exportService from '../services/exportService.js';
 import InvoiceForm from '../components/forms/InvoiceForm.vue';
 
 export default {
@@ -563,7 +563,7 @@ export default {
         const response = await invoiceService.getInvoices();
         console.log('📊 Respuesta del servicio:', response);
         
-        this.invoices = response.data || [];
+        this.invoices = response || [];
         console.log('📋 Facturas cargadas:', this.invoices.length);
         
         this.applyFilters();
@@ -580,7 +580,7 @@ export default {
         console.log('📊 Cargando estadísticas...');
         const response = await invoiceService.getInvoiceStats();
         console.log('📈 Respuesta de estadísticas:', response);
-        this.stats = response.data || { total: 0, byStatus: {}, totalAmount: 0 };
+        this.stats = response || { total: 0, byStatus: {}, totalAmount: 0 };
         console.log('📊 Estadísticas cargadas:', this.stats);
       } catch (error) {
         console.error('❌ Error al cargar estadísticas:', error);

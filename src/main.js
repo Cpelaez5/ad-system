@@ -3,6 +3,9 @@ import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
 
+// Inicializar tenant al cargar la aplicación
+import './utils/initTenant.js'
+
 // Vuetify
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'

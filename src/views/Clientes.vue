@@ -210,39 +210,11 @@ export default {
         { title: 'Estado', key: 'estado', sortable: true },
         { title: 'Acciones', key: 'acciones', sortable: false }
       ],
-      clientes: [
-        {
-          id: 1,
-          nombre: 'Juan Pérez',
-          identificacion: '12345678',
-          email: 'juan.perez@email.com',
-          telefono: '3001234567',
-          direccion: 'Calle 123 #45-67',
-          tipoCliente: 'Persona Natural',
-          estado: 'Activo'
-        },
-        {
-          id: 2,
-          nombre: 'Empresa ABC S.A.S.',
-          identificacion: '900123456',
-          email: 'contacto@empresaabc.com',
-          telefono: '6012345678',
-          direccion: 'Carrera 45 #78-90',
-          tipoCliente: 'Persona Jurídica',
-          estado: 'Activo'
-        },
-        {
-          id: 3,
-          nombre: 'María González',
-          identificacion: '87654321',
-          email: 'maria.gonzalez@email.com',
-          telefono: '3007654321',
-          direccion: 'Avenida 67 #12-34',
-          tipoCliente: 'Persona Natural',
-          estado: 'Inactivo'
-        }
-      ]
+      clientes: []
     }
+  },
+  async mounted() {
+    await this.cargarClientes()
   },
   computed: {
     clientesFiltrados() {
@@ -257,6 +229,35 @@ export default {
     }
   },
   methods: {
+    async cargarClientes() {
+      try {
+        this.cargando = true
+        console.log('🔄 Cargando clientes...')
+        
+        const clientService = (await import('@/services/clientService')).default
+        const clientesData = await clientService.getClients()
+        
+        // Transformar datos para compatibilidad con la vista
+        this.clientes = clientesData.map(cliente => ({
+          id: cliente.id,
+          nombre: cliente.companyName,
+          identificacion: cliente.rif,
+          email: cliente.email,
+          telefono: cliente.phone,
+          direccion: cliente.address,
+          tipoCliente: cliente.taxpayerType,
+          estado: cliente.status
+        }))
+        
+        console.log('✅ Clientes cargados:', this.clientes.length)
+        
+      } catch (error) {
+        console.error('❌ Error al cargar clientes:', error)
+        this.clientes = []
+      } finally {
+        this.cargando = false
+      }
+    },
     abrirDialogoNuevoCliente() {
       this.esEdicion = false
       this.clienteForm = {

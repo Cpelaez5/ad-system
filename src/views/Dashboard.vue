@@ -274,13 +274,45 @@ export default {
       container
     }
   },
+  async mounted() {
+    await this.cargarEstadisticas()
+  },
+  methods: {
+    async cargarEstadisticas() {
+      try {
+        console.log('🔄 Cargando estadísticas del dashboard...')
+        
+        // Cargar estadísticas de clientes
+        const clientService = (await import('@/services/clientService')).default
+        const clientStats = await clientService.getClientStats()
+        
+        // Cargar estadísticas de facturas
+        const invoiceService = (await import('@/services/invoiceService')).default
+        const invoiceStats = await invoiceService.getInvoiceStats()
+        
+        // Actualizar estadísticas
+        this.estadisticas = {
+          totalClientes: clientStats.total || 0,
+          facturasMes: invoiceStats.total || 0,
+          ingresosMes: invoiceStats.totalAmount || 0,
+          documentos: 0 // Por ahora 0, se puede implementar después
+        }
+        
+        console.log('✅ Estadísticas cargadas:', this.estadisticas)
+        
+      } catch (error) {
+        console.error('❌ Error al cargar estadísticas:', error)
+        // Mantener valores por defecto en caso de error
+      }
+    }
+  },
   data() {
     return {
       estadisticas: {
-        totalClientes: 156,
-        facturasMes: 89,
-        ingresosMes: 1250000,
-        documentos: 2341
+        totalClientes: 0,
+        facturasMes: 0,
+        ingresosMes: 0,
+        documentos: 0
       },
       chartData: {
         labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],

@@ -487,7 +487,8 @@ class BCVService {
   }
 }
 
-export const bcvService = new BCVService();
+const bcvService = new BCVService();
+export default bcvService;
 
 // Hacer el servicio accesible desde la consola del navegador para debug
 if (typeof window !== 'undefined') {

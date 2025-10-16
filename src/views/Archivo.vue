@@ -70,6 +70,15 @@
       </v-col>
       <v-col cols="12" md="6" class="text-right">
         <v-btn
+          color="warning"
+          size="large"
+          prepend-icon="mdi-broom"
+          @click="limpiarArchivosHuerfanos"
+          class="mr-2"
+        >
+          Limpiar Archivos
+        </v-btn>
+        <v-btn
           color="primary"
           size="large"
           prepend-icon="mdi-upload"
@@ -324,10 +333,10 @@ export default {
         descripcion: ''
       },
       resumen: {
-        totalDocumentos: 2341,
-        carpetas: 15,
-        espacioUsado: 2147483648, // 2GB en bytes
-        subidasHoy: 12
+        totalDocumentos: 0,
+        carpetas: 5,
+        espacioUsado: 0,
+        subidasHoy: 0
       },
       categorias: [
         'Facturas',
@@ -384,53 +393,7 @@ export default {
           documentos: 12
         }
       ],
-      documentos: [
-        {
-          id: 1,
-          nombre: 'Factura_001_2024.pdf',
-          tipo: 'PDF',
-          tamaño: 245760,
-          categoria: 'Facturas',
-          fechaSubida: '2024-01-20',
-          carpeta: 1
-        },
-        {
-          id: 2,
-          nombre: 'Comprobante_Pago_001.xlsx',
-          tipo: 'Excel',
-          tamaño: 51200,
-          categoria: 'Comprobantes',
-          fechaSubida: '2024-01-19',
-          carpeta: 2
-        },
-        {
-          id: 3,
-          nombre: 'Contrato_Servicios_2024.docx',
-          tipo: 'Word',
-          tamaño: 128000,
-          categoria: 'Contratos',
-          fechaSubida: '2024-01-18',
-          carpeta: 3
-        },
-        {
-          id: 4,
-          nombre: 'Reporte_Mensual_Enero.pdf',
-          tipo: 'PDF',
-          tamaño: 1024000,
-          categoria: 'Reportes',
-          fechaSubida: '2024-01-17',
-          carpeta: 4
-        },
-        {
-          id: 5,
-          nombre: 'Certificado_DIAN.pdf',
-          tipo: 'PDF',
-          tamaño: 76800,
-          categoria: 'Certificados',
-          fechaSubida: '2024-01-16',
-          carpeta: 5
-        }
-      ]
+      documentos: []
     }
   },
   computed: {
@@ -463,7 +426,76 @@ export default {
       return documentos
     }
   },
+  async mounted() {
+    await this.cargarDocumentos()
+    await this.cargarEstadisticas()
+  },
   methods: {
+    async cargarDocumentos() {
+      try {
+        this.cargando = true
+        console.log('🔄 Cargando documentos...')
+        
+        const documentService = (await import('@/services/documentService')).default
+        const documentosData = await documentService.getDocuments()
+        
+        this.documentos = documentosData || []
+        console.log('✅ Documentos cargados:', this.documentos.length)
+        
+      } catch (error) {
+        console.error('❌ Error al cargar documentos:', error)
+      } finally {
+        this.cargando = false
+      }
+    },
+
+    async cargarEstadisticas() {
+      try {
+        console.log('📊 Cargando estadísticas de documentos...')
+        
+        const documentService = (await import('@/services/documentService')).default
+        const stats = await documentService.getDocumentStats()
+        
+        this.resumen = {
+          totalDocumentos: stats.total || 0,
+          carpetas: 5, // Fijo por ahora
+          espacioUsado: stats.totalSize || 0,
+          subidasHoy: stats.uploadsToday || 0
+        }
+        
+        console.log('📊 Estadísticas cargadas:', this.resumen)
+        
+      } catch (error) {
+        console.error('❌ Error al cargar estadísticas:', error)
+      }
+    },
+
+    async limpiarArchivosHuerfanos() {
+      if (confirm('¿Está seguro de limpiar archivos huérfanos del Storage? Esta acción eliminará archivos que no tienen registro en la base de datos.')) {
+        try {
+          console.log('🧹 Iniciando limpieza de archivos huérfanos...')
+          
+          const documentService = (await import('@/services/documentService')).default
+          const result = await documentService.cleanupOrphanedFiles()
+          
+          if (result.success) {
+            console.log(`✅ Limpieza completada: ${result.deletedCount} archivos eliminados`)
+            alert(`Limpieza completada: ${result.deletedCount} archivos huérfanos eliminados`)
+            
+            // Recargar estadísticas
+            await this.cargarEstadisticas()
+          } else {
+            console.error('❌ Error en la limpieza:', result.message)
+            alert(`Error en la limpieza: ${result.message}`)
+          }
+          
+        } catch (error) {
+          console.error('❌ Error inesperado en la limpieza:', error)
+          alert('Error inesperado en la limpieza de archivos')
+        }
+      }
+    },
+
     seleccionarCarpeta(carpeta) {
       this.carpetaSeleccionada = carpeta
     },
@@ -484,25 +516,48 @@ export default {
         this.subiendo = true
         
         try {
-          // Simular subida de archivos
+          const documentService = (await import('@/services/documentService')).default
+          
+          // Subir cada archivo
           for (const archivo of this.archivosSeleccionados) {
-            const nuevoDocumento = {
-              id: Date.now() + Math.random(),
-              nombre: archivo.name,
-              tipo: this.obtenerTipoArchivo(archivo.name),
-              tamaño: archivo.size,
-              categoria: this.documentoForm.categoria,
-              fechaSubida: new Date().toISOString().split('T')[0],
-              carpeta: this.documentoForm.carpeta
+            console.log('🔄 Subiendo archivo:', archivo.name)
+            
+            // 1. Subir archivo a Supabase Storage
+            const uploadResult = await documentService.uploadFile(archivo, this.documentoForm.categoria)
+            
+            if (!uploadResult.success) {
+              console.error('❌ Error al subir archivo:', uploadResult.message)
+              continue
             }
             
-            this.documentos.push(nuevoDocumento)
+            // 2. Crear registro en la base de datos
+            const documentData = {
+              fileName: archivo.name,
+              fileUrl: uploadResult.data.fileUrl,
+              fileType: uploadResult.data.fileType,
+              fileSize: uploadResult.data.fileSize,
+              category: this.documentoForm.categoria,
+              uploadedBy: '11111111-1111-1111-1111-111111111111' // Usuario por defecto
+            }
+            
+            const createResult = await documentService.createDocument(documentData)
+            
+            if (createResult.success) {
+              console.log('✅ Documento creado exitosamente:', createResult.data)
+            } else {
+              console.error('❌ Error al crear documento:', createResult.message)
+            }
           }
           
+          // Recargar documentos y estadísticas
+          await this.cargarDocumentos()
+          await this.cargarEstadisticas()
+          
           this.cerrarDialogoSubida()
-          this.$emit('mostrar-mensaje', 'Documentos subidos exitosamente')
+          console.log('✅ Documentos subidos exitosamente')
+          
         } catch (error) {
-          console.error('Error al subir documentos:', error)
+          console.error('❌ Error al subir documentos:', error)
         } finally {
           this.subiendo = false
         }
@@ -517,11 +572,25 @@ export default {
     editarDocumento(documento) {
       console.log('Editar documento:', documento)
     },
-    eliminarDocumento(documento) {
+    async eliminarDocumento(documento) {
       if (confirm(`¿Está seguro de eliminar el documento ${documento.nombre}?`)) {
-        const index = this.documentos.findIndex(d => d.id === documento.id)
-        if (index > -1) {
-          this.documentos.splice(index, 1)
+        try {
+          console.log('🔄 Eliminando documento:', documento.nombre)
+          
+          const documentService = (await import('@/services/documentService')).default
+          const result = await documentService.deleteDocument(documento.id)
+          
+          if (result.success) {
+            console.log('✅ Documento eliminado exitosamente')
+            // Recargar documentos y estadísticas
+            await this.cargarDocumentos()
+            await this.cargarEstadisticas()
+          } else {
+            console.error('❌ Error al eliminar documento:', result.message)
+          }
+          
+        } catch (error) {
+          console.error('❌ Error inesperado al eliminar documento:', error)
         }
       }
     },
