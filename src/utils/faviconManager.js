@@ -5,9 +5,14 @@
 
 class FaviconManager {
   constructor() {
-    this.lightIcon = '/src/assets/icon-light.svg'
-    this.darkIcon = '/src/assets/icon-dark.svg'
-    this.defaultIcon = '/src/assets/icon-adaptableV2.svg'
+    // Detectar si estamos en desarrollo o producción
+    const isDevelopment = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    const basePath = isDevelopment ? '/src/assets' : '/assets'
+    
+    this.lightIcon = `${basePath}/icon-light.svg`
+    this.darkIcon = `${basePath}/icon-dark.svg`
+    this.defaultIcon = `${basePath}/icon-adaptableV2.svg`
     
     this.init()
   }

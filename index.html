@@ -19,6 +19,10 @@
     <script>
       // Inicializar favicon manager tan pronto como sea posible
       document.addEventListener('DOMContentLoaded', function() {
+        // Detectar si estamos en desarrollo o producción
+        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        const basePath = isDevelopment ? '/src/assets' : '/assets'
+        
         // Función simple para cambiar favicon
         function setFavicon(iconPath) {
           let favicon = document.querySelector('#dynamic-favicon')
@@ -37,17 +41,17 @@
         
         // Establecer favicon inicial
         const theme = getCurrentTheme()
-        const iconPath = theme === 'dark' ? '/src/assets/icon-dark.svg' : '/src/assets/icon-light.svg'
+        const iconPath = theme === 'dark' ? `${basePath}/icon-dark.svg` : `${basePath}/icon-light.svg`
         setFavicon(iconPath)
         
-        console.log('🎨 Favicon inicial establecido para tema:', theme)
+        console.log('🎨 Favicon inicial establecido para tema:', theme, 'en modo:', isDevelopment ? 'desarrollo' : 'producción')
         
         // Escuchar cambios de tema
         if (window.matchMedia) {
           const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
           mediaQuery.addEventListener('change', function(e) {
             const newTheme = e.matches ? 'dark' : 'light'
-            const newIconPath = newTheme === 'dark' ? '/src/assets/icon-dark.svg' : '/src/assets/icon-light.svg'
+            const newIconPath = newTheme === 'dark' ? `${basePath}/icon-dark.svg` : `${basePath}/icon-light.svg`
             setFavicon(newIconPath)
             console.log('🎨 Favicon cambiado automáticamente a tema:', newTheme)
           })
