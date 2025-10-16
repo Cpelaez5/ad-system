@@ -125,7 +125,7 @@ export default {
       console.log('Input detectado:', this.credenciales)
     },
     async iniciarSesion() {
-      console.log('Intentando iniciar sesión...')
+      console.log('🔄 Intentando iniciar sesión con Supabase...')
       console.log('Credenciales:', this.credenciales)
       
       // Validar que los campos no estén vacíos
@@ -137,21 +137,35 @@ export default {
       this.cargando = true
       
       try {
+        // Usar el userService actualizado que maneja Supabase + fallback
         const { userService } = await import('@/services/userService')
         const result = await userService.login({
           username: this.credenciales.usuario,
           password: this.credenciales.password
         })
+        
         if (result.success) {
+          console.log('✅ Login exitoso:', result.user.username)
+          
+          // Guardar datos de sesión
           localStorage.setItem('usuarioAutenticado', 'true')
           localStorage.setItem('currentUser', JSON.stringify(result.user))
           if (result.token) localStorage.setItem('authToken', result.token)
+          
+          // Guardar organization_id para multi-tenancy
+          if (result.user.organization) {
+            localStorage.setItem('current_organization_id', result.user.organization.id)
+            console.log('🏢 Organization ID guardado:', result.user.organization.id)
+          }
+          
+          // Navegar al dashboard
           this.$router.push('/dashboard')
         } else {
+          console.error('❌ Error en login:', result.message)
           alert(result.message || 'Usuario o contraseña incorrectos')
         }
       } catch (error) {
-        console.error('Error al iniciar sesión:', error)
+        console.error('❌ Error inesperado al iniciar sesión:', error)
         alert('Error al iniciar sesión. Inténtalo de nuevo.')
       } finally {
         this.cargando = false
@@ -162,11 +176,30 @@ export default {
       alert('Funcionalidad de recuperación de contraseña en desarrollo')
     }
   },
-  mounted() {
+  async mounted() {
     // Verificar si ya hay una sesión activa
     const usuarioAutenticado = localStorage.getItem('usuarioAutenticado')
     if (usuarioAutenticado === 'true') {
-      this.$router.push('/dashboard')
+      // Verificar también la sesión de Supabase si está disponible
+      try {
+        const { supabase } = await import('@/lib/supabaseClient')
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session) {
+          console.log('✅ Sesión de Supabase activa encontrada')
+          this.$router.push('/dashboard')
+        } else {
+          console.log('⚠️ No hay sesión de Supabase, pero hay datos locales')
+          // Limpiar datos locales si no hay sesión de Supabase
+          localStorage.removeItem('usuarioAutenticado')
+          localStorage.removeItem('currentUser')
+          localStorage.removeItem('authToken')
+          localStorage.removeItem('current_organization_id')
+        }
+      } catch (error) {
+        console.log('⚠️ Error al verificar sesión de Supabase, usando datos locales')
+        this.$router.push('/dashboard')
+      }
     }
   }
 }

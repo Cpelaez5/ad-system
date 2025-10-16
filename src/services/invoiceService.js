@@ -1,5 +1,15 @@
-// Servicio para manejo de facturas con localStorage (MVP sin base de datos)
-import api from './api.js';
+// Servicio para manejo de facturas con Supabase Multi-Tenant y fallback a localStorage
+import { supabase } from '@/lib/supabaseClient'
+import { 
+  getCurrentOrganizationId, 
+  setCurrentOrganizationId, 
+  clearCurrentOrganizationId,
+  queryWithTenant, 
+  insertWithTenant, 
+  updateWithTenant, 
+  deleteWithTenant, 
+  handleTenantError 
+} from '@/utils/tenantHelpers'
 
 class InvoiceService {
   constructor() {
@@ -7,9 +17,11 @@ class InvoiceService {
     this.initializeStorage();
   }
 
-  // Inicializar datos de ejemplo en localStorage
+  // Inicializar datos de ejemplo en localStorage con multi-tenancy
   initializeStorage() {
-    const existingData = localStorage.getItem(this.storageKey);
+    const organizationId = getCurrentOrganizationId()
+    const storageKey = organizationId ? `${this.storageKey}_${organizationId}` : this.storageKey
+    const existingData = localStorage.getItem(storageKey);
     const existingInvoices = existingData ? JSON.parse(existingData) : [];
     
     // Si no hay datos o hay muy pocos (menos de 5), cargar datos de ejemplo
@@ -562,56 +574,137 @@ class InvoiceService {
         }
       ];
       
-      localStorage.setItem(this.storageKey, JSON.stringify(sampleInvoices));
+      localStorage.setItem(storageKey, JSON.stringify(sampleInvoices));
     }
   }
 
-  // Obtener todas las facturas
+  // Obtener todas las facturas de la organización actual
   async getInvoices(filters = {}) {
     try {
-      console.log('🔄 Obteniendo facturas desde localStorage...');
+      console.log('🔄 Obteniendo facturas desde Supabase...')
+
+      // Intentar obtener desde Supabase
+      let query = queryWithTenant('invoices')
+
+      // Aplicar filtros de búsqueda
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase()
+        query = query.or(`invoice_number.ilike.%${searchLower}%,client_info->>company_name.ilike.%${searchLower}%,issuer->>company_name.ilike.%${searchLower}%`)
+      }
+
+      // Aplicar filtro de estado
+      if (filters.status) {
+        query = query.eq('status', filters.status)
+      }
+
+      // Aplicar filtros de fecha
+      if (filters.dateFrom) {
+        query = query.gte('issue_date', filters.dateFrom)
+      }
+      if (filters.dateTo) {
+        query = query.lte('issue_date', filters.dateTo)
+      }
+
+      // Aplicar paginación
+      const page = parseInt(filters.page) || 1
+      const limit = parseInt(filters.limit) || 10
+      const from = (page - 1) * limit
+      const to = from + limit - 1
+
+      query = query.range(from, to).order('created_at', { ascending: false })
+
+      const { data: invoices, error, count } = await query
+
+      if (error) {
+        console.warn('⚠️ Error al obtener facturas desde Supabase, usando fallback:', error.message)
+        return await this.getInvoicesFallback(filters)
+      }
+
+      // Transformar datos para compatibilidad
+      const transformedInvoices = invoices.map(invoice => ({
+        id: invoice.id,
+        invoiceNumber: invoice.invoice_number,
+        controlNumber: invoice.control_number,
+        documentType: invoice.document_type,
+        issueDate: invoice.issue_date,
+        dueDate: invoice.due_date,
+        status: invoice.status,
+        issuer: invoice.issuer,
+        client: invoice.client_info,
+        financial: invoice.financial,
+        items: invoice.items,
+        attachments: invoice.attachments,
+        notes: invoice.notes,
+        createdBy: invoice.created_by,
+        createdAt: invoice.created_at,
+        updatedAt: invoice.updated_at
+      }))
+
+      console.log('✅ Facturas obtenidas desde Supabase:', transformedInvoices.length)
+      return {
+        success: true,
+        data: transformedInvoices,
+        pagination: {
+          page,
+          limit,
+          total: count || transformedInvoices.length,
+          totalPages: Math.ceil((count || transformedInvoices.length) / limit)
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Error inesperado al obtener facturas:', error)
+      return await this.getInvoicesFallback(filters)
+    }
+  }
+
+  // Fallback a localStorage para obtener facturas
+  async getInvoicesFallback(filters = {}) {
+    try {
+      console.log('🔄 Obteniendo facturas desde localStorage (fallback)...')
       
-      // Usar solo localStorage (MVP sin backend)
-      let invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      const organizationId = getCurrentOrganizationId()
+      const storageKey = organizationId ? `${this.storageKey}_${organizationId}` : this.storageKey
+      let invoices = JSON.parse(localStorage.getItem(storageKey) || '[]')
       
       // Si no hay facturas, forzar la inicialización
       if (invoices.length === 0) {
-        console.log('⚠️ No hay facturas en localStorage, forzando inicialización...');
-        this.initializeStorage();
-        invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-        console.log('✅ Facturas inicializadas:', invoices.length);
+        console.log('⚠️ No hay facturas en localStorage, forzando inicialización...')
+        this.initializeStorage()
+        invoices = JSON.parse(localStorage.getItem(storageKey) || '[]')
+        console.log('✅ Facturas inicializadas:', invoices.length)
       }
       
-      let filteredInvoices = [...invoices];
+      let filteredInvoices = [...invoices]
       
       // Aplicar filtros
       if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
+        const searchLower = filters.search.toLowerCase()
         filteredInvoices = filteredInvoices.filter(invoice =>
           invoice.invoiceNumber.toLowerCase().includes(searchLower) ||
           invoice.client.companyName.toLowerCase().includes(searchLower) ||
           invoice.issuer.companyName.toLowerCase().includes(searchLower)
-        );
+        )
       }
       
       if (filters.status) {
-        filteredInvoices = filteredInvoices.filter(invoice => invoice.status === filters.status);
+        filteredInvoices = filteredInvoices.filter(invoice => invoice.status === filters.status)
       }
       
       if (filters.dateFrom) {
-        filteredInvoices = filteredInvoices.filter(invoice => invoice.issueDate >= filters.dateFrom);
+        filteredInvoices = filteredInvoices.filter(invoice => invoice.issueDate >= filters.dateFrom)
       }
       
       if (filters.dateTo) {
-        filteredInvoices = filteredInvoices.filter(invoice => invoice.issueDate <= filters.dateTo);
+        filteredInvoices = filteredInvoices.filter(invoice => invoice.issueDate <= filters.dateTo)
       }
       
       // Paginación
-      const page = parseInt(filters.page) || 1;
-      const limit = parseInt(filters.limit) || 10;
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex);
+      const page = parseInt(filters.page) || 1
+      const limit = parseInt(filters.limit) || 10
+      const startIndex = (page - 1) * limit
+      const endIndex = startIndex + limit
+      const paginatedInvoices = filteredInvoices.slice(startIndex, endIndex)
       
       return {
         success: true,
@@ -622,124 +715,358 @@ class InvoiceService {
           total: filteredInvoices.length,
           totalPages: Math.ceil(filteredInvoices.length / limit)
         }
-      };
+      }
     } catch (error) {
-      console.error('Error al obtener facturas:', error);
-      throw error;
+      console.error('❌ Error en fallback de facturas:', error)
+      throw error
     }
   }
 
-  // Obtener factura por ID
+  // Obtener factura por ID de la organización actual
   async getInvoiceById(id) {
     try {
-      console.log('🔄 Obteniendo factura por ID desde localStorage...');
+      console.log('🔄 Obteniendo factura por ID desde Supabase...')
+
+      // Intentar obtener desde Supabase
+      const { data: invoice, error } = await queryWithTenant('invoices')
+        .eq('id', id)
+        .single()
+
+      if (error) {
+        console.warn('⚠️ Error al obtener factura desde Supabase, usando fallback:', error.message)
+        return await this.getInvoiceByIdFallback(id)
+      }
+
+      if (!invoice) {
+        throw new Error('Factura no encontrada')
+      }
+
+      // Transformar datos para compatibilidad
+      const transformedInvoice = {
+        id: invoice.id,
+        invoiceNumber: invoice.invoice_number,
+        controlNumber: invoice.control_number,
+        documentType: invoice.document_type,
+        issueDate: invoice.issue_date,
+        dueDate: invoice.due_date,
+        status: invoice.status,
+        issuer: invoice.issuer,
+        client: invoice.client_info,
+        financial: invoice.financial,
+        items: invoice.items,
+        attachments: invoice.attachments,
+        notes: invoice.notes,
+        createdBy: invoice.created_by,
+        createdAt: invoice.created_at,
+        updatedAt: invoice.updated_at
+      }
+
+      console.log('✅ Factura obtenida desde Supabase:', transformedInvoice.invoiceNumber)
+      return {
+        success: true,
+        data: transformedInvoice
+      }
+
+    } catch (error) {
+      console.error('❌ Error inesperado al obtener factura:', error)
+      return await this.getInvoiceByIdFallback(id)
+    }
+  }
+
+  // Fallback a localStorage para obtener factura por ID
+  async getInvoiceByIdFallback(id) {
+    try {
+      console.log('🔄 Obteniendo factura por ID desde localStorage (fallback)...')
       
-      // Usar solo localStorage (MVP sin backend)
-      const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-      const invoice = invoices.find(inv => inv.id === parseInt(id));
+      const organizationId = getCurrentOrganizationId()
+      const storageKey = organizationId ? `${this.storageKey}_${organizationId}` : this.storageKey
+      const invoices = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      const invoice = invoices.find(inv => inv.id === parseInt(id))
       
       if (!invoice) {
-        throw new Error('Factura no encontrada');
+        throw new Error('Factura no encontrada')
       }
       
       return {
         success: true,
         data: invoice
-      };
+      }
     } catch (error) {
-      console.error('Error al obtener factura:', error);
-      throw error;
+      console.error('❌ Error en fallback de factura por ID:', error)
+      throw error
     }
   }
 
-  // Crear nueva factura
+  // Crear nueva factura en la organización actual
   async createInvoice(invoiceData) {
     try {
-      console.log('🔄 Creando factura en localStorage...');
+      console.log('🔄 Creando factura en Supabase...')
+
+      // Transformar datos para Supabase
+      const supabaseData = {
+        invoice_number: invoiceData.invoiceNumber,
+        control_number: invoiceData.controlNumber,
+        document_type: invoiceData.documentType,
+        issue_date: invoiceData.issueDate,
+        due_date: invoiceData.dueDate,
+        status: invoiceData.status,
+        issuer: invoiceData.issuer,
+        client_info: invoiceData.client,
+        financial: invoiceData.financial,
+        items: invoiceData.items,
+        attachments: invoiceData.attachments,
+        notes: invoiceData.notes,
+        created_by: invoiceData.createdBy || 'current_user'
+      }
+
+      // Intentar crear en Supabase
+      const { data: newInvoice, error } = await insertWithTenant('invoices', supabaseData)
+
+      if (error) {
+        console.warn('⚠️ Error al crear factura en Supabase, usando fallback:', error.message)
+        return await this.createInvoiceFallback(invoiceData)
+      }
+
+      // Transformar respuesta para compatibilidad
+      const transformedInvoice = {
+        id: newInvoice[0].id,
+        invoiceNumber: newInvoice[0].invoice_number,
+        controlNumber: newInvoice[0].control_number,
+        documentType: newInvoice[0].document_type,
+        issueDate: newInvoice[0].issue_date,
+        dueDate: newInvoice[0].due_date,
+        status: newInvoice[0].status,
+        issuer: newInvoice[0].issuer,
+        client: newInvoice[0].client_info,
+        financial: newInvoice[0].financial,
+        items: newInvoice[0].items,
+        attachments: newInvoice[0].attachments,
+        notes: newInvoice[0].notes,
+        createdBy: newInvoice[0].created_by,
+        createdAt: newInvoice[0].created_at,
+        updatedAt: newInvoice[0].updated_at
+      }
+
+      console.log('✅ Factura creada en Supabase:', transformedInvoice.invoiceNumber)
+      return {
+        success: true,
+        message: 'Factura creada exitosamente',
+        data: transformedInvoice
+      }
+
+    } catch (error) {
+      console.error('❌ Error inesperado al crear factura:', error)
+      return await this.createInvoiceFallback(invoiceData)
+    }
+  }
+
+  // Fallback a localStorage para crear factura
+  async createInvoiceFallback(invoiceData) {
+    try {
+      console.log('🔄 Creando factura en localStorage (fallback)...')
       
-      // Usar solo localStorage (MVP sin backend)
-      const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      const organizationId = getCurrentOrganizationId()
+      const storageKey = organizationId ? `${this.storageKey}_${organizationId}` : this.storageKey
+      const invoices = JSON.parse(localStorage.getItem(storageKey) || '[]')
       
       const newInvoice = {
         id: invoices.length > 0 ? Math.max(...invoices.map(inv => inv.id)) + 1 : 1,
         ...invoiceData,
-        createdBy: 'current_user', // En un sistema real esto vendría del contexto de autenticación
+        createdBy: 'current_user',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      };
+      }
       
-      invoices.push(newInvoice);
-      localStorage.setItem(this.storageKey, JSON.stringify(invoices));
+      invoices.push(newInvoice)
+      localStorage.setItem(storageKey, JSON.stringify(invoices))
       
       return {
         success: true,
         message: 'Factura creada exitosamente',
         data: newInvoice
-      };
+      }
     } catch (error) {
-      console.error('Error al crear factura:', error);
-      throw error;
+      console.error('❌ Error en fallback de crear factura:', error)
+      throw error
     }
   }
 
-  // Actualizar factura
+  // Actualizar factura en la organización actual
   async updateInvoice(id, invoiceData) {
     try {
-      console.log('🔄 Actualizando factura en localStorage...');
+      console.log('🔄 Actualizando factura en Supabase...')
+
+      // Transformar datos para Supabase
+      const supabaseData = {
+        invoice_number: invoiceData.invoiceNumber,
+        control_number: invoiceData.controlNumber,
+        document_type: invoiceData.documentType,
+        issue_date: invoiceData.issueDate,
+        due_date: invoiceData.dueDate,
+        status: invoiceData.status,
+        issuer: invoiceData.issuer,
+        client_info: invoiceData.client,
+        financial: invoiceData.financial,
+        items: invoiceData.items,
+        attachments: invoiceData.attachments,
+        notes: invoiceData.notes
+      }
+
+      // Intentar actualizar en Supabase
+      const { data: updatedInvoice, error } = await updateWithTenant('invoices', id, supabaseData)
+
+      if (error) {
+        console.warn('⚠️ Error al actualizar factura en Supabase, usando fallback:', error.message)
+        return await this.updateInvoiceFallback(id, invoiceData)
+      }
+
+      if (!updatedInvoice || updatedInvoice.length === 0) {
+        throw new Error('Factura no encontrada')
+      }
+
+      // Transformar respuesta para compatibilidad
+      const transformedInvoice = {
+        id: updatedInvoice[0].id,
+        invoiceNumber: updatedInvoice[0].invoice_number,
+        controlNumber: updatedInvoice[0].control_number,
+        documentType: updatedInvoice[0].document_type,
+        issueDate: updatedInvoice[0].issue_date,
+        dueDate: updatedInvoice[0].due_date,
+        status: updatedInvoice[0].status,
+        issuer: updatedInvoice[0].issuer,
+        client: updatedInvoice[0].client_info,
+        financial: updatedInvoice[0].financial,
+        items: updatedInvoice[0].items,
+        attachments: updatedInvoice[0].attachments,
+        notes: updatedInvoice[0].notes,
+        createdBy: updatedInvoice[0].created_by,
+        createdAt: updatedInvoice[0].created_at,
+        updatedAt: updatedInvoice[0].updated_at
+      }
+
+      console.log('✅ Factura actualizada en Supabase:', transformedInvoice.invoiceNumber)
+      return {
+        success: true,
+        message: 'Factura actualizada exitosamente',
+        data: transformedInvoice
+      }
+
+    } catch (error) {
+      console.error('❌ Error inesperado al actualizar factura:', error)
+      return await this.updateInvoiceFallback(id, invoiceData)
+    }
+  }
+
+  // Fallback a localStorage para actualizar factura
+  async updateInvoiceFallback(id, invoiceData) {
+    try {
+      console.log('🔄 Actualizando factura en localStorage (fallback)...')
       
-      // Usar solo localStorage (MVP sin backend)
-      const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-      const invoiceIndex = invoices.findIndex(inv => inv.id === parseInt(id));
+      const organizationId = getCurrentOrganizationId()
+      const storageKey = organizationId ? `${this.storageKey}_${organizationId}` : this.storageKey
+      const invoices = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      const invoiceIndex = invoices.findIndex(inv => inv.id === parseInt(id))
       
       if (invoiceIndex === -1) {
-        throw new Error('Factura no encontrada');
+        throw new Error('Factura no encontrada')
       }
       
       const updatedInvoice = {
         ...invoices[invoiceIndex],
         ...invoiceData,
-        id: invoices[invoiceIndex].id, // Mantener el ID original
+        id: invoices[invoiceIndex].id,
         updatedAt: new Date().toISOString()
-      };
+      }
       
-      invoices[invoiceIndex] = updatedInvoice;
-      localStorage.setItem(this.storageKey, JSON.stringify(invoices));
+      invoices[invoiceIndex] = updatedInvoice
+      localStorage.setItem(storageKey, JSON.stringify(invoices))
       
       return {
         success: true,
         message: 'Factura actualizada exitosamente',
         data: updatedInvoice
-      };
+      }
     } catch (error) {
-      console.error('Error al actualizar factura:', error);
-      throw error;
+      console.error('❌ Error en fallback de actualizar factura:', error)
+      throw error
     }
   }
 
-  // Eliminar factura
+  // Eliminar factura de la organización actual
   async deleteInvoice(id) {
     try {
-      console.log('🔄 Eliminando factura en localStorage...');
+      console.log('🔄 Eliminando factura en Supabase...')
+
+      // Intentar eliminar en Supabase
+      const { data: deletedInvoice, error } = await deleteWithTenant('invoices', id)
+
+      if (error) {
+        console.warn('⚠️ Error al eliminar factura en Supabase, usando fallback:', error.message)
+        return await this.deleteInvoiceFallback(id)
+      }
+
+      if (!deletedInvoice || deletedInvoice.length === 0) {
+        throw new Error('Factura no encontrada')
+      }
+
+      // Transformar respuesta para compatibilidad
+      const transformedInvoice = {
+        id: deletedInvoice[0].id,
+        invoiceNumber: deletedInvoice[0].invoice_number,
+        controlNumber: deletedInvoice[0].control_number,
+        documentType: deletedInvoice[0].document_type,
+        issueDate: deletedInvoice[0].issue_date,
+        dueDate: deletedInvoice[0].due_date,
+        status: deletedInvoice[0].status,
+        issuer: deletedInvoice[0].issuer,
+        client: deletedInvoice[0].client_info,
+        financial: deletedInvoice[0].financial,
+        items: deletedInvoice[0].items,
+        attachments: deletedInvoice[0].attachments,
+        notes: deletedInvoice[0].notes,
+        createdBy: deletedInvoice[0].created_by,
+        createdAt: deletedInvoice[0].created_at,
+        updatedAt: deletedInvoice[0].updated_at
+      }
+
+      console.log('✅ Factura eliminada en Supabase:', transformedInvoice.invoiceNumber)
+      return {
+        success: true,
+        message: 'Factura eliminada exitosamente',
+        data: transformedInvoice
+      }
+
+    } catch (error) {
+      console.error('❌ Error inesperado al eliminar factura:', error)
+      return await this.deleteInvoiceFallback(id)
+    }
+  }
+
+  // Fallback a localStorage para eliminar factura
+  async deleteInvoiceFallback(id) {
+    try {
+      console.log('🔄 Eliminando factura en localStorage (fallback)...')
       
-      // Usar solo localStorage (MVP sin backend)
-      const invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-      const invoiceIndex = invoices.findIndex(inv => inv.id === parseInt(id));
+      const organizationId = getCurrentOrganizationId()
+      const storageKey = organizationId ? `${this.storageKey}_${organizationId}` : this.storageKey
+      const invoices = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      const invoiceIndex = invoices.findIndex(inv => inv.id === parseInt(id))
       
       if (invoiceIndex === -1) {
-        throw new Error('Factura no encontrada');
+        throw new Error('Factura no encontrada')
       }
       
-      const deletedInvoice = invoices.splice(invoiceIndex, 1)[0];
-      localStorage.setItem(this.storageKey, JSON.stringify(invoices));
+      const deletedInvoice = invoices.splice(invoiceIndex, 1)[0]
+      localStorage.setItem(storageKey, JSON.stringify(invoices))
       
       return {
         success: true,
         message: 'Factura eliminada exitosamente',
         data: deletedInvoice
-      };
+      }
     } catch (error) {
-      console.error('Error al eliminar factura:', error);
-      throw error;
+      console.error('❌ Error en fallback de eliminar factura:', error)
+      throw error
     }
   }
 
@@ -847,17 +1174,107 @@ class InvoiceService {
     }
   }
 
-  // Obtener estadísticas de facturas
+  // Obtener estadísticas de facturas de la organización actual
   async getInvoiceStats() {
     try {
-      let invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      console.log('🔄 Obteniendo estadísticas de facturas desde Supabase...')
+
+      // Intentar usar función RPC de Supabase para estadísticas optimizadas
+      const organizationId = getCurrentOrganizationId()
+      if (organizationId) {
+        try {
+          const { data: stats, error } = await supabase
+            .rpc('get_invoice_stats', { org_id: organizationId })
+
+          if (!error && stats) {
+            console.log('✅ Estadísticas obtenidas desde Supabase RPC')
+            return {
+              success: true,
+              data: stats
+            }
+          }
+        } catch (rpcError) {
+          console.warn('⚠️ Error en RPC de estadísticas, calculando manualmente:', rpcError.message)
+        }
+      }
+
+      // Fallback: calcular estadísticas manualmente desde Supabase
+      const { data: invoices, error } = await queryWithTenant('invoices')
+
+      if (error) {
+        console.warn('⚠️ Error al obtener facturas para estadísticas, usando fallback:', error.message)
+        return await this.getInvoiceStatsFallback()
+      }
+
+      const stats = this.calculateInvoiceStats(invoices)
+
+      console.log('✅ Estadísticas calculadas desde Supabase:', stats.total)
+      return {
+        success: true,
+        data: stats
+      }
+
+    } catch (error) {
+      console.error('❌ Error inesperado al obtener estadísticas:', error)
+      return await this.getInvoiceStatsFallback()
+    }
+  }
+
+  // Calcular estadísticas de facturas
+  calculateInvoiceStats(invoices) {
+    const stats = {
+      total: invoices.length,
+      byStatus: {
+        BORRADOR: 0,
+        EMITIDA: 0,
+        ENVIADA: 0,
+        PAGADA: 0,
+        VENCIDA: 0,
+        ANULADA: 0
+      },
+      byMonth: {},
+      totalAmount: 0,
+      paidAmount: 0
+    }
+
+    invoices.forEach(invoice => {
+      // Por estado
+      if (stats.byStatus.hasOwnProperty(invoice.status)) {
+        stats.byStatus[invoice.status] += 1
+      }
+      
+      // Por mes
+      const month = invoice.issue_date.substring(0, 7) // YYYY-MM
+      stats.byMonth[month] = (stats.byMonth[month] || 0) + 1
+      
+      // Monto total (todas las facturas)
+      const totalSales = invoice.financial?.totalSales || 0
+      stats.totalAmount += totalSales
+      
+      // Monto pagado (solo facturas pagadas)
+      if (invoice.status === 'PAGADA') {
+        stats.paidAmount += totalSales
+      }
+    })
+
+    return stats
+  }
+
+  // Fallback a localStorage para estadísticas
+  async getInvoiceStatsFallback() {
+    try {
+      console.log('🔄 Obteniendo estadísticas desde localStorage (fallback)...')
+      
+      const organizationId = getCurrentOrganizationId()
+      const storageKey = organizationId ? `${this.storageKey}_${organizationId}` : this.storageKey
+      let invoices = JSON.parse(localStorage.getItem(storageKey) || '[]')
       
       // Si no hay facturas, forzar la inicialización
       if (invoices.length === 0) {
-        console.log('⚠️ No hay facturas para estadísticas, forzando inicialización...');
-        this.initializeStorage();
-        invoices = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-        console.log('✅ Facturas inicializadas para estadísticas:', invoices.length);
+        console.log('⚠️ No hay facturas para estadísticas, forzando inicialización...')
+        this.initializeStorage()
+        invoices = JSON.parse(localStorage.getItem(storageKey) || '[]')
+        console.log('✅ Facturas inicializadas para estadísticas:', invoices.length)
       }
       
       const stats = {
@@ -873,34 +1290,34 @@ class InvoiceService {
         byMonth: {},
         totalAmount: 0,
         paidAmount: 0
-      };
+      }
       
       invoices.forEach(invoice => {
         // Por estado
         if (stats.byStatus.hasOwnProperty(invoice.status)) {
-          stats.byStatus[invoice.status] += 1;
+          stats.byStatus[invoice.status] += 1
         }
         
         // Por mes
-        const month = invoice.issueDate.substring(0, 7); // YYYY-MM
-        stats.byMonth[month] = (stats.byMonth[month] || 0) + 1;
+        const month = invoice.issueDate.substring(0, 7) // YYYY-MM
+        stats.byMonth[month] = (stats.byMonth[month] || 0) + 1
         
         // Monto total (todas las facturas)
-        stats.totalAmount += invoice.financial.totalSales || 0;
+        stats.totalAmount += invoice.financial.totalSales || 0
         
         // Monto pagado (solo facturas pagadas)
         if (invoice.status === 'PAGADA') {
-          stats.paidAmount += invoice.financial.totalSales || 0;
+          stats.paidAmount += invoice.financial.totalSales || 0
         }
-      });
+      })
       
       return {
         success: true,
         data: stats
-      };
+      }
     } catch (error) {
-      console.error('Error al obtener estadísticas:', error);
-      throw error;
+      console.error('❌ Error en fallback de estadísticas:', error)
+      throw error
     }
   }
 }

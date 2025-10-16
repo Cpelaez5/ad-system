@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mdi/font": "^7.4.0",
+    "@supabase/supabase-js": "^2.75.0",
     "@vuepic/vue-datepicker": "^7.0.0",
     "axios": "^1.6.0",
     "chart.js": "^4.4.1",

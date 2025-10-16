@@ -89,20 +89,80 @@ const router = createRouter({
   routes
 })
 
-// Guard de navegación para autenticación
-router.beforeEach((to, from, next) => {
+// Guard de navegación para autenticación con Supabase Multi-Tenant
+router.beforeEach(async (to, from, next) => {
+  console.log('🔄 Router guard ejecutándose para:', to.path)
+  
   // Verificar si la ruta requiere autenticación
   if (to.meta.requiresAuth) {
-    // Aquí se verificaría si el usuario está autenticado
-    // Por ahora, permitimos el acceso a todas las rutas
-    const isAuthenticated = true // Cambiar por lógica real de autenticación
-    
-    if (isAuthenticated) {
-      next()
-    } else {
-      next('/login')
+    try {
+      // 1. Verificar sesión de Supabase
+      const { supabase } = await import('@/lib/supabaseClient')
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session) {
+        console.log('✅ Sesión de Supabase activa encontrada')
+        
+        // 2. Verificar que organization_id esté disponible
+        const organizationId = localStorage.getItem('current_organization_id')
+        if (!organizationId) {
+          console.log('⚠️ No hay organization_id, recargando datos del usuario...')
+          
+          // Recargar datos del usuario para obtener organization_id
+          const { userService } = await import('@/services/userService')
+          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+          
+          if (currentUser.id) {
+            try {
+              const userData = await userService.getUserById(currentUser.id)
+              if (userData.success && userData.data.organization) {
+                localStorage.setItem('current_organization_id', userData.data.organization.id)
+                console.log('✅ Organization ID recargado:', userData.data.organization.id)
+              }
+            } catch (error) {
+              console.warn('⚠️ Error al recargar datos del usuario:', error.message)
+            }
+          }
+        }
+        
+        // 3. Verificar roles si la ruta lo requiere
+        if (to.meta.roles) {
+          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+          const userRole = currentUser.role
+          
+          if (!to.meta.roles.includes(userRole)) {
+            console.log('❌ Usuario sin permisos para esta ruta:', userRole, 'vs', to.meta.roles)
+            next('/dashboard') // Redirigir al dashboard si no tiene permisos
+            return
+          }
+        }
+        
+        next()
+      } else {
+        // No hay sesión de Supabase, verificar datos locales como fallback
+        const usuarioAutenticado = localStorage.getItem('usuarioAutenticado')
+        if (usuarioAutenticado === 'true') {
+          console.log('⚠️ No hay sesión de Supabase, pero hay datos locales (fallback)')
+          next()
+        } else {
+          console.log('❌ No hay sesión activa, redirigiendo a login')
+          next('/login')
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error en router guard:', error)
+      
+      // Fallback: verificar datos locales
+      const usuarioAutenticado = localStorage.getItem('usuarioAutenticado')
+      if (usuarioAutenticado === 'true') {
+        console.log('⚠️ Error en Supabase, usando fallback local')
+        next()
+      } else {
+        next('/login')
+      }
     }
   } else {
+    // Ruta pública, permitir acceso
     next()
   }
 })
