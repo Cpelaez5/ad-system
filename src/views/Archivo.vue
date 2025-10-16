@@ -70,15 +70,6 @@
       </v-col>
       <v-col cols="12" md="6" class="text-right">
         <v-btn
-          color="warning"
-          size="large"
-          prepend-icon="mdi-broom"
-          @click="limpiarArchivosHuerfanos"
-          class="mr-2"
-        >
-          Limpiar Archivos
-        </v-btn>
-        <v-btn
           color="primary"
           size="large"
           prepend-icon="mdi-upload"
@@ -470,32 +461,6 @@ export default {
       }
     },
 
-    async limpiarArchivosHuerfanos() {
-      if (confirm('¿Está seguro de limpiar archivos huérfanos del Storage? Esta acción eliminará archivos que no tienen registro en la base de datos.')) {
-        try {
-          console.log('🧹 Iniciando limpieza de archivos huérfanos...')
-          
-          const documentService = (await import('@/services/documentService')).default
-          const result = await documentService.cleanupOrphanedFiles()
-          
-          if (result.success) {
-            console.log(`✅ Limpieza completada: ${result.deletedCount} archivos eliminados`)
-            alert(`Limpieza completada: ${result.deletedCount} archivos huérfanos eliminados`)
-            
-            // Recargar estadísticas
-            await this.cargarEstadisticas()
-          } else {
-            console.error('❌ Error en la limpieza:', result.message)
-            alert(`Error en la limpieza: ${result.message}`)
-          }
-          
-        } catch (error) {
-          console.error('❌ Error inesperado en la limpieza:', error)
-          alert('Error inesperado en la limpieza de archivos')
-        }
-      }
-    },
-
     seleccionarCarpeta(carpeta) {
       this.carpetaSeleccionada = carpeta
     },
@@ -518,34 +483,59 @@ export default {
         try {
           const documentService = (await import('@/services/documentService')).default
           
-          // Subir cada archivo
-          for (const archivo of this.archivosSeleccionados) {
-            console.log('🔄 Subiendo archivo:', archivo.name)
+          // Subir cada archivo secuencialmente para evitar conflictos
+          for (let i = 0; i < this.archivosSeleccionados.length; i++) {
+            const archivo = this.archivosSeleccionados[i]
+            console.log(`🔄 Subiendo archivo ${i + 1}/${this.archivosSeleccionados.length}:`, archivo.name)
             
-            // 1. Subir archivo a Supabase Storage
-            const uploadResult = await documentService.uploadFile(archivo, this.documentoForm.categoria)
-            
-            if (!uploadResult.success) {
-              console.error('❌ Error al subir archivo:', uploadResult.message)
-              continue
-            }
-            
-            // 2. Crear registro en la base de datos
-            const documentData = {
-              fileName: archivo.name,
-              fileUrl: uploadResult.data.fileUrl,
-              fileType: uploadResult.data.fileType,
-              fileSize: uploadResult.data.fileSize,
-              category: this.documentoForm.categoria,
-              uploadedBy: '11111111-1111-1111-1111-111111111111' // Usuario por defecto
-            }
-            
-            const createResult = await documentService.createDocument(documentData)
-            
-            if (createResult.success) {
-              console.log('✅ Documento creado exitosamente:', createResult.data)
-            } else {
-              console.error('❌ Error al crear documento:', createResult.message)
+            try {
+              // 1. Subir archivo a Supabase Storage
+              const uploadResult = await documentService.uploadFile(archivo, this.documentoForm.categoria)
+              
+              if (!uploadResult.success) {
+                console.error(`❌ Error al subir archivo ${archivo.name}:`, uploadResult.message)
+                continue
+              }
+              
+              console.log(`✅ Archivo ${archivo.name} subido al Storage exitosamente`)
+              
+              // 2. Crear registro en la base de datos
+              const documentData = {
+                fileName: archivo.name,
+                fileUrl: uploadResult.data.fileUrl,
+                fileType: uploadResult.data.fileType,
+                fileSize: uploadResult.data.fileSize,
+                category: this.documentoForm.categoria,
+                uploadedBy: '11111111-1111-1111-1111-111111111111' // Usuario por defecto
+              }
+              
+              const createResult = await documentService.createDocument(documentData)
+              
+              if (createResult.success) {
+                console.log(`✅ Documento ${archivo.name} creado en BD exitosamente:`, createResult.data)
+              } else {
+                console.error(`❌ Error al crear documento ${archivo.name}:`, createResult.message)
+                
+                // Si falla la creación en BD, eliminar el archivo del Storage
+                console.log(`🧹 Limpiando archivo huérfano del Storage: ${archivo.name}`)
+                try {
+                  const { supabase } = await import('@/lib/supabaseClient')
+                  const urlParts = uploadResult.data.fileUrl.split('/')
+                  const documentsIndex = urlParts.indexOf('documents')
+                  if (documentsIndex !== -1) {
+                    const filePath = urlParts.slice(documentsIndex + 1).join('/')
+                    await supabase.storage
+                      .from('documents')
+                      .remove([filePath])
+                    console.log(`✅ Archivo huérfano ${archivo.name} eliminado del Storage`)
+                  }
+                } catch (cleanupError) {
+                  console.warn(`⚠️ Error al limpiar archivo huérfano ${archivo.name}:`, cleanupError)
+                }
+              }
+              
+            } catch (fileError) {
+              console.error(`❌ Error inesperado al procesar archivo ${archivo.name}:`, fileError)
             }
           }
           
@@ -554,7 +544,7 @@ export default {
           await this.cargarEstadisticas()
           
           this.cerrarDialogoSubida()
-          console.log('✅ Documentos subidos exitosamente')
+          console.log('✅ Proceso de subida completado')
           
         } catch (error) {
           console.error('❌ Error al subir documentos:', error)

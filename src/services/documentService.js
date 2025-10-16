@@ -128,21 +128,54 @@ const documentService = {
       console.log('📄 Documento a eliminar:', document)
       
       // 2. Eliminar el archivo del Storage
+      let storageDeleted = false
       if (document.file_url) {
-        // Extraer la ruta del archivo de la URL
-        const urlParts = document.file_url.split('/')
-        const filePath = urlParts.slice(urlParts.indexOf('documents') + 1).join('/')
-        
-        console.log('🗑️ Eliminando archivo del Storage:', filePath)
-        
-        const { error: storageError } = await supabase.storage
-          .from('documents')
-          .remove([filePath])
-        
-        if (storageError) {
-          console.warn('⚠️ Error al eliminar archivo del Storage (continuando):', storageError.message)
-        } else {
-          console.log('✅ Archivo eliminado del Storage exitosamente')
+        try {
+          // Extraer la ruta del archivo de la URL
+          const urlParts = document.file_url.split('/')
+          const documentsIndex = urlParts.indexOf('documents')
+          
+          if (documentsIndex !== -1) {
+            const filePath = urlParts.slice(documentsIndex + 1).join('/')
+            
+            console.log('🗑️ Eliminando archivo del Storage:', filePath)
+            
+            const { error: storageError } = await supabase.storage
+              .from('documents')
+              .remove([filePath])
+            
+            if (storageError) {
+              console.warn('⚠️ Error al eliminar archivo del Storage:', storageError.message)
+              // Intentar con diferentes variaciones de la ruta
+              const alternativePaths = [
+                filePath,
+                filePath.replace(/^[^/]+\//, ''), // Quitar primera carpeta
+                filePath.split('/').slice(1).join('/') // Quitar primera parte
+              ]
+              
+              for (const altPath of alternativePaths) {
+                if (altPath !== filePath) {
+                  console.log(`🔄 Intentando ruta alternativa: ${altPath}`)
+                  const { error: altError } = await supabase.storage
+                    .from('documents')
+                    .remove([altPath])
+                  
+                  if (!altError) {
+                    console.log(`✅ Archivo eliminado con ruta alternativa: ${altPath}`)
+                    storageDeleted = true
+                    break
+                  }
+                }
+              }
+            } else {
+              console.log('✅ Archivo eliminado del Storage exitosamente')
+              storageDeleted = true
+            }
+          } else {
+            console.warn('⚠️ No se pudo extraer la ruta del archivo de la URL:', document.file_url)
+          }
+        } catch (storageError) {
+          console.warn('⚠️ Error al procesar eliminación del Storage:', storageError)
         }
       }
       
@@ -155,7 +188,11 @@ const documentService = {
       }
       
       console.log('✅ Documento eliminado exitosamente:', deletedDocument)
-      return { success: true, data: deletedDocument }
+      return { 
+        success: true, 
+        data: deletedDocument,
+        storageDeleted: storageDeleted
+      }
       
     } catch (error) {
       console.error('❌ Error inesperado al eliminar documento:', error)
@@ -169,12 +206,21 @@ const documentService = {
       console.log('🔄 Subiendo archivo a Supabase Storage...')
       
       const organizationId = getCurrentOrganizationId()
-      const fileName = `${organizationId}/${category}/${Date.now()}-${file.name}`
+      
+      // Generar nombre único con timestamp y UUID
+      const timestamp = Date.now()
+      const randomId = Math.random().toString(36).substring(2, 15)
+      const fileExtension = file.name.split('.').pop()
+      const baseFileName = file.name.replace(/\.[^/.]+$/, '') // Quitar extensión
+      const uniqueFileName = `${baseFileName}_${timestamp}_${randomId}.${fileExtension}`
+      const filePath = `${organizationId}/${category}/${uniqueFileName}`
+      
+      console.log('📁 Ruta del archivo:', filePath)
       
       // Subir archivo a Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(fileName, file)
+        .upload(filePath, file)
       
       if (uploadError) {
         console.error('❌ Error al subir archivo:', uploadError)
@@ -184,16 +230,19 @@ const documentService = {
       // Obtener URL pública del archivo
       const { data: urlData } = supabase.storage
         .from('documents')
-        .getPublicUrl(fileName)
+        .getPublicUrl(filePath)
       
       console.log('✅ Archivo subido exitosamente:', uploadData)
+      console.log('🔗 URL pública:', urlData.publicUrl)
+      
       return { 
         success: true, 
         data: {
           fileName: uploadData.path,
           fileUrl: urlData.publicUrl,
           fileType: file.type,
-          fileSize: file.size
+          fileSize: file.size,
+          originalName: file.name
         }
       }
       
@@ -325,7 +374,14 @@ const documentService = {
       
       // Función recursiva para buscar archivos huérfanos
       const findOrphanedFiles = (files, currentPath = '') => {
+        if (!Array.isArray(files)) {
+          console.warn('⚠️ files no es un array:', files)
+          return
+        }
+        
         files.forEach(file => {
+          if (!file || !file.name) return
+          
           const fullPath = currentPath ? `${currentPath}/${file.name}` : file.name
           
           if (file.metadata && file.metadata.mimetype) {
@@ -333,7 +389,7 @@ const documentService = {
             if (!dbFilePaths.includes(fullPath)) {
               orphanedFiles.push(fullPath)
             }
-          } else if (file.name) {
+          } else if (file.name && !file.metadata) {
             // Es una carpeta, buscar recursivamente
             findOrphanedFiles(file, fullPath)
           }
