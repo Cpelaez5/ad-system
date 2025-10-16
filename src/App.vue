@@ -16,7 +16,7 @@
     </v-main>
     
     <!-- Footer -->
-    <AppFooter />
+    <!-- <AppFooter /> -->
   </v-app>
 </template>
 
