@@ -1,0 +1,12 @@
+# Netlify redirects for Single Page Application (SPA)
+# This file tells Netlify to serve index.html for all routes
+# so that Vue Router can handle client-side routing
+
+# Redirect all routes to index.html with 200 status
+/*    /index.html   200
+
+# Optional: Handle specific API routes if you have a backend
+# /api/*  https://your-backend-url.com/api/:splat  200
+
+# Optional: Handle specific static assets
+# /assets/*  /assets/:splat  200
