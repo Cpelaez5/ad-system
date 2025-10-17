@@ -48,6 +48,7 @@ src/
 │   │   ├── NotificationSystem.vue
 │   │   ├── AnimatedForm.vue
 │   │   ├── AnimatedTable.vue
+│   │   ├── AnimatedNumber.vue
 │   │   ├── PageTransition.vue
 │   │   └── LoadingSpinner.vue
 │   ├── chart/          # Componentes de gráficos
@@ -332,6 +333,7 @@ El sistema incluye componentes reutilizables avanzados:
 - **NotificationSystem**: Sistema de notificaciones con animaciones específicas por tipo
 - **AnimatedForm**: Formularios con animaciones de entrada escalonadas
 - **AnimatedTable**: Tablas con animaciones de filas y efectos hover
+- **AnimatedNumber**: Números animados para KPIs; soporta locale, easing y formatter
 - **PageTransition**: Sistema de transiciones de página con múltiples efectos
 - **LoadingSpinner**: Spinner de carga con 6 tipos diferentes y efectos profesionales
 - **BarChart**: Gráficos de barras interactivos con animaciones
