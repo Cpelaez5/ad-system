@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     
-    <!-- Favicon dinámico - será manejado por JavaScript -->
-    <link rel="icon" type="image/svg+xml" href="/src/assets/icon-adaptableV2.svg" id="dynamic-favicon" />
+    <!-- Favicon simple sin manejo de temas -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/logo/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/logo/favicon-16x16.png" />
     
-   
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sistema de Contabilidad, Auditoría, Archivo y Facturación</title>
@@ -15,48 +15,5 @@
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
     
-    <!-- Script para inicializar el favicon manager inmediatamente -->
-    <script>
-      // Inicializar favicon manager tan pronto como sea posible
-      document.addEventListener('DOMContentLoaded', function() {
-        // Detectar si estamos en desarrollo o producción
-        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        const basePath = isDevelopment ? '/src/assets' : '/assets'
-        
-        // Función simple para cambiar favicon
-        function setFavicon(iconPath) {
-          let favicon = document.querySelector('#dynamic-favicon')
-          if (favicon) {
-            favicon.href = iconPath + '?v=' + Date.now()
-          }
-        }
-        
-        // Detectar tema inicial
-        function getCurrentTheme() {
-          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            return 'dark'
-          }
-          return 'light'
-        }
-        
-        // Establecer favicon inicial
-        const theme = getCurrentTheme()
-        const iconPath = theme === 'dark' ? `${basePath}/icon-dark.svg` : `${basePath}/icon-light.svg`
-        setFavicon(iconPath)
-        
-        console.log('🎨 Favicon inicial establecido para tema:', theme, 'en modo:', isDevelopment ? 'desarrollo' : 'producción')
-        
-        // Escuchar cambios de tema
-        if (window.matchMedia) {
-          const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-          mediaQuery.addEventListener('change', function(e) {
-            const newTheme = e.matches ? 'dark' : 'light'
-            const newIconPath = newTheme === 'dark' ? `${basePath}/icon-dark.svg` : `${basePath}/icon-light.svg`
-            setFavicon(newIconPath)
-            console.log('🎨 Favicon cambiado automáticamente a tema:', newTheme)
-          })
-        }
-      })
-    </script>
   </body>
 </html>

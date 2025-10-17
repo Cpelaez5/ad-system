@@ -6,8 +6,7 @@ import App from './App.vue'
 // Inicializar tenant al cargar la aplicación
 import './utils/initTenant.js'
 
-// Inicializar favicon manager
-import './utils/faviconManager.js'
+// (El gestor de favicon dinámico se desactiva para respetar los <link media> de index.html)
 
 // Vuetify
 import { createVuetify } from 'vuetify'
