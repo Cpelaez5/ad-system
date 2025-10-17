@@ -11,7 +11,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Eventos Registrados</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ resumen.totalEventos }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="resumen.totalEventos"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -24,7 +37,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Usuarios Activos</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ resumen.usuariosActivos }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="resumen.usuariosActivos"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -37,7 +63,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 mb-4" style="color: #010101;">Alertas de Seguridad</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ resumen.alertas }}</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="resumen.alertas"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -50,7 +89,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 mb-4" style="color: #010101;">Respaldos Exitosos</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ resumen.respaldos }}</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="resumen.respaldos"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -368,8 +420,10 @@
 </template>
 
 <script>
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 export default {
   name: 'Auditoria',
+  components: { AnimatedNumber },
   data() {
     return {
       tabActiva: 'logs',

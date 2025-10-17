@@ -11,7 +11,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Asientos Este Mes</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ resumen.asientosMes }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="resumen.asientosMes"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -24,7 +37,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Ingresos Totales</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">${{ resumen.ingresos.toLocaleString() }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              $<AnimatedNumber
+                :value="resumen.ingresos"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="2"
+                :maximum-fraction-digits="2"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -37,7 +63,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 mb-4" style="color: #010101;">Egresos Totales</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">${{ resumen.egresos.toLocaleString() }}</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
+              $<AnimatedNumber
+                :value="resumen.egresos"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="2"
+                :maximum-fraction-digits="2"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -50,7 +89,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 mb-4" style="color: #010101;">Utilidad Neta</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">${{ resumen.utilidad.toLocaleString() }}</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
+              $<AnimatedNumber
+                :value="resumen.utilidad"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="2"
+                :maximum-fraction-digits="2"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -369,8 +421,10 @@
 </template>
 
 <script>
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 export default {
   name: 'Contabilidad',
+  components: { AnimatedNumber },
   data() {
     return {
       tabActiva: 'asientos',

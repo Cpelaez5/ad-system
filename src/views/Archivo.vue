@@ -11,7 +11,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Documentos Archivados</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ resumen.totalDocumentos }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="resumen.totalDocumentos"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -24,7 +37,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Carpetas Creadas</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ resumen.carpetas }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="resumen.carpetas"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -37,7 +63,18 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 mb-4" style="color: #010101;">Espacio Usado</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ formatearTamaño(resumen.espacioUsado) }}</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="resumen.espacioUsado"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                :formatter="formatearTamaño"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -50,7 +87,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 mb-4" style="color: #010101;">Subidas Hoy</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ resumen.subidasHoy }}</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="resumen.subidasHoy"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -303,8 +353,10 @@
 </template>
 
 <script>
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 export default {
   name: 'Archivo',
+  components: { AnimatedNumber },
   data() {
     return {
       busqueda: '',

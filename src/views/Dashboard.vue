@@ -11,7 +11,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Clientes Activos</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ estadisticas.totalClientes }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="estadisticas.totalClientes"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -24,7 +37,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Facturas Este Mes</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ estadisticas.facturasMes }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="estadisticas.facturasMes"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -37,7 +63,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 mb-4" style="color: #010101;">Ingresos Este Mes</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">${{ estadisticas.ingresosMes.toLocaleString() }}</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
+              $<AnimatedNumber
+                :value="estadisticas.ingresosMes"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="2"
+                :maximum-fraction-digits="2"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -50,7 +89,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 mb-4" style="color: #010101;">Documentos Archivados</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ estadisticas.documentos }}</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="estadisticas.documentos"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -224,6 +276,7 @@
 <script>
 import BarChart from '../components/chart/BarChart.vue'
 import PieChart from '../components/chart/PieChart.vue'
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import { createSwapy } from 'swapy'
 import { onMounted, onUnmounted, ref } from 'vue'
 
@@ -231,7 +284,8 @@ export default {
   name: 'Dashboard',
   components: {
     BarChart,
-    PieChart
+    PieChart,
+    AnimatedNumber
   },
   setup() {
     const swapy = ref(null)

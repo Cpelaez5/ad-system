@@ -138,7 +138,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Total Facturas</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ stats.total }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="stats.total"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -151,7 +164,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 text-white mb-4">Emitidas</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">{{ stats.byStatus?.EMITIDA || 0 }}</div>
+            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="stats.byStatus?.EMITIDA || 0"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -164,7 +190,20 @@
         >
           <div class="d-flex flex-column justify-center h-100">
             <div class="text-body-2 mb-4" style="color: #010101;">Pagadas</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">{{ stats.byStatus?.PAGADA || 0 }}</div>
+            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
+              <AnimatedNumber
+                :value="stats.byStatus?.PAGADA || 0"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                locale="es-VE"
+                :minimum-fraction-digits="0"
+                :maximum-fraction-digits="0"
+              />
+            </div>
           </div>
         </v-card>
       </v-col>
@@ -207,7 +246,16 @@
               :class="{ 'amount-changing': isChangingCurrency }"
               style="color: #010101; font-size: 2.6rem !important;"
             >
-              {{ formatCurrency(displayTotalAmount, currencyDisplay) }}
+              <AnimatedNumber
+                :value="displayTotalAmount"
+                :start="0"
+                :duration="900"
+                :adaptive="false"
+                :min-duration="300"
+                :max-duration="1000"
+                easing="easeOutQuint"
+                :formatter="v => formatCurrency(v, currencyDisplay)"
+              />
             </div>
           </div>
         </v-card>
@@ -472,6 +520,7 @@
 </template>
 
 <script>
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import invoiceService from '../services/invoiceService.js';
 import bcvService from '../services/bcvService.js';
 import exportService from '../services/exportService.js';
@@ -480,7 +529,8 @@ import InvoiceForm from '../components/forms/InvoiceForm.vue';
 export default {
   name: 'Facturacion',
   components: {
-    InvoiceForm
+    InvoiceForm,
+    AnimatedNumber
   },
   data() {
     return {
