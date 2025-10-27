@@ -1,20 +1,17 @@
 <template>
-  <v-app-bar
-    color="white"
-    elevation="0"
-    class="app-bar"
-    style="border-bottom: 1px solid #E0E0E0; z-index: 1000;"
-  >
-    <!-- Logo y título -->
-    <v-app-bar-nav-icon 
-      @click="drawer = !drawer"
-      class="animate-micro-bounce"
-      color="primary"
-    ></v-app-bar-nav-icon>
-    
-    <v-toolbar-title class="text-h5 font-weight-bold animate-fade-in animate-delay-200" style="color: #000000; font-weight: 800 !important;">
-      {{ getCurrentPageTitle() }}
-    </v-toolbar-title>
+   <v-app-bar
+     color="white"
+     elevation="0"
+     class="app-bar"
+     style="border-bottom: 1px solid #E0E0E0; z-index: 1000;"
+   >
+     <!-- Logo y título -->
+     <v-toolbar-title 
+       :class="['text-h5', 'font-weight-bold', 'animate-fade-in', 'animate-delay-200', { 'title-adjusted': sidebarExpanded }]" 
+       style="color: #000000; font-weight: 800 !important;"
+     >
+       {{ getCurrentPageTitle() }}
+     </v-toolbar-title>
 
     <v-spacer></v-spacer>
 
@@ -71,108 +68,92 @@
     </v-menu>
   </v-app-bar>
 
-  <!-- Navegación lateral -->
-  <v-navigation-drawer
-    v-model="drawer"
-    temporary
-    color="#1F355C"
-    class="animate-slide-in-left"
-    dark
-  >
+   <!-- Navegación lateral -->
+   <v-navigation-drawer
+     expand-on-hover
+     permanent
+     rail
+     color="#010101"
+     class="animate-slide-in-left"
+     dark
+     style="height: 100vh; min-height: 100vh;"
+   >
     <!-- Header del sidebar con logo -->
-    <div class="sidebar-header" style="padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+    <div class="sidebar-header" style="padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); background-color: #010101;">
       <img 
         src="@/assets/icon-adaptableV2.svg" 
         alt="Logo" 
         class="logo-icon animate-micro-rotate"
-        style="width: 40px; height: 40px; margin-bottom: 10px;"
+        style="width: 60px; height: 60px; margin-bottom: 0px; filter: brightness(0) invert(1);"
       />
-      <h3 style="color: white; margin: 0; font-size: 18px; font-weight: 600;">Sistema Contable</h3>
+      <h3 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">Business System</h3>
     </div>
-    
-    <v-list>
-      <!-- Dashboard -->
-      <v-list-item
+
+    <v-divider></v-divider>
+
+    <!-- Navigation Items -->
+    <v-list density="compact" nav>
+      <v-list-item 
         :to="{ name: 'Dashboard' }"
-        prepend-icon="mdi-view-dashboard"
-        title="Dashboard"
-        subtitle="Resumen general"
-        class="animate-slide-in-left animate-delay-100 animate-hover-lift"
+        prepend-icon="mdi-view-dashboard" 
+        title="Dashboard" 
+        value="dashboard"
       ></v-list-item>
-
-      <!-- Clientes -->
-      <v-list-item
+      
+      <v-list-item 
         :to="{ name: 'Clientes' }"
-        prepend-icon="mdi-account-group"
-        title="Clientes"
-        subtitle="Gestión de contribuyentes"
-        class="animate-slide-in-left animate-delay-200 animate-hover-lift"
+        prepend-icon="mdi-account-group" 
+        title="Clientes" 
+        value="clientes"
       ></v-list-item>
-
-      <!-- Facturación -->
-      <v-list-item
+      
+      <v-list-item 
         :to="{ name: 'Facturacion' }"
-        prepend-icon="mdi-receipt"
-        title="Facturación"
-        subtitle="Emisión de facturas"
-        class="animate-slide-in-left animate-delay-300 animate-hover-lift"
+        prepend-icon="mdi-receipt" 
+        title="Facturación" 
+        value="facturacion"
       ></v-list-item>
-
-      <!-- Contabilidad -->
-      <v-list-item
+      
+      <v-list-item 
         :to="{ name: 'Contabilidad' }"
-        prepend-icon="mdi-book-open-variant"
-        title="Contabilidad"
-        subtitle="Asientos y reportes"
-        class="animate-slide-in-left animate-delay-400 animate-hover-lift"
+        prepend-icon="mdi-book-open-variant" 
+        title="Contabilidad" 
+        value="contabilidad"
       ></v-list-item>
-
-      <!-- Auditoría -->
-      <v-list-item
+      
+      <v-list-item 
         :to="{ name: 'Auditoria' }"
-        prepend-icon="mdi-shield-search"
-        title="Auditoría"
-        subtitle="Trazabilidad y logs"
-        class="animate-slide-in-left animate-delay-500 animate-hover-lift"
+        prepend-icon="mdi-shield-search" 
+        title="Auditoría" 
+        value="auditoria"
       ></v-list-item>
-
-      <!-- Archivo Digital -->
-      <v-list-item
+      
+      <v-list-item 
         :to="{ name: 'Archivo' }"
-        prepend-icon="mdi-folder-multiple"
-        title="Archivo Digital"
-        subtitle="Documentos y soportes"
-        class="animate-slide-in-left animate-delay-500 animate-hover-lift"
+        prepend-icon="mdi-folder-multiple" 
+        title="Archivo Digital" 
+        value="archivo"
       ></v-list-item>
-
-      <!-- Usuarios (solo para administradores) -->
-      <v-list-item
+      
+      <v-list-item 
         :to="{ name: 'Usuarios' }"
-        prepend-icon="mdi-account-group"
-        title="Usuarios"
-        subtitle="Gestión de usuarios y roles"
-        class="animate-slide-in-left animate-delay-600 animate-hover-lift"
+        prepend-icon="mdi-account-group" 
+        title="Usuarios" 
+        value="usuarios"
         v-if="hasPermission('users.read')"
       ></v-list-item>
     </v-list>
 
-    <!-- Información del sistema -->
+    <!-- Logout Button -->
     <template v-slot:append>
-      <div class="pa-4">
-        <v-card
-          color="primary"
-          variant="tonal"
-          class="pa-3 animate-scale-in animate-delay-500 animate-hover-glow"
-        >
-          <div class="text-caption text-center animate-fade-in animate-delay-600">
-            <v-icon size="small" class="mr-1 animate-pulse">mdi-cloud</v-icon>
-            Sistema Online
-          </div>
-          <div class="text-caption text-center mt-1 animate-fade-in animate-delay-700">
-            v1.0.0
-          </div>
-        </v-card>
-      </div>
+      <v-list density="compact" nav>
+        <v-list-item 
+          @click="logout"
+          prepend-icon="mdi-logout" 
+          title="Cerrar Sesión" 
+          value="logout"
+        ></v-list-item>
+      </v-list>
     </template>
   </v-navigation-drawer>
 </template>
@@ -184,10 +165,10 @@ export default {
   name: 'AppNavigation',
   data() {
     return {
-      drawer: false,
       bcvRate: null,
       bcvLoading: false,
-      bcvError: false
+      bcvError: false,
+      sidebarExpanded: false
     }
   },
   computed: {
@@ -206,6 +187,9 @@ export default {
     this.bcvInterval = setInterval(() => {
       this.loadBCVRate();
     }, 10 * 60 * 1000);
+    
+    // Detectar cambios en el sidebar
+    this.setupSidebarObserver();
   },
   beforeUnmount() {
     if (this.bcvInterval) {
@@ -228,6 +212,30 @@ export default {
         'Login': 'Iniciar Sesión'
       }
       return pageTitles[routeName] || 'Sistema Contable'
+    },
+    
+    setupSidebarObserver() {
+      // Usar MutationObserver para detectar cambios en el sidebar
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+            const sidebar = mutation.target;
+            const isExpanded = sidebar.classList.contains('v-navigation-drawer--is-hovering');
+            this.sidebarExpanded = isExpanded;
+          }
+        });
+      });
+      
+      // Observar el sidebar cuando esté disponible
+      this.$nextTick(() => {
+        const sidebar = document.querySelector('.v-navigation-drawer');
+        if (sidebar) {
+          observer.observe(sidebar, {
+            attributes: true,
+            attributeFilter: ['class']
+          });
+        }
+      });
     },
     
     handleUserButtonClick() {
@@ -339,6 +347,91 @@ export default {
    ======================================== */
 .app-bar {
   z-index: 1000 !important;
+  background-color: white !important;
+  border-bottom: 1px solid #E0E0E0 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Cuando el sidebar se expande, ajustar solo el título */
+.app-bar .v-toolbar-title.title-adjusted {
+  margin-left: 270px !important; /* Espacio para el sidebar expandido (256px + 14px de margen) */
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Header responsive */
+.app-bar .v-toolbar-title {
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  margin-left: 70px !important; /* Espacio para el sidebar cerrado (56px + 14px de margen) */
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-bar .bcv-rate-display {
+  margin-right: 16px;
+}
+
+.app-bar .bcv-rate-display .v-chip {
+  font-size: 0.875rem;
+}
+
+/* Responsive para tablets */
+@media (max-width: 768px) {
+  .app-bar .v-toolbar-title {
+    font-size: 1.25rem !important;
+    margin-left: 70px !important; /* Espacio para el sidebar cerrado */
+  }
+  
+  .app-bar .bcv-rate-display {
+    margin-right: 12px;
+  }
+  
+  .app-bar .bcv-rate-display .v-chip {
+    font-size: 0.8rem;
+  }
+  
+  .app-bar .bcv-rate-display .v-chip .v-icon {
+    font-size: 14px !important;
+  }
+  
+  /* Ajuste del título cuando sidebar se expande en tablets */
+  .app-bar .v-toolbar-title.title-adjusted {
+    margin-left: 270px !important; /* Espacio para el sidebar expandido */
+  }
+}
+
+/* Responsive para móviles */
+@media (max-width: 480px) {
+  .app-bar .v-toolbar-title {
+    font-size: 1.125rem !important;
+    margin-left: 70px !important; /* Espacio para el sidebar cerrado */
+  }
+  
+  .app-bar .bcv-rate-display {
+    margin-right: 8px;
+  }
+  
+  .app-bar .bcv-rate-display .v-chip {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+  
+  .app-bar .bcv-rate-display .v-chip .v-icon {
+    font-size: 12px !important;
+  }
+  
+  .app-bar .v-btn {
+    min-width: 40px !important;
+    padding: 0 8px !important;
+  }
+  
+  .app-bar .v-btn .v-icon {
+    font-size: 20px !important;
+  }
+  
+  /* Ajuste del título cuando sidebar se expande en móviles */
+  .app-bar .v-toolbar-title.title-adjusted {
+    margin-left: 270px !important; /* Espacio para el sidebar expandido */
+  }
 }
 
 /* ========================================
@@ -387,24 +480,159 @@ export default {
    NAVIGATION DRAWER STYLES
    ======================================== */
 .v-navigation-drawer {
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: #010101 !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
 }
 
-.v-list-item {
-  margin: 4px 8px;
-  border-radius: 20px;
-  padding: 20px;
+.v-navigation-drawer .v-list {
+  background-color: #010101 !important;
+  padding: 0 !important;
+}
+
+.v-navigation-drawer .v-list-item {
+  margin: 0px 0px;
+  border-radius: 0px;
+  padding: 12px 16px;
   transition: all 0.3s ease;
+  color: white !important;
+  width: 100%;
+  min-height: 44px; /* Mínimo para accesibilidad táctil */
 }
 
-.v-list-item:hover {
+.v-navigation-drawer .v-list-item .v-list-item-title {
+  color: white !important;
+  font-weight: 500;
+  font-size: 0.875rem; /* 14px - Tamaño más compacto pero legible */
+  line-height: 1.25;
+}
+
+
+.v-navigation-drawer .v-list-item .v-icon {
+  color: white !important;
+  font-size: 1.25rem !important; /* 20px - Iconos más pequeños pero visibles */
+}
+
+.v-navigation-drawer .v-list-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
   transform: translateX(4px);
 }
 
-.v-list-item.v-list-item--active {
+.v-navigation-drawer .v-list-item.v-list-item--active {
   background-color: rgba(255, 255, 255, 0.15);
   border-left: 3px solid #E0B04F;
+}
+
+.v-navigation-drawer .v-list-item.v-list-item--active .v-list-item-title {
+  color: white !important;
+  font-weight: 600;
+}
+
+.v-navigation-drawer .v-list-item.v-list-item--active .v-icon {
+  color: #E0B04F !important;
+}
+
+/* Estilos adicionales para asegurar colores blancos en todo el sidebar */
+.v-navigation-drawer .v-list-item__prepend .v-icon {
+  color: white !important;
+}
+
+.v-navigation-drawer .v-list-item__content {
+  color: white !important;
+}
+
+.v-navigation-drawer .v-list-item__title {
+  color: white !important;
+}
+
+
+/* Asegurar que el sidebar tenga fondo negro */
+.v-navigation-drawer--permanent {
+  background-color: #010101 !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+}
+
+.v-navigation-drawer--permanent .v-list {
+  background-color: #010101 !important;
+  padding: 0 !important;
+}
+
+/* ========================================
+   SCROLLBAR STYLES
+   ======================================== */
+.v-navigation-drawer {
+  /* Webkit browsers (Chrome, Safari, Edge) */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.v-navigation-drawer::-webkit-scrollbar {
+  width: 6px;
+}
+
+.v-navigation-drawer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.v-navigation-drawer::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+}
+
+.v-navigation-drawer::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.v-navigation-drawer::-webkit-scrollbar-thumb:active {
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+/* Eliminar padding interno de los elementos de lista */
+.v-navigation-drawer .v-list-item__content {
+  padding: 0 !important;
+}
+
+.v-navigation-drawer .v-list-item__prepend {
+  margin-inline-end: 12px !important;
+}
+
+/* ========================================
+   LOGOUT BUTTON STYLES
+   ======================================== */
+.v-navigation-drawer .v-list-item[value="logout"] {
+  margin: 0px 0px;
+  border-radius: 0px;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+  color: white !important;
+  width: 100%;
+  min-height: 44px;
+}
+
+.v-navigation-drawer .v-list-item[value="logout"]:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(4px);
+}
+
+.v-navigation-drawer .v-list-item[value="logout"] .v-list-item-title {
+  color: white !important;
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.25;
+}
+
+.v-navigation-drawer .v-list-item[value="logout"] .v-icon {
+  color: white !important;
+  font-size: 1.25rem !important;
 }
 
 /* ========================================
@@ -421,6 +649,55 @@ export default {
   
   .user-role {
     font-size: 0.7rem;
+  }
+  
+  /* Ajustes para móviles */
+  .v-navigation-drawer .v-list-item {
+    padding: 14px 16px; /* Ligeramente más padding en móviles para mejor táctil */
+    min-height: 48px; /* Mayor área táctil en móviles */
+  }
+  
+  .v-navigation-drawer .v-list-item .v-list-item-title {
+    font-size: 0.9rem; /* Fuente ligeramente más grande en móviles */
+  }
+  
+  .v-navigation-drawer .v-list-item .v-icon {
+    font-size: 1.375rem !important; /* Iconos ligeramente más grandes en móviles */
+  }
+  
+  /* Logout button en móviles */
+  .v-navigation-drawer .v-list-item[value="logout"] {
+    padding: 14px 16px;
+    min-height: 48px;
+  }
+  
+  .v-navigation-drawer .v-list-item[value="logout"] .v-list-item-title {
+    font-size: 0.9rem;
+  }
+  
+  .v-navigation-drawer .v-list-item[value="logout"] .v-icon {
+    font-size: 1.375rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .v-navigation-drawer .v-list-item {
+    padding: 16px 20px; /* Aún más padding en pantallas muy pequeñas */
+    min-height: 52px;
+  }
+  
+  .v-navigation-drawer .v-list-item .v-list-item-title {
+    font-size: 0.95rem;
+  }
+  
+  /* Logout button en pantallas muy pequeñas */
+  .v-navigation-drawer .v-list-item[value="logout"] {
+    padding: 16px 20px;
+    min-height: 52px;
+  }
+  
+  .v-navigation-drawer .v-list-item[value="logout"] .v-list-item-title {
+    font-size: 0.95rem;
   }
 }
 
