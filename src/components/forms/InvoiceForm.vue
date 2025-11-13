@@ -160,6 +160,73 @@
           <!-- Paso 2: Emisor y Cliente -->
           <v-stepper-window-item :value="2">
             <v-card-text style="padding: 24px;">
+              <!-- Selector de Cliente -->
+              <v-card variant="outlined" class="mb-4">
+                <v-card-title>
+                  <v-icon left>mdi-account-multiple</v-icon>
+                  Seleccionar Cliente
+                  <v-spacer></v-spacer>
+                  <v-chip 
+                    v-if="currentUser" 
+                    :color="canSelectClients ? 'success' : 'warning'"
+                    size="small"
+                  >
+                    {{ currentUser.name }} ({{ currentUser.role }})
+                  </v-chip>
+                </v-card-title>
+                <v-card-text>
+                  <v-select
+                    v-if="canSelectClients"
+                    v-model="selectedClientId"
+                    :items="clients"
+                    item-title="companyName"
+                    item-value="id"
+                    label="Cliente"
+                    :loading="loadingClients"
+                    :rules="[v => !!v || 'Debe seleccionar un cliente']"
+                    required
+                    variant="outlined"
+                    @update:model-value="onClientChange"
+                    prepend-icon="mdi-account-search"
+                  >
+                    <template v-slot:item="{ props, item }">
+                      <v-list-item v-bind="props">
+                        <template v-slot:title>
+                          {{ item.raw.companyName }}
+                        </template>
+                        <template v-slot:subtitle>
+                          RIF: {{ item.raw.rif }} | {{ item.raw.email }}
+                        </template>
+                      </v-list-item>
+                    </template>
+                    <template v-slot:selection="{ item }">
+                      <span>{{ item.raw.companyName }}</span>
+                    </template>
+                  </v-select>
+                  
+                  <v-alert
+                    v-else
+                    type="info"
+                    variant="tonal"
+                    class="mt-2"
+                  >
+                    <v-icon left>mdi-information</v-icon>
+                    Solo usuarios con rol de Administrador o Contador pueden seleccionar clientes.
+                    Su rol actual: {{ currentUser?.role || 'No identificado' }}
+                  </v-alert>
+                  
+                  <v-alert
+                    v-if="clients.length === 0 && !loadingClients && canSelectClients"
+                    type="warning"
+                    variant="tonal"
+                    class="mt-2"
+                  >
+                    <v-icon left>mdi-alert</v-icon>
+                    No hay clientes registrados. Debe crear al menos un cliente antes de crear facturas.
+                  </v-alert>
+                </v-card-text>
+              </v-card>
+
               <!-- Información del emisor -->
               <v-card variant="outlined" class="mb-4 animated-card">
                 <v-card-title>
@@ -585,6 +652,8 @@
 
 <script>
 import invoiceService from '../../services/invoiceService.js';
+import clientService from '../../services/clientService.js';
+import userService from '../../services/userService.js';
 
 export default {
   name: 'InvoiceForm',
@@ -592,6 +661,14 @@ export default {
     invoice: {
       type: Object,
       default: null
+    },
+    flow: {
+      type: String,
+      default: 'VENTA' // 'VENTA' | 'COMPRA'
+    },
+    autoPartyMode: {
+      type: Boolean,
+      default: true
     }
   },
   emits: ['submit', 'cancel'],
@@ -607,6 +684,15 @@ export default {
       extracting: false,
       extractionResult: null,
       
+      // Clientes
+      clients: [],
+      selectedClientId: null,
+      loadingClients: false,
+      
+      // Usuario actual
+      currentUser: null,
+      canSelectClients: false,
+      
       // Datos del formulario
       formData: {
         invoiceNumber: '',
@@ -617,30 +703,30 @@ export default {
         status: 'BORRADOR',
         
         issuer: {
-          companyName: '',
-          rif: '',
-          taxpayerType: '',
-          phone: '',
-          email: '',
-          website: '',
-          address: ''
+          companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
+          rif: 'J-12345678-9',
+          taxpayerType: 'PERSONA JURÍDICA',
+          phone: '+58 212 123-4567',
+          email: 'info@empresa.com',
+          website: 'www.empresa.com',
+          address: 'Av. Principal, Edificio Empresarial, Piso 5, Caracas, Venezuela'
         },
         
         client: {
-          companyName: '',
-          rif: '',
-          taxpayerType: '',
-          phone: '',
-          email: '',
-          website: '',
-          address: ''
+          companyName: 'CLÍNICA ESPECIALIZADA DEL CARIBE',
+          rif: 'J-98765432-1',
+          taxpayerType: 'PERSONA JURÍDICA',
+          phone: '+58 212 987-6543',
+          email: 'contacto@clinica.com',
+          website: 'www.clinica.com',
+          address: 'Av. Libertador, Centro Médico, Piso 3, Caracas, Venezuela'
         },
         
         financial: {
-          totalSales: 0,
+          totalSales: 100000,
           nonTaxableSales: 0,
-          taxableSales: 0,
-          taxDebit: 0,
+          taxableSales: 100000,
+          taxDebit: 16000,
           ivaRetention: 0,
           islrRetention: 0,
           municipalRetention: 0,
@@ -695,12 +781,111 @@ export default {
       handler(newInvoice) {
         if (newInvoice) {
           this.formData = { ...newInvoice };
+          // Si es una factura existente, establecer el cliente seleccionado
+          if (newInvoice.clientId) {
+            this.selectedClientId = newInvoice.clientId;
+          }
         }
       },
       immediate: true
     }
   },
+  async mounted() {
+    // Si es una nueva factura, generar número automáticamente
+    if (!this.isEditing) {
+      try {
+        const nextNumber = await invoiceService.getNextInvoiceNumber();
+        this.formData.invoiceNumber = nextNumber;
+        console.log('🔢 Número de factura generado:', nextNumber);
+      } catch (error) {
+        console.error('❌ Error al generar número de factura:', error);
+        this.formData.invoiceNumber = 'F-2024-001';
+      }
+    }
+    
+    // Cargar lista de clientes
+    await this.loadClients();
+    
+    // Cargar usuario actual y validar permisos
+    await this.loadCurrentUser();
+
+    // Ajustar modo auto party: ocultar edición de emisor/cliente y solo seleccionar cliente si corresponde
+    if (this.autoPartyMode) {
+      // Si el usuario no puede seleccionar clientes, no exigimos selectedClientId
+      if (!this.canSelectClients) {
+        this.selectedClientId = null
+      }
+    }
+  },
   methods: {
+    async loadClients() {
+      try {
+        this.loadingClients = true;
+        console.log('🔄 Cargando lista de clientes...');
+        
+        const clients = await clientService.getClients();
+        this.clients = clients;
+        
+        console.log('✅ Clientes cargados:', clients.length);
+        
+        // Si hay clientes, seleccionar el primero por defecto (solo si puede elegir)
+        if (this.canSelectClients && clients.length > 0 && !this.selectedClientId) {
+          this.selectedClientId = clients[0].id;
+          this.updateClientInfo(clients[0]);
+          console.log('👤 Cliente seleccionado por defecto:', clients[0].companyName);
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar clientes:', error);
+        this.clients = [];
+      } finally {
+        this.loadingClients = false;
+      }
+    },
+    
+    async loadCurrentUser() {
+      try {
+        console.log('🔄 Cargando usuario actual...');
+        
+        const user = await userService.getCurrentUser();
+        this.currentUser = user;
+        
+        if (user) {
+          // Verificar si el usuario puede seleccionar clientes (admin o contador)
+          this.canSelectClients = user.role === 'admin' || user.role === 'contador';
+          console.log('👤 Usuario actual:', user.name, 'Rol:', user.role);
+          console.log('🔐 Puede seleccionar clientes:', this.canSelectClients);
+        } else {
+          console.warn('⚠️ No se pudo obtener el usuario actual');
+          this.canSelectClients = false;
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar usuario actual:', error);
+        this.canSelectClients = false;
+      }
+    },
+    
+    updateClientInfo(client) {
+      if (client) {
+        this.formData.client = {
+          companyName: client.companyName,
+          rif: client.rif,
+          taxpayerType: client.taxpayerType,
+          phone: client.phone,
+          email: client.email,
+          website: client.website,
+          address: client.address
+        };
+        console.log('📝 Información del cliente actualizada:', client.companyName);
+      }
+    },
+    
+    onClientChange() {
+      const selectedClient = this.clients.find(client => client.id === this.selectedClientId);
+      if (selectedClient) {
+        this.updateClientInfo(selectedClient);
+      }
+    },
+    
     handleFileUpload() {
       if (this.uploadedFile) {
         console.log('Archivo seleccionado:', this.uploadedFile);
@@ -757,24 +942,60 @@ export default {
     },
     
     async handleSubmit() {
-      if (!this.$refs.form.validate()) return;
+      if (!this.$refs.form.validate()) {
+        console.log('❌ Formulario no válido, no se puede enviar');
+        return;
+      }
+      
+      if (this.canSelectClients && !this.selectedClientId) {
+        console.log('❌ No se ha seleccionado un cliente');
+        return;
+      }
+      
+      console.log('📝 Datos del formulario a enviar:', this.formData);
+      console.log('👤 Cliente seleccionado ID:', this.selectedClientId);
+      console.log('🔐 Puede seleccionar clientes:', this.canSelectClients);
       
       this.loading = true;
       
       try {
         let response;
+        const invoiceData = {
+          ...this.formData,
+          clientId: this.canSelectClients ? this.selectedClientId : null,
+          flow: this.flow
+        };
+        
         if (this.isEditing) {
-          response = await invoiceService.updateInvoice(this.invoice.id, this.formData);
+          console.log('🔄 Actualizando factura existente...');
+          response = await invoiceService.updateInvoice(this.invoice.id, invoiceData);
         } else {
-          response = await invoiceService.createInvoice(this.formData);
+          console.log('🔄 Creando nueva factura...');
+          response = await invoiceService.createInvoice(invoiceData);
         }
         
-        this.$emit('submit', response);
+        console.log('📨 Respuesta del servicio:', response);
+        
+        // El servicio ahora devuelve { success: boolean, data: object, message: string }
+        if (response.success) {
+          console.log('✅ Factura guardada exitosamente');
+          this.$emit('submit', {
+            success: true,
+            data: response.data,
+            message: response.message
+          });
+        } else {
+          console.error('❌ Error al guardar factura:', response.message);
+          this.$emit('submit', {
+            success: false,
+            message: response.message || 'Error al guardar la factura'
+          });
+        }
       } catch (error) {
-        console.error('Error al guardar factura:', error);
+        console.error('❌ Error inesperado al guardar factura:', error);
         this.$emit('submit', {
           success: false,
-          message: 'Error al guardar la factura'
+          message: 'Error inesperado al guardar la factura'
         });
       } finally {
         this.loading = false;

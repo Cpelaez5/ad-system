@@ -105,29 +105,98 @@ src/
    - Ejecutar `supabase-schema.sql` en el SQL Editor de Supabase
    - Ejecutar `supabase-seed-data.sql` para datos de prueba
 
+## 📊 Estado del Backend Supabase
+
+### ✅ Verificación Completa
+
+El backend Supabase ha sido **verificado y corregido** para estar completamente alineado con la arquitectura documentada:
+
+- ✅ **Migración simplificada aplicada**: Políticas RLS simplificadas para 4 tipos de usuarios
+- ✅ **Estructura correcta**: Todas las tablas, constraints y relaciones están correctas
+- ✅ **Funciones helper creadas**: Código reutilizable y mantenible
+- ✅ **Políticas RLS funcionando**: 22 políticas RLS simplificadas aplicadas
+- ✅ **Datos consistentes**: No hay inconsistencias en los datos existentes
+
+**Documentación de verificación:**
+- `ESTADO_BACKEND_SUPABASE.md` - Resumen ejecutivo del estado del backend
+- `VERIFICACION_BACKEND_SUPABASE.md` - Verificación detallada del backend
+- `GUIA_BACKEND_SUPABASE_JUNIOR.md` - Guía simple para desarrolladores junior
+
+---
+
 ## 🔐 Credenciales de Acceso
 
 El sistema incluye varios usuarios de prueba con diferentes roles:
 
-### Usuarios de Prueba
+### Tipos de Empresas
 
-| Usuario | Contraseña | Rol | Descripción |
-|---------|------------|-----|-------------|
-| `admin@sistema.local` | `admin123` | Administrador | Acceso completo al sistema |
-| `contador@sistema.local` | `contador123` | Contador | Gestión contable y financiera |
-| `auditor@sistema.local` | `auditor123` | Auditor | Revisión y auditoría |
-| `facturador@sistema.local` | `facturador123` | Facturador | Gestión de facturación |
-| `operador@sistema.local` | `operador123` | Operador | Operaciones básicas |
-| `consultor@sistema.local` | `consultor123` | Consultor | Solo lectura y consultas |
+El sistema maneja **2 tipos de empresas**:
+
+1. **Empresa Administradora/Contadora** (`organizations`):
+   - Empresa que presta servicios contables y fiscales
+   - Puede tener uno o más Contadores y Administradores Contadores
+   - Puede tener múltiples Empresas Cliente asociadas
+   - Ejemplo: "TECNOLOGÍA AVANZADA VENEZOLANA C.A."
+
+2. **Empresa Cliente o Cliente** (`clients`):
+   - Empresa o emprendedor que recibe servicios de administración fiscal
+   - Está asociada a una Empresa Administradora/Contadora
+   - Solo tiene usuarios de tipo "cliente" asociados
+   - Solo puede ver y gestionar sus propios datos
+   - Ejemplo: "CLÍNICA ESPECIALIZADA DEL CARIBE"
+
+### Tipos de Usuarios
+
+El sistema utiliza **4 tipos de usuarios** principales:
+
+1. **Cliente**: Asociado a una Empresa Cliente específica
+   - Tiene `client_id` (empresa cliente) y `organization_id` (empresa administradora)
+   - Ve y gestiona solo sus propios datos (facturas, documentos, compras, gastos)
+   - No puede ver datos de otros clientes
+   - Accede a `ClienteMiArea.vue`
+
+2. **Contador**: Asociado a una Empresa Administradora/Contadora
+   - Tiene `organization_id` (empresa administradora)
+   - Ve datos de TODAS las Empresas Cliente de su organización
+   - Puede gestionar facturas, documentos, compras y gastos de todos los clientes
+   - Accede a `ContadorArea.vue`
+
+3. **Contador Administrador (admin)**: Asociado a una Empresa Administradora/Contadora
+   - Tiene `organization_id` (empresa administradora)
+   - Puede invitar y registrar clientes o contadores a su empresa
+   - Gestiona usuarios, clientes, facturas y documentos de su organización
+   - Acceso completo a gestión de usuarios, clientes y facturas de su empresa
+
+4. **Super Administrador**: No ligado a ninguna empresa
+   - Tiene `organization_id = NULL`
+   - Administra todas las Empresas Administradoras del sistema
+   - Puede crear, registrar o invitar empresas al sistema
+   - Administra usuarios de cualquier empresa
 
 ### Roles y Permisos
 
-- **Administrador**: Acceso completo, gestión de usuarios, configuración del sistema
-- **Contador**: Gestión contable, facturación, reportes financieros
-- **Auditor**: Revisión de datos, auditoría, reportes de trazabilidad
-- **Facturador**: Emisión de facturas, gestión de clientes básica
-- **Operador**: Operaciones básicas, consulta de datos
-- **Consultor**: Solo lectura, generación de reportes
+- **Cliente**: Solo sus datos (facturas, documentos, compras, gastos)
+  - Ve solo sus facturas y documentos
+  - Puede crear y editar sus propias facturas
+  - No puede ver datos de otros clientes
+
+- **Contador**: Datos de todos los clientes de su empresa
+  - Ve todas las empresas cliente de su organización
+  - Ve todas las facturas y documentos de todas las empresas cliente
+  - Puede gestionar facturas de todos los clientes
+  - No puede gestionar usuarios (solo admin puede hacerlo)
+
+- **Contador Administrador**: Gestión completa de su empresa (usuarios, clientes, facturas)
+  - Todo lo que puede hacer un contador
+  - Puede gestionar usuarios (crear, editar, eliminar)
+  - Puede gestionar empresas cliente (crear, editar, eliminar)
+  - Puede invitar y registrar clientes o contadores
+
+- **Super Administrador**: Gestión completa de todas las empresas
+  - Ve y gestiona todas las empresas administradoras
+  - Puede crear nuevas empresas administradoras
+  - Puede gestionar usuarios de cualquier empresa
+  - Acceso completo a todo el sistema
 
 ### Características del Login
 
@@ -349,6 +418,20 @@ El sistema incluye componentes reutilizables avanzados:
 - **Optimización GPU**: Animaciones aceleradas por hardware
 - **Accesibilidad**: Soporte para preferencias de movimiento reducido
 - **Clases utilitarias**: Delays, duraciones, iteraciones personalizables
+
+### 🎨 Sidebar Rail Mode Mejorado
+- **Texto dinámico**: Los textos se ocultan usando position: absolute y left: -9999px
+- **Transiciones suaves**: El texto aparece con position: static al expandir el sidebar
+- **Iconos SIEMPRE visibles**: Garantizados con opacity: 1, visibility: visible, position: static
+- **Centrado perfecto**: Vertical y horizontal usando flexbox (justify-content: center, align-items: center)
+- **Padding optimizado**: 12px 0 en modo rail, 12px 16px en modo expandido
+- **Espaciado mejorado**: Margin lateral de 4px en modo rail para mejor distribución
+- **Área táctil optimizada**: Altura mínima de 48px en modo rail para mejor usabilidad
+- **Transiciones avanzadas**: Usando cubic-bezier con opacity, transform, position y dimensiones
+- **Aplicación universal**: Funciona en todos los elementos de navegación incluyendo logout
+- **Solución robusta**: Texto oculto sin afectar iconos usando posicionamiento absoluto
+- **Iconos garantizados**: margin: 0, opacity: 1, visibility: visible para máxima visibilidad
+- **Estilos específicos**: CSS dedicado para modo rail y modo expandido
 
 ### 🖱️ Sistema de Drag & Drop (Dashboard)
 - **Librería Swapy**: Integración completa para reorganización de cards individuales
@@ -1102,12 +1185,85 @@ Puedes servir los archivos estáticos con cualquier servidor web:
    - Si las fuentes no cargan, verificar conexión a internet (Google Fonts)
    - Usar clases .font-primary y .font-secondary para aplicar fuentes específicas
 
+## 📚 Documentación del Proyecto
+
+### Documentación Principal
+
+- **README.md** - Este archivo (documentación principal del proyecto)
+- **CONTEXTO_PROYECTO.txt** - Contexto completo del proyecto y arquitectura
+
+### Documentación de Arquitectura
+
+- **ARQUITECTURA_EMPRESAS.md** - Arquitectura completa de empresas y usuarios
+  - Explica los 2 tipos de empresas y 4 tipos de usuarios
+  - Relaciones entre empresas y usuarios
+  - Casos de uso y ejemplos
+  - Consultas SQL de verificación
+
+### Documentación de Backend (Supabase)
+
+- **ESTADO_BACKEND_SUPABASE.md** - Resumen ejecutivo del estado del backend
+  - Estado general del backend
+  - Tablas y datos actuales
+  - Políticas RLS aplicadas
+  - Funciones helper creadas
+  - Checklist de verificación
+
+- **VERIFICACION_BACKEND_SUPABASE.md** - Verificación detallada del backend
+  - Problemas identificados y corregidos
+  - Estado antes y después de la migración
+  - Recomendaciones de mejora
+  - Próximos pasos sugeridos
+
+- **GUIA_BACKEND_SUPABASE_JUNIOR.md** - Guía simple para desarrolladores junior
+  - Explicación simple de los 2 tipos de empresas
+  - Explicación simple de los 4 tipos de usuarios
+  - Estructura de tablas explicada
+  - Políticas RLS explicadas de manera simple
+  - Funciones helper explicadas
+  - Preguntas frecuentes
+
+### Documentación de Configuración
+
+- **SUPABASE_SETUP.md** - Guía de configuración de Supabase
+  - Pasos para crear proyecto en Supabase
+  - Configuración de variables de entorno
+  - Ejecución de schema SQL
+  - Aplicación de migraciones
+  - Creación de usuarios
+
+- **CONFIGURAR_USUARIOS.md** - Guía de configuración de usuarios
+  - Arquitectura de empresas explicada
+  - Configuración de cada tipo de usuario
+  - Ejemplos SQL para cada tipo
+  - Verificación de usuarios creados
+
+### Documentación de Migraciones
+
+- **migrations/20250101_simplified_rls_policies.sql** - Migración de políticas RLS simplificadas
+  - Actualiza estructura de tabla `users`
+  - Crea funciones helper
+  - Elimina políticas RLS antiguas
+  - Crea políticas RLS simplificadas
+  - Documentación completa en comentarios
+
+### Documentación de Arquitectura de Facturación
+
+- **ARQUITECTURA_FACTURACION.md** - Arquitectura del sistema de facturación
+  - Flujo de datos
+  - Componentes principales
+  - Modelo de datos
+  - Estados y transiciones
+
+---
+
 ## 📚 Recursos Adicionales
 
 - [Documentación de Vue 3](https://vuejs.org/)
 - [Documentación de Vuetify](https://vuetifyjs.com/)
 - [Documentación de Vite](https://vitejs.dev/)
 - [Documentación de Vue Router](https://router.vuejs.org/)
+- [Documentación de Supabase](https://supabase.com/docs)
 
 ## 🤝 Contribución
 

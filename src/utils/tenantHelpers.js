@@ -20,17 +20,38 @@ import { supabase } from '@/lib/supabaseClient'
  */
 export function getCurrentOrganizationId() {
   try {
-    const orgId = localStorage.getItem('organization_id')
+    // Intentar obtener de ambas claves (compatibilidad)
+    let orgId = localStorage.getItem('organization_id') || localStorage.getItem('current_organization_id')
     
     // Si no hay organization_id o es el mock, establecer el UUID real
     if (!orgId || orgId === 'mock-org-1' || orgId === 'mock-org-2') {
-      console.warn('⚠️ Organization ID inválido o mock detectado, estableciendo UUID real')
-      // Establecer la primera organización como por defecto
+      console.warn('⚠️ Organization ID inválido o mock detectado')
+      
+      // Intentar obtener del usuario actual
+      try {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+        if (currentUser?.organization_id) {
+          orgId = currentUser.organization_id
+          localStorage.setItem('organization_id', orgId)
+          localStorage.setItem('current_organization_id', orgId)
+          console.log('✅ Organization ID obtenido del usuario actual:', orgId)
+          return orgId
+        }
+      } catch (e) {
+        console.warn('⚠️ No se pudo obtener organization_id del usuario actual')
+      }
+      
+      // Si aún no hay organization_id, usar fallback
+      console.warn('⚠️ Usando organization_id por defecto')
       const defaultOrgId = '11111111-1111-1111-1111-111111111111'
       localStorage.setItem('organization_id', defaultOrgId)
-      console.log('✅ Organization ID UUID real establecido:', defaultOrgId)
+      localStorage.setItem('current_organization_id', defaultOrgId)
       return defaultOrgId
     }
+    
+    // Guardar en ambas claves para compatibilidad
+    localStorage.setItem('organization_id', orgId)
+    localStorage.setItem('current_organization_id', orgId)
     
     console.log('✅ Organization ID válido encontrado:', orgId)
     return orgId
@@ -39,6 +60,7 @@ export function getCurrentOrganizationId() {
     // Usar la primera organización como fallback
     const fallbackOrgId = '11111111-1111-1111-1111-111111111111'
     localStorage.setItem('organization_id', fallbackOrgId)
+    localStorage.setItem('current_organization_id', fallbackOrgId)
     return fallbackOrgId
   }
 }
@@ -55,7 +77,9 @@ export function setCurrentOrganizationId(organizationId) {
       return false
     }
     
+    // Guardar en ambas claves para compatibilidad
     localStorage.setItem('organization_id', organizationId)
+    localStorage.setItem('current_organization_id', organizationId)
     console.log('✅ Organization ID guardado:', organizationId)
     return true
   } catch (error) {
@@ -70,6 +94,7 @@ export function setCurrentOrganizationId(organizationId) {
 export function clearCurrentOrganizationId() {
   try {
     localStorage.removeItem('organization_id')
+    localStorage.removeItem('current_organization_id')
     console.log('✅ Organization ID limpiado del localStorage')
     return true
   } catch (error) {
@@ -122,9 +147,11 @@ export async function queryWithTenant(table, selectQuery = '*', additionalFilter
  * 
  * @param {string} table - Nombre de la tabla
  * @param {object} data - Datos a insertar
- * @returns {Promise} Resultado de la inserción
+ * @param {object} options - Opciones adicionales
+ * @param {string} options.returning - Columnas a devolver (ej: 'representation', 'minimal')
+ * @returns {Promise<{data: any, error: any, rlsBlocked: boolean}>} Resultado de la inserción
  */
-export async function insertWithTenant(table, data) {
+export async function insertWithTenant(table, data, options = {}) {
   try {
     const orgId = getCurrentOrganizationId()
     
@@ -132,20 +159,43 @@ export async function insertWithTenant(table, data) {
       throw new Error('No se puede insertar sin organization_id')
     }
     
-    // Agregar organization_id automáticamente
+    // Agregar organization_id automáticamente si no está presente
     const dataWithTenant = {
       ...data,
-      organization_id: orgId
+      organization_id: data.organization_id || orgId
     }
     
-    console.log(`🔄 Insertando en ${table} con organization_id:`, orgId)
+    console.log(`🔄 Insertando en ${table} con organization_id:`, dataWithTenant.organization_id)
     
-    return await supabase
-      .from(table)
-      .insert(dataWithTenant)
+    let query = supabase.from(table).insert(dataWithTenant)
+    
+    // Aplicar opciones de retorno si se especifican
+    if (options.returning) {
+      query = query.select(options.returning === 'representation' ? '*' : options.returning)
+    }
+    
+    const { data: result, error } = await query
+    
+    if (error) {
+      // Si es error de RLS, devolver indicador específico
+      if (error.code === '42501' || (error.details && String(error.details).includes('row-level security'))) {
+        console.warn(`⚠️ Inserción bloqueada por RLS en tabla ${table}:`, error.message)
+        return { data: null, error, rlsBlocked: true }
+      }
+      
+      console.error(`❌ Error en insertWithTenant para tabla ${table}:`, error)
+      return { data: null, error, rlsBlocked: false }
+    }
+    
+    return { data: result, error: null, rlsBlocked: false }
+    
   } catch (error) {
-    console.error(`❌ Error en insertWithTenant para tabla ${table}:`, error)
-    throw error
+    console.error(`❌ Error inesperado en insertWithTenant para tabla ${table}:`, error)
+    return { 
+      data: null, 
+      error, 
+      rlsBlocked: error.code === '42501' || (error.details && String(error.details).includes('row-level security'))
+    }
   }
 }
 

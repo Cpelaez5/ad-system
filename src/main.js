@@ -3,6 +3,36 @@ import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
 
+// --- Detectar tokens de auth/recovery en la URL muy temprano ---
+try {
+  if (typeof window !== 'undefined') {
+    const pathname = window.location.pathname
+    const search = window.location.search || ''
+    const hash = window.location.hash || ''
+    const hasHashAccessToken = !!hash && /access_token=/.test(hash)
+    const searchParams = new URLSearchParams(search.replace(/^\?/, ''))
+  // Considerar también el parámetro `code` que algunos callbacks OAuth/PKCE usan
+  const hasQueryToken = !!(searchParams.get('token') || searchParams.get('access_token') || searchParams.get('code') || searchParams.get('type') === 'recovery')
+    if ((hasHashAccessToken || hasQueryToken) && pathname !== '/login') {
+      console.log('🔁 Detectado token de auth/recovery en la URL — redirigiendo a /login y preservando query+hash')
+      console.log('   original href=', window.location.href)
+      console.log('   original search=', search)
+      console.log('   original hash=', hash)
+      try {
+        // Guardar la URL original para que Login.vue pueda comparar y depurar
+        sessionStorage.setItem('__supabase_initial_url', JSON.stringify({ href: window.location.href, search, hash, ts: Date.now() }))
+      } catch (err) {
+        console.warn('⚠️ No se pudo guardar initial_url en sessionStorage:', err)
+      }
+      const dest = window.location.origin + '/login' + search + hash
+      console.log('   redirecting to:', dest)
+      window.location.replace(dest)
+    }
+  }
+} catch (e) {
+  console.warn('⚠️ Error en la detección temprana de token URL:', e)
+}
+
 // Inicializar tenant al cargar la aplicación
 import './utils/initTenant.js'
 

@@ -14,13 +14,57 @@ class InvoiceService {
     this.storageKey = 'sistema_contabilidad_invoices';
   }
 
-  // Obtener todas las facturas de la organización actual
-  async getInvoices() {
+  async getCurrentUserProfile() {
+    try {
+      const { data: authRes } = await supabase.auth.getUser()
+      const userId = authRes?.user?.id
+      if (!userId) return null
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('id, role, organization_id, client_id')
+        .eq('id', userId)
+        .single()
+      if (error) return null
+      return profile
+    } catch (_) {
+      return null
+    }
+  }
+
+  // Obtener facturas de la organización actual, opcionalmente filtradas por flujo y cliente
+  async getInvoices({ flow = 'VENTA', clientId } = {}) {
     try {
       console.log('🔄 Obteniendo facturas desde Supabase...')
       
-      // Intentar obtener desde Supabase
-      const { data: invoices, error } = await queryWithTenant('invoices', '*')
+      const organizationId = getCurrentOrganizationId()
+      if (!organizationId) {
+        console.warn('⚠️ No hay organization_id disponible, usando fallback')
+        return await this.getInvoicesFallback()
+      }
+      
+      // Obtener facturas con información del cliente relacionado
+      let query = supabase
+        .from('invoices')
+        .select(`
+          *,
+          clients (
+            id,
+            company_name,
+            rif,
+            address,
+            phone,
+            email
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .eq('flow', flow)
+        .order('created_at', { ascending: false })
+
+      if (clientId) {
+        query = query.eq('client_id', clientId)
+      }
+
+      const { data: invoices, error } = await query
       
       if (error) {
         console.warn('⚠️ Error al obtener facturas desde Supabase, usando fallback:', error.message)
@@ -42,18 +86,20 @@ class InvoiceService {
         invoiceNumber: invoice.invoice_number,
         controlNumber: invoice.control_number,
         documentType: invoice.document_type,
+        flow: invoice.flow || 'VENTA',
         issueDate: invoice.issue_date,
         dueDate: invoice.due_date,
         status: invoice.status,
-        issuer: invoice.issuer,
-        client: invoice.client_info,
-        financial: invoice.financial,
+        issuer: invoice.issuer || {},
+        client: invoice.client_info || {},
+        financial: invoice.financial || {},
         items: invoice.items || [],
         attachments: invoice.attachments || [],
         notes: invoice.notes,
         createdBy: invoice.created_by,
         createdAt: invoice.created_at,
         updatedAt: invoice.updated_at,
+        clientId: invoice.client_id,
         clientInfo: invoice.clients // Información del cliente relacionado
       }))
       
@@ -124,33 +170,55 @@ class InvoiceService {
     try {
       console.log('🔄 Obteniendo factura por ID desde Supabase...')
       
-      // Intentar obtener desde Supabase
-      const { data: invoice, error } = await queryWithTenant('invoices', '*, clients(*)', { id })
-      
-      if (error || !invoice || invoice.length === 0) {
-        console.error('❌ Factura no encontrada en Supabase')
+      const organizationId = getCurrentOrganizationId()
+      if (!organizationId) {
+        console.error('❌ No hay organization_id disponible')
         return null
       }
       
-      const invoiceData = invoice[0]
+      // Intentar obtener desde Supabase
+      const { data: invoice, error } = await supabase
+        .from('invoices')
+        .select(`
+          *,
+          clients (
+            id,
+            company_name,
+            rif,
+            address,
+            phone,
+            email
+          )
+        `)
+        .eq('id', id)
+        .eq('organization_id', organizationId)
+        .single()
+      
+      if (error || !invoice) {
+        console.error('❌ Factura no encontrada en Supabase:', error?.message)
+        return null
+      }
+      
       const transformedInvoice = {
-        id: invoiceData.id,
-        invoiceNumber: invoiceData.invoice_number,
-        controlNumber: invoiceData.control_number,
-        documentType: invoiceData.document_type,
-        issueDate: invoiceData.issue_date,
-        dueDate: invoiceData.due_date,
-        status: invoiceData.status,
-        issuer: invoiceData.issuer,
-        client: invoiceData.client_info,
-        financial: invoiceData.financial,
-        items: invoiceData.items || [],
-        attachments: invoiceData.attachments || [],
-        notes: invoiceData.notes,
-        createdBy: invoiceData.created_by,
-        createdAt: invoiceData.created_at,
-        updatedAt: invoiceData.updated_at,
-        clientInfo: invoiceData.clients
+        id: invoice.id,
+        invoiceNumber: invoice.invoice_number,
+        controlNumber: invoice.control_number,
+        documentType: invoice.document_type,
+        flow: invoice.flow || 'VENTA',
+        issueDate: invoice.issue_date,
+        dueDate: invoice.due_date,
+        status: invoice.status,
+        issuer: invoice.issuer || {},
+        client: invoice.client_info || {},
+        financial: invoice.financial || {},
+        items: invoice.items || [],
+        attachments: invoice.attachments || [],
+        notes: invoice.notes,
+        createdBy: invoice.created_by,
+        createdAt: invoice.created_at,
+        updatedAt: invoice.updated_at,
+        clientId: invoice.client_id,
+        clientInfo: invoice.clients
       }
       
       console.log('✅ Factura obtenida desde Supabase:', transformedInvoice.invoiceNumber)
@@ -166,55 +234,96 @@ class InvoiceService {
   async createInvoice(invoiceData) {
     try {
       console.log('🔄 Creando factura en Supabase...')
+      console.log('📥 Datos recibidos:', invoiceData)
+      
+      const organizationId = getCurrentOrganizationId()
+      console.log('🏢 Organization ID:', organizationId)
+      
+      if (!organizationId) {
+        console.error('❌ No hay organization_id disponible')
+        return { success: false, message: 'No hay organización disponible' }
+      }
+
+      // Determinar cliente según el rol; si es cliente, forzar su client_id
+      const userProfile = await this.getCurrentUserProfile()
+      const effectiveClientId = userProfile?.role === 'cliente' ? (userProfile?.client_id || null) : (invoiceData.clientId || null)
+      const effectiveFlow = invoiceData.flow || 'VENTA'
       
       // Preparar datos para Supabase
       const invoiceRecord = {
-        client_id: invoiceData.clientId,
+        organization_id: organizationId,
+        client_id: effectiveClientId,
         invoice_number: invoiceData.invoiceNumber,
-        control_number: invoiceData.controlNumber,
+        control_number: invoiceData.controlNumber || null,
         document_type: invoiceData.documentType || 'FACTURA',
+        flow: effectiveFlow,
         issue_date: invoiceData.issueDate,
-        due_date: invoiceData.dueDate,
+        due_date: invoiceData.dueDate || null,
         status: invoiceData.status || 'BORRADOR',
         issuer: invoiceData.issuer || {},
         client_info: invoiceData.client || {},
         financial: invoiceData.financial || {},
         items: invoiceData.items || [],
         attachments: invoiceData.attachments || [],
-        notes: invoiceData.notes,
-        created_by: invoiceData.createdBy
+        notes: invoiceData.notes || null,
+        created_by: invoiceData.createdBy || organizationId
       }
       
-      const { data: newInvoice, error } = await insertWithTenant('invoices', invoiceRecord)
+      console.log('📝 Datos a insertar:', invoiceRecord)
+      
+      const { data: newInvoice, error } = await supabase
+        .from('invoices')
+        .insert(invoiceRecord)
+        .select()
+        .single()
       
       if (error) {
-        console.error('❌ Error al crear factura en Supabase:', error.message)
-        return { success: false, message: 'Error al crear factura' }
+        console.error('❌ Error al crear factura en Supabase:', error)
+        console.error('❌ Detalles del error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        return { success: false, message: `Error al crear factura: ${error.message}` }
       }
       
-      console.log('✅ Factura creada exitosamente en Supabase')
+      console.log('✅ Factura creada exitosamente en Supabase:', newInvoice.id)
+      console.log('📄 Factura creada:', newInvoice)
+      
+      // Transformar respuesta para el frontend
+      const transformedInvoice = {
+        id: newInvoice.id,
+        invoiceNumber: newInvoice.invoice_number,
+        controlNumber: newInvoice.control_number,
+        documentType: newInvoice.document_type,
+        flow: newInvoice.flow || 'VENTA',
+        issueDate: newInvoice.issue_date,
+        dueDate: newInvoice.due_date,
+        status: newInvoice.status,
+        issuer: newInvoice.issuer || {},
+        client: newInvoice.client_info || {},
+        financial: newInvoice.financial || {},
+        items: newInvoice.items || [],
+        attachments: newInvoice.attachments || [],
+        notes: newInvoice.notes,
+        createdBy: newInvoice.created_by,
+        createdAt: newInvoice.created_at,
+        updatedAt: newInvoice.updated_at,
+        clientId: newInvoice.client_id
+      }
+      
+      console.log('🔄 Factura transformada:', transformedInvoice)
+      
       return {
-        id: newInvoice[0].id,
-        invoiceNumber: newInvoice[0].invoice_number,
-        controlNumber: newInvoice[0].control_number,
-        documentType: newInvoice[0].document_type,
-        issueDate: newInvoice[0].issue_date,
-        dueDate: newInvoice[0].due_date,
-        status: newInvoice[0].status,
-        issuer: newInvoice[0].issuer,
-        client: newInvoice[0].client_info,
-        financial: newInvoice[0].financial,
-        items: newInvoice[0].items || [],
-        attachments: newInvoice[0].attachments || [],
-        notes: newInvoice[0].notes,
-        createdBy: newInvoice[0].created_by,
-        createdAt: newInvoice[0].created_at,
-        updatedAt: newInvoice[0].updated_at
+        success: true,
+        data: transformedInvoice,
+        message: 'Factura creada exitosamente'
       }
       
     } catch (error) {
       console.error('❌ Error inesperado al crear factura:', error)
-      return { success: false, message: 'Error al crear factura' }
+      return { success: false, message: 'Error inesperado al crear factura' }
     }
   }
 
@@ -223,21 +332,30 @@ class InvoiceService {
     try {
       console.log('🔄 Actualizando factura en Supabase...')
       
+      const organizationId = getCurrentOrganizationId()
+      if (!organizationId) {
+        console.error('❌ No hay organization_id disponible')
+        return { success: false, message: 'No hay organización disponible' }
+      }
+      
       // Preparar datos para actualización
+      // Si el usuario es cliente, no permitir cambiar el client_id
+      const userProfile = await this.getCurrentUserProfile()
       const updateData = {
-        client_id: invoiceData.clientId,
+        client_id: userProfile?.role === 'cliente' ? undefined : (invoiceData.clientId || null),
         invoice_number: invoiceData.invoiceNumber,
-        control_number: invoiceData.controlNumber,
+        control_number: invoiceData.controlNumber || null,
         document_type: invoiceData.documentType,
+        flow: invoiceData.flow || 'VENTA',
         issue_date: invoiceData.issueDate,
-        due_date: invoiceData.dueDate,
+        due_date: invoiceData.dueDate || null,
         status: invoiceData.status,
-        issuer: invoiceData.issuer,
-        client_info: invoiceData.client,
-        financial: invoiceData.financial,
-        items: invoiceData.items,
-        attachments: invoiceData.attachments,
-        notes: invoiceData.notes
+        issuer: invoiceData.issuer || {},
+        client_info: invoiceData.client || {},
+        financial: invoiceData.financial || {},
+        items: invoiceData.items || [],
+        attachments: invoiceData.attachments || [],
+        notes: invoiceData.notes || null
       }
       
       // Remover campos undefined
@@ -247,36 +365,54 @@ class InvoiceService {
         }
       })
       
-      const { data: updatedInvoice, error } = await updateWithTenant('invoices', id, updateData)
+      console.log('📝 Datos a actualizar:', updateData)
+      
+      const { data: updatedInvoice, error } = await supabase
+        .from('invoices')
+        .update(updateData)
+        .eq('id', id)
+        .eq('organization_id', organizationId)
+        .select()
+        .single()
       
       if (error) {
         console.error('❌ Error al actualizar factura en Supabase:', error.message)
-        return { success: false, message: 'Error al actualizar factura' }
+        return { success: false, message: `Error al actualizar factura: ${error.message}` }
       }
       
-      console.log('✅ Factura actualizada en Supabase')
+      console.log('✅ Factura actualizada en Supabase:', updatedInvoice.id)
+      
+      // Transformar respuesta para el frontend
+      const transformedInvoice = {
+        id: updatedInvoice.id,
+        invoiceNumber: updatedInvoice.invoice_number,
+        controlNumber: updatedInvoice.control_number,
+        documentType: updatedInvoice.document_type,
+        flow: updatedInvoice.flow || 'VENTA',
+        issueDate: updatedInvoice.issue_date,
+        dueDate: updatedInvoice.due_date,
+        status: updatedInvoice.status,
+        issuer: updatedInvoice.issuer || {},
+        client: updatedInvoice.client_info || {},
+        financial: updatedInvoice.financial || {},
+        items: updatedInvoice.items || [],
+        attachments: updatedInvoice.attachments || [],
+        notes: updatedInvoice.notes,
+        createdBy: updatedInvoice.created_by,
+        createdAt: updatedInvoice.created_at,
+        updatedAt: updatedInvoice.updated_at,
+        clientId: updatedInvoice.client_id
+      }
+      
       return {
-        id: updatedInvoice[0].id,
-        invoiceNumber: updatedInvoice[0].invoice_number,
-        controlNumber: updatedInvoice[0].control_number,
-        documentType: updatedInvoice[0].document_type,
-        issueDate: updatedInvoice[0].issue_date,
-        dueDate: updatedInvoice[0].due_date,
-        status: updatedInvoice[0].status,
-        issuer: updatedInvoice[0].issuer,
-        client: updatedInvoice[0].client_info,
-        financial: updatedInvoice[0].financial,
-        items: updatedInvoice[0].items || [],
-        attachments: updatedInvoice[0].attachments || [],
-        notes: updatedInvoice[0].notes,
-        createdBy: updatedInvoice[0].created_by,
-        createdAt: updatedInvoice[0].created_at,
-        updatedAt: updatedInvoice[0].updated_at
+        success: true,
+        data: transformedInvoice,
+        message: 'Factura actualizada exitosamente'
       }
       
     } catch (error) {
       console.error('❌ Error inesperado al actualizar factura:', error)
-      return { success: false, message: 'Error al actualizar factura' }
+      return { success: false, message: 'Error inesperado al actualizar factura' }
     }
   }
 
@@ -285,37 +421,58 @@ class InvoiceService {
     try {
       console.log('🔄 Eliminando factura en Supabase (soft delete)...')
       
+      const organizationId = getCurrentOrganizationId()
+      if (!organizationId) {
+        console.error('❌ No hay organization_id disponible')
+        return { success: false, message: 'No hay organización disponible' }
+      }
+      
       // Soft delete: marcar como anulada
-      const { data: deletedInvoice, error } = await updateWithTenant('invoices', id, { status: 'ANULADA' })
+      const { data: deletedInvoice, error } = await supabase
+        .from('invoices')
+        .update({ status: 'ANULADA' })
+        .eq('id', id)
+        .eq('organization_id', organizationId)
+        .select()
+        .single()
       
       if (error) {
         console.error('❌ Error al eliminar factura en Supabase:', error.message)
-        return { success: false, message: 'Error al eliminar factura' }
+        return { success: false, message: `Error al eliminar factura: ${error.message}` }
       }
       
-      console.log('✅ Factura eliminada (soft delete) en Supabase')
-      return {
-        id: deletedInvoice[0].id,
-        invoiceNumber: deletedInvoice[0].invoice_number,
-        controlNumber: deletedInvoice[0].control_number,
-        documentType: deletedInvoice[0].document_type,
-        issueDate: deletedInvoice[0].issue_date,
-        dueDate: deletedInvoice[0].due_date,
+      console.log('✅ Factura eliminada (soft delete) en Supabase:', deletedInvoice.id)
+      
+      // Transformar respuesta para el frontend
+      const transformedInvoice = {
+        id: deletedInvoice.id,
+        invoiceNumber: deletedInvoice.invoice_number,
+        controlNumber: deletedInvoice.control_number,
+        documentType: deletedInvoice.document_type,
+        issueDate: deletedInvoice.issue_date,
+        dueDate: deletedInvoice.due_date,
         status: 'ANULADA',
-        issuer: deletedInvoice[0].issuer,
-        client: deletedInvoice[0].client_info,
-        financial: deletedInvoice[0].financial,
-        items: deletedInvoice[0].items || [],
-        attachments: deletedInvoice[0].attachments || [],
-        notes: deletedInvoice[0].notes,
-        createdBy: deletedInvoice[0].created_by,
-        createdAt: deletedInvoice[0].created_at,
-        updatedAt: deletedInvoice[0].updated_at
+        issuer: deletedInvoice.issuer || {},
+        client: deletedInvoice.client_info || {},
+        financial: deletedInvoice.financial || {},
+        items: deletedInvoice.items || [],
+        attachments: deletedInvoice.attachments || [],
+        notes: deletedInvoice.notes,
+        createdBy: deletedInvoice.created_by,
+        createdAt: deletedInvoice.created_at,
+        updatedAt: deletedInvoice.updated_at,
+        clientId: deletedInvoice.client_id
+      }
+      
+      return {
+        success: true,
+        data: transformedInvoice,
+        message: 'Factura eliminada exitosamente'
       }
       
     } catch (error) {
       console.error('❌ Error inesperado al eliminar factura:', error)
-      return { success: false, message: 'Error al eliminar factura' }
+      return { success: false, message: 'Error inesperado al eliminar factura' }
     }
   }
 
@@ -350,7 +507,10 @@ class InvoiceService {
       }
       
       // Fallback: calcular manualmente
-      const { data: invoices, error } = await queryWithTenant('invoices')
+      const { data: invoices, error } = await supabase
+        .from('invoices')
+        .select('status, financial')
+        .eq('organization_id', organizationId)
       
       if (error) {
         console.error('❌ Error al obtener facturas para estadísticas:', error.message)
@@ -388,7 +548,7 @@ class InvoiceService {
   }
 
   // Buscar facturas
-  async searchInvoices(searchTerm) {
+  async searchInvoices(searchTerm, { flow = 'VENTA', clientId } = {}) {
     try {
       console.log('🔄 Buscando facturas en Supabase...')
       
@@ -399,11 +559,24 @@ class InvoiceService {
       }
       
       // Buscar en múltiples campos
-      const { data: invoices, error } = await supabase
+      let query = supabase
         .from('invoices')
-        .select('*, clients(*)')
+        .select(`
+          *,
+          clients (
+            id,
+            company_name,
+            rif,
+            address,
+            phone,
+            email
+          )
+        `)
         .eq('organization_id', organizationId)
+        .eq('flow', flow)
         .or(`invoice_number.ilike.%${searchTerm}%,control_number.ilike.%${searchTerm}%,client_info->>companyName.ilike.%${searchTerm}%`)
+      if (clientId) query = query.eq('client_id', clientId)
+      const { data: invoices, error } = await query
       
       if (error) {
         console.error('❌ Error al buscar facturas:', error.message)
@@ -416,18 +589,20 @@ class InvoiceService {
         invoiceNumber: invoice.invoice_number,
         controlNumber: invoice.control_number,
         documentType: invoice.document_type,
+        flow: invoice.flow || 'VENTA',
         issueDate: invoice.issue_date,
         dueDate: invoice.due_date,
         status: invoice.status,
-        issuer: invoice.issuer,
-        client: invoice.client_info,
-        financial: invoice.financial,
+        issuer: invoice.issuer || {},
+        client: invoice.client_info || {},
+        financial: invoice.financial || {},
         items: invoice.items || [],
         attachments: invoice.attachments || [],
         notes: invoice.notes,
         createdBy: invoice.created_by,
         createdAt: invoice.created_at,
         updatedAt: invoice.updated_at,
+        clientId: invoice.client_id,
         clientInfo: invoice.clients
       }))
       

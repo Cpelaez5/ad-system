@@ -1,19 +1,18 @@
 <template>
   <v-container fluid class="pa-4">
-
     <!-- Tarjetas de estadísticas -->
     <v-row class="mb-6">
       <v-col cols="12" sm="6" md="3">
         <v-card
-          class="pa-6. stats-card"
+          class="pa-6 stats-card"
           height="120"
           style="background-color: #02254d;"
         >
           <div class="d-flex flex-column justify-center h-100">
-            <div class="text-body-2 text-white mb-4">Clientes Activos</div>
+            <div class="text-body-2 text-white mb-4">Mis Facturas</div>
             <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
               <AnimatedNumber
-                :value="estadisticas.totalClientes"
+                :value="estadisticas.totalFacturas"
                 :start="0"
                 :duration="900"
                 :adaptive="false"
@@ -107,8 +106,6 @@
         </v-card>
       </v-col>
     </v-row>
-
-    
 
     <!-- Contenedor de Drag & Drop para cards individuales -->
     <div ref="container" class="dashboard-drag-container">
@@ -227,7 +224,6 @@
         </div>
       </div>
 
-
       <!-- Nueva Card - Reportes -->
       <div data-swapy-slot="reportes" class="dashboard-slot">
         <div data-swapy-item="reportes">
@@ -268,20 +264,20 @@
           </v-card>
         </div>
       </div>
-
     </div>
   </v-container>
 </template>
 
 <script>
-import BarChart from '../components/chart/BarChart.vue'
-import PieChart from '../components/chart/PieChart.vue'
+import BarChart from '@/components/chart/BarChart.vue'
+import PieChart from '@/components/chart/PieChart.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import { createSwapy } from 'swapy'
 import { onMounted, onUnmounted, ref } from 'vue'
+import userService from '@/services/userService.js'
 
 export default {
-  name: 'Dashboard',
+  name: 'ClienteDashboard',
   components: {
     BarChart,
     PieChart,
@@ -292,18 +288,16 @@ export default {
     const container = ref()
 
     onMounted(() => {
-      // Si el contenedor está cargado
       if (container.value) {
         swapy.value = createSwapy(container.value, {
-          animation: 'dynamic', // Animación spring más suave y profesional
+          animation: 'dynamic',
           enabled: true,
-          swapMode: 'hover', // Intercambio al hacer hover
-          autoScrollOnDrag: true, // Auto-scroll durante el arrastre
-          dragOnHold: false, // Arrastre inmediato
-          dragAxis: 'both' // Arrastre en ambas direcciones
+          swapMode: 'hover',
+          autoScrollOnDrag: true,
+          dragOnHold: false,
+          dragAxis: 'both'
         })
 
-        // Event listeners
         swapy.value.onSwap(event => {
           console.log('🔄 Elementos intercambiados:', event)
         })
@@ -319,7 +313,6 @@ export default {
     })
 
     onUnmounted(() => {
-      // Destruir la instancia de Swapy al desmontar el componente
       swapy.value?.destroy()
     })
 
@@ -334,36 +327,58 @@ export default {
   methods: {
     async cargarEstadisticas() {
       try {
-        console.log('🔄 Cargando estadísticas del dashboard...')
+        console.log('🔄 Cargando estadísticas del dashboard del cliente...')
         
-        // Cargar estadísticas de clientes
-        const clientService = (await import('@/services/clientService')).default
-        const clientStats = await clientService.getClientStats()
+        // Obtener usuario actual
+        const currentUser = await userService.getCurrentUser()
+        if (!currentUser || !currentUser.client_id) {
+          console.warn('⚠️ No hay client_id disponible')
+          return
+        }
+
+        const clientId = currentUser.client_id
         
-        // Cargar estadísticas de facturas
-        const invoiceService = (await import('@/services/invoiceService')).default
-        const invoiceStats = await invoiceService.getInvoiceStats()
+        // Cargar estadísticas de facturas (VENTA y COMPRA)
+        const invoiceServiceModule = (await import('@/services/invoiceService')).default
+        const ventas = await invoiceServiceModule.getInvoices({ flow: 'VENTA', clientId })
+        const compras = await invoiceServiceModule.getInvoices({ flow: 'COMPRA', clientId })
+        
+        // Calcular estadísticas de facturas
+        const todasLasFacturas = [...(ventas || []), ...(compras || [])]
+        const facturasEsteMes = todasLasFacturas.filter(inv => {
+          const fecha = new Date(inv.issueDate || inv.createdAt)
+          const ahora = new Date()
+          return fecha.getMonth() === ahora.getMonth() && fecha.getFullYear() === ahora.getFullYear()
+        })
+        
+        const ingresosEsteMes = facturasEsteMes.reduce((sum, inv) => {
+          const monto = parseFloat(inv?.financial?.totalSales || 0)
+          return sum + (isNaN(monto) ? 0 : monto)
+        }, 0)
+        
+        // Cargar estadísticas de documentos
+        const documentServiceModule = (await import('@/services/documentService')).default
+        const documentos = await documentServiceModule.getDocuments()
         
         // Actualizar estadísticas
         this.estadisticas = {
-          totalClientes: clientStats.total || 0,
-          facturasMes: invoiceStats.total || 0,
-          ingresosMes: invoiceStats.totalAmount || 0,
-          documentos: 0 // Por ahora 0, se puede implementar después
+          totalFacturas: todasLasFacturas.length,
+          facturasMes: facturasEsteMes.length,
+          ingresosMes: ingresosEsteMes,
+          documentos: documentos?.length || 0
         }
         
         console.log('✅ Estadísticas cargadas:', this.estadisticas)
         
       } catch (error) {
         console.error('❌ Error al cargar estadísticas:', error)
-        // Mantener valores por defecto en caso de error
       }
     }
   },
   data() {
     return {
       estadisticas: {
-        totalClientes: 0,
+        totalFacturas: 0,
         facturasMes: 0,
         ingresosMes: 0,
         documentos: 0
@@ -453,27 +468,27 @@ export default {
       actividadesRecientes: [
         {
           id: 1,
-          descripcion: 'Nueva factura creada para Cliente ABC',
+          descripcion: 'Nueva factura creada',
           fecha: 'Hace 2 horas',
           icono: 'mdi-receipt'
         },
         {
           id: 2,
-          descripcion: 'Cliente XYZ actualizado',
-          fecha: 'Hace 4 horas',
-          icono: 'mdi-account-edit'
-        },
-        {
-          id: 3,
           descripcion: 'Documento subido al archivo',
-          fecha: 'Ayer',
+          fecha: 'Hace 4 horas',
           icono: 'mdi-file-upload'
         },
         {
-          id: 4,
-          descripcion: 'Reporte de auditoría generado',
+          id: 3,
+          descripcion: 'Factura actualizada',
           fecha: 'Ayer',
-          icono: 'mdi-file-chart'
+          icono: 'mdi-file-edit'
+        },
+        {
+          id: 4,
+          descripcion: 'Nueva compra registrada',
+          fecha: 'Ayer',
+          icono: 'mdi-cart'
         }
       ]
     }
@@ -494,7 +509,6 @@ export default {
   border-radius: 4px;
 }
 
-/* Estilos específicos para las tarjetas de estadísticas */
 .stats-card {
   border-radius: 20px !important;
   box-shadow: none !important;
@@ -518,7 +532,6 @@ export default {
   line-height: 1.2;
 }
 
-/* Estilos para el contenedor de drag & drop */
 .dashboard-drag-container {
   position: relative;
   display: grid;
@@ -529,7 +542,6 @@ export default {
   max-width: 100%;
 }
 
-/* Primera fila: 3 elementos */
 .dashboard-drag-container > :nth-child(1) {
   grid-column: 1 / 3;
   grid-row: 1 / 2;
@@ -545,7 +557,6 @@ export default {
   grid-row: 1 / 2;
 }
 
-/* Segunda fila: 2 elementos de 50% cada uno */
 .dashboard-drag-container > :nth-child(4) {
   grid-column: 1 / 3;
   grid-row: 2 / 3;
@@ -556,7 +567,6 @@ export default {
   grid-row: 2 / 3;
 }
 
-/* Estilos para los slots del dashboard */
 .dashboard-slot {
   height: 100%;
   width: 100%;
@@ -588,8 +598,6 @@ export default {
   width: 100%;
 }
 
-
-/* Responsive grid */
 @media (max-width: 960px) {
   .dashboard-drag-container {
     grid-template-columns: 1fr;
@@ -603,7 +611,6 @@ export default {
   }
 }
 
-/* Asegurar que las cards no se salgan del contenedor */
 .dashboard-slot .v-card {
   width: 100% !important;
   max-width: 100% !important;
@@ -612,7 +619,6 @@ export default {
   flex: 1;
 }
 
-/* Forzar estiramiento completo */
 .dashboard-slot {
   width: 100% !important;
   min-width: 100% !important;
@@ -628,7 +634,7 @@ export default {
 [data-swapy-item] {
   transition: opacity 0.2s ease;
 }
-/* Asegurar que los border-radius se mantengan durante el drag */
+
 [data-swapy-item][data-swapy-dragging] .v-card {
   border-radius: 20px !important;
 }
@@ -646,17 +652,14 @@ export default {
   border-radius: 20px !important;
 }
 
-/* Estilo para elemento siendo arrastrado */
 [data-swapy-item][data-swapy-dragging] {
   opacity: 0.6 !important;
   transition: opacity 0.2s ease;
 }
 
-/* Estilo para slot destacado */
 [data-swapy-slot][data-swapy-highlighted] {
   background: rgba(128, 128, 128, 0.1);
   transition: background 0.2s ease;
 }
-
-
 </style>
+

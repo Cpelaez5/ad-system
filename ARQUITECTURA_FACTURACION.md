@@ -1,4 +1,4 @@
-# Arquitectura del Sistema de Facturación
+# Arquitectura de Ventas y Compras (antes Facturación)
 
 ## Diagrama de Arquitectura
 
@@ -7,9 +7,10 @@
 │                        FRONTEND (Vue 3)                        │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │  Facturacion.vue│  │  InvoiceForm.vue│  │ invoiceService.js│  │
+│  │  Ventas.vue     │  │  InvoiceForm.vue│  │ invoiceService.js│  │
+│  │  Compras.vue    │  │                 │  │                 │  │
 │  │                 │  │                 │  │                 │  │
-│  │ • Lista facturas│  │ • Formulario    │  │ • CRUD local    │  │
+│  │ • Lista facturas│  │ • Formulario    │  │ • CRUD Supabase │  │
 │  │ • Filtros       │  │ • Validación    │  │ • API calls     │  │
 │  │ • Estadísticas  │  │ • Autocompletado│  │ • localStorage  │  │
 │  │ • Búsqueda      │  │ • Carga archivos│  │ • Fallback      │  │
@@ -54,9 +55,9 @@ Usuario → InvoiceForm → invoiceService → Backend API → In-Memory Storage
 Formulario → Validación → CRUD Service → Endpoints → Datos
 ```
 
-### 2. Listar Facturas
+### 2. Listar Facturas por flujo (VENTA/COMPRA)
 ```
-Usuario → Facturacion.vue → invoiceService → Backend API → In-Memory Storage
+Usuario → Ventas/Compras.vue → invoiceService(flow) → Supabase → Datos
    ↓           ↓              ↓              ↓              ↓
 Vista Lista → Filtros → GET /invoices → Query → JSON Data
 ```
@@ -154,6 +155,7 @@ Seleccionar → Cargar → Extraer Datos → Autocompletar → Validar
   }>,
   
   // Metadatos
+  flow: 'VENTA' | 'COMPRA',
   createdBy: string,
   createdAt: string,
   updatedAt: string,
@@ -225,6 +227,11 @@ BORRADOR → EMITIDA → ENVIADA → PAGADA
 - **Rate Limiting**: Protección contra ataques
 - **Helmet**: Headers de seguridad
 - **Validación**: Sanitización de inputs
+
+### Multi-tenancy y RLS específicos
+- `invoices.flow` separa Ventas/Compras
+- `users.client_id` para rol `cliente`
+- RLS: rol `cliente` solo accede a su `client_id`
 
 ### Preparado para:
 - **HTTPS**: Certificados SSL

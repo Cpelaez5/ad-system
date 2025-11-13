@@ -521,10 +521,11 @@
 
 <script>
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
-import invoiceService from '../services/invoiceService.js';
-import bcvService from '../services/bcvService.js';
-import exportService from '../services/exportService.js';
-import InvoiceForm from '../components/forms/InvoiceForm.vue';
+import invoiceService from '@/services/invoiceService.js';
+import bcvService from '@/services/bcvService.js';
+import exportService from '@/services/exportService.js';
+import InvoiceForm from '@/components/forms/InvoiceForm.vue';
+import userService from '@/services/userService.js';
 
 export default {
   name: 'Facturacion',
@@ -572,6 +573,7 @@ export default {
       },
       
       // Configuración de la tabla
+      currentUser: null,
       headers: [
         { title: 'Número', key: 'invoiceNumber', sortable: true },
         { title: 'Cliente', key: 'client', sortable: true },
@@ -601,11 +603,25 @@ export default {
     }
   },
   async mounted() {
+    await this.loadUser();
     await this.loadInvoices();
     await this.loadStats();
   },
   methods: {
+    async loadUser() {
+      try {
+        this.currentUser = await userService.getCurrentUser();
+        if (!this.currentUser || (this.currentUser.role !== 'admin' && this.currentUser.role !== 'contador')) {
+          console.warn('⚠️ Usuario sin permisos para esta vista');
+          this.$router.push('/dashboard');
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar usuario:', error);
+        this.$router.push('/login');
+      }
+    },
     async loadInvoices() {
+      console.log('🔄 Cargando facturas de la organización...');
       try {
         this.loading = true;
         console.log('🔄 Cargando facturas...');
@@ -700,24 +716,38 @@ export default {
       if (!this.invoiceToDelete) return;
       
       try {
-        await invoiceService.deleteInvoice(this.invoiceToDelete.id);
-        await this.loadInvoices();
-        await this.loadStats();
-        this.deleteDialog = false;
-        this.invoiceToDelete = null;
-        // Mostrar notificación de éxito
+        const response = await invoiceService.deleteInvoice(this.invoiceToDelete.id);
+        
+        if (response.success) {
+          await this.loadInvoices();
+          await this.loadStats();
+          this.deleteDialog = false;
+          this.invoiceToDelete = null;
+          console.log('✅ Factura eliminada exitosamente:', response.message);
+          // Mostrar notificación de éxito
+        } else {
+          console.error('❌ Error al eliminar factura:', response.message);
+          // Mostrar notificación de error
+        }
       } catch (error) {
-        console.error('Error al eliminar factura:', error);
+        console.error('❌ Error inesperado al eliminar factura:', error);
         // Mostrar notificación de error
       }
     },
     
     async handleInvoiceSubmit(result) {
+      console.log('📨 Respuesta recibida en Facturacion.vue:', result);
+      
       if (result.success) {
+        console.log('✅ Factura guardada exitosamente, recargando datos...');
         await this.loadInvoices();
         await this.loadStats();
         this.closeInvoiceDialog();
+        console.log('✅ Datos recargados y diálogo cerrado');
         // Mostrar notificación de éxito
+      } else {
+        console.error('❌ Error al guardar factura:', result.message);
+        // Mostrar notificación de error
       }
     },
     

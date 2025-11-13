@@ -421,11 +421,14 @@
 
 <script>
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import userService from '@/services/userService.js'
+
 export default {
   name: 'Auditoria',
   components: { AnimatedNumber },
   data() {
-    return {
+      return {
+      currentUser: null,
       tabActiva: 'logs',
       cargando: false,
       filtroTipo: null,
@@ -584,7 +587,24 @@ export default {
       return logs
     }
   },
+  async mounted() {
+    await this.loadUser()
+    // TODO: Cargar logs de auditoría de la organización
+    // Los logs se filtrarán automáticamente por organization_id cuando se integren los servicios
+  },
   methods: {
+    async loadUser() {
+      try {
+        this.currentUser = await userService.getCurrentUser()
+        if (!this.currentUser || (this.currentUser.role !== 'admin' && this.currentUser.role !== 'contador')) {
+          console.warn('⚠️ Usuario sin permisos para esta vista')
+          this.$router.push('/dashboard')
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar usuario:', error)
+        this.$router.push('/login')
+      }
+    },
     abrirDialogoNuevoUsuario() {
       console.log('Nuevo usuario')
     },

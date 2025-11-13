@@ -422,11 +422,14 @@
 
 <script>
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import userService from '@/services/userService.js'
+
 export default {
   name: 'Contabilidad',
   components: { AnimatedNumber },
   data() {
     return {
+      currentUser: null,
       tabActiva: 'asientos',
       cargando: false,
       dialogoAsiento: false,
@@ -495,7 +498,24 @@ export default {
       return totalDebe === totalHaber && totalDebe > 0
     }
   },
+  async mounted() {
+    await this.loadUser()
+    // TODO: Cargar datos contables de la organización
+    // Los datos se filtrarán automáticamente por organization_id cuando se integren los servicios
+  },
   methods: {
+    async loadUser() {
+      try {
+        this.currentUser = await userService.getCurrentUser()
+        if (!this.currentUser || (this.currentUser.role !== 'admin' && this.currentUser.role !== 'contador')) {
+          console.warn('⚠️ Usuario sin permisos para esta vista')
+          this.$router.push('/dashboard')
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar usuario:', error)
+        this.$router.push('/login')
+      }
+    },
     abrirDialogoNuevoAsiento() {
       this.asientoForm = {
         numero: '',

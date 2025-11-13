@@ -1,13 +1,32 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Dashboard from '../views/Dashboard.vue'
-import Clientes from '../views/Clientes.vue'
-import Facturacion from '../views/Facturacion.vue'
-import Contabilidad from '../views/Contabilidad.vue'
-import Auditoria from '../views/Auditoria.vue'
-import Archivo from '../views/Archivo.vue'
-import Login from '../views/Login.vue'
+
+// Vistas compartidas (accesibles por todos los usuarios autenticados)
+import Dashboard from '../views/shared/Dashboard.vue'
+import Login from '../views/shared/Login.vue'
+const SingUp = () => import('../views/shared/SingUp.vue')
+
+// Vistas para cliente
+const ClienteMiArea = () => import('../views/cliente/ClienteMiArea.vue')
+const ClienteDashboard = () => import('../views/cliente/Dashboard.vue')
+const ClienteCompras = () => import('../views/cliente/Compras.vue')
+const ClienteGastos = () => import('../views/cliente/Gastos.vue')
+const ClienteArchivo = () => import('../views/cliente/Archivo.vue')
+
+// Vistas para contador y admin
+const ContadorArea = () => import('../views/contador/ContadorArea.vue')
+const Gastos = () => import('../views/contador/Gastos.vue')
+const Compras = () => import('../views/contador/Compras.vue')
+const Clientes = () => import('../views/contador/Clientes.vue')
+const Facturacion = () => import('../views/contador/Facturacion.vue')
+const Contabilidad = () => import('../views/contador/Contabilidad.vue')
+const Auditoria = () => import('../views/contador/Auditoria.vue')
+const Archivo = () => import('../views/contador/Archivo.vue')
+
+// Vistas para admin y super_admin
+const Usuarios = () => import('../views/admin/Usuarios.vue')
+
+// Componentes de prueba
 import TestForm from '../components/common/TestForm.vue'
-import Usuarios from '../views/Usuarios.vue'
 
 // Definir las rutas del sistema
 const routes = [
@@ -16,46 +35,100 @@ const routes = [
     redirect: '/dashboard'
   },
   {
+    path: '/gastos',
+    name: 'Gastos',
+    component: Gastos,
+    meta: { requiresAuth: true, title: 'Gastos', roles: ['admin', 'contador'] }
+  },
+  {
+    path: '/compras',
+    name: 'Compras',
+    component: Compras,
+    meta: { requiresAuth: true, title: 'Compras', roles: ['admin', 'contador'] }
+  },
+  {
+    path: '/cliente/mi-area',
+    name: 'ClienteMiArea',
+    component: ClienteMiArea,
+    meta: { requiresAuth: true, title: 'Mi Área', roles: ['cliente'] }
+  },
+  {
+    path: '/contador/area',
+    name: 'ContadorArea',
+    component: ContadorArea,
+    meta: { requiresAuth: true, title: 'Área de Contador', roles: ['admin', 'contador'] }
+  },
+  {
     path: '/login',
     name: 'Login',
     component: Login,
     meta: { requiresAuth: false }
   },
   {
+    path: '/signup',
+    name: 'SingUp',
+    component: SingUp,
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: Dashboard,
-    meta: { requiresAuth: true, title: 'Dashboard' }
+    meta: { requiresAuth: true, title: 'Dashboard', roles: ['super_admin', 'admin', 'contador'] } // Dashboard compartido para admin/contador
+  },
+  {
+    path: '/cliente/dashboard',
+    name: 'ClienteDashboard',
+    component: ClienteDashboard,
+    meta: { requiresAuth: true, title: 'Dashboard', roles: ['cliente'] }
+  },
+  {
+    path: '/cliente/compras',
+    name: 'ClienteCompras',
+    component: ClienteCompras,
+    meta: { requiresAuth: true, title: 'Mis Compras', roles: ['cliente'] }
+  },
+  {
+    path: '/cliente/gastos',
+    name: 'ClienteGastos',
+    component: ClienteGastos,
+    meta: { requiresAuth: true, title: 'Mis Gastos', roles: ['cliente'] }
+  },
+  {
+    path: '/cliente/archivo',
+    name: 'ClienteArchivo',
+    component: ClienteArchivo,
+    meta: { requiresAuth: true, title: 'Mis Documentos', roles: ['cliente'] }
   },
   {
     path: '/clientes',
     name: 'Clientes',
     component: Clientes,
-    meta: { requiresAuth: true, title: 'Gestión de Clientes' }
+    meta: { requiresAuth: true, title: 'Gestión de Clientes', roles: ['admin', 'contador'] }
   },
   {
     path: '/facturacion',
     name: 'Facturacion',
     component: Facturacion,
-    meta: { requiresAuth: true, title: 'Facturación' }
+    meta: { requiresAuth: true, title: 'Facturación', roles: ['admin', 'contador'] }
   },
   {
     path: '/contabilidad',
     name: 'Contabilidad',
     component: Contabilidad,
-    meta: { requiresAuth: true, title: 'Contabilidad' }
+    meta: { requiresAuth: true, title: 'Contabilidad', roles: ['admin', 'contador'] }
   },
   {
     path: '/auditoria',
     name: 'Auditoria',
     component: Auditoria,
-    meta: { requiresAuth: true, title: 'Auditoría' }
+    meta: { requiresAuth: true, title: 'Auditoría', roles: ['admin', 'contador'] }
   },
   {
     path: '/archivo',
     name: 'Archivo',
     component: Archivo,
-    meta: { requiresAuth: true, title: 'Archivo Digital' }
+    meta: { requiresAuth: true, title: 'Archivo Digital', roles: ['admin', 'contador'] }
   },
   {
     path: '/test-form',
@@ -67,7 +140,7 @@ const routes = [
     path: '/usuarios',
     name: 'Usuarios',
     component: Usuarios,
-    meta: { requiresAuth: true, title: 'Gestión de Usuarios', roles: ['admin'] }
+    meta: { requiresAuth: true, title: 'Gestión de Usuarios', roles: ['super_admin', 'admin'] }
   },
   {
     path: '/profile',
@@ -125,16 +198,70 @@ router.beforeEach(async (to, from, next) => {
           }
         }
         
-        // 3. Verificar roles si la ruta lo requiere
-        if (to.meta.roles) {
-          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-          const userRole = currentUser.role
+        // 3. Verificar roles y redirecciones especiales
+        try {
+          const { default: userService } = await import('@/services/userService')
+          const currentUser = await userService.getCurrentUser()
           
-          if (!to.meta.roles.includes(userRole)) {
-            console.log('❌ Usuario sin permisos para esta ruta:', userRole, 'vs', to.meta.roles)
-            next('/dashboard') // Redirigir al dashboard si no tiene permisos
+          if (!currentUser) {
+            console.log('❌ No se pudo obtener usuario actual')
+            next('/login')
             return
           }
+          
+          const userRole = currentUser.role
+          
+          // Si el usuario no tiene perfil en la tabla users, redirigir a una página de error o mostrar mensaje
+          if (currentUser.needsProfile) {
+            console.error('❌ El usuario no tiene perfil en la tabla users. Por favor, contacta al administrador.')
+            // Mostrar mensaje de error y redirigir al login
+            alert('Tu usuario no está registrado en el sistema. Por favor, contacta al administrador para crear tu perfil.')
+            next('/login')
+            return
+          }
+          
+          // Verificar que el rol sea válido
+          const validRoles = ['super_admin', 'admin', 'contador', 'cliente']
+          if (!validRoles.includes(userRole)) {
+            console.error('❌ Rol de usuario no válido:', userRole)
+            alert(`Tu usuario tiene un rol no válido (${userRole}). Por favor, contacta al administrador.`)
+            next('/login')
+            return
+          }
+          
+          // Redirigir clientes desde /dashboard a /cliente/dashboard
+          if (to.path === '/dashboard' && userRole === 'cliente') {
+            console.log('🔄 Redirigiendo cliente a su dashboard')
+            next('/cliente/dashboard')
+            return
+          }
+          
+          // Redirigir admin/contador desde /cliente/* a /dashboard
+          if (to.path.startsWith('/cliente/') && (userRole === 'admin' || userRole === 'contador' || userRole === 'super_admin')) {
+            console.log('🔄 Redirigiendo admin/contador a dashboard general')
+            next('/dashboard')
+            return
+          }
+          
+          // Verificar roles si la ruta lo requiere
+          if (to.meta.roles && !to.meta.roles.includes(userRole)) {
+            console.log('❌ Usuario sin permisos para esta ruta:', userRole, 'vs', to.meta.roles)
+            // Redirigir según el rol del usuario
+            if (userRole === 'cliente') {
+              next('/cliente/dashboard')
+            } else if (userRole === 'contador' || userRole === 'admin') {
+              next('/dashboard')
+            } else if (userRole === 'super_admin') {
+              next('/dashboard')
+            } else {
+              next('/login')
+            }
+            return
+          }
+        } catch (error) {
+          console.error('❌ Error al verificar roles:', error)
+          next('/dashboard')
+          return
         }
         
         next()

@@ -354,6 +354,9 @@
 
 <script>
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import documentService from '@/services/documentService.js'
+import userService from '@/services/userService.js'
+
 export default {
   name: 'Archivo',
   components: { AnimatedNumber },
@@ -436,7 +439,8 @@ export default {
           documentos: 12
         }
       ],
-      documentos: []
+      documentos: [],
+      currentUser: null
     }
   },
   computed: {
@@ -470,16 +474,29 @@ export default {
     }
   },
   async mounted() {
+    await this.loadUser()
     await this.cargarDocumentos()
     await this.cargarEstadisticas()
   },
   methods: {
+    async loadUser() {
+      try {
+        this.currentUser = await userService.getCurrentUser()
+        if (!this.currentUser || (this.currentUser.role !== 'admin' && this.currentUser.role !== 'contador')) {
+          console.warn('⚠️ Usuario sin permisos para esta vista')
+          this.$router.push('/dashboard')
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar usuario:', error)
+        this.$router.push('/login')
+      }
+    },
     async cargarDocumentos() {
       try {
         this.cargando = true
-        console.log('🔄 Cargando documentos...')
+        console.log('🔄 Cargando documentos de la organización...')
         
-        const documentService = (await import('@/services/documentService')).default
+        // Los documentos se filtran automáticamente por organization_id en el servicio
         const documentosData = await documentService.getDocuments()
         
         this.documentos = documentosData || []
@@ -487,6 +504,7 @@ export default {
         
       } catch (error) {
         console.error('❌ Error al cargar documentos:', error)
+        this.documentos = []
       } finally {
         this.cargando = false
       }
@@ -494,14 +512,14 @@ export default {
 
     async cargarEstadisticas() {
       try {
-        console.log('📊 Cargando estadísticas de documentos...')
+        console.log('📊 Cargando estadísticas de documentos de la organización...')
         
-        const documentService = (await import('@/services/documentService')).default
+        // Las estadísticas se filtran automáticamente por organization_id en el servicio
         const stats = await documentService.getDocumentStats()
         
         this.resumen = {
           totalDocumentos: stats.total || 0,
-          carpetas: 5, // Fijo por ahora
+          carpetas: stats.folders || 5, // Usar estadísticas reales si están disponibles
           espacioUsado: stats.totalSize || 0,
           subidasHoy: stats.uploadsToday || 0
         }
@@ -533,7 +551,15 @@ export default {
         this.subiendo = true
         
         try {
-          const documentService = (await import('@/services/documentService')).default
+          // Verificar que el usuario esté cargado
+          if (!this.currentUser) {
+            console.error('❌ Usuario no disponible para subir documentos')
+            alert('Error: Usuario no disponible')
+            this.subiendo = false
+            return
+          }
+          
+          console.log('🔄 Subiendo documentos de la organización...')
           
           // Subir cada archivo secuencialmente para evitar conflictos
           for (let i = 0; i < this.archivosSeleccionados.length; i++) {
@@ -552,13 +578,14 @@ export default {
               console.log(`✅ Archivo ${archivo.name} subido al Storage exitosamente`)
               
               // 2. Crear registro en la base de datos
+              // El servicio maneja automáticamente el organization_id y uploaded_by
               const documentData = {
                 fileName: archivo.name,
                 fileUrl: uploadResult.data.fileUrl,
                 fileType: uploadResult.data.fileType,
                 fileSize: uploadResult.data.fileSize,
-                category: this.documentoForm.categoria,
-                uploadedBy: '11111111-1111-1111-1111-111111111111' // Usuario por defecto
+                category: this.documentoForm.categoria
+                // uploadedBy se asigna automáticamente en el servicio desde el usuario actual
               }
               
               const createResult = await documentService.createDocument(documentData)
@@ -617,9 +644,8 @@ export default {
     async eliminarDocumento(documento) {
       if (confirm(`¿Está seguro de eliminar el documento ${documento.nombre}?`)) {
         try {
-          console.log('🔄 Eliminando documento:', documento.nombre)
+          console.log('🔄 Eliminando documento de la organización:', documento.nombre)
           
-          const documentService = (await import('@/services/documentService')).default
           const result = await documentService.deleteDocument(documento.id)
           
           if (result.success) {

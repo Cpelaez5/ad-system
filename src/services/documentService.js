@@ -7,8 +7,40 @@ const documentService = {
     try {
       console.log('🔄 Obteniendo documentos desde Supabase...')
       
-      // Intentar obtener desde Supabase
-      const { data: documents, error } = await queryWithTenant('documents', '*')
+      // Obtener organization_id del usuario actual
+      const organizationId = getCurrentOrganizationId()
+      if (!organizationId) {
+        console.warn('⚠️ No hay organization_id disponible')
+        return []
+      }
+      
+      // Obtener usuario actual para filtrar por rol
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) {
+        console.warn('⚠️ No hay usuario autenticado')
+        return []
+      }
+      
+      // Obtener perfil del usuario para saber su rol y client_id
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('role, client_id')
+        .eq('id', authUser.id)
+        .single()
+      
+      let query = supabase
+        .from('documents')
+        .select('*')
+        .eq('organization_id', organizationId)
+      
+      // Si es cliente, solo ver sus documentos (subidos por él)
+      if (userProfile?.role === 'cliente') {
+        query = query.eq('uploaded_by', authUser.id)
+      }
+      // Si es admin o contador, ver todos los documentos de la organización
+      // (las políticas RLS ya filtran automáticamente)
+      
+      const { data: documents, error } = await query
       
       if (error) {
         console.warn('⚠️ Error al obtener documentos desde Supabase, usando fallback:', error.message)
@@ -51,6 +83,18 @@ const documentService = {
     try {
       console.log('🔄 Creando documento en Supabase...')
       
+      // Obtener usuario actual si no se proporciona uploadedBy
+      let uploadedBy = documentData.uploadedBy
+      if (!uploadedBy) {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (authUser) {
+          uploadedBy = authUser.id
+        } else {
+          console.warn('⚠️ No se pudo obtener usuario actual, usando valor por defecto')
+          uploadedBy = '11111111-1111-1111-1111-111111111111' // Usuario por defecto (no debería llegar aquí)
+        }
+      }
+      
       // Preparar datos para Supabase
       const documentRecord = {
         file_name: documentData.fileName,
@@ -58,7 +102,7 @@ const documentService = {
         file_type: documentData.fileType,
         file_size: documentData.fileSize,
         category: documentData.category,
-        uploaded_by: documentData.uploadedBy || '11111111-1111-1111-1111-111111111111' // Usuario por defecto
+        uploaded_by: uploadedBy
       }
       
       console.log('📄 Datos del documento a crear:', documentRecord)
