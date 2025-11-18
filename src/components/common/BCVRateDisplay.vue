@@ -110,7 +110,7 @@
 </template>
 
 <script>
-import bcvService from '../../services/bcvService.js';
+import bcvService from '@/services/bcvService.js';
 
 export default {
   name: 'BCVRateDisplay',

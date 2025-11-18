@@ -651,9 +651,9 @@
 </template>
 
 <script>
-import invoiceService from '../../services/invoiceService.js';
-import clientService from '../../services/clientService.js';
-import userService from '../../services/userService.js';
+import invoiceService from '@/services/invoiceService.js';
+import clientService from '@/services/clientService.js';
+import userService from '@/services/userService.js';
 
 export default {
   name: 'InvoiceForm',

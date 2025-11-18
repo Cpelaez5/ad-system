@@ -215,6 +215,9 @@ export default {
             console.log('🏢 Organization ID guardado:', result.user.organization.id)
           }
           
+          // Disparar evento para actualizar Sidebar inmediatamente
+          window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }))
+          
           // Redirigir al dashboard después de un inicio de sesión exitoso
           this.$router.push('/dashboard')
         } else {

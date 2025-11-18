@@ -170,9 +170,9 @@
 
 <script>
 import InvoiceForm from '../components/forms/InvoiceForm.vue';
-import invoiceService from '../services/invoiceService.js';
-import documentService from '../services/documentService.js';
-import userService from '../services/userService.js';
+import invoiceService from '@/services/invoiceService.js';
+import documentService from '@/services/documentService.js';
+import userService from '@/services/userService.js';
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 
 export default {

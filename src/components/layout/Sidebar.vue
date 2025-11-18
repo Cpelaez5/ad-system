@@ -199,12 +199,19 @@ export default {
   data() {
     return {
       sidebarExpanded: false,
+      currentUserData: null, // Almacenar usuario en data para reactividad
     };
   },
   computed: {
     currentUser() {
+      // Usar data reactivo en lugar de leer directamente de localStorage
+      if (this.currentUserData) {
+        return this.currentUserData;
+      }
       try {
-        return JSON.parse(localStorage.getItem("currentUser") || "{}");
+        const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        this.currentUserData = user;
+        return user;
       } catch (error) {
         console.error("Error obteniendo usuario:", error);
         return {};
@@ -227,6 +234,15 @@ export default {
     }
   },
   mounted() {
+    // Cargar usuario inicial
+    this.loadUser();
+    
+    // Escuchar cambios en localStorage (cuando se guarda el usuario después del login)
+    window.addEventListener('storage', this.handleStorageChange);
+    
+    // También escuchar eventos personalizados si el login se hace en la misma ventana
+    window.addEventListener('userUpdated', this.loadUser);
+    
     // Mantener estado visual: detectamos ancho inicial y hover (vuetify agrega clases)
     this.$nextTick(() => {
       const sidebar = document.querySelector(".v-navigation-drawer");
@@ -237,7 +253,30 @@ export default {
         sidebar.classList.contains("v-navigation-drawer--is-hovering");
     });
   },
+  beforeUnmount() {
+    // Limpiar listeners
+    window.removeEventListener('storage', this.handleStorageChange);
+    window.removeEventListener('userUpdated', this.loadUser);
+  },
   methods: {
+    loadUser() {
+      try {
+        const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        this.currentUserData = user;
+        console.log('👤 Usuario cargado en Sidebar:', user.role);
+        // Forzar actualización del componente
+        this.$forceUpdate();
+      } catch (error) {
+        console.error("Error cargando usuario:", error);
+        this.currentUserData = {};
+      }
+    },
+    handleStorageChange(e) {
+      // Detectar cambios en localStorage (funciona entre pestañas)
+      if (e.key === 'currentUser') {
+        this.loadUser();
+      }
+    },
     hasPermission(permission) {
       try {
         const currentUser = this.currentUser;

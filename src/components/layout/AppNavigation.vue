@@ -68,7 +68,7 @@
 </template>
 
 <script>
-import bcvService from '../../services/bcvService.js';
+import bcvService from '@/services/bcvService.js';
 import Sidebar from './Sidebar.vue';
 
 export default {

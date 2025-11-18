@@ -84,7 +84,7 @@
 </template>
 
 <script>
-import bcvService from '../../services/bcvService.js';
+import bcvService from '@/services/bcvService.js';
 import BCVRateDisplay from './BCVRateDisplay.vue';
 
 export default {
