@@ -84,6 +84,12 @@
             value="cliente-gastos"
           ></v-list-item>
           <v-list-item
+            :to="{ name: 'ClienteVentas' }"
+            prepend-icon="mdi-cash-plus"
+            title="Mis Ventas"
+            value="cliente-ventas"
+          ></v-list-item>
+          <v-list-item
             :to="{ name: 'ClienteCompras' }"
             prepend-icon="mdi-cart"
             title="Mis Compras"
@@ -131,10 +137,45 @@
             value="gastos"
         ></v-list-item>
         <v-list-item
+            :to="{ name: 'Ventas' }"
+            prepend-icon="mdi-cash-plus"
+            title="Ventas"
+            value="ventas"
+        ></v-list-item>
+        <v-list-item
           :to="{ name: 'Compras' }"
           prepend-icon="mdi-cart"
           title="Compras"
           value="compras"
+        ></v-list-item>
+      </v-list-group>
+
+      <v-list-group value="organizacion">
+        <template #activator="{ props }">
+          <v-list-item
+            v-bind="props"
+            prepend-icon="mdi-office-building"
+            title="Organización"
+            value="organizacion"
+          />
+        </template>
+        <v-list-item
+            :to="{ name: 'GastosOrganizacion' }"
+            prepend-icon="mdi-cash-minus"
+            title="Gastos"
+            value="gastos-organizacion"
+        ></v-list-item>
+        <v-list-item
+            :to="{ name: 'ComprasOrganizacion' }"
+            prepend-icon="mdi-cart"
+            title="Compras"
+            value="compras-organizacion"
+        ></v-list-item>
+        <v-list-item
+            :to="{ name: 'VentasOrganizacion' }"
+            prepend-icon="mdi-cash-plus"
+            title="Ventas"
+            value="ventas-organizacion"
         ></v-list-item>
       </v-list-group>
 

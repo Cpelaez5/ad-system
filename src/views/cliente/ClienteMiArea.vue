@@ -169,7 +169,7 @@
 </template>
 
 <script>
-import InvoiceForm from '../components/forms/InvoiceForm.vue';
+import InvoiceForm from '@/components/forms/InvoiceForm.vue';
 import invoiceService from '@/services/invoiceService.js';
 import documentService from '@/services/documentService.js';
 import userService from '@/services/userService.js';

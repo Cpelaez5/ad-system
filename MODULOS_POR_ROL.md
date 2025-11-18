@@ -30,7 +30,12 @@
 - ✅ **Clientes** (Clientes) - Gestión de todas las empresas cliente de la organización
 - ✅ **Facturación** (grupo expandible):
   - **Gastos** (Gastos) - Facturas de venta de todos los clientes
+  - **Ventas** (Ventas) - Facturas de venta de todos los clientes
   - **Compras** (Compras) - Facturas de compra de todos los clientes
+- ✅ **Organización** (grupo expandible):
+  - **Gastos** (GastosOrganizacion) - Gastos propios de la organización (servicios constantes)
+  - **Compras** (ComprasOrganizacion) - Compras propias de la organización (mercancía/productos)
+  - **Ventas** (VentasOrganizacion) - Ventas propias de la organización (ingresos)
 - ✅ **Contabilidad** (Contabilidad) - Módulo contable general
 - ✅ **Auditoría** (Auditoria) - Herramientas de auditoría
 - ✅ **Archivo Digital** (Archivo) - Expediente Fiscal 360 completo
@@ -38,6 +43,7 @@
 #### Restricciones:
 - ❌ No puede gestionar usuarios (solo Admin puede)
 - ✅ Puede ver y gestionar datos de TODAS las empresas cliente de su organización
+- ✅ Puede gestionar los gastos, compras y ventas propios de la organización
 
 ---
 
@@ -50,7 +56,12 @@
 - ✅ **Clientes** (Clientes) - Gestión de todas las empresas cliente
 - ✅ **Facturación** (grupo expandible):
   - **Gastos** (Gastos) - Facturas de venta de todos los clientes
+  - **Ventas** (Ventas) - Facturas de venta de todos los clientes
   - **Compras** (Compras) - Facturas de compra de todos los clientes
+- ✅ **Organización** (grupo expandible):
+  - **Gastos** (GastosOrganizacion) - Gastos propios de la organización (servicios constantes)
+  - **Compras** (ComprasOrganizacion) - Compras propias de la organización (mercancía/productos)
+  - **Ventas** (VentasOrganizacion) - Ventas propias de la organización (ingresos)
 - ✅ **Contabilidad** (Contabilidad) - Módulo contable general
 - ✅ **Auditoría** (Auditoria) - Herramientas de auditoría
 - ✅ **Archivo Digital** (Archivo) - Expediente Fiscal 360 completo
@@ -60,6 +71,7 @@
 - ✅ Puede crear, editar y eliminar usuarios
 - ✅ Puede gestionar clientes y proveedores
 - ✅ Puede ver y gestionar datos de TODAS las empresas cliente de su organización
+- ✅ Puede gestionar los gastos, compras y ventas propios de la organización
 
 ---
 
@@ -138,7 +150,11 @@ localStorage.setItem("currentUser", JSON.stringify(userProfile));
 | Área de Contador | ❌ | ✅ | ✅ | ❌ |
 | Clientes | ❌ | ✅ | ✅ | ❌ |
 | Facturación > Gastos | ✅ (Mis) | ✅ (Todos) | ✅ (Todos) | ❌ |
+| Facturación > Ventas | ✅ (Mis) | ✅ (Todos) | ✅ (Todos) | ❌ |
 | Facturación > Compras | ✅ (Mis) | ✅ (Todos) | ✅ (Todos) | ❌ |
+| Organización > Gastos | ❌ | ✅ | ✅ | ❌ |
+| Organización > Compras | ❌ | ✅ | ✅ | ❌ |
+| Organización > Ventas | ❌ | ✅ | ✅ | ❌ |
 | Contabilidad | ❌ | ✅ | ✅ | ❌ |
 | Auditoría | ❌ | ✅ | ✅ | ❌ |
 | Archivo Digital | ✅ (Mis) | ✅ (Todos) | ✅ (Todos) | ❌ |

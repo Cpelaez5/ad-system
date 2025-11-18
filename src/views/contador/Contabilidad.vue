@@ -122,9 +122,11 @@
         <v-icon left>mdi-format-list-bulleted</v-icon>
         Plan de Cuentas
       </v-tab>
-    <v-tabs-window v-model="tabActiva">
+    </v-tabs>
+
+    <v-window v-model="tabActiva">
       <!-- Pestaña de Asientos Contables -->
-      <v-tabs-window-item value="asientos">
+      <v-window-item value="asientos">
         <v-row class="mb-4">
           <v-col cols="12" class="text-right">
             <v-btn
@@ -175,10 +177,10 @@
             </template>
           </v-data-table>
         </v-card>
-      </v-tabs-window-item>
+      </v-window-item>
 
       <!-- Pestaña de Reportes -->
-      <v-tabs-window-item value="reportes">
+      <v-window-item value="reportes">
         <v-row>
           <v-col cols="12" md="6">
             <v-card class="pa-4">
@@ -240,10 +242,10 @@
             </v-card>
           </v-col>
         </v-row>
-      </v-tabs-window-item>
+      </v-window-item>
 
       <!-- Pestaña de Plan de Cuentas -->
-      <v-tabs-window-item value="cuentas">
+      <v-window-item value="cuentas">
         <v-row class="mb-4">
           <v-col cols="12" class="text-right">
             <v-btn
@@ -293,9 +295,8 @@
             </template>
           </v-data-table>
         </v-card>
-      </v-tabs-window-item>
-    </v-tabs-window>
-    </v-tabs>
+      </v-window-item>
+    </v-window>
 
     <!-- Diálogo para nuevo asiento -->
     <v-dialog v-model="dialogoAsiento" max-width="800px">
@@ -423,6 +424,7 @@
 <script>
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import userService from '@/services/userService.js'
+import invoiceService from '@/services/invoiceService.js'
 
 export default {
   name: 'Contabilidad',
@@ -435,10 +437,10 @@ export default {
       dialogoAsiento: false,
       formularioValido: false,
       resumen: {
-        asientosMes: 45,
-        ingresos: 2500000,
-        egresos: 1800000,
-        utilidad: 700000
+        asientosMes: 0,
+        ingresos: 0,
+        egresos: 0,
+        utilidad: 0
       },
       headersAsientos: [
         { title: 'Número', key: 'numero', sortable: true },
@@ -466,29 +468,8 @@ export default {
           }
         ]
       },
-      asientos: [
-        {
-          id: 1,
-          numero: 'AS-001',
-          fecha: '2024-01-15',
-          descripcion: 'Venta de servicios',
-          total: 150000
-        },
-        {
-          id: 2,
-          numero: 'AS-002',
-          fecha: '2024-01-16',
-          descripcion: 'Pago de nómina',
-          total: 500000
-        }
-      ],
-      cuentas: [
-        { codigo: '1105', nombre: 'Caja', tipo: 'Activo', saldo: 500000 },
-        { codigo: '1305', nombre: 'Clientes', tipo: 'Activo', saldo: 800000 },
-        { codigo: '2408', nombre: 'Proveedores', tipo: 'Pasivo', saldo: 300000 },
-        { codigo: '4135', nombre: 'Ventas', tipo: 'Ingreso', saldo: 2000000 },
-        { codigo: '5105', nombre: 'Gastos Administrativos', tipo: 'Gasto', saldo: 400000 }
-      ]
+      asientos: [],
+      cuentas: []
     }
   },
   computed: {
@@ -500,8 +481,7 @@ export default {
   },
   async mounted() {
     await this.loadUser()
-    // TODO: Cargar datos contables de la organización
-    // Los datos se filtrarán automáticamente por organization_id cuando se integren los servicios
+    await this.loadRealData()
   },
   methods: {
     async loadUser() {
@@ -514,6 +494,46 @@ export default {
       } catch (error) {
         console.error('❌ Error al cargar usuario:', error)
         this.$router.push('/login')
+      }
+    },
+    async loadRealData() {
+      this.cargando = true
+      try {
+        // Obtener todas las facturas de la organización
+        const ventas = await invoiceService.getInvoices({ flow: 'VENTA' })
+        const compras = await invoiceService.getInvoices({ flow: 'COMPRA' })
+        
+        // Calcular ingresos (ventas)
+        const ingresos = ventas.reduce((sum, inv) => {
+          const total = parseFloat(inv.financial?.totalSales || 0)
+          return sum + total
+        }, 0)
+        
+        // Calcular egresos (compras)
+        const egresos = compras.reduce((sum, inv) => {
+          const total = parseFloat(inv.financial?.totalSales || 0)
+          return sum + total
+        }, 0)
+        
+        // Actualizar resumen con datos reales
+        this.resumen.ingresos = ingresos
+        this.resumen.egresos = egresos
+        this.resumen.utilidad = ingresos - egresos
+        this.resumen.asientosMes = ventas.length + compras.length
+        
+        // TODO: Cargar asientos contables reales cuando exista la tabla
+        // TODO: Cargar plan de cuentas real cuando exista la tabla
+        
+        console.log('✅ Datos contables cargados:', {
+          ingresos: this.resumen.ingresos,
+          egresos: this.resumen.egresos,
+          utilidad: this.resumen.utilidad,
+          asientosMes: this.resumen.asientosMes
+        })
+      } catch (error) {
+        console.error('❌ Error al cargar datos contables:', error)
+      } finally {
+        this.cargando = false
       }
     },
     abrirDialogoNuevoAsiento() {

@@ -1,21 +1,26 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 // Vistas compartidas (accesibles por todos los usuarios autenticados)
-import Dashboard from '../views/shared/Dashboard.vue'
-import Login from '../views/shared/Login.vue'
-const SingUp = () => import('../views/shared/SingUp.vue')
+import Dashboard from '@/views/shared/Dashboard.vue'
+import Login from '@/views/shared/Login.vue'
+const SingUp = () => import('@/views/shared/SingUp.vue')
 
 // Vistas para cliente
 const ClienteMiArea = () => import('../views/cliente/ClienteMiArea.vue')
 const ClienteDashboard = () => import('../views/cliente/Dashboard.vue')
 const ClienteCompras = () => import('../views/cliente/Compras.vue')
 const ClienteGastos = () => import('../views/cliente/Gastos.vue')
+const ClienteVentas = () => import('../views/cliente/Ventas.vue')
 const ClienteArchivo = () => import('../views/cliente/Archivo.vue')
 
 // Vistas para contador y admin
 const ContadorArea = () => import('../views/contador/ContadorArea.vue')
 const Gastos = () => import('../views/contador/Gastos.vue')
+const Ventas = () => import('../views/contador/Ventas.vue')
 const Compras = () => import('../views/contador/Compras.vue')
+const GastosOrganizacion = () => import('../views/contador/GastosOrganizacion.vue')
+const ComprasOrganizacion = () => import('../views/contador/ComprasOrganizacion.vue')
+const VentasOrganizacion = () => import('../views/contador/VentasOrganizacion.vue')
 const Clientes = () => import('../views/contador/Clientes.vue')
 const Facturacion = () => import('../views/contador/Facturacion.vue')
 const Contabilidad = () => import('../views/contador/Contabilidad.vue')
@@ -26,7 +31,7 @@ const Archivo = () => import('../views/contador/Archivo.vue')
 const Usuarios = () => import('../views/admin/Usuarios.vue')
 
 // Componentes de prueba
-import TestForm from '../components/common/TestForm.vue'
+import TestForm from '@/components/common/TestForm.vue'
 
 // Definir las rutas del sistema
 const routes = [
@@ -41,10 +46,34 @@ const routes = [
     meta: { requiresAuth: true, title: 'Gastos', roles: ['admin', 'contador'] }
   },
   {
+    path: '/ventas',
+    name: 'Ventas',
+    component: Ventas,
+    meta: { requiresAuth: true, title: 'Ventas', roles: ['admin', 'contador'] }
+  },
+  {
     path: '/compras',
     name: 'Compras',
     component: Compras,
     meta: { requiresAuth: true, title: 'Compras', roles: ['admin', 'contador'] }
+  },
+  {
+    path: '/organizacion/gastos',
+    name: 'GastosOrganizacion',
+    component: GastosOrganizacion,
+    meta: { requiresAuth: true, title: 'Gastos de la Organización', roles: ['admin', 'contador'] }
+  },
+  {
+    path: '/organizacion/compras',
+    name: 'ComprasOrganizacion',
+    component: ComprasOrganizacion,
+    meta: { requiresAuth: true, title: 'Compras de la Organización', roles: ['admin', 'contador'] }
+  },
+  {
+    path: '/organizacion/ventas',
+    name: 'VentasOrganizacion',
+    component: VentasOrganizacion,
+    meta: { requiresAuth: true, title: 'Ventas de la Organización', roles: ['admin', 'contador'] }
   },
   {
     path: '/cliente/mi-area',
@@ -93,6 +122,12 @@ const routes = [
     name: 'ClienteGastos',
     component: ClienteGastos,
     meta: { requiresAuth: true, title: 'Mis Gastos', roles: ['cliente'] }
+  },
+  {
+    path: '/cliente/ventas',
+    name: 'ClienteVentas',
+    component: ClienteVentas,
+    meta: { requiresAuth: true, title: 'Mis Ventas', roles: ['cliente'] }
   },
   {
     path: '/cliente/archivo',

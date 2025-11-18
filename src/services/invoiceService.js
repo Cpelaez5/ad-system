@@ -32,9 +32,10 @@ class InvoiceService {
   }
 
   // Obtener facturas de la organización actual, opcionalmente filtradas por flujo y cliente
-  async getInvoices({ flow = 'VENTA', clientId } = {}) {
+  // organizationOnly: si es true, solo devuelve facturas de la organización (client_id IS NULL)
+  async getInvoices({ flow = 'VENTA', clientId, organizationOnly = false } = {}) {
     try {
-      console.log('🔄 Obteniendo facturas desde Supabase...')
+      console.log('🔄 Obteniendo facturas desde Supabase...', { flow, clientId, organizationOnly })
       
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
@@ -60,7 +61,11 @@ class InvoiceService {
         .eq('flow', flow)
         .order('created_at', { ascending: false })
 
-      if (clientId) {
+      if (organizationOnly) {
+        // Filtrar solo facturas de la organización (sin client_id)
+        query = query.is('client_id', null)
+      } else if (clientId) {
+        // Filtrar por cliente específico
         query = query.eq('client_id', clientId)
       }
 
@@ -245,8 +250,11 @@ class InvoiceService {
       }
 
       // Determinar cliente según el rol; si es cliente, forzar su client_id
+      // Si clientId es explícitamente null (organización), mantenerlo null
       const userProfile = await this.getCurrentUserProfile()
-      const effectiveClientId = userProfile?.role === 'cliente' ? (userProfile?.client_id || null) : (invoiceData.clientId || null)
+      const effectiveClientId = invoiceData.clientId === null 
+        ? null  // Factura de la organización (sin client_id)
+        : (userProfile?.role === 'cliente' ? (userProfile?.client_id || null) : (invoiceData.clientId || null))
       const effectiveFlow = invoiceData.flow || 'VENTA'
       
       // Preparar datos para Supabase

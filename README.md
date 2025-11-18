@@ -12,6 +12,8 @@ Un sistema web completo desarrollado con Vue 3, Vite y Vuetify para la gestión 
 - **Diseño Intuitivo**: Fácil de usar sin conocimientos avanzados
 - **Experiencia Premium**: Sistema completo de animaciones y micro-interacciones
 - **Interfaz Moderna**: Diseño Material Design con efectos visuales profesionales
+- **Gestión Dual**: Administración de datos de clientes y datos propios de la organización
+- **Separación por Roles**: Vistas organizadas por tipo de usuario para mejor mantenibilidad
 
 ## 🛠️ Tecnologías Utilizadas
 

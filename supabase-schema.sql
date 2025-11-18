@@ -117,7 +117,7 @@ CREATE TABLE clients (
 CREATE TABLE invoices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    client_id UUID NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
+    client_id UUID REFERENCES clients(id) ON DELETE RESTRICT, -- NULL para facturas de la organización
     invoice_number TEXT NOT NULL,
     control_number TEXT,
     document_type TEXT NOT NULL DEFAULT 'FACTURA',

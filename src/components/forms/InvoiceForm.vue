@@ -669,6 +669,10 @@ export default {
     autoPartyMode: {
       type: Boolean,
       default: true
+    },
+    organizationOnly: {
+      type: Boolean,
+      default: false // Si es true, la factura es de la organización (sin client_id)
     }
   },
   emits: ['submit', 'cancel'],
@@ -811,8 +815,11 @@ export default {
 
     // Ajustar modo auto party: ocultar edición de emisor/cliente y solo seleccionar cliente si corresponde
     if (this.autoPartyMode) {
-      // Si el usuario no puede seleccionar clientes, no exigimos selectedClientId
-      if (!this.canSelectClients) {
+      // Si organizationOnly es true, no seleccionar cliente (factura de la organización)
+      if (this.organizationOnly) {
+        this.selectedClientId = null
+        this.canSelectClients = false
+      } else if (!this.canSelectClients) {
         this.selectedClientId = null
       }
     }
@@ -947,7 +954,8 @@ export default {
         return;
       }
       
-      if (this.canSelectClients && !this.selectedClientId) {
+      // Si organizationOnly es true, no requerir clientId
+      if (!this.organizationOnly && this.canSelectClients && !this.selectedClientId) {
         console.log('❌ No se ha seleccionado un cliente');
         return;
       }
@@ -955,14 +963,17 @@ export default {
       console.log('📝 Datos del formulario a enviar:', this.formData);
       console.log('👤 Cliente seleccionado ID:', this.selectedClientId);
       console.log('🔐 Puede seleccionar clientes:', this.canSelectClients);
+      console.log('🏢 Organización solamente:', this.organizationOnly);
       
       this.loading = true;
       
       try {
         let response;
+        // Si organizationOnly es true, pasar null explícitamente para clientId
+        const clientId = this.organizationOnly ? null : (this.canSelectClients ? this.selectedClientId : null);
         const invoiceData = {
           ...this.formData,
-          clientId: this.canSelectClients ? this.selectedClientId : null,
+          clientId: clientId,
           flow: this.flow
         };
         

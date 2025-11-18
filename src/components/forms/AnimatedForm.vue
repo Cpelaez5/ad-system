@@ -59,7 +59,7 @@
 </template>
 
 <script>
-import CustomButton from '../common/CustomButton.vue'
+import CustomButton from '@/components/common/CustomButton.vue'
 
 export default {
   name: 'AnimatedForm',

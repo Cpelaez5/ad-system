@@ -168,9 +168,11 @@
         <v-icon left>mdi-backup-restore</v-icon>
         Respaldos
       </v-tab>
-    <v-tabs-window v-model="tabActiva">
+    </v-tabs>
+
+    <v-window v-model="tabActiva">
       <!-- Pestaña de Logs -->
-      <v-tabs-window-item value="logs">
+      <v-window-item value="logs">
         <v-card>
           <v-card-title>
             <v-icon left>mdi-history</v-icon>
@@ -208,10 +210,10 @@
             </template>
           </v-data-table>
         </v-card>
-      </v-tabs-window-item>
+      </v-window-item>
 
       <!-- Pestaña de Usuarios -->
-      <v-tabs-window-item value="usuarios">
+      <v-window-item value="usuarios">
         <v-row class="mb-4">
           <v-col cols="12" class="text-right">
             <v-btn
@@ -268,10 +270,10 @@
             </template>
           </v-data-table>
         </v-card>
-      </v-tabs-window-item>
+      </v-window-item>
 
       <!-- Pestaña de Seguridad -->
-      <v-tabs-window-item value="seguridad">
+      <v-window-item value="seguridad">
         <v-row>
           <v-col cols="12" md="6">
             <v-card class="pa-4">
@@ -347,10 +349,10 @@
             </v-card>
           </v-col>
         </v-row>
-      </v-tabs-window-item>
+      </v-window-item>
 
       <!-- Pestaña de Respaldos -->
-      <v-tabs-window-item value="respaldos">
+      <v-window-item value="respaldos">
         <v-row class="mb-4">
           <v-col cols="12" class="text-right">
             <v-btn
@@ -413,9 +415,8 @@
             </template>
           </v-data-table>
         </v-card>
-      </v-tabs-window-item>
-    </v-tabs-window>
-    </v-tabs>
+      </v-window-item>
+    </v-window>
   </v-container>
 </template>
 
@@ -436,10 +437,10 @@ export default {
       filtroFechaInicio: '',
       filtroFechaFin: '',
       resumen: {
-        totalEventos: 1247,
-        usuariosActivos: 8,
-        alertas: 3,
-        respaldos: 15
+        totalEventos: 0,
+        usuariosActivos: 0,
+        alertas: 0,
+        respaldos: 0
       },
       tiposEvento: [
         'Login',
@@ -479,97 +480,10 @@ export default {
         dosFactores: false,
         logsSesion: true
       },
-      logs: [
-        {
-          id: 1,
-          fecha: '2024-01-20T10:30:00',
-          usuario: 'admin',
-          tipo: 'Login',
-          descripcion: 'Inicio de sesión exitoso',
-          ip: '192.168.1.100'
-        },
-        {
-          id: 2,
-          fecha: '2024-01-20T10:25:00',
-          usuario: 'contador1',
-          tipo: 'Crear',
-          descripcion: 'Nueva factura creada',
-          ip: '192.168.1.101'
-        },
-        {
-          id: 3,
-          fecha: '2024-01-20T10:20:00',
-          usuario: 'admin',
-          tipo: 'Error',
-          descripcion: 'Error al procesar archivo',
-          ip: '192.168.1.100'
-        }
-      ],
-      usuarios: [
-        {
-          id: 1,
-          usuario: 'admin',
-          nombre: 'Administrador',
-          rol: 'Administrador',
-          estado: 'Activo',
-          ultimoAcceso: '2024-01-20T10:30:00'
-        },
-        {
-          id: 2,
-          usuario: 'contador1',
-          nombre: 'Juan Pérez',
-          rol: 'Contador',
-          estado: 'Activo',
-          ultimoAcceso: '2024-01-20T09:45:00'
-        },
-        {
-          id: 3,
-          usuario: 'auditor1',
-          nombre: 'María González',
-          rol: 'Auditor',
-          estado: 'Inactivo',
-          ultimoAcceso: '2024-01-19T16:20:00'
-        }
-      ],
-      respaldos: [
-        {
-          id: 1,
-          fecha: '2024-01-20T02:00:00',
-          tipo: 'Completo',
-          tamaño: 1024000000,
-          estado: 'Exitoso'
-        },
-        {
-          id: 2,
-          fecha: '2024-01-19T02:00:00',
-          tipo: 'Incremental',
-          tamaño: 512000000,
-          estado: 'Exitoso'
-        },
-        {
-          id: 3,
-          fecha: '2024-01-18T02:00:00',
-          tipo: 'Completo',
-          tamaño: 0,
-          estado: 'Error'
-        }
-      ],
-      alertasSeguridad: [
-        {
-          id: 1,
-          titulo: 'Múltiples intentos de login fallidos',
-          descripcion: 'Usuario admin - 5 intentos fallidos',
-          criticidad: 'Alta',
-          icono: 'mdi-alert-circle'
-        },
-        {
-          id: 2,
-          titulo: 'Acceso desde IP no reconocida',
-          descripcion: 'IP 203.0.113.1 - Usuario contador1',
-          criticidad: 'Media',
-          icono: 'mdi-shield-alert'
-        }
-      ]
+      logs: [],
+      usuarios: [],
+      respaldos: [],
+      alertasSeguridad: []
     }
   },
   computed: {
@@ -589,8 +503,7 @@ export default {
   },
   async mounted() {
     await this.loadUser()
-    // TODO: Cargar logs de auditoría de la organización
-    // Los logs se filtrarán automáticamente por organization_id cuando se integren los servicios
+    await this.loadRealData()
   },
   methods: {
     async loadUser() {
@@ -603,6 +516,38 @@ export default {
       } catch (error) {
         console.error('❌ Error al cargar usuario:', error)
         this.$router.push('/login')
+      }
+    },
+    async loadRealData() {
+      this.cargando = true
+      try {
+        // Cargar usuarios reales de la organización
+        const users = await userService.getUsers()
+        this.usuarios = users.map(user => ({
+          id: user.id,
+          usuario: user.username || user.email,
+          nombre: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+          rol: user.role === 'admin' ? 'Administrador' : user.role === 'contador' ? 'Contador' : user.role,
+          estado: user.isActive ? 'Activo' : 'Inactivo',
+          ultimoAcceso: user.lastLogin || 'Nunca'
+        }))
+        
+        // Actualizar resumen con datos reales
+        this.resumen.usuariosActivos = this.usuarios.filter(u => u.estado === 'Activo').length
+        this.resumen.totalEventos = this.logs.length
+        
+        // TODO: Cargar logs reales desde audit_logs cuando esté disponible
+        // TODO: Cargar respaldos reales cuando esté disponible
+        // TODO: Cargar alertas de seguridad reales cuando esté disponible
+        
+        console.log('✅ Datos de auditoría cargados:', {
+          usuarios: this.usuarios.length,
+          usuariosActivos: this.resumen.usuariosActivos
+        })
+      } catch (error) {
+        console.error('❌ Error al cargar datos de auditoría:', error)
+      } finally {
+        this.cargando = false
       }
     },
     abrirDialogoNuevoUsuario() {

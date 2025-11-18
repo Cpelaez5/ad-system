@@ -23,7 +23,7 @@ export function getCurrentOrganizationId() {
     // Intentar obtener de ambas claves (compatibilidad)
     let orgId = localStorage.getItem('organization_id') || localStorage.getItem('current_organization_id')
     
-    // Si no hay organization_id o es el mock, establecer el UUID real
+    // Si no hay organization_id o es el mock, intentar obtener del usuario actual
     if (!orgId || orgId === 'mock-org-1' || orgId === 'mock-org-2') {
       console.warn('⚠️ Organization ID inválido o mock detectado')
       
@@ -41,12 +41,10 @@ export function getCurrentOrganizationId() {
         console.warn('⚠️ No se pudo obtener organization_id del usuario actual')
       }
       
-      // Si aún no hay organization_id, usar fallback
-      console.warn('⚠️ Usando organization_id por defecto')
-      const defaultOrgId = '11111111-1111-1111-1111-111111111111'
-      localStorage.setItem('organization_id', defaultOrgId)
-      localStorage.setItem('current_organization_id', defaultOrgId)
-      return defaultOrgId
+      // Si aún no hay organization_id, NO usar fallback inseguro
+      // En su lugar, retornar null y dejar que el servicio maneje el error
+      console.error('❌ No se pudo obtener organization_id válido')
+      return null
     }
     
     // Guardar en ambas claves para compatibilidad
@@ -57,11 +55,8 @@ export function getCurrentOrganizationId() {
     return orgId
   } catch (error) {
     console.error('❌ Error al obtener organization_id:', error)
-    // Usar la primera organización como fallback
-    const fallbackOrgId = '11111111-1111-1111-1111-111111111111'
-    localStorage.setItem('organization_id', fallbackOrgId)
-    localStorage.setItem('current_organization_id', fallbackOrgId)
-    return fallbackOrgId
+    // NO usar fallback inseguro - retornar null
+    return null
   }
 }
 

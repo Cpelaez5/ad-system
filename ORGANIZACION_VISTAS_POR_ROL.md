@@ -24,7 +24,11 @@ src/views/
 │   ├── ContadorArea.vue    # Área de trabajo del contador
 │   ├── Clientes.vue    # Gestión de empresas cliente
 │   ├── Gastos.vue      # Facturas de venta (todos los clientes)
+│   ├── Ventas.vue      # Facturas de venta (todos los clientes)
 │   ├── Compras.vue     # Facturas de compra (todos los clientes)
+│   ├── GastosOrganizacion.vue    # Gastos de la organización (sin client_id)
+│   ├── ComprasOrganizacion.vue   # Compras de la organización (sin client_id)
+│   ├── VentasOrganizacion.vue    # Ventas de la organización (sin client_id)
 │   ├── Facturacion.vue # Vista general de facturación
 │   ├── Contabilidad.vue    # Módulo contable
 │   ├── Auditoria.vue   # Herramientas de auditoría
@@ -63,8 +67,12 @@ src/views/
 - ✅ `/dashboard` → `shared/Dashboard.vue`
 - ✅ `/contador/area` → `contador/ContadorArea.vue`
 - ✅ `/clientes` → `contador/Clientes.vue`
-- ✅ `/gastos` → `contador/Gastos.vue`
-- ✅ `/compras` → `contador/Compras.vue`
+- ✅ `/gastos` → `contador/Gastos.vue` (gastos de clientes)
+- ✅ `/ventas` → `contador/Ventas.vue` (ventas de clientes)
+- ✅ `/compras` → `contador/Compras.vue` (compras de clientes)
+- ✅ `/organizacion/gastos` → `contador/GastosOrganizacion.vue` (gastos de la organización)
+- ✅ `/organizacion/compras` → `contador/ComprasOrganizacion.vue` (compras de la organización)
+- ✅ `/organizacion/ventas` → `contador/VentasOrganizacion.vue` (ventas de la organización)
 - ✅ `/facturacion` → `contador/Facturacion.vue`
 - ✅ `/contabilidad` → `contador/Contabilidad.vue`
 - ✅ `/auditoria` → `contador/Auditoria.vue`
