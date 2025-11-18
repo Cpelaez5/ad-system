@@ -44,11 +44,30 @@ class InvoiceService {
       }
       
       // Obtener facturas con información del cliente relacionado
+      // Construir la consulta paso a paso para evitar ambigüedad
       let query = supabase
         .from('invoices')
         .select(`
-          *,
-          clients (
+          id,
+          organization_id,
+          client_id,
+          invoice_number,
+          control_number,
+          document_type,
+          flow,
+          issue_date,
+          due_date,
+          status,
+          issuer,
+          client_info,
+          financial,
+          items,
+          attachments,
+          notes,
+          created_by,
+          created_at,
+          updated_at,
+          clients!invoices_client_id_fkey (
             id,
             company_name,
             rif,
@@ -59,8 +78,8 @@ class InvoiceService {
         `)
         .eq('organization_id', organizationId)
         .eq('flow', flow)
-        .order('created_at', { ascending: false })
 
+      // Aplicar filtros de client_id ANTES del order para evitar ambigüedad
       if (organizationOnly) {
         // Filtrar solo facturas de la organización (sin client_id)
         query = query.is('client_id', null)
@@ -68,6 +87,9 @@ class InvoiceService {
         // Filtrar por cliente específico
         query = query.eq('client_id', clientId)
       }
+      
+      // Aplicar orden al final
+      query = query.order('created_at', { ascending: false })
 
       const { data: invoices, error } = await query
       
@@ -185,8 +207,26 @@ class InvoiceService {
       const { data: invoice, error } = await supabase
         .from('invoices')
         .select(`
-          *,
-          clients (
+          id,
+          organization_id,
+          client_id,
+          invoice_number,
+          control_number,
+          document_type,
+          flow,
+          issue_date,
+          due_date,
+          status,
+          issuer,
+          client_info,
+          financial,
+          items,
+          attachments,
+          notes,
+          created_by,
+          created_at,
+          updated_at,
+          clients!invoices_client_id_fkey (
             id,
             company_name,
             rif,
@@ -570,8 +610,26 @@ class InvoiceService {
       let query = supabase
         .from('invoices')
         .select(`
-          *,
-          clients (
+          id,
+          organization_id,
+          client_id,
+          invoice_number,
+          control_number,
+          document_type,
+          flow,
+          issue_date,
+          due_date,
+          status,
+          issuer,
+          client_info,
+          financial,
+          items,
+          attachments,
+          notes,
+          created_by,
+          created_at,
+          updated_at,
+          clients!invoices_client_id_fkey (
             id,
             company_name,
             rif,

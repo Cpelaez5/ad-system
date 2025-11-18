@@ -192,26 +192,26 @@
             <v-card-text>
               <div class="mb-3">
                 <div class="d-flex justify-space-between">
-                  <span>Almacenamiento</span>
-                  <span>75%</span>
+                  <span>Documentos</span>
+                  <span>{{ estadisticas.documentos }}</span>
                 </div>
                 <v-progress-linear
                   color="primary"
                   height="8"
-                  :model-value="75"
+                  :model-value="Math.min((estadisticas.documentos / 100) * 100, 100)"
                   rounded
                 ></v-progress-linear>
               </div>
               
               <div class="mb-3">
                 <div class="d-flex justify-space-between">
-                  <span>Respaldos</span>
-                  <span>100%</span>
+                  <span>Facturas</span>
+                  <span>{{ estadisticas.facturasMes }}</span>
                 </div>
                 <v-progress-linear
                   color="success"
                   height="8"
-                  :model-value="100"
+                  :model-value="Math.min((estadisticas.facturasMes / 50) * 100, 100)"
                   rounded
                 ></v-progress-linear>
               </div>
@@ -239,22 +239,22 @@
             <v-card-text>
               <div class="mb-3">
                 <div class="d-flex justify-space-between align-center">
-                  <span>Reportes del Mes</span>
-                  <v-chip color="primary" size="small">12</v-chip>
+                  <span>Facturas Totales</span>
+                  <v-chip color="primary" size="small">{{ estadisticas.facturasMes }}</v-chip>
                 </div>
               </div>
               
               <div class="mb-3">
                 <div class="d-flex justify-space-between align-center">
-                  <span>Pendientes</span>
-                  <v-chip color="warning" size="small">3</v-chip>
+                  <span>Clientes Activos</span>
+                  <v-chip color="success" size="small">{{ estadisticas.totalClientes }}</v-chip>
                 </div>
               </div>
 
               <div class="mb-3">
                 <div class="d-flex justify-space-between align-center">
-                  <span>Completados</span>
-                  <v-chip color="success" size="small">9</v-chip>
+                  <span>Documentos</span>
+                  <v-chip color="info" size="small">{{ estadisticas.documentos }}</v-chip>
                 </div>
               </div>
 
@@ -330,6 +330,8 @@ export default {
   },
   async mounted() {
     await this.cargarEstadisticas()
+    await this.cargarDatosGraficas()
+    await this.cargarActividadesRecientes()
   },
   methods: {
     async cargarEstadisticas() {
@@ -344,12 +346,16 @@ export default {
         const invoiceService = (await import('@/services/invoiceService')).default
         const invoiceStats = await invoiceService.getInvoiceStats()
         
+        // Cargar documentos
+        const documentService = (await import('@/services/documentService')).default
+        const documentos = await documentService.getDocuments()
+        
         // Actualizar estadísticas
         this.estadisticas = {
           totalClientes: clientStats.total || 0,
           facturasMes: invoiceStats.total || 0,
           ingresosMes: invoiceStats.totalAmount || 0,
-          documentos: 0 // Por ahora 0, se puede implementar después
+          documentos: documentos?.length || 0
         }
         
         console.log('✅ Estadísticas cargadas:', this.estadisticas)
@@ -357,6 +363,191 @@ export default {
       } catch (error) {
         console.error('❌ Error al cargar estadísticas:', error)
         // Mantener valores por defecto en caso de error
+      }
+    },
+    async cargarDatosGraficas() {
+      try {
+        console.log('🔄 Cargando datos para gráficas...')
+        
+        const invoiceService = (await import('@/services/invoiceService')).default
+        
+        // Obtener todas las facturas de los últimos 6 meses
+        const ventas = await invoiceService.getInvoices({ flow: 'VENTA' })
+        const compras = await invoiceService.getInvoices({ flow: 'COMPRA' })
+        
+        // Calcular datos por mes (últimos 6 meses)
+        const ahora = new Date()
+        const meses = []
+        const ingresosPorMes = []
+        const egresosPorMes = []
+        
+        for (let i = 5; i >= 0; i--) {
+          const fecha = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1)
+          const mesNombre = fecha.toLocaleDateString('es-ES', { month: 'short' })
+          meses.push(mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1))
+          
+          // Filtrar facturas del mes
+          const ventasMes = ventas.filter(inv => {
+            const fechaInv = new Date(inv.issueDate || inv.createdAt)
+            return fechaInv.getMonth() === fecha.getMonth() && 
+                   fechaInv.getFullYear() === fecha.getFullYear()
+          })
+          
+          const comprasMes = compras.filter(inv => {
+            const fechaInv = new Date(inv.issueDate || inv.createdAt)
+            return fechaInv.getMonth() === fecha.getMonth() && 
+                   fechaInv.getFullYear() === fecha.getFullYear()
+          })
+          
+          // Calcular totales
+          const ingresos = ventasMes.reduce((sum, inv) => {
+            return sum + (parseFloat(inv.financial?.totalSales || 0))
+          }, 0)
+          
+          const egresos = comprasMes.reduce((sum, inv) => {
+            return sum + (parseFloat(inv.financial?.totalSales || 0))
+          }, 0)
+          
+          ingresosPorMes.push(ingresos)
+          egresosPorMes.push(egresos)
+        }
+        
+        // Actualizar gráfica de barras
+        this.chartData = {
+          labels: meses,
+          datasets: [
+            {
+              label: 'Ingresos',
+              data: ingresosPorMes,
+              backgroundColor: 'rgba(25, 118, 210, 0.8)',
+              borderColor: '#1976D2',
+              borderWidth: 2,
+              borderRadius: 6,
+              borderSkipped: false,
+            },
+            {
+              label: 'Egresos',
+              data: egresosPorMes,
+              backgroundColor: 'rgba(255, 82, 82, 0.8)',
+              borderColor: '#FF5252',
+              borderWidth: 2,
+              borderRadius: 6,
+              borderSkipped: false,
+            }
+          ]
+        }
+        
+        // Calcular distribución de gastos (por tipo de factura COMPRA)
+        const categoriasGastos = {}
+        compras.forEach(inv => {
+          const categoria = inv.items?.[0]?.description || 'Otros'
+          const monto = parseFloat(inv.financial?.totalSales || 0)
+          categoriasGastos[categoria] = (categoriasGastos[categoria] || 0) + monto
+        })
+        
+        // Ordenar y tomar las 5 categorías principales
+        const categoriasOrdenadas = Object.entries(categoriasGastos)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+        
+        const labelsGastos = categoriasOrdenadas.map(([cat]) => cat)
+        const datosGastos = categoriasOrdenadas.map(([, monto]) => monto)
+        
+        // Si no hay datos, usar valores por defecto vacíos
+        if (labelsGastos.length === 0) {
+          labelsGastos.push('Sin datos')
+          datosGastos.push(0)
+        }
+        
+        // Actualizar gráfica de pastel
+        this.pieChartData = {
+          labels: labelsGastos,
+          datasets: [{
+            data: datosGastos,
+            backgroundColor: [
+              '#1976D2',
+              '#FF5252',
+              '#FFC107',
+              '#4CAF50',
+              '#9E9E9E'
+            ],
+            borderWidth: 2,
+            borderColor: '#FFFFFF'
+          }]
+        }
+        
+        console.log('✅ Datos de gráficas cargados')
+        
+      } catch (error) {
+        console.error('❌ Error al cargar datos de gráficas:', error)
+      }
+    },
+    async cargarActividadesRecientes() {
+      try {
+        console.log('🔄 Cargando actividades recientes...')
+        
+        const invoiceService = (await import('@/services/invoiceService')).default
+        const documentService = (await import('@/services/documentService')).default
+        
+        // Obtener facturas recientes
+        const facturas = await invoiceService.getInvoices({ flow: 'VENTA' })
+        
+        // Obtener documentos recientes
+        const documentos = await documentService.getDocuments()
+        
+        // Combinar facturas y documentos con fechas originales para ordenar
+        const todasLasActividades = [
+          ...facturas.map(inv => ({
+            id: inv.id,
+            descripcion: `Nueva factura ${inv.invoiceNumber} creada`,
+            fecha: new Date(inv.createdAt || inv.issueDate),
+            fechaFormateada: this.formatearFechaRelativa(new Date(inv.createdAt || inv.issueDate)),
+            icono: 'mdi-receipt'
+          })),
+          ...documentos.map(doc => ({
+            id: doc.id,
+            descripcion: `Documento ${doc.fileName} subido`,
+            fecha: new Date(doc.createdAt),
+            fechaFormateada: this.formatearFechaRelativa(new Date(doc.createdAt)),
+            icono: 'mdi-file-upload'
+          }))
+        ]
+        
+        // Ordenar por fecha (más reciente primero) y tomar las 4 más recientes
+        this.actividadesRecientes = todasLasActividades
+          .sort((a, b) => b.fecha - a.fecha)
+          .slice(0, 4)
+          .map(act => ({
+            id: act.id,
+            descripcion: act.descripcion,
+            fecha: act.fechaFormateada,
+            icono: act.icono
+          }))
+        
+        console.log('✅ Actividades recientes cargadas:', this.actividadesRecientes.length)
+        
+      } catch (error) {
+        console.error('❌ Error al cargar actividades recientes:', error)
+        this.actividadesRecientes = []
+      }
+    },
+    formatearFechaRelativa(fecha) {
+      const ahora = new Date()
+      const diffMs = ahora - fecha
+      const diffMins = Math.floor(diffMs / 60000)
+      const diffHours = Math.floor(diffMs / 3600000)
+      const diffDays = Math.floor(diffMs / 86400000)
+      
+      if (diffMins < 60) {
+        return `Hace ${diffMins} ${diffMins === 1 ? 'minuto' : 'minutos'}`
+      } else if (diffHours < 24) {
+        return `Hace ${diffHours} ${diffHours === 1 ? 'hora' : 'horas'}`
+      } else if (diffDays === 1) {
+        return 'Ayer'
+      } else if (diffDays < 7) {
+        return `Hace ${diffDays} días`
+      } else {
+        return fecha.toLocaleDateString('es-ES')
       }
     }
   },
@@ -369,11 +560,11 @@ export default {
         documentos: 0
       },
       chartData: {
-        labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+        labels: [],
         datasets: [
           {
             label: 'Ingresos',
-            data: [1200000, 1350000, 1100000, 1450000, 1300000, 1250000],
+            data: [],
             backgroundColor: 'rgba(25, 118, 210, 0.8)',
             borderColor: '#1976D2',
             borderWidth: 2,
@@ -382,7 +573,7 @@ export default {
           },
           {
             label: 'Egresos',
-            data: [800000, 900000, 750000, 950000, 850000, 800000],
+            data: [],
             backgroundColor: 'rgba(255, 82, 82, 0.8)',
             borderColor: '#FF5252',
             borderWidth: 2,
@@ -419,9 +610,9 @@ export default {
         }
       },
       pieChartData: {
-        labels: ['Nómina', 'Servicios', 'Equipos', 'Marketing', 'Otros'],
+        labels: [],
         datasets: [{
-          data: [40, 25, 15, 12, 8],
+          data: [],
           backgroundColor: [
             '#1976D2',
             '#FF5252',
@@ -450,32 +641,7 @@ export default {
           }
         }
       },
-      actividadesRecientes: [
-        {
-          id: 1,
-          descripcion: 'Nueva factura creada para Cliente ABC',
-          fecha: 'Hace 2 horas',
-          icono: 'mdi-receipt'
-        },
-        {
-          id: 2,
-          descripcion: 'Cliente XYZ actualizado',
-          fecha: 'Hace 4 horas',
-          icono: 'mdi-account-edit'
-        },
-        {
-          id: 3,
-          descripcion: 'Documento subido al archivo',
-          fecha: 'Ayer',
-          icono: 'mdi-file-upload'
-        },
-        {
-          id: 4,
-          descripcion: 'Reporte de auditoría generado',
-          fecha: 'Ayer',
-          icono: 'mdi-file-chart'
-        }
-      ]
+      actividadesRecientes: []
     }
   }
 }
