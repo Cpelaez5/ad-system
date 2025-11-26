@@ -4,107 +4,41 @@
     <!-- Tarjetas de estadísticas -->
     <v-row class="mb-6">
       <v-col cols="12" sm="6" md="3">
-        <v-card
-          class="pa-6. stats-card"
-          height="120"
-          style="background-color: #02254d;"
-        >
-          <div class="d-flex flex-column justify-center h-100">
-            <div class="text-body-2 text-white mb-4">Clientes Activos</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
-              <AnimatedNumber
-                :value="estadisticas.totalClientes"
-                :start="0"
-                :duration="900"
-                :adaptive="false"
-                :min-duration="300"
-                :max-duration="1000"
-                easing="easeOutQuint"
-                locale="es-VE"
-                :minimum-fraction-digits="0"
-                :maximum-fraction-digits="0"
-              />
-            </div>
-          </div>
-        </v-card>
+        <StatsCard
+          title="Clientes Activos"
+          :value="estadisticas.totalClientes"
+          bg-color="#02254d"
+          text-color="white"
+        />
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
-        <v-card
-          class="pa-6 stats-card"
-          height="120"
-          style="background-color: #961112;"
-        >
-          <div class="d-flex flex-column justify-center h-100">
-            <div class="text-body-2 text-white mb-4">Facturas Este Mes</div>
-            <div class="text-h4 text-white" style="font-size: 2.6rem !important;">
-              <AnimatedNumber
-                :value="estadisticas.facturasMes"
-                :start="0"
-                :duration="900"
-                :adaptive="false"
-                :min-duration="300"
-                :max-duration="1000"
-                easing="easeOutQuint"
-                locale="es-VE"
-                :minimum-fraction-digits="0"
-                :maximum-fraction-digits="0"
-              />
-            </div>
-          </div>
-        </v-card>
+        <StatsCard
+          title="Facturas Este Mes"
+          :value="estadisticas.facturasMes"
+          bg-color="#961112"
+          text-color="white"
+        />
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
-        <v-card
-          class="pa-6 stats-card"
-          height="120"
-          style="background-color: #f2b648;"
-        >
-          <div class="d-flex flex-column justify-center h-100">
-            <div class="text-body-2 mb-4" style="color: #010101;">Ingresos Este Mes</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
-              $<AnimatedNumber
-                :value="estadisticas.ingresosMes"
-                :start="0"
-                :duration="900"
-                :adaptive="false"
-                :min-duration="300"
-                :max-duration="1000"
-                easing="easeOutQuint"
-                locale="es-VE"
-                :minimum-fraction-digits="2"
-                :maximum-fraction-digits="2"
-              />
-            </div>
-          </div>
-        </v-card>
+        <StatsCard
+          title="Ingresos Este Mes"
+          :value="estadisticas.ingresosMes"
+          bg-color="#f2b648"
+          text-color="#010101"
+          is-currency
+          currency-symbol="$"
+        />
       </v-col>
 
       <v-col cols="12" sm="6" md="3">
-        <v-card
-          class="pa-6 stats-card"
-          height="120"
-          style="background-color: #f0d29b;"
-        >
-          <div class="d-flex flex-column justify-center h-100">
-            <div class="text-body-2 mb-4" style="color: #010101;">Documentos Archivados</div>
-            <div class="text-h4" style="color: #010101; font-size: 2.6rem !important;">
-              <AnimatedNumber
-                :value="estadisticas.documentos"
-                :start="0"
-                :duration="900"
-                :adaptive="false"
-                :min-duration="300"
-                :max-duration="1000"
-                easing="easeOutQuint"
-                locale="es-VE"
-                :minimum-fraction-digits="0"
-                :maximum-fraction-digits="0"
-              />
-            </div>
-          </div>
-        </v-card>
+        <StatsCard
+          title="Documentos Archivados"
+          :value="estadisticas.documentos"
+          bg-color="#f0d29b"
+          text-color="#010101"
+        />
       </v-col>
     </v-row>
 
@@ -276,7 +210,7 @@
 <script>
 import BarChart from '@/components/chart/BarChart.vue'
 import PieChart from '@/components/chart/PieChart.vue'
-import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import StatsCard from '@/components/common/StatsCard.vue'
 import { createSwapy } from 'swapy'
 import { onMounted, onUnmounted, ref } from 'vue'
 
@@ -285,7 +219,7 @@ export default {
   components: {
     BarChart,
     PieChart,
-    AnimatedNumber
+    StatsCard
   },
   setup() {
     const swapy = ref(null)

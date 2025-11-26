@@ -102,6 +102,111 @@
                 </v-card-text>
               </v-card>
 
+              <!-- Selector de Tipo de Flujo - Destacado -->
+              <v-card variant="outlined" class="mb-4" style="border: 2px solid #e0e0e0; border-radius: 12px;">
+                <v-card-text class="pa-4">
+                  <div class="d-flex align-center mb-3">
+                    <v-icon color="primary" size="24" class="mr-2">mdi-swap-horizontal-circle</v-icon>
+                    <span class="text-h6 font-weight-medium">Tipo de Factura</span>
+                    <v-chip size="small" color="primary" variant="tonal" class="ml-2">Requerido</v-chip>
+                  </div>
+                  
+                  <v-radio-group
+                    v-model="formData.flow"
+                    inline
+                    :rules="[v => !!v || 'Debe seleccionar el tipo de factura']"
+                    required
+                    hide-details="auto"
+                  >
+                    <v-radio
+                      value="VENTA"
+                      color="success"
+                    >
+                      <template v-slot:label>
+                        <div class="d-flex align-center pa-3" style="border: 2px solid #4caf50; border-radius: 8px; min-width: 200px; background: #f1f8f4;">
+                          <v-icon color="success" size="32" class="mr-3">mdi-cash-plus</v-icon>
+                          <div>
+                            <div class="text-subtitle-1 font-weight-bold" style="color: #2e7d32;">Venta</div>
+                            <div class="text-caption" style="color: #558b5f;">Factura emitida a cliente</div>
+                          </div>
+                        </div>
+                      </template>
+                    </v-radio>
+                    
+                    <v-radio
+                      value="COMPRA"
+                      color="primary"
+                      class="ml-4"
+                    >
+                      <template v-slot:label>
+                        <div class="d-flex align-center pa-3" style="border: 2px solid #2196f3; border-radius: 8px; min-width: 200px; background: #e3f2fd;">
+                          <v-icon color="primary" size="32" class="mr-3">mdi-cash-minus</v-icon>
+                          <div>
+                            <div class="text-subtitle-1 font-weight-bold" style="color: #1565c0;">Compra</div>
+                            <div class="text-caption" style="color: #1976d2;">Factura recibida de proveedor</div>
+                          </div>
+                        </div>
+                      </template>
+                    </v-radio>
+                  </v-radio-group>
+                </v-card-text>
+              </v-card>
+
+              <!-- Selector de Tipo de Egreso - Solo para COMPRA -->
+              <v-card 
+                v-if="formData.flow === 'COMPRA'" 
+                variant="outlined" 
+                class="mb-4" 
+                style="border: 2px solid #ff9800; border-radius: 12px;"
+              >
+                <v-card-text class="pa-4">
+                  <div class="d-flex align-center mb-3">
+                    <v-icon color="orange" size="24" class="mr-2">mdi-tag-outline</v-icon>
+                    <span class="text-h6 font-weight-medium">Tipo de Egreso</span>
+                    <v-chip size="small" color="orange" variant="tonal" class="ml-2">Requerido</v-chip>
+                  </div>
+                  
+                  <v-radio-group
+                    v-model="formData.expense_type"
+                    inline
+                    :rules="[v => !!v || 'Debe seleccionar el tipo de egreso']"
+                    required
+                    hide-details="auto"
+                  >
+                    <v-radio
+                      value="COMPRA"
+                      color="info"
+                    >
+                      <template v-slot:label>
+                        <div class="d-flex align-center pa-3" style="border: 2px solid #2196f3; border-radius: 8px; min-width: 220px; background: #e3f2fd;">
+                          <v-icon color="info" size="28" class="mr-3">mdi-cart</v-icon>
+                          <div>
+                            <div class="text-subtitle-1 font-weight-bold" style="color: #1565c0;">Compra</div>
+                            <div class="text-caption" style="color: #1976d2;">Mercancía, productos, servicios</div>
+                          </div>
+                        </div>
+                      </template>
+                    </v-radio>
+                    
+                    <v-radio
+                      value="GASTO"
+                      color="warning"
+                      class="ml-4"
+                    >
+                      <template v-slot:label>
+                        <div class="d-flex align-center pa-3" style="border: 2px solid #ff9800; border-radius: 8px; min-width: 220px; background: #fff3e0;">
+                          <v-icon color="warning" size="28" class="mr-3">mdi-receipt</v-icon>
+                          <div>
+                            <div class="text-subtitle-1 font-weight-bold" style="color: #e65100;">Gasto</div>
+                            <div class="text-caption" style="color: #f57c00;">Servicios recurrentes (luz, agua, etc.)</div>
+                          </div>
+                        </div>
+                      </template>
+                    </v-radio>
+                  </v-radio-group>
+                </v-card-text>
+              </v-card>
+
               <!-- Información básica de la factura -->
               <v-row>
                 <v-col cols="12" md="6">
@@ -112,6 +217,9 @@
                     required
                     variant="outlined"
                     class="animated-field"
+                    prepend-inner-icon="mdi-receipt-text"
+                    hint="Ej: F-2024-001"
+                    persistent-hint
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
@@ -120,6 +228,9 @@
                     label="Número de Control"
                     variant="outlined"
                     class="animated-field"
+                    prepend-inner-icon="mdi-barcode"
+                    hint="Opcional"
+                    persistent-hint
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="4">
@@ -131,6 +242,7 @@
                     required
                     variant="outlined"
                     class="animated-field"
+                    prepend-inner-icon="mdi-file-document"
                   ></v-select>
                 </v-col>
                 <v-col cols="12" md="4">
@@ -142,6 +254,9 @@
                     required
                     variant="outlined"
                     class="animated-field"
+                    prepend-inner-icon="mdi-calendar"
+                    hint="Fecha en que se emite la factura"
+                    persistent-hint
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="4">
@@ -151,6 +266,9 @@
                     type="date"
                     variant="outlined"
                     class="animated-field"
+                    prepend-inner-icon="mdi-calendar-clock"
+                    hint="Opcional - Fecha límite de pago"
+                    persistent-hint
                   ></v-text-field>
                 </v-col>
               </v-row>
@@ -606,13 +724,14 @@
       </v-stepper>
       
       <!-- Botones de navegación -->
-      <v-card-actions class="pa-4">
+      <v-card-actions class="pa-4" style="background: #fafafa; border-top: 1px solid #e0e0e0;">
         <v-btn
           v-if="currentStep > 1"
-          color="grey"
-          variant="text"
-          @click="currentStep--"
+          color="grey-darken-1"
+          variant="outlined"
+          @click="previousStep"
           prepend-icon="mdi-chevron-left"
+          size="large"
         >
           Anterior
         </v-btn>
@@ -622,8 +741,10 @@
         <v-btn
           v-if="currentStep < 4"
           color="primary"
-          @click="currentStep++"
+          @click="nextStep"
           append-icon="mdi-chevron-right"
+          size="large"
+          variant="elevated"
         >
           Siguiente
         </v-btn>
@@ -633,7 +754,10 @@
           color="success"
           :loading="loading"
           @click="handleSubmit"
-          prepend-icon="mdi-check"
+          prepend-icon="mdi-check-circle"
+          size="large"
+          variant="elevated"
+          class="px-6"
         >
           {{ isEditing ? 'Actualizar Factura' : 'Crear Factura' }}
         </v-btn>
@@ -642,11 +766,20 @@
           color="grey"
           variant="text"
           @click="$emit('cancel')"
+          size="large"
         >
           Cancelar
         </v-btn>
       </v-card-actions>
     </v-card>
+    
+    <!-- Snackbar reutilizable para mensajes -->
+    <AppSnackbar
+      v-model="snackbar.show"
+      :type="snackbar.type"
+      :message="snackbar.message"
+      :timeout="snackbar.timeout"
+    />
   </v-form>
 </template>
 
@@ -654,9 +787,13 @@
 import invoiceService from '@/services/invoiceService.js';
 import clientService from '@/services/clientService.js';
 import userService from '@/services/userService.js';
+import AppSnackbar from '@/components/common/AppSnackbar.vue';
 
 export default {
   name: 'InvoiceForm',
+  components: {
+    AppSnackbar
+  },
   props: {
     invoice: {
       type: Object,
@@ -697,11 +834,21 @@ export default {
       currentUser: null,
       canSelectClients: false,
       
+      // Snackbar para mensajes
+      snackbar: {
+        show: false,
+        message: '',
+        type: 'info', // 'success', 'error', 'warning', 'info'
+        timeout: 4000
+      },
+      
       // Datos del formulario
       formData: {
         invoiceNumber: '',
         controlNumber: '',
         documentType: 'FACTURA',
+        flow: 'VENTA', // Tipo de flujo: VENTA o COMPRA
+        expense_type: 'COMPRA', // Tipo de egreso: COMPRA o GASTO (solo para flow=COMPRA)
         issueDate: new Date().toISOString().split('T')[0],
         dueDate: '',
         status: 'BORRADOR',
@@ -893,6 +1040,74 @@ export default {
       }
     },
     
+    // Métodos de navegación con validación
+    validateStep(step) {
+      switch(step) {
+        case 1:
+          // Validar información básica
+          return !!this.formData.invoiceNumber && 
+                 !!this.formData.documentType && 
+                 !!this.formData.issueDate &&
+                 !!this.formData.flow;
+        case 2:
+          // Validar emisor y cliente
+          return !!this.formData.issuer.companyName && 
+                 !!this.formData.issuer.rif &&
+                 !!this.formData.client.companyName && 
+                 !!this.formData.client.rif;
+        case 3:
+          // Validar financiero
+          return this.formData.financial.totalSales > 0;
+        case 4:
+          // Paso final, siempre válido
+          return true;
+        default:
+          return true;
+      }
+    },
+    
+    async nextStep() {
+      const isValid = this.validateStep(this.currentStep);
+      
+      if (!isValid) {
+        // Mostrar mensaje de error
+        let message = 'Por favor complete todos los campos obligatorios';
+        
+        if (this.currentStep === 1 && !this.formData.flow) {
+          message = 'Por favor seleccione el tipo de factura (Venta o Compra)';
+        } else if (this.currentStep === 1 && !this.formData.issueDate) {
+          message = 'Por favor ingrese la fecha de emisión';
+        } else if (this.currentStep === 2) {
+          message = 'Por favor complete la información del emisor y cliente';
+        } else if (this.currentStep === 3) {
+          message = 'Por favor ingrese el monto total de la factura';
+        }
+        
+        // Mostrar snackbar con el error
+        this.showSnackbar(message, 'error');
+        console.warn('⚠️ Validación fallida en paso', this.currentStep, ':', message);
+        return;
+      }
+      
+      this.currentStep++;
+      console.log('✅ Avanzando al paso', this.currentStep);
+    },
+    
+    previousStep() {
+      this.currentStep--;
+      console.log('⬅️ Retrocediendo al paso', this.currentStep);
+    },
+    
+    // Método helper para mostrar snackbar
+    showSnackbar(message, type = 'info', timeout = 4000) {
+      this.snackbar = {
+        show: true,
+        message,
+        type,
+        timeout
+      };
+    },
+    
     handleFileUpload() {
       if (this.uploadedFile) {
         console.log('Archivo seleccionado:', this.uploadedFile);
@@ -951,12 +1166,14 @@ export default {
     async handleSubmit() {
       if (!this.$refs.form.validate()) {
         console.log('❌ Formulario no válido, no se puede enviar');
+        this.showSnackbar('Por favor complete todos los campos obligatorios', 'error');
         return;
       }
       
       // Si organizationOnly es true, no requerir clientId
       if (!this.organizationOnly && this.canSelectClients && !this.selectedClientId) {
         console.log('❌ No se ha seleccionado un cliente');
+        this.showSnackbar('Por favor seleccione un cliente antes de crear la factura', 'error');
         return;
       }
       

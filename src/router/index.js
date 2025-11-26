@@ -15,9 +15,6 @@ const ClienteArchivo = () => import('../views/cliente/Archivo.vue')
 
 // Vistas para contador y admin
 const ContadorArea = () => import('../views/contador/ContadorArea.vue')
-const Gastos = () => import('../views/contador/Gastos.vue')
-const Ventas = () => import('../views/contador/Ventas.vue')
-const Compras = () => import('../views/contador/Compras.vue')
 const GastosOrganizacion = () => import('../views/contador/GastosOrganizacion.vue')
 const ComprasOrganizacion = () => import('../views/contador/ComprasOrganizacion.vue')
 const VentasOrganizacion = () => import('../views/contador/VentasOrganizacion.vue')
@@ -38,24 +35,6 @@ const routes = [
   {
     path: '/',
     redirect: '/dashboard'
-  },
-  {
-    path: '/gastos',
-    name: 'Gastos',
-    component: Gastos,
-    meta: { requiresAuth: true, title: 'Gastos', roles: ['admin', 'contador'] }
-  },
-  {
-    path: '/ventas',
-    name: 'Ventas',
-    component: Ventas,
-    meta: { requiresAuth: true, title: 'Ventas', roles: ['admin', 'contador'] }
-  },
-  {
-    path: '/compras',
-    name: 'Compras',
-    component: Compras,
-    meta: { requiresAuth: true, title: 'Compras', roles: ['admin', 'contador'] }
   },
   {
     path: '/organizacion/gastos',
@@ -200,26 +179,26 @@ const router = createRouter({
 // Guard de navegación para autenticación con Supabase Multi-Tenant
 router.beforeEach(async (to, from, next) => {
   console.log('🔄 Router guard ejecutándose para:', to.path)
-  
+
   // Verificar si la ruta requiere autenticación
   if (to.meta.requiresAuth) {
     try {
       // 1. Verificar sesión de Supabase
       const { supabase } = await import('@/lib/supabaseClient')
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (session) {
         console.log('✅ Sesión de Supabase activa encontrada')
-        
+
         // 2. Verificar que organization_id esté disponible
         const organizationId = localStorage.getItem('current_organization_id')
         if (!organizationId) {
           console.log('⚠️ No hay organization_id, recargando datos del usuario...')
-          
+
           // Recargar datos del usuario para obtener organization_id
           const { userService } = await import('@/services/userService')
           const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-          
+
           if (currentUser.id) {
             try {
               const userData = await userService.getUserById(currentUser.id)
@@ -232,20 +211,20 @@ router.beforeEach(async (to, from, next) => {
             }
           }
         }
-        
+
         // 3. Verificar roles y redirecciones especiales
         try {
           const { default: userService } = await import('@/services/userService')
           const currentUser = await userService.getCurrentUser()
-          
+
           if (!currentUser) {
             console.log('❌ No se pudo obtener usuario actual')
             next('/login')
             return
           }
-          
+
           const userRole = currentUser.role
-          
+
           // Si el usuario no tiene perfil en la tabla users, redirigir a una página de error o mostrar mensaje
           if (currentUser.needsProfile) {
             console.error('❌ El usuario no tiene perfil en la tabla users. Por favor, contacta al administrador.')
@@ -254,7 +233,7 @@ router.beforeEach(async (to, from, next) => {
             next('/login')
             return
           }
-          
+
           // Verificar que el rol sea válido
           const validRoles = ['super_admin', 'admin', 'contador', 'cliente']
           if (!validRoles.includes(userRole)) {
@@ -263,21 +242,21 @@ router.beforeEach(async (to, from, next) => {
             next('/login')
             return
           }
-          
+
           // Redirigir clientes desde /dashboard a /cliente/dashboard
           if (to.path === '/dashboard' && userRole === 'cliente') {
             console.log('🔄 Redirigiendo cliente a su dashboard')
             next('/cliente/dashboard')
             return
           }
-          
+
           // Redirigir admin/contador desde /cliente/* a /dashboard
           if (to.path.startsWith('/cliente/') && (userRole === 'admin' || userRole === 'contador' || userRole === 'super_admin')) {
             console.log('🔄 Redirigiendo admin/contador a dashboard general')
             next('/dashboard')
             return
           }
-          
+
           // Verificar roles si la ruta lo requiere
           if (to.meta.roles && !to.meta.roles.includes(userRole)) {
             console.log('❌ Usuario sin permisos para esta ruta:', userRole, 'vs', to.meta.roles)
@@ -298,7 +277,7 @@ router.beforeEach(async (to, from, next) => {
           next('/dashboard')
           return
         }
-        
+
         next()
       } else {
         // No hay sesión de Supabase, verificar datos locales como fallback
@@ -313,7 +292,7 @@ router.beforeEach(async (to, from, next) => {
       }
     } catch (error) {
       console.error('❌ Error en router guard:', error)
-      
+
       // Fallback: verificar datos locales
       const usuarioAutenticado = localStorage.getItem('usuarioAutenticado')
       if (usuarioAutenticado === 'true') {

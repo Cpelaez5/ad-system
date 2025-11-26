@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ejecutar Migración - Flow Column</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .sql-container {
+            background: #1e1e1e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            position: relative;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .sql-code {
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+        
+        .copy-btn.copied {
+            background: #10b981;
+        }
+        
+        .steps {
+            margin: 30px 0;
+        }
+        
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin: 15px 0;
+            border-radius: 6px;
+        }
+        
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .step-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .step-content {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .link:hover {
+            text-decoration: underline;
+        }
+        
+        .alert {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+        }
+        
+        .alert-title {
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 5px;
+        }
+        
+        .alert-content {
+            color: #78350f;
+            font-size: 14px;
+        }
+        
+        .success {
+            background: #d1fae5;
+            border-left-color: #10b981;
+        }
+        
+        .success .alert-title {
+            color: #065f46;
+        }
+        
+        .success .alert-content {
+            color: #047857;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Migración: Columna Flow</h1>
+        <p class="subtitle">Agregar columna flow a la tabla invoices para separar VENTAS y COMPRAS</p>
+        
+        <div class="alert">
+            <div class="alert-title">⚠️ Importante</div>
+            <div class="alert-content">
+                Esta migración agregará la columna <code>flow</code> a la tabla <code>invoices</code> y actualizará las facturas existentes.
+            </div>
+        </div>
+        
+        <div class="steps">
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">1</span>
+                    Abrir Supabase Dashboard
+                </div>
+                <div class="step-content">
+                    Ve a: <a href="https://supabase.com/dashboard/project/ybeippdhlvjzfgpbcoqy/sql" target="_blank" class="link">Supabase SQL Editor</a>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">2</span>
+                    Crear Nueva Query
+                </div>
+                <div class="step-content">
+                    Haz clic en el botón "New query" en el SQL Editor
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">3</span>
+                    Copiar SQL
+                </div>
+                <div class="step-content">
+                    Haz clic en el botón "Copiar SQL" abajo para copiar la migración completa
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">4</span>
+                    Pegar y Ejecutar
+                </div>
+                <div class="step-content">
+                    Pega el SQL en el editor y haz clic en "Run" o presiona Ctrl+Enter
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-title">
+                    <span class="step-number">5</span>
+                    Verificar Resultado
+                </div>
+                <div class="step-content">
+                    Revisa que no haya errores y que aparezca el mensaje de confirmación
+                </div>
+            </div>
+        </div>
+        
+        <div class="sql-container">
+            <button class="copy-btn" onclick="copySql()">📋 Copiar SQL</button>
+            <pre class="sql-code" id="sqlCode">-- =====================================================
+-- MIGRACIÓN: Agregar columna flow a tabla invoices
+-- =====================================================
+-- Fecha: 2025-11-24
+-- Propósito: Separar facturas de VENTA y COMPRA
+-- =====================================================
+
+-- 1. Agregar columna flow con constraint
+ALTER TABLE invoices 
+ADD COLUMN IF NOT EXISTS flow TEXT CHECK (flow IN ('VENTA', 'COMPRA'));
+
+-- 2. Comentario en la columna
+COMMENT ON COLUMN invoices.flow IS 'Tipo de flujo: VENTA (factura emitida) o COMPRA (factura recibida)';
+
+-- 3. Actualizar facturas existentes (si las hay)
+-- Facturas con client_id son VENTAS (emitidas a clientes)
+UPDATE invoices 
+SET flow = 'VENTA' 
+WHERE client_id IS NOT NULL AND flow IS NULL;
+
+-- Facturas sin client_id son COMPRAS (recibidas de proveedores)
+UPDATE invoices 
+SET flow = 'COMPRA' 
+WHERE client_id IS NULL AND flow IS NULL;
+
+-- 4. Hacer la columna NOT NULL después de actualizar datos existentes
+ALTER TABLE invoices 
+ALTER COLUMN flow SET NOT NULL;
+
+-- 5. Agregar valor por defecto para nuevas facturas
+ALTER TABLE invoices 
+ALTER COLUMN flow SET DEFAULT 'VENTA';
+
+-- 6. Crear índice para mejorar performance en queries filtradas por flow
+CREATE INDEX IF NOT EXISTS idx_invoices_flow 
+ON invoices(organization_id, flow);
+
+-- 7. Crear índice compuesto para queries comunes
+CREATE INDEX IF NOT EXISTS idx_invoices_org_flow_status 
+ON invoices(organization_id, flow, status);
+
+-- =====================================================
+-- VERIFICACIÓN
+-- =====================================================
+
+-- Verificar que la columna se agregó correctamente
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_name = 'invoices' AND column_name = 'flow';
+
+-- Verificar que los índices se crearon
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE tablename = 'invoices' AND indexname LIKE '%flow%';
+
+-- Verificar distribución de facturas por flow
+SELECT flow, COUNT(*) as total
+FROM invoices
+GROUP BY flow;</pre>
+        </div>
+        
+        <div class="alert success">
+            <div class="alert-title">✅ Después de ejecutar</div>
+            <div class="alert-content">
+                El código frontend ya está listo para usar la columna <code>flow</code>. No necesitas hacer cambios adicionales en el código.
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function copySql() {
+            const sqlCode = document.getElementById('sqlCode').textContent;
+            navigator.clipboard.writeText(sqlCode).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copiado!';
+                btn.classList.add('copied');
+                
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

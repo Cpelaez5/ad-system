@@ -121,34 +121,12 @@
         value="clientes"
       ></v-list-item>
 
-      <v-list-group value="facturacion">
-        <template #activator="{ props }">
-          <v-list-item
-            v-bind="props"
-            prepend-icon="mdi-receipt"
-            title="Facturación"
-            value="facturacion"
-          />
-        </template>
-        <v-list-item
-            :to="{ name: 'Gastos' }"
-            prepend-icon="mdi-cash-minus"
-            title="Gastos"
-            value="gastos"
-        ></v-list-item>
-        <v-list-item
-            :to="{ name: 'Ventas' }"
-            prepend-icon="mdi-cash-plus"
-            title="Ventas"
-            value="ventas"
-        ></v-list-item>
-        <v-list-item
-          :to="{ name: 'Compras' }"
-          prepend-icon="mdi-cart"
-          title="Compras"
-          value="compras"
-        ></v-list-item>
-      </v-list-group>
+      <v-list-item
+        :to="{ name: 'Facturacion' }"
+        prepend-icon="mdi-receipt"
+        title="Facturación"
+        value="facturacion"
+      ></v-list-item>
 
       <v-list-group value="organizacion">
         <template #activator="{ props }">
