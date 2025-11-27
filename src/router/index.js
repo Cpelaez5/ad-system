@@ -4,6 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '@/views/shared/Dashboard.vue'
 import Login from '@/views/shared/Login.vue'
 const SingUp = () => import('@/views/shared/SingUp.vue')
+const OCRDemo = () => import('@/views/shared/OCRDemo.vue')
 
 // Vistas para cliente
 const ClienteMiArea = () => import('../views/cliente/ClienteMiArea.vue')
@@ -83,6 +84,12 @@ const routes = [
     name: 'Dashboard',
     component: Dashboard,
     meta: { requiresAuth: true, title: 'Dashboard', roles: ['super_admin', 'admin', 'contador'] } // Dashboard compartido para admin/contador
+  },
+  {
+    path: '/ocr-demo',
+    name: 'OCRDemo',
+    component: OCRDemo,
+    meta: { requiresAuth: true, title: 'Demo OCR', roles: ['super_admin', 'admin', 'contador'] }
   },
   {
     path: '/cliente/dashboard',

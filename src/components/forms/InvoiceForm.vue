@@ -49,58 +49,30 @@
           <v-stepper-window-item :value="1">
             <v-card-text style="padding: 24px;">
               <!-- Sección de carga de archivo - Compacta -->
-              <v-card variant="outlined" class="mb-4 file-upload-card">
-                <v-card-text class="pa-3">
-                  <div class="d-flex align-center mb-2">
-                    <v-icon left color="primary">mdi-file-upload</v-icon>
-                    <span class="text-subtitle-2 text-primary">Cargar y Autocompletar desde Archivo</span>
+              <div class="mb-4">
+                <FileUploadZone
+                  accept="application/pdf,image/jpeg,image/png,image/jpg"
+                  :max-size-m-b="10"
+                  :loading="extracting"
+                  loading-message="Analizando factura con IA..."
+                  @file-selected="handleFileSelect"
+                  @extract-data="handleExtractedData"
+                />
+                
+                <v-alert
+                  v-if="extractionResult"
+                  :type="extractionResult.success ? 'success' : 'error'"
+                  class="mt-2"
+                  density="compact"
+                  variant="tonal"
+                  closable
+                >
+                  {{ extractionResult.message }}
+                  <div v-if="extractionResult.success && extractionResult.data.confidence">
+                    <small>Confianza: {{ Math.round(extractionResult.data.confidence * 100) }}%</small>
                   </div>
-                  
-                  <v-row no-gutters>
-                    <v-col cols="12" md="8">
-                      <v-file-input
-                        v-model="uploadedFile"
-                        label="Seleccionar archivo (PDF o imagen)"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        prepend-icon="mdi-file"
-                        show-size
-                        @change="handleFileUpload"
-                        :disabled="extracting"
-                        variant="outlined"
-                        density="compact"
-                        hide-details
-                      ></v-file-input>
-                    </v-col>
-                    <v-col cols="12" md="4" class="pl-md-2">
-                      <v-btn
-                        v-if="uploadedFile"
-                        color="primary"
-                        :loading="extracting"
-                        :disabled="extracting"
-                        @click="extractDataFromFile"
-                        size="small"
-                        block
-                      >
-                        <v-icon left>mdi-auto-fix</v-icon>
-                        Extraer
-                      </v-btn>
-                    </v-col>
-                  </v-row>
-                  
-                  <v-alert
-                    v-if="extractionResult"
-                    :type="extractionResult.success ? 'success' : 'error'"
-                    class="mt-2"
-                    density="compact"
-                    variant="tonal"
-                  >
-                    {{ extractionResult.message }}
-                    <div v-if="extractionResult.success && extractionResult.data.confidence">
-                      <small>Confianza: {{ Math.round(extractionResult.data.confidence * 100) }}%</small>
-                    </div>
-                  </v-alert>
-                </v-card-text>
-              </v-card>
+                </v-alert>
+              </div>
 
               <!-- Selector de Tipo de Flujo - Destacado -->
               <v-card variant="outlined" class="mb-4" style="border: 2px solid #e0e0e0; border-radius: 12px;">
@@ -787,12 +759,15 @@
 import invoiceService from '@/services/invoiceService.js';
 import clientService from '@/services/clientService.js';
 import userService from '@/services/userService.js';
+import ocrService from '@/services/ocrService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
+import FileUploadZone from '@/components/common/FileUploadZone.vue';
 
 export default {
   name: 'InvoiceForm',
   components: {
-    AppSnackbar
+    AppSnackbar,
+    FileUploadZone
   },
   props: {
     invoice: {
@@ -1108,44 +1083,108 @@ export default {
       };
     },
     
-    handleFileUpload() {
-      if (this.uploadedFile) {
-        console.log('Archivo seleccionado:', this.uploadedFile);
-      }
+    handleFileSelect(file) {
+      this.uploadedFile = file;
+      console.log('Archivo seleccionado:', file);
     },
     
-    async extractDataFromFile() {
-      if (!this.uploadedFile) return;
+    async handleExtractedData(file) {
+      if (!file) return;
       
       this.extracting = true;
       this.extractionResult = null;
       
       try {
-        const response = await invoiceService.extractDataFromFile(this.uploadedFile);
-        this.extractionResult = response;
+        console.log('🚀 Iniciando extracción de datos desde InvoiceForm...');
+        const data = await ocrService.extractInvoiceData(file);
         
-        if (response.success && response.data) {
-          // Autocompletar campos con datos extraídos
-          const data = response.data;
-          if (data.invoiceNumber) this.formData.invoiceNumber = data.invoiceNumber;
-          if (data.issueDate) this.formData.issueDate = data.issueDate;
-          if (data.totalSales) this.formData.financial.totalSales = data.totalSales;
-          if (data.issuer) {
-            Object.assign(this.formData.issuer, data.issuer);
-          }
-          if (data.client) {
-            Object.assign(this.formData.client, data.client);
-          }
-        }
+        this.extractionResult = {
+          success: true,
+          message: 'Datos extraídos correctamente',
+          data: data
+        };
+        
+        // Mapear datos extraídos al formulario
+        this.mapExtractedDataToForm(data);
+        
+        this.showSnackbar('Datos extraídos exitosamente', 'success');
+        
       } catch (error) {
-        console.error('Error al extraer datos:', error);
+        console.error('❌ Error al extraer datos:', error);
         this.extractionResult = {
           success: false,
-          message: 'Error al procesar el archivo'
+          message: `Error: ${error.message}`
         };
+        this.showSnackbar('Error al procesar el archivo. Intente nuevamente.', 'error');
       } finally {
         this.extracting = false;
       }
+    },
+
+    mapExtractedDataToForm(data) {
+      console.log('🗺️ Mapeando datos extraídos al formulario...', data);
+      
+      // 1. Información Básica
+      if (data.invoiceNumber) this.formData.invoiceNumber = data.invoiceNumber;
+      if (data.issueDate) this.formData.issueDate = data.issueDate;
+      if (data.dueDate) this.formData.dueDate = data.dueDate;
+      if (data.currency) this.formData.financial.currency = data.currency;
+      
+      // 2. Cliente
+      if (data.client) {
+        // Intentar buscar cliente existente por RIF
+        if (data.client.rif) {
+          const existingClient = this.clients.find(c => 
+            c.rif.replace(/\s/g, '').toUpperCase() === data.client.rif.replace(/\s/g, '').toUpperCase()
+          );
+          
+          if (existingClient) {
+            console.log('✅ Cliente existente encontrado:', existingClient.companyName);
+            this.selectedClientId = existingClient.id;
+            this.updateClientInfo(existingClient);
+          } else {
+            console.log('⚠️ Cliente no encontrado, llenando datos manualmente');
+            // Llenar datos para nuevo cliente
+            if (data.client.companyName) this.formData.client.companyName = data.client.companyName;
+            if (data.client.rif) this.formData.client.rif = data.client.rif;
+            if (data.client.address) this.formData.client.address = data.client.address;
+            if (data.client.phone) this.formData.client.phone = data.client.phone;
+            if (data.client.email) this.formData.client.email = data.client.email;
+            
+            // Limpiar selección de cliente existente
+            this.selectedClientId = null;
+          }
+        }
+      }
+      
+      // 3. Emisor (Proveedor)
+      if (data.issuer) {
+        if (data.issuer.companyName) this.formData.issuer.companyName = data.issuer.companyName;
+        if (data.issuer.rif) this.formData.issuer.rif = data.issuer.rif;
+      }
+      
+      // 4. Items
+      if (data.items && data.items.length > 0) {
+        this.formData.items = data.items.map(item => ({
+          description: item.description || '',
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || 0,
+          total: item.amount || (item.quantity * item.unitPrice) || 0
+        }));
+        this.showItems = true;
+      }
+      
+      // 5. Financiero
+      if (data.total) this.formData.financial.totalSales = data.total;
+      if (data.subtotal) this.formData.financial.taxableSales = data.subtotal;
+      if (data.tax) this.formData.financial.taxDebit = data.tax;
+      
+      // 6. Notas
+      if (data.notes) {
+        this.formData.notes = data.notes;
+      }
+      
+      console.log('✅ Mapeo completado. Formulario actualizado.');
     },
     
     addItem() {
@@ -1172,6 +1211,12 @@ export default {
       
       // Si organizationOnly es true, no requerir clientId
       if (!this.organizationOnly && this.canSelectClients && !this.selectedClientId) {
+        // Si no hay cliente seleccionado, pero hay datos de cliente llenos manualmente (caso OCR nuevo cliente)
+        // Podríamos permitirlo o requerir crear el cliente primero.
+        // Por ahora, asumimos que si hay datos manuales es válido para "cliente ocasional" o similar,
+        // pero la lógica original requería seleccionar un cliente de la lista.
+        // Vamos a mantener la validación original pero con un warning si hay datos.
+        
         console.log('❌ No se ha seleccionado un cliente');
         this.showSnackbar('Por favor seleccione un cliente antes de crear la factura', 'error');
         return;
