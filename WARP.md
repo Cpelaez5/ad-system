@@ -18,7 +18,7 @@ Environment and configuration
   - VITE_SUPABASE_URL: Supabase project URL
   - VITE_SUPABASE_ANON_KEY: Supabase anon key
   - VITE_API_BASE_URL (optional): External API base, defaults to http://localhost:3001/api
-- Create a .env.local at repo root to set these for local dev; code logs a clear warning if they are missing (see src/lib/supabaseClient.js).
+- Create a .env at repo root to set these for local dev; code logs a clear warning if they are missing (see src/lib/supabaseClient.js).
 - Path alias: the code imports via @/... which assumes bundler resolves @ to src/. Ensure your dev/build config defines this alias.
 
 Big-picture architecture

@@ -91,7 +91,7 @@ src/
    ```
 
 3. **Configurar Supabase**
-   - Crear archivo `.env.local` en la raíz del proyecto
+   - Crear archivo `.env` en la raíz del proyecto
    - Agregar las credenciales de Supabase:
      ```
      VITE_SUPABASE_URL=https://tu-proyecto.supabase.co

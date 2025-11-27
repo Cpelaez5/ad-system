@@ -60,7 +60,7 @@ Una vez creado el proyecto:
 
 ### 3. Configurar Variables de Entorno
 
-Crea el archivo `.env.local` en la raíz del proyecto:
+Crea el archivo `.env` en la raíz del proyecto:
 
 ```env
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
