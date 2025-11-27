@@ -1,12 +1,12 @@
 // Servicio para manejo de facturas con Supabase Multi-Tenant
 import { supabase } from '@/lib/supabaseClient'
-import { 
-  getCurrentOrganizationId, 
-  queryWithTenant, 
-  insertWithTenant, 
-  updateWithTenant, 
-  deleteWithTenant, 
-  handleTenantError 
+import {
+  getCurrentOrganizationId,
+  queryWithTenant,
+  insertWithTenant,
+  updateWithTenant,
+  deleteWithTenant,
+  handleTenantError
 } from '@/utils/tenantHelpers'
 
 class InvoiceService {
@@ -36,13 +36,13 @@ class InvoiceService {
   async getInvoices({ flow = 'VENTA', clientId, organizationOnly = false } = {}) {
     try {
       console.log('🔄 Obteniendo facturas desde Supabase...', { flow, clientId, organizationOnly })
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
-        console.warn('⚠️ No hay organization_id disponible, usando fallback')
-        return await this.getInvoicesFallback()
+        console.warn('⚠️ No hay organization_id disponible')
+        return []
       }
-      
+
       // Obtener facturas con información del cliente relacionado
       // Construir la consulta paso a paso para evitar ambigüedad
       let query = supabase
@@ -87,26 +87,26 @@ class InvoiceService {
         // Filtrar por cliente específico
         query = query.eq('client_id', clientId)
       }
-      
+
       // Aplicar orden al final
       query = query.order('created_at', { ascending: false })
 
       const { data: invoices, error } = await query
-      
+
       if (error) {
-        console.warn('⚠️ Error al obtener facturas desde Supabase, usando fallback:', error.message)
-        return await this.getInvoicesFallback()
+        console.warn('⚠️ Error al obtener facturas desde Supabase:', error.message)
+        return []
       }
-      
+
       console.log('🔍 Datos brutos de facturas:', invoices)
       console.log('🔍 Número de facturas brutas:', invoices?.length || 0)
-      
+
       // Verificar que invoices no sea null o undefined
       if (!invoices || !Array.isArray(invoices)) {
         console.warn('⚠️ Facturas no es un array válido:', invoices)
-        return await this.getInvoicesFallback()
+        return []
       }
-      
+
       // Transformar datos para compatibilidad con el frontend
       const transformedInvoices = invoices.map(invoice => ({
         id: invoice.id,
@@ -129,65 +129,13 @@ class InvoiceService {
         clientId: invoice.client_id,
         clientInfo: invoice.clients // Información del cliente relacionado
       }))
-      
+
       console.log('🔍 Facturas transformadas:', transformedInvoices)
       console.log('✅ Facturas obtenidas desde Supabase:', transformedInvoices.length)
       return transformedInvoices
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al obtener facturas:', error)
-      return await this.getInvoicesFallback()
-    }
-  }
-
-  // Fallback para obtener facturas
-  async getInvoicesFallback() {
-    try {
-      console.log('🔄 Obteniendo facturas desde fallback...')
-      
-      // Facturas mínimas para fallback
-      const fallbackInvoices = [
-        {
-          id: 'fallback-invoice-1',
-          invoiceNumber: 'F-2024-001',
-          controlNumber: '00-0000001',
-          documentType: 'FACTURA',
-          issueDate: new Date().toISOString().split('T')[0],
-          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          status: 'BORRADOR',
-          issuer: {
-            companyName: 'Empresa Demo',
-            rif: 'J-12345678-9'
-          },
-          client: {
-            companyName: 'Cliente Demo',
-            rif: 'J-98765432-1'
-          },
-          financial: {
-            totalSales: 100000.00,
-            currency: 'VES',
-            exchangeRate: 1
-          },
-          items: [
-            {
-              description: 'Servicio Demo',
-              quantity: 1,
-              unitPrice: 100000.00,
-              total: 100000.00
-            }
-          ],
-          attachments: [],
-          notes: 'Factura de demostración',
-          createdBy: 'fallback-admin',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]
-      
-      console.log('✅ Facturas obtenidas desde fallback:', fallbackInvoices.length)
-      return fallbackInvoices
-    } catch (error) {
-      console.error('❌ Error en fallback de facturas:', error)
       return []
     }
   }
@@ -196,13 +144,13 @@ class InvoiceService {
   async getInvoiceById(id) {
     try {
       console.log('🔄 Obteniendo factura por ID desde Supabase...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return null
       }
-      
+
       // Intentar obtener desde Supabase
       const { data: invoice, error } = await supabase
         .from('invoices')
@@ -238,12 +186,12 @@ class InvoiceService {
         .eq('id', id)
         .eq('organization_id', organizationId)
         .single()
-      
+
       if (error || !invoice) {
         console.error('❌ Factura no encontrada en Supabase:', error?.message)
         return null
       }
-      
+
       const transformedInvoice = {
         id: invoice.id,
         invoiceNumber: invoice.invoice_number,
@@ -265,10 +213,10 @@ class InvoiceService {
         clientId: invoice.client_id,
         clientInfo: invoice.clients
       }
-      
+
       console.log('✅ Factura obtenida desde Supabase:', transformedInvoice.invoiceNumber)
       return transformedInvoice
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al obtener factura:', error)
       return null
@@ -280,10 +228,10 @@ class InvoiceService {
     try {
       console.log('🔄 Creando factura en Supabase...')
       console.log('📥 Datos recibidos:', invoiceData)
-      
+
       const organizationId = getCurrentOrganizationId()
       console.log('🏢 Organization ID:', organizationId)
-      
+
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return { success: false, message: 'No hay organización disponible' }
@@ -292,11 +240,11 @@ class InvoiceService {
       // Determinar cliente según el rol; si es cliente, forzar su client_id
       // Si clientId es explícitamente null (organización), mantenerlo null
       const userProfile = await this.getCurrentUserProfile()
-      const effectiveClientId = invoiceData.clientId === null 
+      const effectiveClientId = invoiceData.clientId === null
         ? null  // Factura de la organización (sin client_id)
         : (userProfile?.role === 'cliente' ? (userProfile?.client_id || null) : (invoiceData.clientId || null))
       const effectiveFlow = invoiceData.flow || 'VENTA'
-      
+
       // Preparar datos para Supabase
       const invoiceRecord = {
         organization_id: organizationId,
@@ -316,15 +264,15 @@ class InvoiceService {
         notes: invoiceData.notes || null,
         created_by: invoiceData.createdBy || organizationId
       }
-      
+
       console.log('📝 Datos a insertar:', invoiceRecord)
-      
+
       const { data: newInvoice, error } = await supabase
         .from('invoices')
         .insert(invoiceRecord)
         .select()
         .single()
-      
+
       if (error) {
         console.error('❌ Error al crear factura en Supabase:', error)
         console.error('❌ Detalles del error:', {
@@ -335,10 +283,10 @@ class InvoiceService {
         })
         return { success: false, message: `Error al crear factura: ${error.message}` }
       }
-      
+
       console.log('✅ Factura creada exitosamente en Supabase:', newInvoice.id)
       console.log('📄 Factura creada:', newInvoice)
-      
+
       // Transformar respuesta para el frontend
       const transformedInvoice = {
         id: newInvoice.id,
@@ -360,15 +308,15 @@ class InvoiceService {
         updatedAt: newInvoice.updated_at,
         clientId: newInvoice.client_id
       }
-      
+
       console.log('🔄 Factura transformada:', transformedInvoice)
-      
+
       return {
         success: true,
         data: transformedInvoice,
         message: 'Factura creada exitosamente'
       }
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al crear factura:', error)
       return { success: false, message: 'Error inesperado al crear factura' }
@@ -379,13 +327,13 @@ class InvoiceService {
   async updateInvoice(id, invoiceData) {
     try {
       console.log('🔄 Actualizando factura en Supabase...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return { success: false, message: 'No hay organización disponible' }
       }
-      
+
       // Preparar datos para actualización
       // Si el usuario es cliente, no permitir cambiar el client_id
       const userProfile = await this.getCurrentUserProfile()
@@ -405,16 +353,16 @@ class InvoiceService {
         attachments: invoiceData.attachments || [],
         notes: invoiceData.notes || null
       }
-      
+
       // Remover campos undefined
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === undefined) {
           delete updateData[key]
         }
       })
-      
+
       console.log('📝 Datos a actualizar:', updateData)
-      
+
       const { data: updatedInvoice, error } = await supabase
         .from('invoices')
         .update(updateData)
@@ -422,14 +370,14 @@ class InvoiceService {
         .eq('organization_id', organizationId)
         .select()
         .single()
-      
+
       if (error) {
         console.error('❌ Error al actualizar factura en Supabase:', error.message)
         return { success: false, message: `Error al actualizar factura: ${error.message}` }
       }
-      
+
       console.log('✅ Factura actualizada en Supabase:', updatedInvoice.id)
-      
+
       // Transformar respuesta para el frontend
       const transformedInvoice = {
         id: updatedInvoice.id,
@@ -451,13 +399,13 @@ class InvoiceService {
         updatedAt: updatedInvoice.updated_at,
         clientId: updatedInvoice.client_id
       }
-      
+
       return {
         success: true,
         data: transformedInvoice,
         message: 'Factura actualizada exitosamente'
       }
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al actualizar factura:', error)
       return { success: false, message: 'Error inesperado al actualizar factura' }
@@ -468,13 +416,13 @@ class InvoiceService {
   async deleteInvoice(id) {
     try {
       console.log('🔄 Eliminando factura en Supabase (soft delete)...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return { success: false, message: 'No hay organización disponible' }
       }
-      
+
       // Soft delete: marcar como anulada
       const { data: deletedInvoice, error } = await supabase
         .from('invoices')
@@ -483,14 +431,14 @@ class InvoiceService {
         .eq('organization_id', organizationId)
         .select()
         .single()
-      
+
       if (error) {
         console.error('❌ Error al eliminar factura en Supabase:', error.message)
         return { success: false, message: `Error al eliminar factura: ${error.message}` }
       }
-      
+
       console.log('✅ Factura eliminada (soft delete) en Supabase:', deletedInvoice.id)
-      
+
       // Transformar respuesta para el frontend
       const transformedInvoice = {
         id: deletedInvoice.id,
@@ -511,13 +459,13 @@ class InvoiceService {
         updatedAt: deletedInvoice.updated_at,
         clientId: deletedInvoice.client_id
       }
-      
+
       return {
         success: true,
         data: transformedInvoice,
         message: 'Factura eliminada exitosamente'
       }
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al eliminar factura:', error)
       return { success: false, message: 'Error inesperado al eliminar factura' }
@@ -528,19 +476,19 @@ class InvoiceService {
   async getInvoiceStats() {
     try {
       console.log('🔄 Obteniendo estadísticas de facturas desde Supabase...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return { total: 0, byStatus: {}, totalAmount: 0, paidAmount: 0 }
       }
-      
+
       // Intentar usar función RPC optimizada
       try {
         const { data: stats, error } = await supabase.rpc('get_invoice_stats', {
           org_id: organizationId
         })
-        
+
         if (!error && stats) {
           console.log('✅ Estadísticas obtenidas desde función RPC')
           return {
@@ -553,18 +501,18 @@ class InvoiceService {
       } catch (rpcError) {
         console.warn('⚠️ Error en función RPC, calculando manualmente:', rpcError.message)
       }
-      
+
       // Fallback: calcular manualmente
       const { data: invoices, error } = await supabase
         .from('invoices')
         .select('status, financial')
         .eq('organization_id', organizationId)
-      
+
       if (error) {
         console.error('❌ Error al obtener facturas para estadísticas:', error.message)
         return { total: 0, byStatus: {}, totalAmount: 0, paidAmount: 0 }
       }
-      
+
       // Calcular estadísticas
       const stats = {
         total: invoices.length,
@@ -572,23 +520,23 @@ class InvoiceService {
         totalAmount: 0,
         paidAmount: 0
       }
-      
+
       invoices.forEach(invoice => {
         // Por estado
         stats.byStatus[invoice.status] = (stats.byStatus[invoice.status] || 0) + 1
-        
+
         // Montos
         const totalSales = parseFloat(invoice.financial?.totalSales || 0)
         stats.totalAmount += totalSales
-        
+
         if (invoice.status === 'PAGADA') {
           stats.paidAmount += totalSales
         }
       })
-      
+
       console.log('✅ Estadísticas calculadas manualmente')
       return stats
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al obtener estadísticas:', error)
       return { total: 0, byStatus: {}, totalAmount: 0, paidAmount: 0 }
@@ -599,13 +547,13 @@ class InvoiceService {
   async searchInvoices(searchTerm, { flow = 'VENTA', clientId } = {}) {
     try {
       console.log('🔄 Buscando facturas en Supabase...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return []
       }
-      
+
       // Buscar en múltiples campos
       let query = supabase
         .from('invoices')
@@ -641,14 +589,18 @@ class InvoiceService {
         .eq('organization_id', organizationId)
         .eq('flow', flow)
         .or(`invoice_number.ilike.%${searchTerm}%,control_number.ilike.%${searchTerm}%,client_info->>companyName.ilike.%${searchTerm}%`)
-      if (clientId) query = query.eq('client_id', clientId)
+
+      if (clientId) {
+        query = query.eq('client_id', clientId)
+      }
+
       const { data: invoices, error } = await query
-      
+
       if (error) {
         console.error('❌ Error al buscar facturas:', error.message)
         return []
       }
-      
+
       // Transformar datos
       const transformedInvoices = invoices.map(invoice => ({
         id: invoice.id,
@@ -671,10 +623,10 @@ class InvoiceService {
         clientId: invoice.client_id,
         clientInfo: invoice.clients
       }))
-      
+
       console.log('✅ Facturas encontradas:', transformedInvoices.length)
       return transformedInvoices
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al buscar facturas:', error)
       return []
@@ -685,34 +637,34 @@ class InvoiceService {
   async validateUniqueInvoiceNumber(invoiceNumber, excludeId = null) {
     try {
       console.log('🔄 Validando número de factura único en Supabase...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return false
       }
-      
+
       let query = supabase
         .from('invoices')
         .select('id')
         .eq('organization_id', organizationId)
         .eq('invoice_number', invoiceNumber)
-      
+
       if (excludeId) {
         query = query.neq('id', excludeId)
       }
-      
+
       const { data: existingInvoice, error } = await query
-      
+
       if (error) {
         console.error('❌ Error al validar número de factura:', error.message)
         return false
       }
-      
+
       const isValid = !existingInvoice || existingInvoice.length === 0
       console.log('✅ Número de factura válido:', isValid)
       return isValid
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al validar número de factura:', error)
       return false
@@ -723,13 +675,13 @@ class InvoiceService {
   async getNextInvoiceNumber() {
     try {
       console.log('🔄 Obteniendo siguiente número de factura desde Supabase...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return 'F-2024-001'
       }
-      
+
       // Obtener el último número de factura
       const { data: lastInvoice, error } = await supabase
         .from('invoices')
@@ -737,28 +689,28 @@ class InvoiceService {
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(1)
-      
+
       if (error) {
         console.error('❌ Error al obtener último número de factura:', error.message)
         return 'F-2024-001'
       }
-      
+
       if (!lastInvoice || lastInvoice.length === 0) {
         return 'F-2024-001'
       }
-      
+
       // Extraer número y incrementar
       const lastNumber = lastInvoice[0].invoice_number
       const match = lastNumber.match(/F-(\d{4})-(\d+)/)
-      
+
       if (match) {
         const year = match[1]
         const number = parseInt(match[2]) + 1
         return `F-${year}-${number.toString().padStart(3, '0')}`
       }
-      
+
       return 'F-2024-001'
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al obtener siguiente número:', error)
       return 'F-2024-001'
@@ -769,10 +721,10 @@ class InvoiceService {
   async extractDataFromFile(file) {
     try {
       console.log('🔄 Extrayendo datos de archivo (simulado)...')
-      
+
       // Simular procesamiento de archivo
       await new Promise(resolve => setTimeout(resolve, 2000))
-      
+
       // Retornar datos simulados
       return {
         success: true,
@@ -784,7 +736,7 @@ class InvoiceService {
           items: []
         }
       }
-      
+
     } catch (error) {
       console.error('❌ Error al extraer datos del archivo:', error)
       return { success: false, message: 'Error al procesar archivo' }
@@ -795,10 +747,10 @@ class InvoiceService {
   async uploadAttachment(file) {
     try {
       console.log('🔄 Subiendo archivo adjunto (simulado)...')
-      
+
       // Simular subida de archivo
       await new Promise(resolve => setTimeout(resolve, 1500))
-      
+
       // Retornar URL simulada
       return {
         success: true,
@@ -807,7 +759,7 @@ class InvoiceService {
         fileSize: file.size,
         fileType: file.type
       }
-      
+
     } catch (error) {
       console.error('❌ Error al subir archivo:', error)
       return { success: false, message: 'Error al subir archivo' }

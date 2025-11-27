@@ -1,8 +1,8 @@
 // Servicio para manejo de clientes con Supabase Multi-Tenant
 // Integra Supabase con sistema de organizaciones
 import { supabase } from '@/lib/supabaseClient'
-import { 
-  getCurrentOrganizationId, 
+import {
+  getCurrentOrganizationId,
   queryWithTenant,
   insertWithTenant,
   updateWithTenant,
@@ -19,15 +19,15 @@ class ClientService {
   async getClients() {
     try {
       console.log('🔄 Obteniendo clientes desde Supabase...')
-      
-      // Intentar obtener desde Supabase
-      const { data: clients, error } = await queryWithTenant('clients')
-      
+
+      // Intentar obtener desde Supabase con selección explícita de columnas para evitar ambigüedad
+      const { data: clients, error } = await queryWithTenant('clients', 'id, company_name, rif, taxpayer_type, address, phone, email, contact_person, website, status, created_at, updated_at')
+
       if (error) {
-        console.warn('⚠️ Error al obtener clientes desde Supabase, usando fallback:', error.message)
-        return await this.getClientsFallback()
+        console.warn('⚠️ Error al obtener clientes desde Supabase:', error.message)
+        return []
       }
-      
+
       // Transformar datos para compatibilidad con el frontend
       const transformedClients = clients.map(client => ({
         id: client.id,
@@ -43,43 +43,12 @@ class ClientService {
         createdAt: client.created_at,
         updatedAt: client.updated_at
       }))
-      
+
       console.log('✅ Clientes obtenidos desde Supabase:', transformedClients.length)
       return transformedClients
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al obtener clientes:', error)
-      return await this.getClientsFallback()
-    }
-  }
-
-  // Fallback para obtener clientes
-  async getClientsFallback() {
-    try {
-      console.log('🔄 Obteniendo clientes desde fallback...')
-      
-      // Clientes mínimos para fallback
-      const fallbackClients = [
-        {
-          id: 'fallback-client-1',
-          companyName: 'Cliente Demo 1',
-          rif: 'J-12345678-9',
-          taxpayerType: 'JURIDICA',
-          address: 'Dirección Demo',
-          phone: '+58 212 555-0001',
-          email: 'demo1@cliente.com',
-          contactPerson: 'Contacto Demo',
-          website: 'www.demo1.com',
-          status: 'ACTIVO',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]
-      
-      console.log('✅ Clientes obtenidos desde fallback:', fallbackClients.length)
-      return fallbackClients
-    } catch (error) {
-      console.error('❌ Error en fallback de clientes:', error)
       return []
     }
   }
@@ -88,15 +57,15 @@ class ClientService {
   async getClientById(id) {
     try {
       console.log('🔄 Obteniendo cliente por ID desde Supabase...')
-      
+
       // Intentar obtener desde Supabase
       const { data: client, error } = await queryWithTenant('clients', '*', { id })
-      
+
       if (error || !client || client.length === 0) {
         console.error('❌ Cliente no encontrado en Supabase')
         return null
       }
-      
+
       const clientData = client[0]
       const transformedClient = {
         id: clientData.id,
@@ -112,10 +81,10 @@ class ClientService {
         createdAt: clientData.created_at,
         updatedAt: clientData.updated_at
       }
-      
+
       console.log('✅ Cliente obtenido desde Supabase:', transformedClient.companyName)
       return transformedClient
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al obtener cliente:', error)
       return null
@@ -126,7 +95,7 @@ class ClientService {
   async createClient(clientData) {
     try {
       console.log('🔄 Creando cliente en Supabase...')
-      
+
       // Preparar datos para Supabase
       const clientRecord = {
         company_name: clientData.companyName,
@@ -139,14 +108,20 @@ class ClientService {
         website: clientData.website,
         status: clientData.status || 'ACTIVO'
       }
-      
-      const { data: newClient, error } = await insertWithTenant('clients', clientRecord)
-      
+
+      // Solicitar retorno de datos con { returning: 'representation' }
+      const { data: newClient, error } = await insertWithTenant('clients', clientRecord, { returning: 'representation' })
+
       if (error) {
         console.error('❌ Error al crear cliente en Supabase:', error.message)
         return { success: false, message: 'Error al crear cliente' }
       }
-      
+
+      if (!newClient || newClient.length === 0) {
+        console.error('❌ Error: Supabase no devolvió los datos del cliente creado')
+        return { success: false, message: 'Cliente creado pero no se obtuvieron datos de retorno' }
+      }
+
       console.log('✅ Cliente creado exitosamente en Supabase')
       return {
         id: newClient[0].id,
@@ -162,7 +137,7 @@ class ClientService {
         createdAt: newClient[0].created_at,
         updatedAt: newClient[0].updated_at
       }
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al crear cliente:', error)
       return { success: false, message: 'Error al crear cliente' }
@@ -173,7 +148,7 @@ class ClientService {
   async updateClient(id, clientData) {
     try {
       console.log('🔄 Actualizando cliente en Supabase...')
-      
+
       // Preparar datos para actualización
       const updateData = {
         company_name: clientData.companyName,
@@ -186,21 +161,21 @@ class ClientService {
         website: clientData.website,
         status: clientData.status
       }
-      
+
       // Remover campos undefined
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === undefined) {
           delete updateData[key]
         }
       })
-      
+
       const { data: updatedClient, error } = await updateWithTenant('clients', id, updateData)
-      
+
       if (error) {
         console.error('❌ Error al actualizar cliente en Supabase:', error.message)
         return { success: false, message: 'Error al actualizar cliente' }
       }
-      
+
       console.log('✅ Cliente actualizado en Supabase')
       return {
         id: updatedClient[0].id,
@@ -216,7 +191,7 @@ class ClientService {
         createdAt: updatedClient[0].created_at,
         updatedAt: updatedClient[0].updated_at
       }
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al actualizar cliente:', error)
       return { success: false, message: 'Error al actualizar cliente' }
@@ -227,15 +202,15 @@ class ClientService {
   async deleteClient(id) {
     try {
       console.log('🔄 Eliminando cliente en Supabase (soft delete)...')
-      
+
       // Soft delete: marcar como inactivo
       const { data: deletedClient, error } = await updateWithTenant('clients', id, { status: 'INACTIVO' })
-      
+
       if (error) {
         console.error('❌ Error al eliminar cliente en Supabase:', error.message)
         return { success: false, message: 'Error al eliminar cliente' }
       }
-      
+
       console.log('✅ Cliente eliminado (soft delete) en Supabase')
       return {
         id: deletedClient[0].id,
@@ -251,7 +226,7 @@ class ClientService {
         createdAt: deletedClient[0].created_at,
         updatedAt: deletedClient[0].updated_at
       }
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al eliminar cliente:', error)
       return { success: false, message: 'Error al eliminar cliente' }
@@ -262,19 +237,19 @@ class ClientService {
   async getClientStats() {
     try {
       console.log('🔄 Obteniendo estadísticas de clientes desde Supabase...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return { total: 0, byStatus: {}, byType: {} }
       }
-      
+
       // Intentar usar función RPC optimizada
       try {
         const { data: stats, error } = await supabase.rpc('get_client_stats', {
           org_id: organizationId
         })
-        
+
         if (!error && stats) {
           console.log('✅ Estadísticas obtenidas desde función RPC')
           return {
@@ -286,33 +261,33 @@ class ClientService {
       } catch (rpcError) {
         console.warn('⚠️ Error en función RPC, calculando manualmente:', rpcError.message)
       }
-      
+
       // Fallback: calcular manualmente
       const { data: clients, error } = await queryWithTenant('clients')
-      
+
       if (error) {
         console.error('❌ Error al obtener clientes para estadísticas:', error.message)
         return { total: 0, byStatus: {}, byType: {} }
       }
-      
+
       // Calcular estadísticas
       const stats = {
         total: clients.length,
         byStatus: {},
         byType: {}
       }
-      
+
       clients.forEach(client => {
         // Por estado
         stats.byStatus[client.status] = (stats.byStatus[client.status] || 0) + 1
-        
+
         // Por tipo de contribuyente
         stats.byType[client.taxpayer_type] = (stats.byType[client.taxpayer_type] || 0) + 1
       })
-      
+
       console.log('✅ Estadísticas calculadas manualmente')
       return stats
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al obtener estadísticas:', error)
       return { total: 0, byStatus: {}, byType: {} }
@@ -323,25 +298,25 @@ class ClientService {
   async searchClients(searchTerm) {
     try {
       console.log('🔄 Buscando clientes en Supabase...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return []
       }
-      
+
       // Buscar en múltiples campos
       const { data: clients, error } = await supabase
         .from('clients')
         .select('*')
         .eq('organization_id', organizationId)
         .or(`company_name.ilike.%${searchTerm}%,rif.ilike.%${searchTerm}%,contact_person.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
-      
+
       if (error) {
         console.error('❌ Error al buscar clientes:', error.message)
         return []
       }
-      
+
       // Transformar datos
       const transformedClients = clients.map(client => ({
         id: client.id,
@@ -357,10 +332,10 @@ class ClientService {
         createdAt: client.created_at,
         updatedAt: client.updated_at
       }))
-      
+
       console.log('✅ Clientes encontrados:', transformedClients.length)
       return transformedClients
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al buscar clientes:', error)
       return []
@@ -371,34 +346,34 @@ class ClientService {
   async validateUniqueRif(rif, excludeId = null) {
     try {
       console.log('🔄 Validando RIF único en Supabase...')
-      
+
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return false
       }
-      
+
       let query = supabase
         .from('clients')
         .select('id')
         .eq('organization_id', organizationId)
         .eq('rif', rif)
-      
+
       if (excludeId) {
         query = query.neq('id', excludeId)
       }
-      
+
       const { data: existingClient, error } = await query
-      
+
       if (error) {
         console.error('❌ Error al validar RIF:', error.message)
         return false
       }
-      
+
       const isValid = !existingClient || existingClient.length === 0
       console.log('✅ RIF válido:', isValid)
       return isValid
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al validar RIF:', error)
       return false
