@@ -5,39 +5,20 @@
     rail
     color="#010101"
     class="animate-slide-in-left"
-    dark
-    style="height: 100vh; min-height: 100vh"
+    theme="dark"
   >
-    <!-- Header del sidebar con logo -->
-    <div
-      class="sidebar-header"
-      style="
-        padding: 20px;
-        text-align: center;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        background-color: #010101;
-      "
-    >
-      <img
-        src="@/assets/icon-adaptableV2.svg"
-        alt="Logo"
-        class="logo-icon animate-micro-rotate"
-        style="
-          width: 60px;
-          height: 60px;
-          margin-bottom: 0px;
-          filter: brightness(0) invert(1);
-        "
-      />
-      <h3
-        :class="[
-          'sidebar-title',
-          { 'sidebar-title--hidden': !sidebarExpanded },
-        ]"
-      >
-        Business System
-      </h3>
-    </div>
+    <!-- Header del sidebar con logo (Fijo, no scrolleable) -->
+    <template v-slot:prepend>
+      <div class="sidebar-header">
+        <div class="logo-container">
+          <img
+            src="@/assets/icon-adaptableV2.svg"
+            alt="Logo"
+            class="logo-icon animate-micro-rotate"
+          />
+        </div>
+      </div>
+    </template>
 
     <v-divider></v-divider>
 
@@ -217,7 +198,6 @@ export default {
   name: "Sidebar",
   data() {
     return {
-      sidebarExpanded: false,
       currentUserData: null, // Almacenar usuario en data para reactividad
     };
   },
@@ -261,16 +241,6 @@ export default {
     
     // También escuchar eventos personalizados si el login se hace en la misma ventana
     window.addEventListener('userUpdated', this.loadUser);
-    
-    // Mantener estado visual: detectamos ancho inicial y hover (vuetify agrega clases)
-    this.$nextTick(() => {
-      const sidebar = document.querySelector(".v-navigation-drawer");
-      if (!sidebar) return;
-      const THRESHOLD = 88;
-      this.sidebarExpanded =
-        sidebar.offsetWidth > THRESHOLD ||
-        sidebar.classList.contains("v-navigation-drawer--is-hovering");
-    });
   },
   beforeUnmount() {
     // Limpiar listeners
@@ -334,192 +304,143 @@ export default {
 
 <style scoped>
 /* ========================================
-   NAVIGATION DRAWER STYLES (moved desde AppNavigation.vue)
+   NAVIGATION DRAWER STYLES
    ======================================== */
 .v-navigation-drawer {
   border-right: 1px solid rgba(255, 255, 255, 0.1);
-  background-color: #010101 !important;
   height: 100vh !important;
   min-height: 100vh !important;
   position: fixed !important;
   top: 0 !important;
   bottom: 0 !important;
+  z-index: 1000;
 }
 
-.v-navigation-drawer .v-list {
-  background-color: #010101 !important;
+/* Custom logo styling */
+.sidebar-header {
+  padding: 20px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px; /* Larger in expanded mode */
+  height: 60px;
+  transition: all 0.3s ease;
+}
+
+.logo-icon {
+  width: 48px; /* Larger in expanded mode */
+  height: 48px;
+  filter: brightness(0) invert(1); /* White logo */
+  object-fit: contain;
+  transition: all 0.3s ease;
+}
+
+/* Custom user selectors for specific padding control */
+#app > div > div > nav > div.v-navigation-drawer__content > div.v-list.v-list--nav.v-theme--dark.bg-transparent.v-list--density-compact.v-list--one-line > a.v-list-item.v-list-item--active.v-list-item--link.v-list-item--nav.v-theme--dark.v-list-item--density-compact.v-list-item--one-line.rounded-0.v-list-item--variant-text{
+  padding: 20px 14px !important;
+}
+
+#app > div > div > nav > div.v-navigation-drawer__content > div.v-list.v-list--nav.v-theme--dark.bg-transparent.v-list--density-compact.v-list--one-line{
+  padding: 20px 0px !important;
+}
+
+.v-list{
+  padding: 20px 0px !important;
+}
+
+/* RAIL MODE SPECIFIC STYLES */
+/* Resize logo in rail mode to fit standard 56px width */
+:deep(.v-navigation-drawer--rail) .logo-container {
+  width: 32px;
+  height: 32px;
+}
+
+:deep(.v-navigation-drawer--rail) .logo-icon {
+  width: 24px;
+  height: 24px;
+}
+
+:deep(.v-navigation-drawer--rail) .sidebar-header {
+  padding: 10px 0; /* Reduce padding in rail mode */
+}
+
+/* Ensure header item is centered in rail mode */
+.sidebar-header-item {
+  padding-inline-start: 8px !important;
+  padding-inline-end: 8px !important;
+}
+
+:deep(.v-navigation-drawer--rail) .sidebar-header-item {
+  justify-content: center;
   padding: 0 !important;
 }
 
-.v-navigation-drawer .v-list-item {
-  margin: 0px 0px;
-  border-radius: 0px;
-  padding: 12px 16px;
-  transition: all 0.3s ease;
-  color: white !important;
+/* Standard rail mode adjustments for list items */
+:deep(.v-navigation-drawer--rail) .v-list-item {
+  padding: 0px !important; /* Override global padding */
+  justify-content: center !important;
+  min-height: 56px !important; /* Ensure sufficient height */
+}
+
+:deep(.v-navigation-drawer--rail) .v-list-item__prepend {
+  margin-inline-end: 0 !important;
   width: 100%;
-  min-height: 44px;
+  justify-content: center;
+  padding: 0 !important; /* Ensure no internal padding */
 }
 
-.v-navigation-drawer .v-list-item .v-list-item-title {
-  color: white !important;
+:deep(.v-navigation-drawer--rail) .v-list-item__content {
+  display: none !important;
+}
+
+/* General list item styling */
+.v-list-item {
+  /* Default padding for expanded mode */
+  padding: 10px 16px !important; 
+}
+
+/* Hover effects for list items */
+.v-list{
+  padding: 20px 0px !important;
+}
+.v-list-item--nav .v-list-item-title {
+  font-size: 0.9rem;
   font-weight: 500;
-  font-size: 0.875rem;
-  line-height: 1.25;
 }
 
-.v-navigation-drawer .v-list-item .v-icon {
+/* Active state styling */
+.v-list-item--active {
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.1);
   color: white !important;
-  font-size: 1.25rem !important;
 }
 
-.v-navigation-drawer .v-list-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  transform: translateX(4px);
-}
-
-.v-navigation-drawer .v-list-item.v-list-item--active {
-  background-color: rgba(255, 255, 255, 0.15);
-  border-left: 3px solid #e0b04f;
-}
-
-.v-navigation-drawer .v-list-item.v-list-item--active .v-list-item-title {
-  color: white !important;
-  font-weight: 600;
-}
-
-.v-navigation-drawer .v-list-item.v-list-item--active .v-icon {
+.v-list-item--active .v-icon {
   color: #e0b04f !important;
 }
 
-.v-navigation-drawer .v-list-item__prepend .v-icon {
-  color: white !important;
+/* Scrollbar customization */
+.v-navigation-drawer ::-webkit-scrollbar {
+  width: 4px;
 }
 
-.v-navigation-drawer .v-list-item__content {
-  color: white !important;
-}
 
-.v-navigation-drawer .v-list-item__title {
-  color: white !important;
-}
-
-.v-navigation-drawer--permanent {
-  background-color: #010101 !important;
-  height: 100vh !important;
-  min-height: 100vh !important;
-  position: fixed !important;
-  top: 0 !important;
-  bottom: 0 !important;
-}
-
-.v-navigation-drawer--permanent .v-list {
-  background-color: #010101 !important;
-  padding: 0 !important;
-}
-
-/* Scrollbar */
-.v-navigation-drawer {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
-}
-.v-navigation-drawer::-webkit-scrollbar {
-  width: 6px;
-}
-.v-navigation-drawer::-webkit-scrollbar-track {
+.v-navigation-drawer ::-webkit-scrollbar-track {
   background: transparent;
 }
-.v-navigation-drawer::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-  transition: background-color 0.3s ease;
-}
-.v-navigation-drawer::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.5);
-}
-.v-navigation-drawer::-webkit-scrollbar-thumb:active {
-  background-color: rgba(255, 255, 255, 0.7);
+
+.v-navigation-drawer ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
-/* Logout button styles */
-.v-navigation-drawer .v-list-item[value="logout"] {
-  padding: 12px 16px;
-  min-height: 44px;
-}
-.v-navigation-drawer .v-list-item[value="logout"]:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  transform: translateX(4px);
-}
-.v-navigation-drawer .v-list-item[value="logout"] .v-list-item-title {
-  color: white !important;
-  font-weight: 500;
-  font-size: 0.875rem;
-  line-height: 1.25;
-}
-.v-navigation-drawer .v-list-item[value="logout"] .v-icon {
-  color: white !important;
-  font-size: 1.25rem !important;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .v-navigation-drawer .v-list-item {
-    padding: 14px 16px;
-    min-height: 48px;
-  }
-  .v-navigation-drawer .v-list-item .v-list-item-title {
-    font-size: 0.9rem;
-  }
-  .v-navigation-drawer .v-list-item .v-icon {
-    font-size: 1.375rem !important;
-  }
-  .v-navigation-drawer .v-list-item[value="logout"] {
-    padding: 14px 16px;
-    min-height: 48px;
-  }
-}
-
-@media (max-width: 480px) {
-  .v-navigation-drawer .v-list-item {
-    padding: 16px 20px;
-    min-height: 52px;
-  }
-  .v-navigation-drawer .v-list-item .v-list-item-title {
-    font-size: 0.95rem;
-  }
-  .v-navigation-drawer .v-list-item[value="logout"] {
-    padding: 16px 20px;
-    min-height: 52px;
-  }
-}
-
-/* Animations / accessibility kept local */
-.v-list-item {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-@media (prefers-reduced-motion: reduce) {
-  .v-list-item {
-    transition: none;
-  }
-  .v-list-item:hover {
-    transform: none;
-  }
-}
-
-/* Sidebar title animation */
-.sidebar-title {
-  color: white;
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-  display: inline-block;
-  transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: opacity, transform;
-}
-.sidebar-title--hidden {
-  opacity: 0;
-  transform: translateX(-6px) scale(0.98);
-  pointer-events: none;
+.v-navigation-drawer ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 </style>
