@@ -7,7 +7,7 @@
       </v-card-title>
       
       <!-- Stepper para navegación por pasos -->
-      <v-stepper v-model="currentStep" class="elevation-0">
+      <v-stepper v-model="currentStep" flat>
         <v-stepper-header>
           <v-stepper-item
             :complete="currentStep > 1"
@@ -44,59 +44,81 @@
           ></v-stepper-item>
         </v-stepper-header>
         
-        <v-stepper-window style="max-height: 500px; overflow-y: auto;">
+        <v-stepper-window style="max-height: calc(100vh - 320px); overflow-y: auto;">
           <!-- Paso 1: Información Básica -->
           <v-stepper-window-item :value="1">
-            <v-card-text style="padding: 24px;">
-              <!-- Sección de carga de archivo - Compacta -->
-              <div class="mb-4">
-                <FileUploadZone
-                  accept="application/pdf,image/jpeg,image/png,image/jpg"
-                  :max-size-m-b="10"
-                  :loading="extracting"
-                  loading-message="Analizando factura con IA..."
-                  @file-selected="handleFileSelect"
-                  @extract-data="handleExtractedData"
-                />
-                
-                <v-alert
-                  v-if="extractionResult"
-                  :type="extractionResult.success ? 'success' : 'error'"
-                  class="mt-2"
-                  density="compact"
-                  variant="tonal"
-                  closable
-                >
-                  {{ extractionResult.message }}
-                  <div v-if="extractionResult.success && extractionResult.data.confidence">
-                    <small>Confianza: {{ Math.round(extractionResult.data.confidence * 100) }}%</small>
-                  </div>
-                </v-alert>
-              </div>
+            <v-container fluid class="pa-6">
+              <!-- Aviso de verificación de datos OCR -->
+              <v-alert
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mb-4"
+                icon="mdi-information"
+              >
+                <strong>💡 Tip:</strong> Puedes escanear tu factura con IA, pero <strong>verifica siempre los datos</strong> ya que el escaneo puede no ser 100% exacto.
+              </v-alert>
 
-              <!-- Selector de Tipo de Flujo - Destacado -->
-              <v-card variant="outlined" class="mb-4" style="border: 2px solid #e0e0e0; border-radius: 12px;">
-                <v-card-text class="pa-4">
-                  <div class="d-flex align-center mb-3">
-                    <v-icon color="primary" size="24" class="mr-2">mdi-swap-horizontal-circle</v-icon>
-                    <span class="text-h6 font-weight-medium">Tipo de Factura</span>
-                    <v-chip size="small" color="primary" variant="tonal" class="ml-2">Requerido</v-chip>
-                  </div>
-                  
-                  <v-radio-group
-                    v-model="formData.flow"
-                    inline
-                    :rules="[v => !!v || 'Debe seleccionar el tipo de factura']"
-                    required
-                    hide-details="auto"
-                  >
-                    <v-radio
-                      value="VENTA"
-                      color="success"
+              <!-- Sección de carga de archivo - Colapsable -->
+              <v-expansion-panels class="mb-4">
+                <v-expansion-panel>
+                  <v-expansion-panel-title>
+                    <div class="d-flex align-center">
+                      <v-icon class="mr-2" color="primary">mdi-file-upload</v-icon>
+                      <span class="font-weight-medium">Escanear Factura con IA</span>
+                      <v-chip size="x-small" color="success" variant="tonal" class="ml-2">Opcional</v-chip>
+                    </div>
+                  </v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <FileUploadZone
+                      accept="application/pdf,image/jpeg,image/png,image/jpg"
+                      :max-size-m-b="10"
+                      :loading="extracting"
+                      loading-message="Analizando factura con IA..."
+                      @file-selected="handleFileSelect"
+                      @extract-data="handleExtractedData"
+                    />
+                    
+                    <v-alert
+                      v-if="extractionResult"
+                      :type="extractionResult.success ? 'success' : 'error'"
+                      class="mt-3"
+                      density="compact"
+                      variant="tonal"
+                      closable
                     >
-                      <template v-slot:label>
-                        <div class="d-flex align-center pa-3" style="border: 2px solid #4caf50; border-radius: 8px; min-width: 200px; background: #f1f8f4;">
-                          <v-icon color="success" size="32" class="mr-3">mdi-cash-plus</v-icon>
+                      {{ extractionResult.message }}
+                      <div v-if="extractionResult.success && extractionResult.data.confidence">
+                        <small>Confianza: {{ Math.round(extractionResult.data.confidence * 100) }}%</small>
+                      </div>
+                    </v-alert>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </v-expansion-panels>
+
+              <!-- Selector de Tipo de Flujo -->
+              <v-sheet variant="outlined" class="mb-6 rounded-lg border-2 pa-4">
+                <div class="d-flex align-center mb-4">
+                  <v-icon color="primary" size="24" class="mr-2">mdi-swap-horizontal-circle</v-icon>
+                  <span class="text-h6 font-weight-medium">Tipo de Factura</span>
+                  <v-chip size="small" color="primary" variant="tonal" class="ml-2">Requerido</v-chip>
+                </div>
+                
+                <v-radio-group
+                  v-model="formData.flow"
+                  inline
+                  :rules="[v => !!v || 'Debe seleccionar el tipo de factura']"
+                  required
+                  hide-details="auto"
+                  @update:model-value="handleFlowChange"
+                >
+                  <v-radio
+                    value="VENTA"
+                    color="success"
+                  >
+                    <template v-slot:label>
+                      <div class="d-flex align-center pa-3 border-2 rounded-lg bg-green-lighten-5" style="min-width: 200px; border-color: #4caf50;">
+                        <v-icon color="success" size="32" class="mr-3">mdi-cash-plus</v-icon>
                           <div>
                             <div class="text-subtitle-1 font-weight-bold" style="color: #2e7d32;">Venta</div>
                             <div class="text-caption" style="color: #558b5f;">Factura emitida a cliente</div>
@@ -121,8 +143,7 @@
                       </template>
                     </v-radio>
                   </v-radio-group>
-                </v-card-text>
-              </v-card>
+                </v-sheet>
 
               <!-- Selector de Tipo de Egreso - Solo para COMPRA -->
               <v-card 
@@ -243,85 +264,49 @@
                     persistent-hint
                   ></v-text-field>
                 </v-col>
-              </v-row>
-            </v-card-text>
-          </v-stepper-window-item>
-
-          <!-- Paso 2: Emisor y Cliente -->
-          <v-stepper-window-item :value="2">
-            <v-card-text style="padding: 24px;">
-              <!-- Selector de Cliente -->
-              <v-card variant="outlined" class="mb-4">
-                <v-card-title>
-                  <v-icon left>mdi-account-multiple</v-icon>
-                  Seleccionar Cliente
-                  <v-spacer></v-spacer>
-                  <v-chip 
-                    v-if="currentUser" 
-                    :color="canSelectClients ? 'success' : 'warning'"
-                    size="small"
-                  >
-                    {{ currentUser.name }} ({{ currentUser.role }})
-                  </v-chip>
-                </v-card-title>
-                <v-card-text>
+                <v-col cols="12" md="4">
                   <v-select
-                    v-if="canSelectClients"
-                    v-model="selectedClientId"
-                    :items="clients"
-                    item-title="companyName"
-                    item-value="id"
-                    label="Cliente"
-                    :loading="loadingClients"
-                    :rules="[v => !!v || 'Debe seleccionar un cliente']"
-                    required
+                    v-model="formData.status"
+                    :items="invoiceStatuses"
+                    label="Estado de la Factura"
                     variant="outlined"
-                    @update:model-value="onClientChange"
-                    prepend-icon="mdi-account-search"
+                    class="animated-field"
+                    prepend-inner-icon="mdi-flag"
+                    hint="Selecciona el estado actual"
+                    persistent-hint
                   >
                     <template v-slot:item="{ props, item }">
                       <v-list-item v-bind="props">
-                        <template v-slot:title>
-                          {{ item.raw.companyName }}
-                        </template>
-                        <template v-slot:subtitle>
-                          RIF: {{ item.raw.rif }} | {{ item.raw.email }}
+                        <template v-slot:prepend>
+                          <v-icon :color="getStatusColor(item.value)">mdi-circle</v-icon>
                         </template>
                       </v-list-item>
                     </template>
                     <template v-slot:selection="{ item }">
-                      <span>{{ item.raw.companyName }}</span>
+                      <v-chip :color="getStatusColor(item.value)" size="small">
+                        {{ item.value }}
+                      </v-chip>
                     </template>
                   </v-select>
-                  
-                  <v-alert
-                    v-else
-                    type="info"
-                    variant="tonal"
-                    class="mt-2"
-                  >
-                    <v-icon left>mdi-information</v-icon>
-                    Solo usuarios con rol de Administrador o Contador pueden seleccionar clientes.
-                    Su rol actual: {{ currentUser?.role || 'No identificado' }}
-                  </v-alert>
-                  
-                  <v-alert
-                    v-if="clients.length === 0 && !loadingClients && canSelectClients"
-                    type="warning"
-                    variant="tonal"
-                    class="mt-2"
-                  >
-                    <v-icon left>mdi-alert</v-icon>
-                    No hay clientes registrados. Debe crear al menos un cliente antes de crear facturas.
-                  </v-alert>
-                </v-card-text>
-              </v-card>
+                </v-col>
+              </v-row>
+            </v-container>
+          </v-stepper-window-item>
 
-              <!-- Información del emisor -->
-              <v-card variant="outlined" class="mb-4 animated-card">
-                <v-card-title>
-                  <v-icon left>mdi-domain</v-icon>
-                  Información del Emisor
+          <!-- Paso 2: Emisor y Cliente -->
+          <v-stepper-window-item :value="2">
+            <v-container fluid class="pa-6">
+              
+              <!-- Información del Emisor -->
+              <v-card variant="outlined" class="mb-4 animated-card" :class="{'bg-grey-lighten-4': formData.flow === 'VENTA'}">
+                <v-card-title class="d-flex justify-space-between align-center">
+                  <div>
+                    <v-icon left>mdi-domain</v-icon>
+                    Información del Emisor
+                    <span v-if="formData.flow === 'VENTA'" class="text-caption text-grey ml-2">(Usted)</span>
+                    <span v-else class="text-caption text-grey ml-2">(Proveedor)</span>
+                  </div>
+                  <v-chip v-if="formData.flow === 'VENTA'" size="small" color="info">Autocompletado</v-chip>
                 </v-card-title>
                 <v-card-text>
                   <v-row>
@@ -333,6 +318,7 @@
                         required
                         variant="outlined"
                         class="animated-field"
+                        :readonly="issuerFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -342,6 +328,7 @@
                         :rules="[v => !!v || 'El RIF es requerido']"
                         required
                         variant="outlined"
+                        :readonly="issuerFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -350,6 +337,7 @@
                         :items="taxpayerTypes"
                         label="Tipo de Contribuyente"
                         variant="outlined"
+                        :readonly="issuerFieldsReadonly"
                       ></v-select>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -357,6 +345,7 @@
                         v-model="formData.issuer.phone"
                         label="Teléfono"
                         variant="outlined"
+                        :readonly="issuerFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -365,6 +354,7 @@
                         label="Email"
                         type="email"
                         variant="outlined"
+                        :readonly="issuerFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -372,6 +362,7 @@
                         v-model="formData.issuer.website"
                         label="Sitio Web"
                         variant="outlined"
+                        :readonly="issuerFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12">
@@ -380,17 +371,23 @@
                         label="Dirección"
                         rows="2"
                         variant="outlined"
+                        :readonly="issuerFieldsReadonly"
                       ></v-textarea>
                     </v-col>
                   </v-row>
                 </v-card-text>
               </v-card>
 
-              <!-- Información del cliente -->
-              <v-card variant="outlined">
-                <v-card-title>
-                  <v-icon left>mdi-account</v-icon>
-                  Información del Cliente
+              <!-- Información del Cliente -->
+              <v-card variant="outlined" :class="{'bg-grey-lighten-4': formData.flow === 'COMPRA'}">
+                <v-card-title class="d-flex justify-space-between align-center">
+                  <div>
+                    <v-icon left>mdi-account</v-icon>
+                    Información del Cliente
+                    <span v-if="formData.flow === 'COMPRA'" class="text-caption text-grey ml-2">(Usted)</span>
+                    <span v-else class="text-caption text-grey ml-2">(Su Cliente)</span>
+                  </div>
+                  <v-chip v-if="formData.flow === 'COMPRA'" size="small" color="info">Autocompletado</v-chip>
                 </v-card-title>
                 <v-card-text>
                   <v-row>
@@ -401,6 +398,7 @@
                         :rules="[v => !!v || 'El nombre de la empresa es requerido']"
                         required
                         variant="outlined"
+                        :readonly="clientFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -410,6 +408,7 @@
                         :rules="[v => !!v || 'El RIF es requerido']"
                         required
                         variant="outlined"
+                        :readonly="clientFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -418,6 +417,7 @@
                         :items="taxpayerTypes"
                         label="Tipo de Contribuyente"
                         variant="outlined"
+                        :readonly="clientFieldsReadonly"
                       ></v-select>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -425,6 +425,7 @@
                         v-model="formData.client.phone"
                         label="Teléfono"
                         variant="outlined"
+                        :readonly="clientFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -433,6 +434,7 @@
                         label="Email"
                         type="email"
                         variant="outlined"
+                        :readonly="clientFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -440,6 +442,7 @@
                         v-model="formData.client.website"
                         label="Sitio Web"
                         variant="outlined"
+                        :readonly="clientFieldsReadonly"
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12">
@@ -448,17 +451,18 @@
                         label="Dirección"
                         rows="2"
                         variant="outlined"
+                        :readonly="clientFieldsReadonly"
                       ></v-textarea>
                     </v-col>
                   </v-row>
                 </v-card-text>
               </v-card>
-            </v-card-text>
+            </v-container>
           </v-stepper-window-item>
 
           <!-- Paso 3: Detalles Financieros -->
           <v-stepper-window-item :value="3">
-            <v-card-text style="padding: 24px;">
+            <v-container fluid class="pa-6">
               <v-row>
                 <v-col cols="12" md="6">
                   <v-text-field
@@ -552,12 +556,12 @@
                   ></v-text-field>
                 </v-col>
               </v-row>
-            </v-card-text>
+            </v-container>
           </v-stepper-window-item>
 
           <!-- Paso 4: Items y Notas -->
           <v-stepper-window-item :value="4">
-            <v-card-text style="padding: 24px;">
+            <v-container fluid class="pa-6">
               <!-- Items de la factura - Opcional -->
               <v-card variant="outlined" class="mb-4 items-card">
                 <v-card-text class="pa-3">
@@ -690,13 +694,13 @@
                   ></v-textarea>
                 </v-card-text>
               </v-card>
-            </v-card-text>
+            </v-container>
           </v-stepper-window-item>
         </v-stepper-window>
       </v-stepper>
       
       <!-- Botones de navegación -->
-      <v-card-actions class="pa-4" style="background: #fafafa; border-top: 1px solid #e0e0e0;">
+      <v-card-actions class="pa-6 bg-grey-lighten-4 border-t">
         <v-btn
           v-if="currentStep > 1"
           color="grey-darken-1"
@@ -757,15 +761,14 @@
 
 <script>
 import invoiceService from '@/services/invoiceService.js';
-import clientService from '@/services/clientService.js';
 import userService from '@/services/userService.js';
-import adminOcrService from '@/services/adminOcrService.js';
+import clientOcrService from '@/services/clientOcrService.js';
 import bcvService from '@/services/bcvService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
 
 export default {
-  name: 'InvoiceForm',
+  name: 'ClientInvoiceForm',
   components: {
     AppSnackbar,
     FileUploadZone
@@ -778,14 +781,6 @@ export default {
     flow: {
       type: String,
       default: 'VENTA' // 'VENTA' | 'COMPRA'
-    },
-    autoPartyMode: {
-      type: Boolean,
-      default: true
-    },
-    organizationOnly: {
-      type: Boolean,
-      default: false // Si es true, la factura es de la organización (sin client_id)
     }
   },
   emits: ['submit', 'cancel'],
@@ -794,27 +789,21 @@ export default {
       valid: false,
       loading: false,
       currentStep: 1,
-      showItems: false, // Controla si se muestran los items
+      showItems: false,
       
       // Archivo subido
       uploadedFile: null,
       extracting: false,
       extractionResult: null,
       
-      // Clientes
-      clients: [],
-      selectedClientId: null,
-      loadingClients: false,
-      
-      // Usuario actual
+      // Usuario actual (Cliente)
       currentUser: null,
-      canSelectClients: false,
       
-      // Snackbar para mensajes
+      // Snackbar
       snackbar: {
         show: false,
         message: '',
-        type: 'info', // 'success', 'error', 'warning', 'info'
+        type: 'info',
         timeout: 4000
       },
       
@@ -823,37 +812,37 @@ export default {
         invoiceNumber: '',
         controlNumber: '',
         documentType: 'FACTURA',
-        flow: 'VENTA', // Tipo de flujo: VENTA o COMPRA
-        expense_type: 'COMPRA', // Tipo de egreso: COMPRA o GASTO (solo para flow=COMPRA)
+        flow: 'VENTA',
+        expense_type: 'COMPRA',
         issueDate: new Date().toISOString().split('T')[0],
         dueDate: '',
         status: 'BORRADOR',
         
         issuer: {
-          companyName: 'TECNOLOGÍA AVANZADA VENEZOLANA C.A.',
-          rif: 'J-12345678-9',
+          companyName: '',
+          rif: '',
           taxpayerType: 'PERSONA JURÍDICA',
-          phone: '+58 212 123-4567',
-          email: 'info@empresa.com',
-          website: 'www.empresa.com',
-          address: 'Av. Principal, Edificio Empresarial, Piso 5, Caracas, Venezuela'
+          phone: '',
+          email: '',
+          website: '',
+          address: ''
         },
         
         client: {
-          companyName: 'CLÍNICA ESPECIALIZADA DEL CARIBE',
-          rif: 'J-98765432-1',
+          companyName: '',
+          rif: '',
           taxpayerType: 'PERSONA JURÍDICA',
-          phone: '+58 212 987-6543',
-          email: 'contacto@clinica.com',
-          website: 'www.clinica.com',
-          address: 'Av. Libertador, Centro Médico, Piso 3, Caracas, Venezuela'
+          phone: '',
+          email: '',
+          website: '',
+          address: ''
         },
         
         financial: {
-          totalSales: 100000,
+          totalSales: 0,
           nonTaxableSales: 0,
-          taxableSales: 100000,
-          taxDebit: 16000,
+          taxableSales: 0,
+          taxDebit: 0,
           ivaRetention: 0,
           islrRetention: 0,
           municipalRetention: 0,
@@ -875,7 +864,6 @@ export default {
         attachments: []
       },
       
-      // Opciones para selects
       documentTypes: [
         'FACTURA',
         'NOTA DE CRÉDITO',
@@ -895,12 +883,31 @@ export default {
         'VES',
         'USD',
         'EUR'
+      ],
+      
+      invoiceStatuses: [
+        'BORRADOR',
+        'EMITIDA',
+        'ENVIADA',
+        'PAGADA',
+        'VENCIDA',
+        'ANULADA'
       ]
     };
   },
   computed: {
     isEditing() {
       return !!this.invoice;
+    },
+    
+    // Campos del emisor son readonly cuando es VENTA (el cliente es el emisor)
+    issuerFieldsReadonly() {
+      return this.formData.flow === 'VENTA';
+    },
+    
+    // Campos del cliente son readonly cuando es COMPRA o GASTO (el cliente es el receptor)
+    clientFieldsReadonly() {
+      return this.formData.flow === 'COMPRA' || this.formData.flow === 'GASTO';
     }
   },
   watch: {
@@ -908,10 +915,6 @@ export default {
       handler(newInvoice) {
         if (newInvoice) {
           this.formData = { ...newInvoice };
-          // Si es una factura existente, establecer el cliente seleccionado
-          if (newInvoice.clientId) {
-            this.selectedClientId = newInvoice.clientId;
-          }
         }
       },
       immediate: true
@@ -930,119 +933,150 @@ export default {
       try {
         const nextNumber = await invoiceService.getNextInvoiceNumber();
         this.formData.invoiceNumber = nextNumber;
-        console.log('🔢 Número de factura generado:', nextNumber);
       } catch (error) {
         console.error('❌ Error al generar número de factura:', error);
         this.formData.invoiceNumber = 'F-2024-001';
       }
+      
+      // Establecer flujo inicial desde prop
+      this.formData.flow = this.flow;
     }
     
-    // Cargar lista de clientes
-    await this.loadClients();
-    
-    // Cargar usuario actual y validar permisos
+    // Cargar datos del usuario actual (Cliente)
     await this.loadCurrentUser();
-
-    // Ajustar modo auto party: ocultar edición de emisor/cliente y solo seleccionar cliente si corresponde
-    if (this.autoPartyMode) {
-      // Si organizationOnly es true, no seleccionar cliente (factura de la organización)
-      if (this.organizationOnly) {
-        this.selectedClientId = null
-        this.canSelectClients = false
-      } else if (!this.canSelectClients) {
-        this.selectedClientId = null
-      }
-    }
   },
   methods: {
-    async loadClients() {
-      try {
-        this.loadingClients = true;
-        console.log('🔄 Cargando lista de clientes...');
-        
-        const clients = await clientService.getClients();
-        this.clients = clients;
-        
-        console.log('✅ Clientes cargados:', clients.length);
-        
-        // Si hay clientes, seleccionar el primero por defecto (solo si puede elegir)
-        if (this.canSelectClients && clients.length > 0 && !this.selectedClientId) {
-          this.selectedClientId = clients[0].id;
-          this.updateClientInfo(clients[0]);
-          console.log('👤 Cliente seleccionado por defecto:', clients[0].companyName);
-        }
-      } catch (error) {
-        console.error('❌ Error al cargar clientes:', error);
-        this.clients = [];
-      } finally {
-        this.loadingClients = false;
-      }
-    },
-    
     async loadCurrentUser() {
       try {
-        console.log('🔄 Cargando usuario actual...');
-        
         const user = await userService.getCurrentUser();
+        console.log('👤 [ClientInvoiceForm] Usuario cargado:', user);
         this.currentUser = user;
         
         if (user) {
-          // Verificar si el usuario puede seleccionar clientes (admin o contador)
-          this.canSelectClients = user.role === 'admin' || user.role === 'contador';
-          console.log('👤 Usuario actual:', user.name, 'Rol:', user.role);
-          console.log('🔐 Puede seleccionar clientes:', this.canSelectClients);
-        } else {
-          console.warn('⚠️ No se pudo obtener el usuario actual');
-          this.canSelectClients = false;
+          // Pre-llenar datos según el flujo
+          this.handleFlowChange();
         }
       } catch (error) {
         console.error('❌ Error al cargar usuario actual:', error);
-        this.canSelectClients = false;
+      }
+    },
+
+    async fetchExchangeRate(date) {
+      if (!date) return;
+      
+      try {
+        console.log(`💱 Buscando tasa de cambio para: ${date}`);
+        const result = await bcvService.getRateForDate(date);
+        
+        if (result.success && result.data && result.data.dollar) {
+          this.formData.financial.exchangeRate = result.data.dollar;
+          this.showSnackbar(`Tasa actualizada: ${result.data.dollar.toFixed(4)} VES/USD`, 'success');
+        } else {
+          console.warn('⚠️ No se encontró tasa para la fecha, usando actual...');
+          // Fallback a tasa actual si falla la histórica
+          const currentRate = await bcvService.getCurrentRate();
+          if (currentRate.success && currentRate.data && currentRate.data.dollar) {
+            this.formData.financial.exchangeRate = currentRate.data.dollar;
+            this.showSnackbar(`Usando tasa actual: ${currentRate.data.dollar.toFixed(4)} VES/USD`, 'info');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error al obtener tasa de cambio:', error);
       }
     },
     
-    updateClientInfo(client) {
-      if (client) {
-        this.formData.client = {
-          companyName: client.companyName,
-          rif: client.rif,
-          taxpayerType: client.taxpayerType,
-          phone: client.phone,
-          email: client.email,
-          website: client.website,
-          address: client.address
-        };
-        console.log('📝 Información del cliente actualizada:', client.companyName);
+    handleFlowChange() {
+      console.log('🔄 [ClientInvoiceForm] Cambio de flujo:', this.formData.flow);
+      if (!this.currentUser) {
+        console.warn('⚠️ [ClientInvoiceForm] No hay usuario actual para auto-llenar datos');
+        return;
+      }
+      
+      // Mapear datos del usuario a la estructura de factura
+      // Priorizar datos del perfil de cliente si existen
+      const clientProfile = this.currentUser.client || {};
+      console.log('🏢 [ClientInvoiceForm] Perfil de cliente:', clientProfile);
+      
+      const userData = {
+        companyName: clientProfile.company_name || this.currentUser.companyName || this.currentUser.name,
+        rif: clientProfile.rif || this.currentUser.rif || '',
+        taxpayerType: clientProfile.taxpayer_type || this.currentUser.taxpayerType || 'PERSONA JURÍDICA',
+        phone: clientProfile.phone || this.currentUser.phone || '',
+        email: clientProfile.email || this.currentUser.email || '',
+        website: clientProfile.website || this.currentUser.website || '',
+        address: clientProfile.address || this.currentUser.address || ''
+      };
+      
+      console.log('📋 [ClientInvoiceForm] Datos mapeados para auto-llenado:', userData);
+      
+      if (this.formData.flow === 'VENTA') {
+        // En VENTA, yo soy el Emisor
+        this.formData.issuer = { ...userData };
+        // Limpiar cliente si es nueva factura
+        if (!this.isEditing) {
+          this.clearClientData();
+        }
+      } else {
+        // En COMPRA, yo soy el Cliente
+        this.formData.client = { ...userData };
+        // Limpiar emisor si es nueva factura
+        if (!this.isEditing) {
+          this.clearIssuerData();
+        }
       }
     },
     
-    onClientChange() {
-      const selectedClient = this.clients.find(client => client.id === this.selectedClientId);
-      if (selectedClient) {
-        this.updateClientInfo(selectedClient);
-      }
+    clearClientData() {
+      this.formData.client = {
+        companyName: '',
+        rif: '',
+        taxpayerType: 'PERSONA JURÍDICA',
+        phone: '',
+        email: '',
+        website: '',
+        address: ''
+      };
     },
     
-    // Métodos de navegación con validación
+    clearIssuerData() {
+      this.formData.issuer = {
+        companyName: '',
+        rif: '',
+        taxpayerType: 'PERSONA JURÍDICA',
+        phone: '',
+        email: '',
+        website: '',
+        address: ''
+      };
+    },
+    
+    getStatusColor(status) {
+      const colors = {
+        'BORRADOR': 'grey',
+        'EMITIDA': 'blue',
+        'ENVIADA': 'cyan',
+        'PAGADA': 'green',
+        'VENCIDA': 'red',
+        'ANULADA': 'black'
+      };
+      return colors[status] || 'grey';
+    },
+    
     validateStep(step) {
       switch(step) {
         case 1:
-          // Validar información básica
           return !!this.formData.invoiceNumber && 
                  !!this.formData.documentType && 
                  !!this.formData.issueDate &&
                  !!this.formData.flow;
         case 2:
-          // Validar emisor y cliente
           return !!this.formData.issuer.companyName && 
                  !!this.formData.issuer.rif &&
                  !!this.formData.client.companyName && 
                  !!this.formData.client.rif;
         case 3:
-          // Validar financiero
           return this.formData.financial.totalSales > 0;
         case 4:
-          // Paso final, siempre válido
           return true;
         default:
           return true;
@@ -1053,35 +1087,29 @@ export default {
       const isValid = this.validateStep(this.currentStep);
       
       if (!isValid) {
-        // Mostrar mensaje de error
         let message = 'Por favor complete todos los campos obligatorios';
         
         if (this.currentStep === 1 && !this.formData.flow) {
-          message = 'Por favor seleccione el tipo de factura (Venta o Compra)';
+          message = 'Por favor seleccione el tipo de factura';
         } else if (this.currentStep === 1 && !this.formData.issueDate) {
           message = 'Por favor ingrese la fecha de emisión';
         } else if (this.currentStep === 2) {
           message = 'Por favor complete la información del emisor y cliente';
         } else if (this.currentStep === 3) {
-          message = 'Por favor ingrese el monto total de la factura';
+          message = 'Por favor ingrese el monto total';
         }
         
-        // Mostrar snackbar con el error
         this.showSnackbar(message, 'error');
-        console.warn('⚠️ Validación fallida en paso', this.currentStep, ':', message);
         return;
       }
       
       this.currentStep++;
-      console.log('✅ Avanzando al paso', this.currentStep);
     },
     
     previousStep() {
       this.currentStep--;
-      console.log('⬅️ Retrocediendo al paso', this.currentStep);
     },
     
-    // Método helper para mostrar snackbar
     showSnackbar(message, type = 'info', timeout = 4000) {
       this.snackbar = {
         show: true,
@@ -1093,7 +1121,6 @@ export default {
     
     handleFileSelect(file) {
       this.uploadedFile = file;
-      console.log('Archivo seleccionado:', file);
     },
     
     async handleExtractedData(file) {
@@ -1103,8 +1130,26 @@ export default {
       this.extractionResult = null;
       
       try {
-        console.log('🚀 Iniciando extracción de datos desde InvoiceForm...');
-        const data = await ocrService.extractInvoiceData(file);
+        // Preparar contexto del usuario para auto-detección
+        const userContext = {
+            companyName: this.currentUser?.companyName || this.currentUser?.name,
+            rif: this.currentUser?.rif
+        };
+
+        // Pasar el tipo de flujo (si existe) y contexto al servicio OCR
+        const data = await clientOcrService.extractInvoiceData(file, this.formData.flow || null, userContext);
+        
+        // Si se detectó un flujo y no estaba seleccionado (o era diferente), actualizarlo
+        if (data.detectedFlow) {
+            console.log(`🤖 Flujo detectado por IA: ${data.detectedFlow}`);
+            
+            if (!this.formData.flow || this.formData.flow !== data.detectedFlow) {
+                this.formData.flow = data.detectedFlow;
+                // Actualizar UI y datos según el nuevo flujo
+                this.handleFlowChange();
+                this.showSnackbar(`Tipo de factura detectado: ${data.detectedFlow}`, 'success');
+            }
+        }
         
         this.extractionResult = {
           success: true,
@@ -1112,9 +1157,7 @@ export default {
           data: data
         };
         
-        // Mapear datos extraídos al formulario
         this.mapExtractedDataToForm(data);
-        
         this.showSnackbar('Datos extraídos exitosamente', 'success');
         
       } catch (error) {
@@ -1123,55 +1166,37 @@ export default {
           success: false,
           message: `Error: ${error.message}`
         };
-        this.showSnackbar('Error al procesar el archivo. Intente nuevamente.', 'error');
+        this.showSnackbar('Error al procesar el archivo', 'error');
       } finally {
         this.extracting = false;
       }
     },
 
     mapExtractedDataToForm(data) {
-      console.log('🗺️ Mapeando datos extraídos al formulario...', data);
-      
       // 1. Información Básica
       if (data.invoiceNumber) this.formData.invoiceNumber = data.invoiceNumber;
       if (data.issueDate) this.formData.issueDate = data.issueDate;
       if (data.dueDate) this.formData.dueDate = data.dueDate;
       if (data.currency) this.formData.financial.currency = data.currency;
       
-      // 2. Cliente
-      if (data.client) {
-        // Intentar buscar cliente existente por RIF
-        if (data.client.rif) {
-          const existingClient = this.clients.find(c => 
-            c.rif.replace(/\s/g, '').toUpperCase() === data.client.rif.replace(/\s/g, '').toUpperCase()
-          );
-          
-          if (existingClient) {
-            console.log('✅ Cliente existente encontrado:', existingClient.companyName);
-            this.selectedClientId = existingClient.id;
-            this.updateClientInfo(existingClient);
-          } else {
-            console.log('⚠️ Cliente no encontrado, llenando datos manualmente');
-            // Llenar datos para nuevo cliente
+      // 2. Mapeo inteligente según flujo
+      if (this.formData.flow === 'VENTA') {
+        // Si es venta, los datos extraídos del "Cliente" van a mi cliente
+        if (data.client) {
             if (data.client.companyName) this.formData.client.companyName = data.client.companyName;
             if (data.client.rif) this.formData.client.rif = data.client.rif;
             if (data.client.address) this.formData.client.address = data.client.address;
-            if (data.client.phone) this.formData.client.phone = data.client.phone;
-            if (data.client.email) this.formData.client.email = data.client.email;
-            
-            // Limpiar selección de cliente existente
-            this.selectedClientId = null;
-          }
+        }
+      } else {
+        // Si es compra, los datos extraídos del "Emisor" van al proveedor
+        if (data.issuer) {
+            if (data.issuer.companyName) this.formData.issuer.companyName = data.issuer.companyName;
+            if (data.issuer.rif) this.formData.issuer.rif = data.issuer.rif;
+            if (data.issuer.address) this.formData.issuer.address = data.issuer.address;
         }
       }
       
-      // 3. Emisor (Proveedor)
-      if (data.issuer) {
-        if (data.issuer.companyName) this.formData.issuer.companyName = data.issuer.companyName;
-        if (data.issuer.rif) this.formData.issuer.rif = data.issuer.rif;
-      }
-      
-      // 4. Items
+      // 3. Items
       if (data.items && data.items.length > 0) {
         this.formData.items = data.items.map(item => ({
           description: item.description || '',
@@ -1182,17 +1207,15 @@ export default {
         this.showItems = true;
       }
       
-      // 5. Financiero
+      // 4. Financiero
       if (data.total) this.formData.financial.totalSales = data.total;
       if (data.subtotal) this.formData.financial.taxableSales = data.subtotal;
       if (data.tax) this.formData.financial.taxDebit = data.tax;
       
-      // 6. Notas
+      // 5. Notas
       if (data.notes) {
         this.formData.notes = data.notes;
       }
-      
-      console.log('✅ Mapeo completado. Formulario actualizado.');
     },
     
     addItem() {
@@ -1212,68 +1235,53 @@ export default {
     
     async handleSubmit() {
       if (!this.$refs.form.validate()) {
-        console.log('❌ Formulario no válido, no se puede enviar');
         this.showSnackbar('Por favor complete todos los campos obligatorios', 'error');
         return;
       }
       
-      // Si organizationOnly es true, no requerir clientId
-      if (!this.organizationOnly && this.canSelectClients && !this.selectedClientId) {
-        // Si no hay cliente seleccionado, pero hay datos de cliente llenos manualmente (caso OCR nuevo cliente)
-        // Podríamos permitirlo o requerir crear el cliente primero.
-        // Por ahora, asumimos que si hay datos manuales es válido para "cliente ocasional" o similar,
-        // pero la lógica original requería seleccionar un cliente de la lista.
-        // Vamos a mantener la validación original pero con un warning si hay datos.
-        
-        console.log('❌ No se ha seleccionado un cliente');
-        this.showSnackbar('Por favor seleccione un cliente antes de crear la factura', 'error');
-        return;
-      }
-      
-      console.log('📝 Datos del formulario a enviar:', this.formData);
-      console.log('👤 Cliente seleccionado ID:', this.selectedClientId);
-      console.log('🔐 Puede seleccionar clientes:', this.canSelectClients);
-      console.log('🏢 Organización solamente:', this.organizationOnly);
-      
       this.loading = true;
       
       try {
-        let response;
-        // Si organizationOnly es true, pasar null explícitamente para clientId
-        const clientId = this.organizationOnly ? null : (this.canSelectClients ? this.selectedClientId : null);
+        // Para clientes, el clientId es su propio ID (que el backend debería manejar o extraer del token/contexto)
+        // Pero para mantener compatibilidad con el servicio existente:
+        // Si es VENTA: client_id es el ID del cliente al que le vendo (pero aquí no tengo IDs, solo texto)
+        // Si es COMPRA: client_id soy YO.
+        
+        // IMPORTANTE: El backend actual probablemente espera un clientId válido de la tabla de clientes.
+        // Si el sistema permite "clientes ocasionales" (sin ID), esto funcionará.
+        // Si no, tendremos un problema. Asumiremos que el backend maneja la creación de factura
+        // asociándola al usuario autenticado como "dueño" de la factura.
+        
         const invoiceData = {
           ...this.formData,
-          clientId: clientId,
-          flow: this.flow
+          // No enviamos clientId explícito porque:
+          // 1. Si es Venta, el cliente es un string (nombre), no un ID de base de datos.
+          // 2. Si es Compra, yo soy el cliente, y el backend sabe quién soy por el token.
+          clientId: this.currentUser?.id || null, 
+          flow: this.formData.flow
         };
         
+        let response;
         if (this.isEditing) {
-          console.log('🔄 Actualizando factura existente...');
           response = await invoiceService.updateInvoice(this.invoice.id, invoiceData);
         } else {
-          console.log('🔄 Creando nueva factura...');
           response = await invoiceService.createInvoice(invoiceData);
         }
         
-        console.log('📨 Respuesta del servicio:', response);
-        
-        // El servicio ahora devuelve { success: boolean, data: object, message: string }
         if (response.success) {
-          console.log('✅ Factura guardada exitosamente');
           this.$emit('submit', {
             success: true,
             data: response.data,
             message: response.message
           });
         } else {
-          console.error('❌ Error al guardar factura:', response.message);
           this.$emit('submit', {
             success: false,
             message: response.message || 'Error al guardar la factura'
           });
         }
       } catch (error) {
-        console.error('❌ Error inesperado al guardar factura:', error);
+        console.error('❌ Error inesperado:', error);
         this.$emit('submit', {
           success: false,
           message: 'Error inesperado al guardar la factura'
@@ -1287,19 +1295,10 @@ export default {
 </script>
 
 <style scoped>
-.v-stepper {
-  box-shadow: none !important;
-}
-
-.v-stepper-header {
-  box-shadow: none !important;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.v-stepper-item {
-  padding: 16px;
-}
-
+/* Copia de estilos de InvoiceForm.vue */
+.v-stepper { box-shadow: none !important; }
+.v-stepper-header { box-shadow: none !important; border-bottom: 1px solid #e0e0e0; }
+.v-stepper-item { padding: 16px; }
 .v-stepper-window {
   min-height: 400px;
   max-height: 500px;
@@ -1308,334 +1307,28 @@ export default {
   scrollbar-color: #ccc #f5f5f5;
   margin-bottom: 20px;
 }
-
-/* Estilos para el scrollbar en WebKit (Chrome, Safari, Edge) */
-.v-stepper-window::-webkit-scrollbar {
-  width: 8px;
-}
-
-.v-stepper-window::-webkit-scrollbar-track {
-  background: #f5f5f5;
-  border-radius: 4px;
-}
-
-.v-stepper-window::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 4px;
-}
-
-.v-stepper-window::-webkit-scrollbar-thumb:hover {
-  background: #999;
-}
-
-.v-card {
-  border-radius: 12px;
-  border: 1px solid #e0e0e0 !important;
-}
-
-.v-card-title {
-  background-color: #f5f5f5;
-  border-radius: 12px 12px 0 0;
-}
-
-/* Quitar bordes negros y usar colores más suaves */
-.v-text-field .v-field,
-.v-select .v-field,
-.v-textarea .v-field,
-.v-file-input .v-field {
+.v-card { border-radius: 12px; border: 1px solid #e0e0e0 !important; }
+.v-card-title { background-color: #f5f5f5; border-radius: 12px 12px 0 0; }
+.v-text-field .v-field, .v-select .v-field, .v-textarea .v-field {
   border: 1px solid #e0e0e0 !important;
   border-radius: 8px !important;
 }
-
-.v-text-field .v-field:hover,
-.v-select .v-field:hover,
-.v-textarea .v-field:hover,
-.v-file-input .v-field:hover {
-  border: 1px solid #bdbdbd !important;
-}
-
-.v-text-field .v-field--focused,
-.v-select .v-field--focused,
-.v-textarea .v-field--focused,
-.v-file-input .v-field--focused {
+.v-text-field .v-field:hover, .v-select .v-field:hover { border: 1px solid #bdbdbd !important; }
+.v-text-field .v-field--focused, .v-select .v-field--focused {
   border: 2px solid #1976d2 !important;
   box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.1) !important;
 }
-
-/* Estilos para la sección de carga de archivo compacta */
-.file-upload-card {
-  border: 1px solid #e3f2fd !important;
-  background-color: #fafafa;
-}
-
-.file-upload-card .v-card-text {
-  padding: 16px !important;
-}
-
-/* Estilos para la sección de items compacta */
-.items-card {
-  border: 1px solid #e3f2fd !important;
-  background-color: #fafafa;
-  min-height: 60px; /* Altura mínima cuando está colapsada */
-}
-
-.items-card .v-card-text {
-  padding: 16px !important;
-  min-height: 60px; /* Altura mínima del contenido */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.items-card .v-text-field {
-  margin-bottom: 0 !important;
-}
-
-/* Estilos para el chip "Opcional" */
-.v-chip--size-small {
-  font-size: 0.75rem !important;
-  height: 22px !important;
-}
-
-.v-btn {
-  border-radius: 8px;
-  text-transform: none;
-  font-weight: 500;
-  border: 1px solid transparent !important;
-}
-
-.v-btn--variant-outlined {
-  border: 1px solid #e0e0e0 !important;
-  background-color: #ffffff !important;
-}
-
-.v-btn--variant-outlined:hover {
-  border: 1px solid #bdbdbd !important;
-  background-color: #f5f5f5 !important;
-}
-
-.v-text-field,
-.v-select,
-.v-textarea {
-  margin-bottom: 8px;
-}
-
-/* Animaciones suaves */
-.v-stepper-window-item {
-  transition: all 0.3s ease;
-}
-
-/* Estilos para los campos requeridos */
-.v-text-field[required] .v-label::after,
-.v-select[required] .v-label::after {
-  content: ' *';
-  color: #f44336;
-}
-
-/* Indicador de scroll */
-.v-stepper-window::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 30px;
-  background: linear-gradient(transparent, rgba(250,250,250,0.9));
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Mejorar el padding para evitar que el contenido se corte */
-.v-stepper-window-item .v-card-text {
-  padding-bottom: 80px !important;
-}
-
-/* Asegurar que los botones no tapen el contenido */
-.v-card-actions {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
-  background-color: #fafafa;
-}
-
-/* ===== ANIMACIONES ===== */
-
-/* Animación de expansión para la sección de items */
-.expand-enter-active,
-.expand-leave-active {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-}
-
-.expand-enter-from {
-  opacity: 0;
-  max-height: 0;
-  transform: translateY(-10px);
-}
-
-.expand-leave-to {
-  opacity: 0;
-  max-height: 0;
-  transform: translateY(-10px);
-}
-
-.expand-enter-to,
-.expand-leave-from {
-  opacity: 1;
-  max-height: 1000px;
-  transform: translateY(0);
-}
-
-/* Animación para la lista de items */
-.item-list-enter-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.item-list-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: absolute;
-  width: 100%;
-}
-
-.item-list-enter-from {
-  opacity: 0;
-  transform: translateX(-30px) scale(0.95);
-}
-
-.item-list-leave-to {
-  opacity: 0;
-  transform: translateX(30px) scale(0.95);
-}
-
-.item-list-move {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Animaciones para campos de entrada */
-.animated-field {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.animated-field:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.animated-field:focus-within {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(25, 118, 210, 0.15);
-}
-
-/* Animaciones para botones */
-.animated-btn {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.animated-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.animated-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Animación para las tarjetas */
-.v-card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.v-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-}
-
-.animated-card {
-  animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Animación para el stepper */
-.v-stepper-window-item {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Animación de entrada para elementos del formulario */
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animated-field {
-  animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Animación de pulso para elementos importantes */
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.02);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.v-text-field[required] .v-field--focused {
-  animation: pulse 0.3s ease-in-out;
-}
-
-/* Animación de shake para errores */
-@keyframes shake {
-  0%, 100% {
-    transform: translateX(0);
-  }
-  10%, 30%, 50%, 70%, 90% {
-    transform: translateX(-5px);
-  }
-  20%, 40%, 60%, 80% {
-    transform: translateX(5px);
-  }
-}
-
-.v-text-field.error--text .v-field {
-  animation: shake 0.5s ease-in-out;
-}
-
-/* Animación de fade para alertas */
-.v-alert {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.v-alert-enter-active,
-.v-alert-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.v-alert-enter-from,
-.v-alert-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-/* Animación para el contenido de items */
-.items-content {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Animación de entrada escalonada para campos */
-.animated-field:nth-child(1) { animation-delay: 0.1s; }
-.animated-field:nth-child(2) { animation-delay: 0.2s; }
-.animated-field:nth-child(3) { animation-delay: 0.3s; }
-.animated-field:nth-child(4) { animation-delay: 0.4s; }
-.animated-field:nth-child(5) { animation-delay: 0.5s; }
-.animated-field:nth-child(6) { animation-delay: 0.6s; }
+.items-card { border: 1px solid #e3f2fd !important; background-color: #fafafa; min-height: 60px; }
+.v-btn { border-radius: 8px; text-transform: none; font-weight: 500; }
+.v-btn--variant-outlined { border: 1px solid #e0e0e0 !important; background-color: #ffffff !important; }
+.v-card-actions { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0; background-color: #fafafa; }
+.animated-field { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.animated-field:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+.animated-field:focus-within { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(25, 118, 210, 0.15); }
+.expand-enter-active, .expand-leave-active { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; }
+.expand-enter-from, .expand-leave-to { opacity: 0; max-height: 0; transform: translateY(-10px); }
+.expand-enter-to, .expand-leave-from { opacity: 1; max-height: 1000px; transform: translateY(0); }
+.item-list-enter-active, .item-list-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.item-list-enter-from { opacity: 0; transform: translateX(-30px) scale(0.95); }
+.item-list-leave-to { opacity: 0; transform: translateX(30px) scale(0.95); }
 </style>

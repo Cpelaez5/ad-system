@@ -1,9 +1,9 @@
 // Servicio de gestión de usuarios y roles con Supabase Multi-Tenant
 // Integra Supabase Auth con sistema de organizaciones
 import { supabase } from '@/lib/supabaseClient';
-import { 
-  getCurrentOrganizationId, 
-  setCurrentOrganizationId, 
+import {
+  getCurrentOrganizationId,
+  setCurrentOrganizationId,
   clearCurrentOrganizationId,
   queryWithTenant,
   insertWithTenant,
@@ -68,44 +68,44 @@ const userService = {
         email: credentials.email || credentials.usuario,
         hasPassword: !!credentials.password
       });
-      
+
       // Validar credenciales
       if (!credentials) {
         return { success: false, message: 'Credenciales no proporcionadas' };
       }
-      
+
       const email = credentials.email || credentials.usuario || '';
       const password = credentials.password || '';
-      
+
       if (!email || !password) {
         return { success: false, message: 'Email/usuario y contraseña son requeridos' };
       }
-      
+
       // Normalizar email
       const normalizedEmail = email.includes('@') ? email : `${email}@sistema.local`;
-      
+
       // 1. Autenticar con Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password: password
       });
-      
+
       if (authError) {
         console.error('❌ Error de autenticación:', {
           code: authError.status,
           message: authError.message
         });
-        return { 
-          success: false, 
+        return {
+          success: false,
           message: authError.message || 'Error al iniciar sesión',
-          error: authError 
+          error: authError
         };
       }
-      
+
       if (!authData?.user) {
         throw new Error('No se pudo obtener información del usuario después de la autenticación');
       }
-      
+
       console.log('✅ Autenticación exitosa, ID de usuario:', authData.user.id);
 
       // 2. Obtener perfil con reintentos
@@ -117,7 +117,7 @@ const userService = {
       while (attempts < maxAttempts && !profile) {
         attempts++;
         console.log(`🔄 Intento ${attempts} de obtener perfil...`);
-        
+
         try {
           // Query corregida: obtener datos básicos primero y luego el cliente si existe
           const { data, error: profileError } = await supabase
@@ -128,7 +128,7 @@ const userService = {
             `)
             .eq('id', authData.user.id)
             .maybeSingle();
-          
+
           // Si hay un client_id, obtener los datos del cliente por separado
           if (!profileError && data?.client_id) {
             const { data: clientData } = await supabase
@@ -136,7 +136,7 @@ const userService = {
               .select('*')
               .eq('id', data.client_id)
               .maybeSingle();
-            
+
             if (clientData) {
               data.clients = clientData;
             }
@@ -189,20 +189,20 @@ const userService = {
                 .insert(newProfile)
                 .select('*, organizations(*)')
                 .maybeSingle();
-              insertResult = { 
-                data: result.data, 
+              insertResult = {
+                data: result.data,
                 error: result.error,
-                rlsBlocked: result.error?.code === '42501' || 
-                          (result.error?.details && String(result.error.details).includes('row-level security'))
+                rlsBlocked: result.error?.code === '42501' ||
+                  (result.error?.details && String(result.error.details).includes('row-level security'))
               };
             }
           } catch (err) {
             // Si el helper lanza, convertir a objeto normal
-            insertResult = { 
-              error: err, 
+            insertResult = {
+              error: err,
               data: null,
-              rlsBlocked: err.code === '42501' || 
-                         (err.details && String(err.details).includes('row-level security'))
+              rlsBlocked: err.code === '42501' ||
+                (err.details && String(err.details).includes('row-level security'))
             };
           }
 
@@ -249,24 +249,24 @@ const userService = {
       // 4. Verificar que el usuario esté activo
       if (profile && profile.is_active === false) {
         console.warn('⚠️ Usuario inactivo');
-        return { 
-          success: false, 
+        return {
+          success: false,
           message: 'Usuario inactivo. Por favor, contacta al administrador.',
           error: { code: 'USER_INACTIVE' }
         };
       }
-      
+
       // 5. Guardar organization_id para uso global (si está disponible)
       if (profile?.organization_id) {
         setCurrentOrganizationId(profile.organization_id);
       }
-      
+
       // 6. Actualizar último login (si existe profile en public.users)
       if (profile?.id) {
         try {
           await supabase
             .from('users')
-            .update({ 
+            .update({
               last_login: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
@@ -275,7 +275,7 @@ const userService = {
           console.warn('⚠️ No se pudo actualizar la fecha de último acceso:', updateError);
         }
       }
-      
+
       // 7. Combinar datos de autenticación con perfil
       const userData = {
         ...authData.user,
@@ -305,7 +305,7 @@ const userService = {
         token: authData.session?.access_token || null,
         expiresAt: authData.session?.expires_at ? new Date(authData.session.expires_at * 1000) : null
       };
-      
+
       console.log('✅ Autenticación exitosa');
       return response;
 
@@ -315,7 +315,7 @@ const userService = {
         code: error.code,
         details: error.details
       });
-      
+
       return {
         success: false,
         user: null,
@@ -338,8 +338,14 @@ const userService = {
         try {
           const user = JSON.parse(storedUser);
           if (user && user.id) {
-            console.log('✅ Usuario actual obtenido desde localStorage');
-            return user;
+            // Validar si es un cliente y le faltan los datos de cliente (cache antigua)
+            if (user.client_id && !user.client) {
+              console.log('⚠️ Cache de usuario desactualizada (falta datos de cliente), recargando...');
+              // Continuar a carga desde Supabase
+            } else {
+              console.log('✅ Usuario actual obtenido desde localStorage');
+              return user;
+            }
           }
         } catch (e) {
           console.warn('⚠️ Error al parsear usuario desde localStorage:', e);
@@ -362,7 +368,7 @@ const userService = {
         `)
         .eq('id', authUser.id)
         .maybeSingle();
-      
+
       // Si hay un client_id, obtener los datos del cliente por separado
       if (!error && profile?.client_id) {
         const { data: clientData } = await supabase
@@ -370,7 +376,7 @@ const userService = {
           .select('*')
           .eq('id', profile.client_id)
           .maybeSingle();
-        
+
         if (clientData) {
           profile.clients = clientData;
         }
@@ -380,7 +386,7 @@ const userService = {
         console.warn('⚠️ Error al obtener perfil del usuario:', error);
         return null;
       }
-      
+
       if (!profile) {
         console.warn('⚠️ El usuario no existe en la tabla users. Por favor, contacta al administrador para crear tu perfil.');
         // Retornar un objeto básico para evitar errores, pero sin rol válido
@@ -405,7 +411,8 @@ const userService = {
         lastLogin: profile.last_login || null,
         organization: profile.organizations || null,
         organization_id: profile.organization_id || null,
-        client_id: profile.client_id || null
+        client_id: profile.client_id || null,
+        client: profile.clients || null
       };
 
       // Guardar en localStorage para próximas consultas
@@ -427,7 +434,7 @@ const userService = {
   async getUsers() {
     try {
       console.log('🔄 Obteniendo usuarios desde Supabase...');
-      
+
       const currentUser = await this.getCurrentUser();
       if (!currentUser) {
         return [];
@@ -461,7 +468,7 @@ const userService = {
           .select('*, organizations(*)')
           .eq('organization_id', orgId)
           .order('created_at', { ascending: false });
-        
+
         if (error) {
           console.warn('⚠️ Error al obtener usuarios desde Supabase:', error.message);
           return [];
@@ -476,7 +483,7 @@ const userService = {
       }
 
       return [];
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al obtener usuarios:', error);
       return [];
@@ -506,21 +513,21 @@ const userService = {
   async getUserById(id) {
     try {
       console.log('🔄 Obteniendo usuario por ID desde Supabase...');
-      
+
       const { data: user, error } = await supabase
         .from('users')
         .select('*, organizations(*)')
         .eq('id', id)
         .maybeSingle();
-      
+
       if (error || !user) {
         console.error('❌ Usuario no encontrado en Supabase');
         return null;
       }
-      
+
       console.log('✅ Usuario obtenido desde Supabase:', user.username);
       return this.transformUser(user);
-      
+
     } catch (error) {
       console.error('❌ Error inesperado al obtener usuario:', error);
       return null;
@@ -548,23 +555,23 @@ const userService = {
   async logout() {
     try {
       console.log('🔄 Cerrando sesión...');
-      
+
       // Cerrar sesión en Supabase
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
         console.warn('⚠️ Error al cerrar sesión en Supabase:', error.message);
       }
-      
+
       // Limpiar datos locales
       clearCurrentOrganizationId();
       localStorage.removeItem('authToken');
       localStorage.removeItem('usuarioAutenticado');
       localStorage.removeItem('currentUser');
-      
+
       console.log('✅ Sesión cerrada correctamente');
       return { success: true, message: 'Sesión cerrada correctamente' };
-      
+
     } catch (error) {
       console.error('❌ Error al cerrar sesión:', error);
       return { success: false, message: 'Error al cerrar sesión' };

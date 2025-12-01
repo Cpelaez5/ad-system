@@ -11,9 +11,9 @@ try {
     const hash = window.location.hash || ''
     const hasHashAccessToken = !!hash && /access_token=/.test(hash)
     const searchParams = new URLSearchParams(search.replace(/^\?/, ''))
-  // Considerar también el parámetro `code` que algunos callbacks OAuth/PKCE usan
-  const hasQueryToken = !!(searchParams.get('token') || searchParams.get('access_token') || searchParams.get('code') || searchParams.get('type') === 'recovery')
-    if ((hasHashAccessToken || hasQueryToken) && pathname !== '/login') {
+    // Considerar también el parámetro `code` que algunos callbacks OAuth/PKCE usan
+    const hasQueryToken = !!(searchParams.get('token') || searchParams.get('access_token') || searchParams.get('code') || searchParams.get('type') === 'recovery')
+    if ((hasHashAccessToken || hasQueryToken) && pathname !== '/login' && pathname !== '/signup') {
       console.log('🔁 Detectado token de auth/recovery en la URL — redirigiendo a /login y preservando query+hash')
       console.log('   original href=', window.location.href)
       console.log('   original search=', search)

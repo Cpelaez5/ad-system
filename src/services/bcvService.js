@@ -7,6 +7,40 @@ class BCVService {
     this.isProduction = import.meta.env.PROD; // Detectar si estamos en producción
   }
 
+  // Helper para realizar peticiones a través de proxies (evitar CORS)
+  async fetchWithProxy(endpoint) {
+    const targetURL = `${this.baseURL}${endpoint}`;
+    const proxies = [
+      // Opción 1: AllOrigins
+      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      // Opción 2: CORS Proxy IO (Fallback)
+      (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`
+    ];
+
+    let lastError = null;
+
+    for (const proxyGen of proxies) {
+      try {
+        const proxyURL = proxyGen(targetURL);
+
+        const response = await fetch(proxyURL, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          cache: 'no-cache'
+        });
+
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (error) {
+        console.warn(`⚠️ Proxy falló, intentando siguiente...`);
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('No se pudo conectar con el servicio del BCV a través de ningún proxy');
+  }
+
   // Obtener la tasa de cambio actual del BCV
   async getCurrentRate() {
     try {
@@ -17,47 +51,28 @@ class BCVService {
         return cached;
       }
 
-      // Intentar obtener tasa real usando proxy público
-      console.log('🌐 Obteniendo tasa del BCV usando proxy público...');
+      console.log('🌐 Obteniendo tasa del BCV...');
+      const rawData = await this.fetchWithProxy('/rates/');
 
-      try {
-        // Usar un proxy público para evitar CORS
-        const proxyURL = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(`${this.baseURL}/rates/`);
-        const response = await fetch(proxyURL, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          cache: 'no-cache'
-        });
+      console.log('💰 Datos recibidos del BCV:', rawData);
 
-        if (!response.ok) {
-          throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const rawData = await response.json();
-        console.log('💰 Datos recibidos del BCV:', rawData);
-
-        if (!rawData || typeof rawData.dollar !== 'number') {
-          throw new Error('Respuesta inválida del BCV: estructura de datos incorrecta');
-        }
-
-        const result = {
-          success: true,
-          data: {
-            dollar: rawData.dollar,
-            date: rawData.date,
-            source: 'BCV',
-            timestamp: new Date().toISOString()
-          }
-        };
-
-        this.setCachedRate(result.data);
-        console.log('✅ Tasa del BCV obtenida exitosamente:', result);
-        return result;
-
-      } catch (proxyError) {
-        console.error('❌ Proxy falló:', proxyError);
-        return { success: false, error: 'No se pudo obtener la tasa del BCV' };
+      if (!rawData || typeof rawData.dollar !== 'number') {
+        throw new Error('Respuesta inválida del BCV: estructura de datos incorrecta');
       }
+
+      const result = {
+        success: true,
+        data: {
+          dollar: rawData.dollar,
+          date: rawData.date,
+          source: 'BCV',
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      this.setCachedRate(result.data);
+      console.log('✅ Tasa del BCV obtenida exitosamente:', result);
+      return result;
 
     } catch (error) {
       console.error('❌ Error al obtener tasa del BCV:', error);
@@ -68,20 +83,19 @@ class BCVService {
   // Obtener tasa para una fecha específica
   async getRateForDate(date) {
     try {
-      const response = await fetch(`${this.baseURL}/rates/${date}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-        mode: 'cors',
-        cache: 'no-cache'
-      });
+      console.log(`🌐 Buscando tasa histórica para ${date}...`);
+      const rawData = await this.fetchWithProxy(`/rates/${date}`);
 
-      if (!response.ok) {
-        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+      console.log(`💰 Datos históricos recibidos:`, rawData);
+
+      if (!rawData || typeof rawData.dollar !== 'number') {
+        console.warn(`⚠️ Respuesta inválida para ${date}:`, rawData);
+        return {
+          success: false,
+          error: 'No hay tasa disponible para esta fecha',
+          data: null
+        };
       }
-
-      const rawData = await response.json();
 
       return {
         success: true,
@@ -93,7 +107,7 @@ class BCVService {
         }
       };
     } catch (error) {
-      console.error(`Error al obtener tasa del BCV para ${date}:`, error);
+      console.error(`❌ Error al obtener tasa del BCV para ${date}:`, error);
       return {
         success: false,
         error: error.message,

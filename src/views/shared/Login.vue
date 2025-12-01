@@ -426,7 +426,7 @@ export default {
 
 <style scoped>
 .login-container {
-  background: linear-gradient(135deg, #ebebeb 0%, #949494 100%);
+  background-color: var(--color-background);
   min-height: 100vh;
   display: flex;
   align-items: center;

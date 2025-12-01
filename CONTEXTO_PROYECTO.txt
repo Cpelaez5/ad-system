@@ -1025,3 +1025,150 @@ EMPRESA ADMINISTRADORA/CONTADORA (organizations)
       ├── FACTURAS (invoices con client_id)
       └── DOCUMENTOS (documents con client_id)
 
+SISTEMA DE INVITACIONES Y REGISTRO POR ROLES
+=============================================
+
+IMPLEMENTADO: Noviembre 2025
+
+ARQUITECTURA:
+=============
+
+1. TABLA DE INVITACIONES (invitations):
+   - id: UUID PRIMARY KEY
+   - email: TEXT NOT NULL
+   - token: UUID UNIQUE NOT NULL (generado automáticamente)
+   - role: TEXT CHECK (role IN ('admin', 'contador', 'cliente'))
+   - organization_id: UUID REFERENCES organizations(id)
+   - client_id: UUID REFERENCES clients(id) -- Solo para rol 'cliente'
+   - status: TEXT DEFAULT 'pending' ('pending', 'accepted', 'expired')
+   - expires_at: TIMESTAMP DEFAULT (NOW() + INTERVAL '7 days')
+   - created_by: UUID REFERENCES auth.users(id)
+
+2. POLÍTICAS RLS:
+   - Lectura pública por token (para validar invitación al registrarse)
+   - Admins/Contadores pueden gestionar invitaciones de su organización
+   - Clientes pueden actualizar sus propios datos de empresa al registrarse
+
+3. COMPONENTES FRONTEND:
+   src/views/auth/
+   ├── Register.vue              # Dispatcher principal (valida token)
+   └── register/
+       ├── RegisterFirm.vue      # Registro de nueva organización (sin token)
+       ├── RegisterClient.vue    # Registro de cliente invitado (con token)
+       └── RegisterAccountant.vue # Registro de contador invitado (con token)
+
+FLUJO DE REGISTRO:
+==================
+
+1. REGISTRO DE NUEVA FIRMA (Sin invitación):
+   - URL: /signup (sin parámetro token)
+   - Componente: RegisterFirm.vue
+   - Datos requeridos: Nombre, Apellido, Email, Nombre de Firma, Contraseña
+   - Resultado: Crea organización + usuario admin
+
+2. REGISTRO DE CLIENTE INVITADO:
+   - URL: /signup?token=UUID
+   - Componente: RegisterClient.vue
+   - Datos requeridos:
+     * Usuario: Nombre, Apellido, Contraseña
+     * Empresa: Razón Social, RIF, Dirección, Teléfono
+   - Resultado: Crea usuario cliente + actualiza datos de empresa cliente
+   - IMPORTANTE: Incluye campos de empresa (RIF, Dirección) que resuelven el problema
+     de validación en ClientInvoiceForm.vue
+
+3. REGISTRO DE CONTADOR INVITADO:
+   - URL: /signup?token=UUID
+   - Componente: RegisterAccountant.vue
+   - Datos requeridos: Nombre, Apellido, Contraseña
+   - Resultado: Crea usuario contador vinculado a organización
+
+LÓGICA DE DISPATCHER (Register.vue):
+=====================================
+
+1. Detecta presencia de token en query params
+2. Si NO hay token → Muestra RegisterFirm.vue
+3. Si HAY token:
+   a. Consulta tabla invitations con .maybeSingle()
+   b. Valida status = 'pending' y expires_at > NOW()
+   c. Según role de la invitación:
+      - 'cliente' → Muestra RegisterClient.vue
+      - 'contador' → Muestra RegisterAccountant.vue
+      - 'admin' → Muestra RegisterAccountant.vue
+   d. Pasa datos de invitación como prop
+
+CORRECCIONES IMPLEMENTADAS:
+============================
+
+1. MAIN.JS:
+   - Modificado para NO redirigir /signup?token=... a /login
+   - Excepción agregada: pathname !== '/signup'
+
+2. REGISTER.VUE:
+   - Query cambiada de .single() a .maybeSingle() para evitar error 406
+   - Join con organizations separado en consulta opcional
+   - Manejo robusto de errores de RLS
+
+3. REGISTERCLIENT.VUE:
+   - Carga opcional de datos previos de empresa (si existen)
+   - Actualización de tabla clients después del registro
+   - Campos completos: company_name, rif, address, phone
+   - Soluciona error "Por favor complete la información del emisor y cliente"
+
+4. LOGIN.VUE:
+   - Fondo degradado eliminado, usa var(--color-background)
+   - Alineado con paleta de colores del sistema
+
+ARCHIVOS SQL:
+=============
+
+1. INVITATION_SYSTEM.sql:
+   - Schema completo de tabla invitations
+   - Políticas RLS para invitaciones
+   - Política para que clientes actualicen sus propios datos
+   - Política para que usuarios actualicen su propio perfil
+
+2. TEST_INVITATION.sql:
+   - Organización demo: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
+   - Cliente demo: b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22
+   - Invitación demo con token: 12345678-1234-1234-1234-123456789012
+
+DESPLIEGUE EN NETLIFY:
+=======================
+
+El sistema de invitaciones funciona perfectamente en producción (Netlify):
+
+1. VARIABLES DE ENTORNO:
+   - VITE_SUPABASE_URL
+   - VITE_SUPABASE_ANON_KEY
+   - VITE_DEEPSEEK_API_KEY (opcional)
+
+2. LINKS DE INVITACIÓN:
+   - Formato: https://ad-businessgroup.netlify.app/signup?token=UUID
+   - Funcionan igual que en desarrollo local
+   - Token se pasa por query params (independiente del dominio)
+
+3. CONFIGURACIÓN BUILD:
+   - Build command: npm run build
+   - Publish directory: dist
+
+SOLUCIÓN AL PROBLEMA DE FACTURACIÓN:
+=====================================
+
+El error "Por favor complete la información del emisor y cliente" en ClientInvoiceForm.vue
+se resuelve porque RegisterClient.vue ahora solicita y guarda:
+- RIF de la empresa cliente
+- Dirección fiscal completa
+- Teléfono de contacto
+- Razón social
+
+Estos datos se guardan en la tabla clients y están disponibles cuando el cliente
+intenta crear una factura de venta (donde es el emisor).
+
+PRÓXIMOS PASOS SUGERIDOS:
+==========================
+
+1. Crear interfaz de administración para generar invitaciones
+2. Implementar envío de emails con links de invitación
+3. Agregar dashboard de invitaciones pendientes/aceptadas
+4. Implementar expiración automática de invitaciones (pg_cron o Edge Function)
+5. Agregar validación de email único al crear invitación

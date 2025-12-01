@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 // Vistas compartidas (accesibles por todos los usuarios autenticados)
 import Dashboard from '@/views/shared/Dashboard.vue'
 import Login from '@/views/shared/Login.vue'
-const SingUp = () => import('@/views/shared/SingUp.vue')
+const Register = () => import('@/views/auth/Register.vue')
 const OCRDemo = () => import('@/views/shared/OCRDemo.vue')
 
 // Vistas para cliente
@@ -13,6 +13,7 @@ const ClienteCompras = () => import('../views/cliente/Compras.vue')
 const ClienteGastos = () => import('../views/cliente/Gastos.vue')
 const ClienteVentas = () => import('../views/cliente/Ventas.vue')
 const ClienteArchivo = () => import('../views/cliente/Archivo.vue')
+const ClienteFacturacion = () => import('../views/cliente/Facturacion.vue')
 
 // Vistas para contador y admin
 const ContadorArea = () => import('../views/contador/ContadorArea.vue')
@@ -75,8 +76,8 @@ const routes = [
   },
   {
     path: '/signup',
-    name: 'SingUp',
-    component: SingUp,
+    name: 'Register',
+    component: Register,
     meta: { requiresAuth: false }
   },
   {
@@ -98,22 +99,25 @@ const routes = [
     meta: { requiresAuth: true, title: 'Dashboard', roles: ['cliente'] }
   },
   {
+    path: '/cliente/facturacion',
+    name: 'ClienteFacturacion',
+    component: ClienteFacturacion,
+    meta: { requiresAuth: true, title: 'Facturación', roles: ['cliente'] }
+  },
+  {
     path: '/cliente/compras',
     name: 'ClienteCompras',
-    component: ClienteCompras,
-    meta: { requiresAuth: true, title: 'Mis Compras', roles: ['cliente'] }
+    redirect: to => { return { path: '/cliente/facturacion', query: { tab: 'compras' } } }
   },
   {
     path: '/cliente/gastos',
     name: 'ClienteGastos',
-    component: ClienteGastos,
-    meta: { requiresAuth: true, title: 'Mis Gastos', roles: ['cliente'] }
+    redirect: to => { return { path: '/cliente/facturacion', query: { tab: 'gastos' } } }
   },
   {
     path: '/cliente/ventas',
     name: 'ClienteVentas',
-    component: ClienteVentas,
-    meta: { requiresAuth: true, title: 'Mis Ventas', roles: ['cliente'] }
+    redirect: to => { return { path: '/cliente/facturacion', query: { tab: 'ventas' } } }
   },
   {
     path: '/cliente/archivo',

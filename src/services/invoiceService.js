@@ -262,7 +262,7 @@ class InvoiceService {
         items: invoiceData.items || [],
         attachments: invoiceData.attachments || [],
         notes: invoiceData.notes || null,
-        created_by: invoiceData.createdBy || organizationId
+        created_by: invoiceData.createdBy || userProfile?.id || null
       }
 
       console.log('📝 Datos a insertar:', invoiceRecord)
