@@ -7,7 +7,7 @@
       </v-card-title>
       
       <!-- Stepper para navegación por pasos -->
-      <v-stepper v-model="currentStep" class="elevation-0">
+      <v-stepper v-model="currentStep" flat class="elevation-0">
         <v-stepper-header>
           <v-stepper-item
             :complete="currentStep > 1"
@@ -44,140 +44,183 @@
           ></v-stepper-item>
         </v-stepper-header>
         
-        <v-stepper-window style="max-height: 500px; overflow-y: auto;">
+        <v-stepper-window style="max-height: calc(100vh - 320px); overflow-y: auto;">
           <!-- Paso 1: Información Básica -->
           <v-stepper-window-item :value="1">
-            <v-card-text style="padding: 24px;">
-              <!-- Sección de carga de archivo - Compacta -->
-              <div class="mb-4">
-                <FileUploadZone
-                  accept="application/pdf,image/jpeg,image/png,image/jpg"
-                  :max-size-m-b="10"
-                  :loading="extracting"
-                  loading-message="Analizando factura con IA..."
-                  @file-selected="handleFileSelect"
-                  @extract-data="handleExtractedData"
-                />
-                
-                <v-alert
-                  v-if="extractionResult"
-                  :type="extractionResult.success ? 'success' : 'error'"
-                  class="mt-2"
-                  density="compact"
-                  variant="tonal"
-                  closable
-                >
-                  {{ extractionResult.message }}
-                  <div v-if="extractionResult.success && extractionResult.data.confidence">
-                    <small>Confianza: {{ Math.round(extractionResult.data.confidence * 100) }}%</small>
-                  </div>
-                </v-alert>
-              </div>
+            <v-container fluid class="pa-6">
+              <!-- Aviso de verificación de datos OCR -->
+              <v-alert
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mb-4"
+                icon="mdi-information"
+              >
+                <strong>💡 Tip:</strong> Puedes escanear tu factura con IA, pero <strong>verifica siempre los datos</strong> ya que el escaneo puede no ser 100% exacto.
+              </v-alert>
+
+              <!-- Sección de carga de archivo - Colapsable -->
+              <v-expansion-panels class="mb-4">
+                <v-expansion-panel>
+                  <v-expansion-panel-title>
+                    <div class="d-flex align-center">
+                      <v-icon class="mr-2" color="primary">mdi-file-upload</v-icon>
+                      <span class="font-weight-medium">Escanear Factura con IA</span>
+                      <v-chip size="x-small" color="success" variant="tonal" class="ml-2">Opcional</v-chip>
+                    </div>
+                  </v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <FileUploadZone
+                      accept="application/pdf,image/jpeg,image/png,image/jpg"
+                      :max-size-m-b="10"
+                      :loading="extracting"
+                      loading-message="Analizando factura con IA..."
+                      @file-selected="handleFileSelect"
+                      @extract-data="handleExtractedData"
+                    />
+                    
+                    <v-alert
+                      v-if="extractionResult"
+                      :type="extractionResult.success ? 'success' : 'error'"
+                      class="mt-3"
+                      density="compact"
+                      variant="tonal"
+                      closable
+                    >
+                      {{ extractionResult.message }}
+                      <div v-if="extractionResult.success && extractionResult.data.confidence">
+                        <small>Confianza: {{ Math.round(extractionResult.data.confidence * 100) }}%</small>
+                      </div>
+                    </v-alert>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
+              </v-expansion-panels>
 
               <!-- Selector de Tipo de Flujo - Destacado -->
-              <v-card variant="outlined" class="mb-4" style="border: 2px solid #e0e0e0; border-radius: 12px;">
-                <v-card-text class="pa-4">
-                  <div class="d-flex align-center mb-3">
-                    <v-icon color="primary" size="24" class="mr-2">mdi-swap-horizontal-circle</v-icon>
-                    <span class="text-h6 font-weight-medium">Tipo de Factura</span>
-                    <v-chip size="small" color="primary" variant="tonal" class="ml-2">Requerido</v-chip>
-                  </div>
-                  
-                  <v-radio-group
-                    v-model="formData.flow"
-                    inline
-                    :rules="[v => !!v || 'Debe seleccionar el tipo de factura']"
-                    required
-                    hide-details="auto"
+              <!-- Selector de Tipo de Flujo -->
+              <v-sheet variant="outlined" class="mb-6 rounded-lg border-2 pa-4">
+                <div class="d-flex align-center mb-4">
+                  <v-icon color="primary" size="24" class="mr-2">mdi-swap-horizontal-circle</v-icon>
+                  <span class="text-h6 font-weight-medium">Tipo de Factura</span>
+                  <v-chip size="small" color="primary" variant="tonal" class="ml-2">Requerido</v-chip>
+                </div>
+                
+                <v-radio-group
+                  v-model="formData.flow"
+                  inline
+                  :rules="[v => !!v || 'Debe seleccionar el tipo de factura']"
+                  required
+                  hide-details="auto"
+                >
+                  <v-radio
+                    value="VENTA"
+                    color="success"
                   >
-                    <v-radio
-                      value="VENTA"
-                      color="success"
-                    >
-                      <template v-slot:label>
-                        <div class="d-flex align-center pa-3" style="border: 2px solid #4caf50; border-radius: 8px; min-width: 200px; background: #f1f8f4;">
-                          <v-icon color="success" size="32" class="mr-3">mdi-cash-plus</v-icon>
-                          <div>
-                            <div class="text-subtitle-1 font-weight-bold" style="color: #2e7d32;">Venta</div>
-                            <div class="text-caption" style="color: #558b5f;">Factura emitida a cliente</div>
-                          </div>
+                    <template v-slot:label>
+                      <div class="d-flex align-center pa-3 border-2 rounded-lg bg-green-lighten-5" style="min-width: 200px; border-color: #4caf50;">
+                        <v-icon color="success" size="32" class="mr-3">mdi-cash-plus</v-icon>
+                        <div>
+                          <div class="text-subtitle-1 font-weight-bold text-green-darken-3">Venta</div>
+                          <div class="text-caption text-green-darken-1">Factura emitida a cliente</div>
                         </div>
-                      </template>
-                    </v-radio>
-                    
-                    <v-radio
-                      value="COMPRA"
-                      color="primary"
-                      class="ml-4"
-                    >
-                      <template v-slot:label>
-                        <div class="d-flex align-center pa-3" style="border: 2px solid #2196f3; border-radius: 8px; min-width: 200px; background: #e3f2fd;">
-                          <v-icon color="primary" size="32" class="mr-3">mdi-cash-minus</v-icon>
-                          <div>
-                            <div class="text-subtitle-1 font-weight-bold" style="color: #1565c0;">Compra</div>
-                            <div class="text-caption" style="color: #1976d2;">Factura recibida de proveedor</div>
-                          </div>
+                      </div>
+                    </template>
+                  </v-radio>
+                  
+                  <v-radio
+                    value="COMPRA"
+                    color="primary"
+                    class="ml-4"
+                  >
+                    <template v-slot:label>
+                      <div class="d-flex align-center pa-3 border-2 rounded-lg bg-blue-lighten-5" style="min-width: 200px; border-color: #2196f3;">
+                        <v-icon color="primary" size="32" class="mr-3">mdi-cash-minus</v-icon>
+                        <div>
+                          <div class="text-subtitle-1 font-weight-bold text-blue-darken-3">Compra</div>
+                          <div class="text-caption text-blue-darken-1">Factura recibida de proveedor</div>
                         </div>
-                      </template>
-                    </v-radio>
-                  </v-radio-group>
-                </v-card-text>
-              </v-card>
+                      </div>
+                    </template>
+                  </v-radio>
+                </v-radio-group>
+              </v-sheet>
 
               <!-- Selector de Tipo de Egreso - Solo para COMPRA -->
-              <v-card 
+              <v-sheet 
                 v-if="formData.flow === 'COMPRA'" 
                 variant="outlined" 
-                class="mb-4" 
-                style="border: 2px solid #ff9800; border-radius: 12px;"
+                class="mb-6 rounded-lg border-2 pa-4"
+                style="border-color: #ff9800 !important;"
               >
-                <v-card-text class="pa-4">
-                  <div class="d-flex align-center mb-3">
-                    <v-icon color="orange" size="24" class="mr-2">mdi-tag-outline</v-icon>
-                    <span class="text-h6 font-weight-medium">Tipo de Egreso</span>
-                    <v-chip size="small" color="orange" variant="tonal" class="ml-2">Requerido</v-chip>
-                  </div>
-                  
-                  <v-radio-group
-                    v-model="formData.expense_type"
-                    inline
-                    :rules="[v => !!v || 'Debe seleccionar el tipo de egreso']"
-                    required
-                    hide-details="auto"
+                <div class="d-flex align-center mb-4">
+                  <v-icon color="orange" size="24" class="mr-2">mdi-tag-outline</v-icon>
+                  <span class="text-h6 font-weight-medium">Tipo de Egreso</span>
+                  <v-chip size="small" color="orange" variant="tonal" class="ml-2">Requerido</v-chip>
+                </div>
+                
+                <v-radio-group
+                  v-model="formData.expense_type"
+                  inline
+                  :rules="[v => !!v || 'Debe seleccionar el tipo de egreso']"
+                  required
+                  hide-details="auto"
+                >
+                  <v-radio
+                    value="COMPRA"
+                    color="info"
                   >
-                    <v-radio
-                      value="COMPRA"
-                      color="info"
-                    >
-                      <template v-slot:label>
-                        <div class="d-flex align-center pa-3" style="border: 2px solid #2196f3; border-radius: 8px; min-width: 220px; background: #e3f2fd;">
-                          <v-icon color="info" size="28" class="mr-3">mdi-cart</v-icon>
-                          <div>
-                            <div class="text-subtitle-1 font-weight-bold" style="color: #1565c0;">Compra</div>
-                            <div class="text-caption" style="color: #1976d2;">Mercancía, productos, servicios</div>
-                          </div>
+                    <template v-slot:label>
+                      <div class="d-flex align-center pa-3 border-2 rounded-lg bg-blue-lighten-5" style="min-width: 220px; border-color: #2196f3;">
+                        <v-icon color="info" size="28" class="mr-3">mdi-cart</v-icon>
+                        <div>
+                          <div class="text-subtitle-1 font-weight-bold text-blue-darken-3">Compra</div>
+                          <div class="text-caption text-blue-darken-1">Mercancía, productos, servicios</div>
                         </div>
-                      </template>
-                    </v-radio>
-                    
-                    <v-radio
-                      value="GASTO"
-                      color="warning"
-                      class="ml-4"
-                    >
-                      <template v-slot:label>
-                        <div class="d-flex align-center pa-3" style="border: 2px solid #ff9800; border-radius: 8px; min-width: 220px; background: #fff3e0;">
-                          <v-icon color="warning" size="28" class="mr-3">mdi-receipt</v-icon>
-                          <div>
-                            <div class="text-subtitle-1 font-weight-bold" style="color: #e65100;">Gasto</div>
-                            <div class="text-caption" style="color: #f57c00;">Servicios recurrentes (luz, agua, etc.)</div>
-                          </div>
+                      </div>
+                    </template>
+                  </v-radio>
+                  
+                  <v-radio
+                    value="GASTO"
+                    color="warning"
+                    class="ml-4"
+                  >
+                    <template v-slot:label>
+                      <div class="d-flex align-center pa-3 border-2 rounded-lg bg-orange-lighten-5" style="min-width: 220px; border-color: #ff9800;">
+                        <v-icon color="warning" size="28" class="mr-3">mdi-receipt</v-icon>
+                        <div>
+                          <div class="text-subtitle-1 font-weight-bold text-orange-darken-4">Gasto</div>
+                          <div class="text-caption text-orange-darken-3">Servicios recurrentes (luz, agua, etc.)</div>
                         </div>
-                      </template>
-                    </v-radio>
-                  </v-radio-group>
-                </v-card-text>
-              </v-card>
+                      </div>
+                    </template>
+                  </v-radio>
+                </v-radio-group>
+              </v-sheet>
+
+              <!-- Estado de la Factura -->
+              <v-select
+                v-model="formData.status"
+                :items="invoiceStatuses"
+                label="Estado de la Factura"
+                variant="outlined"
+                class="mb-6"
+                prepend-inner-icon="mdi-list-status"
+                hide-details="auto"
+              >
+                <template v-slot:selection="{ item }">
+                  <v-chip :color="getStatusColor(item.raw)" size="small" class="font-weight-bold">
+                    {{ item.raw }}
+                  </v-chip>
+                </template>
+                <template v-slot:item="{ props, item }">
+                  <v-list-item v-bind="props">
+                    <template v-slot:prepend>
+                      <v-icon :color="getStatusColor(item.raw)" size="small">mdi-circle</v-icon>
+                    </template>
+                  </v-list-item>
+                </template>
+              </v-select>
 
               <!-- Información básica de la factura -->
               <v-row>
@@ -244,12 +287,12 @@
                   ></v-text-field>
                 </v-col>
               </v-row>
-            </v-card-text>
+            </v-container>
           </v-stepper-window-item>
 
           <!-- Paso 2: Emisor y Cliente -->
           <v-stepper-window-item :value="2">
-            <v-card-text style="padding: 24px;">
+            <v-container fluid class="pa-6">
               <!-- Selector de Cliente -->
               <v-card variant="outlined" class="mb-4">
                 <v-card-title>
@@ -453,12 +496,12 @@
                   </v-row>
                 </v-card-text>
               </v-card>
-            </v-card-text>
+            </v-container>
           </v-stepper-window-item>
 
           <!-- Paso 3: Detalles Financieros -->
           <v-stepper-window-item :value="3">
-            <v-card-text style="padding: 24px;">
+            <v-container fluid class="pa-6">
               <v-row>
                 <v-col cols="12" md="6">
                   <v-text-field
@@ -552,12 +595,12 @@
                   ></v-text-field>
                 </v-col>
               </v-row>
-            </v-card-text>
+            </v-container>
           </v-stepper-window-item>
 
           <!-- Paso 4: Items y Notas -->
           <v-stepper-window-item :value="4">
-            <v-card-text style="padding: 24px;">
+            <v-container fluid class="pa-6">
               <!-- Items de la factura - Opcional -->
               <v-card variant="outlined" class="mb-4 items-card">
                 <v-card-text class="pa-3">
@@ -690,13 +733,13 @@
                   ></v-textarea>
                 </v-card-text>
               </v-card>
-            </v-card-text>
+            </v-container>
           </v-stepper-window-item>
         </v-stepper-window>
       </v-stepper>
       
       <!-- Botones de navegación -->
-      <v-card-actions class="pa-4" style="background: #fafafa; border-top: 1px solid #e0e0e0;">
+      <v-card-actions class="pa-6 bg-grey-lighten-4 border-t">
         <v-btn
           v-if="currentStep > 1"
           color="grey-darken-1"
@@ -823,6 +866,7 @@ export default {
         invoiceNumber: '',
         controlNumber: '',
         documentType: 'FACTURA',
+        documentCategory: 'FACTURA', // FACTURA (fiscal) or RECIBO (delivery note)
         flow: 'VENTA', // Tipo de flujo: VENTA o COMPRA
         expense_type: 'COMPRA', // Tipo de egreso: COMPRA o GASTO (solo para flow=COMPRA)
         issueDate: new Date().toISOString().split('T')[0],
@@ -1115,17 +1159,44 @@ export default {
         // Mapear datos extraídos al formulario
         this.mapExtractedDataToForm(data);
         
-        this.showSnackbar('Datos extraídos exitosamente', 'success');
+        this.showSnackbar('Datos extraídos correctamente. Por favor verifique la información.', 'success');
         
       } catch (error) {
-        console.error('❌ Error al extraer datos:', error);
+        console.error('❌ Error en extracción:', error);
         this.extractionResult = {
           success: false,
-          message: `Error: ${error.message}`
+          message: 'Error al procesar el archivo: ' + error.message
         };
-        this.showSnackbar('Error al procesar el archivo. Intente nuevamente.', 'error');
+        this.showSnackbar('Error al procesar el archivo', 'error');
       } finally {
         this.extracting = false;
+      }
+    },
+
+    async fetchExchangeRate(date) {
+      if (!date) return;
+      
+      try {
+        console.log(`💱 Buscando tasa de cambio para: ${date}`);
+        const result = await bcvService.getRateForDate(date);
+        
+        if (result && result.success && result.data && result.data.dollar) {
+          this.formData.financial.exchangeRate = result.data.dollar;
+          this.showSnackbar(`Tasa actualizada: ${result.data.dollar.toFixed(4)} VES/USD`, 'success');
+        } else {
+          console.warn('⚠️ No se encontró tasa para la fecha, usando actual...');
+          // Fallback a tasa actual si falla la histórica
+          const currentRate = await bcvService.getCurrentRate();
+          if (currentRate && currentRate.success && currentRate.data && currentRate.data.dollar) {
+            this.formData.financial.exchangeRate = currentRate.data.dollar;
+            this.showSnackbar(`Usando tasa actual: ${currentRate.data.dollar.toFixed(4)} VES/USD`, 'info');
+          } else {
+             this.showSnackbar('No se pudo obtener la tasa de cambio. Ingrese manualmente.', 'warning');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error al obtener tasa de cambio:', error);
+        this.showSnackbar('Error al obtener tasa. Ingrese manualmente.', 'warning');
       }
     },
 

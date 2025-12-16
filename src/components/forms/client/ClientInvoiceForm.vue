@@ -239,6 +239,31 @@
                   ></v-select>
                 </v-col>
                 <v-col cols="12" md="4">
+                  <v-select
+                    v-model="formData.documentCategory"
+                    :items="documentCategories"
+                    label="Categoría de Documento"
+                    :rules="[v => !!v || 'La categoría es requerida']"
+                    required
+                    variant="outlined"
+                    class="animated-field"
+                    prepend-inner-icon="mdi-file-certificate-outline"
+                  >
+                    <template v-slot:item="{ props, item }">
+                      <v-list-item v-bind="props">
+                        <template v-slot:prepend>
+                          <v-icon :color="item.raw === 'FACTURA' ? 'success' : 'info'">
+                            {{ item.raw === 'FACTURA' ? 'mdi-file-document-check' : 'mdi-file-document-outline' }}
+                          </v-icon>
+                        </template>
+                        <template v-slot:subtitle>
+                          {{ item.raw === 'FACTURA' ? 'Factura fiscal (incluida en libros SENIAT)' : 'Nota de entrega (no fiscal)' }}
+                        </template>
+                      </v-list-item>
+                    </template>
+                  </v-select>
+                </v-col>
+                <v-col cols="12" md="4">
                   <v-text-field
                     v-model="formData.issueDate"
                     label="Fecha de Emisión"
@@ -812,6 +837,7 @@ export default {
         invoiceNumber: '',
         controlNumber: '',
         documentType: 'FACTURA',
+        documentCategory: 'FACTURA', // FACTURA (fiscal) or RECIBO (delivery note)
         flow: 'VENTA',
         expense_type: 'COMPRA',
         issueDate: new Date().toISOString().split('T')[0],
@@ -870,6 +896,11 @@ export default {
         'NOTA DE DÉBITO',
         'RECIBO',
         'COMPROBANTE'
+      ],
+      
+      documentCategories: [
+        'FACTURA',
+        'RECIBO'
       ],
       
       taxpayerTypes: [

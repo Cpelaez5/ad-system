@@ -1,4 +1,5 @@
 // Servicio para exportación de datos a Excel y CSV
+import * as XLSX from 'xlsx';
 
 class ExportService {
   constructor() {
@@ -9,31 +10,303 @@ class ExportService {
   formatDateForExport(date) {
     if (!date) return '';
     const d = new Date(date);
-    return d.toLocaleDateString('es-ES');
+    return d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
-  // Formatear moneda para exportación
+  // Formatear moneda para exportación (solo número, sin símbolo)
   formatCurrencyForExport(amount, currency = 'VES') {
-    if (!amount) return '0,00';
-    
-    if (currency === 'USD') {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2
-      }).format(amount);
-    }
-    
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'VES',
-      minimumFractionDigits: 2
-    }).format(amount);
+    if (!amount && amount !== 0) return 0;
+    return Number(amount).toFixed(2);
   }
 
-  // Exportar factura individual a CSV
-  exportInvoiceToCSV(invoice) {
-    const csvData = [
+  // Obtener período del mes actual
+  getPeriod() {
+    const now = new Date();
+    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return `${months[now.getMonth()]}-${now.getFullYear().toString().slice(-2)}`;
+  }
+
+  // Exportar Libro de Compras (formato SENIAT)
+  exportLibroCompras(invoices, userRif = '') {
+    const ws = XLSX.utils.aoa_to_sheet([]);
+
+    // Encabezado
+    XLSX.utils.sheet_add_aoa(ws, [
+      ['Libro de Compras'],
+      [`Según Artículo 75, del Reglamento de la Ley del IVA (G.O 5.363 de 12 de Julio de 1999)`],
+      [`RAZÓN SOCIAL O NOMBRE DE MATERIAL ELÉCTRICO Y HERRAMIENTAS RML`],
+      [''],
+      [`Período`, this.getPeriod(), '', '', '', '', '', '', '', '', '', '', '', 'R.I.F.', userRif],
+      ['PERIODO ACTUAL'],
+      ['']
+    ], { origin: 'A1' });
+
+    // Headers de columnas
+    const headers = [
+      'Fecha',
+      'Tipo',
+      'Número Documento',
+      'Nombre / Apellido o Razón Social',
+      'RIF',
+      'Total Compras más IVA',
+      'Monto Exento o Exonerado',
+      'Base Imponible',
+      '(%)',
+      'Crédito Fiscal',
+      '(%)',
+      'Crédito Fiscal'
+    ];
+
+    XLSX.utils.sheet_add_aoa(ws, [headers], { origin: 'A8' });
+
+    // Datos de facturas
+    let currentRow = 9;
+    let totals = {
+      totalCompras: 0,
+      montoExento: 0,
+      baseImponible: 0,
+      creditoFiscal: 0
+    };
+
+    invoices.forEach(inv => {
+      const totalCompras = inv.financial?.totalSales || 0;
+      const montoExento = inv.financial?.nonTaxableSales || 0;
+      const baseImponible = inv.financial?.taxableSales || 0;
+      const creditoFiscal = inv.financial?.taxDebit || 0;
+      const alicuota = baseImponible > 0 ? ((creditoFiscal / baseImponible) * 100).toFixed(0) : 0;
+
+      const row = [
+        this.formatDateForExport(inv.issueDate),
+        inv.documentType || 'FAC',
+        inv.invoiceNumber || '',
+        inv.issuer?.companyName || '',
+        inv.issuer?.rif || '',
+        Number(totalCompras).toFixed(2),
+        Number(montoExento).toFixed(2),
+        Number(baseImponible).toFixed(2),
+        alicuota,
+        Number(creditoFiscal).toFixed(2),
+        '', // % retención
+        '' // Crédito fiscal retenido
+      ];
+
+      XLSX.utils.sheet_add_aoa(ws, [row], { origin: `A${currentRow}` });
+
+      totals.totalCompras += totalCompras;
+      totals.montoExento += montoExento;
+      totals.baseImponible += baseImponible;
+      totals.creditoFiscal += creditoFiscal;
+
+      currentRow++;
+    });
+
+    // Fila de totales
+    XLSX.utils.sheet_add_aoa(ws, [
+      [
+        'Total',
+        '',
+        '',
+        '',
+        '',
+        Number(totals.totalCompras).toFixed(2),
+        Number(totals.montoExento).toFixed(2),
+        Number(totals.baseImponible).toFixed(2),
+        '',
+        Number(totals.creditoFiscal).toFixed(2),
+        '',
+        ''
+      ]
+    ], { origin: `A${currentRow}` });
+
+    currentRow += 2;
+
+    // Sección de resumen
+    XLSX.utils.sheet_add_aoa(ws, [
+      ['', 'Totales', '', 'Base Imponible', '', 'Crédito Fiscal', '', 'Retención de IVA'],
+      ['Compras no gravadas y/o sin derecho a crédito fiscal', '', '', '0.00', '', '', '', ''],
+      ['Compras importación gravadas solo alícuota general', '', '', '', '', '', '', ''],
+      ['Importaciones gravadas por alícuota general más alícuota adicional', '', '', '', '', '', '', ''],
+      ['Importaciones gravadas por alícuota reducida', '', '', '', '', '', '', ''],
+      ['Compras internas gravadas por alícuota general', '', '', '-', '', '-', '', ''],
+      ['Compras internas gravadas por alícuota general más alícuota adicional', '', '', '', '', '', '', ''],
+      ['Compras internas gravadas por alícuota reducida', '', '', '', '', '', '', ''],
+      ['Total compras y créditos fiscales del período', '', '', '-', '', '-', '', '']
+    ], { origin: `A${currentRow}` });
+
+    // Ajustar anchos de columna
+    ws['!cols'] = [
+      { wch: 12 }, // Fecha
+      { wch: 6 },  // Tipo
+      { wch: 15 }, // Número
+      { wch: 35 }, // Nombre
+      { wch: 12 }, // RIF
+      { wch: 18 }, // Total Compras
+      { wch: 18 }, // Monto Exento
+      { wch: 15 }, // Base Imponible
+      { wch: 6 },  // %
+      { wch: 15 }, // Crédito Fiscal
+      { wch: 6 },  // %
+      { wch: 15 }  // Crédito Fiscal
+    ];
+
+    return ws;
+  }
+
+  // Exportar Libro de Ventas (formato SENIAT)
+  exportLibroVentas(invoices, userRif = '') {
+    const ws = XLSX.utils.aoa_to_sheet([]);
+
+    // Encabezado
+    XLSX.utils.sheet_add_aoa(ws, [
+      ['Libro de Ventas'],
+      [`Según Artículo 75, del Reglamento de la Ley del IVA (G.O 5.363 de 12 de Julio de 1999)`],
+      [`RAZÓN SOCIAL O NOMBRE DE MATERIAL ELÉCTRICO Y HERRAMIENTAS RML`],
+      [''],
+      [`Período`, this.getPeriod(), '', '', '', '', '', '', '', '', '', '', '', 'R.I.F.', userRif],
+      ['PERIODO ACTUAL'],
+      ['']
+    ], { origin: 'A1' });
+
+    // Headers de columnas
+    const headers = [
+      'Fecha',
+      'Tipo',
+      'Número Documento',
+      'Nombre / Apellido o Razón Social',
+      'RIF',
+      'Total Ventas más IVA',
+      'Ventas Exentas o Exoneradas',
+      'Base Imponible',
+      '(%)',
+      'Débito Fiscal',
+      'IVA Retenido',
+      'N° Comprobante'
+    ];
+
+    XLSX.utils.sheet_add_aoa(ws, [headers], { origin: 'A8' });
+
+    // Datos de facturas
+    let currentRow = 9;
+    let totals = {
+      totalVentas: 0,
+      ventasExentas: 0,
+      baseImponible: 0,
+      debitoFiscal: 0,
+      ivaRetenido: 0
+    };
+
+    invoices.forEach(inv => {
+      const totalVentas = inv.financial?.totalSales || 0;
+      const ventasExentas = inv.financial?.nonTaxableSales || 0;
+      const baseImponible = inv.financial?.taxableSales || 0;
+      const debitoFiscal = inv.financial?.taxDebit || 0;
+      const ivaRetenido = inv.financial?.ivaRetention || 0;
+      const alicuota = baseImponible > 0 ? ((debitoFiscal / baseImponible) * 100).toFixed(0) : 0;
+
+      const row = [
+        this.formatDateForExport(inv.issueDate),
+        inv.documentType || 'FAC',
+        inv.invoiceNumber || '',
+        inv.client?.companyName || '',
+        inv.client?.rif || '',
+        Number(totalVentas).toFixed(2),
+        Number(ventasExentas).toFixed(2),
+        Number(baseImponible).toFixed(2),
+        alicuota,
+        Number(debitoFiscal).toFixed(2),
+        Number(ivaRetenido).toFixed(2),
+        inv.controlNumber || ''
+      ];
+
+      XLSX.utils.sheet_add_aoa(ws, [row], { origin: `A${currentRow}` });
+
+      totals.totalVentas += totalVentas;
+      totals.ventasExentas += ventasExentas;
+      totals.baseImponible += baseImponible;
+      totals.debitoFiscal += debitoFiscal;
+      totals.ivaRetenido += ivaRetenido;
+
+      currentRow++;
+    });
+
+    // Fila de totales
+    XLSX.utils.sheet_add_aoa(ws, [
+      [
+        'Total',
+        '',
+        '',
+        '',
+        '',
+        Number(totals.totalVentas).toFixed(2),
+        Number(totals.ventasExentas).toFixed(2),
+        Number(totals.baseImponible).toFixed(2),
+        '',
+        Number(totals.debitoFiscal).toFixed(2),
+        Number(totals.ivaRetenido).toFixed(2),
+        ''
+      ]
+    ], { origin: `A${currentRow}` });
+
+    currentRow += 2;
+
+    // Sección de resumen
+    XLSX.utils.sheet_add_aoa(ws, [
+      ['', 'Totales', '', 'Base Imponible', '', 'Débito Fiscal', '', 'IVA Retenido'],
+      ['Ventas internas no gravadas', '', '', '0.00', '', '', '', ''],
+      ['Ventas de exportación', '', '', '', '', '', '', ''],
+      ['Ventas internas gravadas por alícuota general', '', '', Number(totals.baseImponible).toFixed(2), '', Number(totals.debitoFiscal).toFixed(2), '', Number(totals.ivaRetenido).toFixed(2)],
+      ['Ventas internas gravadas por alícuota general más alícuota adicional', '', '', '', '', '', '', ''],
+      ['Ventas internas gravadas por alícuota reducida', '', '', '', '', '', '', ''],
+      ['Total ventas y débitos fiscales del período', '', '', Number(totals.baseImponible).toFixed(2), '', Number(totals.debitoFiscal).toFixed(2), '', Number(totals.ivaRetenido).toFixed(2)]
+    ], { origin: `A${currentRow}` });
+
+    // Ajustar anchos de columna
+    ws['!cols'] = [
+      { wch: 12 }, // Fecha
+      { wch: 6 },  // Tipo
+      { wch: 15 }, // Número
+      { wch: 35 }, // Nombre
+      { wch: 12 }, // RIF
+      { wch: 18 }, // Total Ventas
+      { wch: 18 }, // Ventas Exentas
+      { wch: 15 }, // Base Imponible
+      { wch: 6 },  // %
+      { wch: 15 }, // Débito Fiscal
+      { wch: 15 }, // IVA Retenido
+      { wch: 15 }  // N° Comprobante
+    ];
+
+    return ws;
+  }
+
+  // Exportar tabla completa a Excel (detecta automáticamente el tipo)
+  exportTableToExcel(invoices, currencyDisplay, filename) {
+    if (!invoices || invoices.length === 0) {
+      console.warn('No hay facturas para exportar');
+      return;
+    }
+
+    // Detectar si son ventas o compras/gastos
+    const firstInvoice = invoices[0];
+    const isVentas = firstInvoice.flow === 'VENTA';
+
+    let ws;
+    if (isVentas) {
+      ws = this.exportLibroVentas(invoices, firstInvoice.issuer?.rif || '');
+    } else {
+      ws = this.exportLibroCompras(invoices, firstInvoice.client?.rif || '');
+    }
+
+    const wb = XLSX.utils.book_new();
+    const sheetName = isVentas ? 'Libro de Ventas' : 'Libro de Compras';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    XLSX.writeFile(wb, filename, { compression: true });
+  }
+
+  // Generar array de datos para una factura individual
+  getInvoiceDataArray(invoice) {
+    const data = [
       ['DETALLE DE FACTURA'],
       [''],
       ['INFORMACIÓN GENERAL'],
@@ -77,9 +350,9 @@ class ExportService {
 
     // Agregar items si existen
     if (invoice.items && invoice.items.length > 0) {
-      csvData.push(['Descripción', 'Cantidad', 'Precio Unitario', 'Total']);
-      invoice.items.forEach((item, index) => {
-        csvData.push([
+      data.push(['Descripción', 'Cantidad', 'Precio Unitario', 'Total']);
+      invoice.items.forEach((item) => {
+        data.push([
           item.description || '',
           item.quantity || 0,
           this.formatCurrencyForExport(item.unitPrice),
@@ -87,97 +360,50 @@ class ExportService {
         ]);
       });
     } else {
-      csvData.push(['Sin items detallados']);
+      data.push(['Sin items detallados']);
     }
 
     // Agregar notas si existen
     if (invoice.notes) {
-      csvData.push(['']);
-      csvData.push(['NOTAS']);
-      csvData.push([invoice.notes]);
+      data.push(['']);
+      data.push(['NOTAS']);
+      data.push([invoice.notes]);
     }
 
     // Agregar metadatos
-    csvData.push(['']);
-    csvData.push(['METADATOS']);
-    csvData.push(['Creado por', invoice.createdBy || '']);
-    csvData.push(['Fecha de Creación', this.formatDateForExport(invoice.createdAt)]);
-    csvData.push(['Última Actualización', this.formatDateForExport(invoice.updatedAt)]);
+    data.push(['']);
+    data.push(['METADATOS']);
+    data.push(['Creado por', invoice.createdBy || '']);
+    data.push(['Fecha de Creación', this.formatDateForExport(invoice.createdAt)]);
+    data.push(['Última Actualización', this.formatDateForExport(invoice.updatedAt)]);
 
-    return this.convertToCSV(csvData);
+    return data;
   }
 
-  // Exportar tabla completa a CSV
-  exportTableToCSV(invoices, currencyDisplay = 'VES') {
-    const headers = [
-      'Número de Factura',
-      'Número de Control',
-      'Tipo de Documento',
-      'Fecha de Emisión',
-      'Fecha de Vencimiento',
-      'Estado',
-      'Emisor - Nombre',
-      'Emisor - RIF',
-      'Cliente - Nombre',
-      'Cliente - RIF',
-      'Ventas Totales',
-      'Ventas No Gravadas',
-      'Ventas Gravadas',
-      'Débito Fiscal',
-      'Retención IVA',
-      'Retención ISLR',
-      'Retención Municipal',
-      'IGTF',
-      'Moneda',
-      'Tasa de Cambio',
-      'Cantidad de Items',
-      'Notas',
-      'Creado por',
-      'Fecha de Creación',
-      'Última Actualización'
-    ];
+  // Exportar factura individual a CSV
+  exportInvoiceToCSV(invoice) {
+    const data = this.getInvoiceDataArray(invoice);
+    return this.convertToCSV(data);
+  }
 
-    const csvData = [headers];
+  // Exportar factura individual a Excel (XLSX)
+  exportInvoiceToExcel(invoice, filename) {
+    const data = this.getInvoiceDataArray(invoice);
+    const ws = XLSX.utils.aoa_to_sheet(data);
 
-    invoices.forEach(invoice => {
-      const row = [
-        invoice.invoiceNumber || '',
-        invoice.controlNumber || '',
-        invoice.documentType || '',
-        this.formatDateForExport(invoice.issueDate),
-        this.formatDateForExport(invoice.dueDate),
-        invoice.status || '',
-        invoice.issuer?.companyName || '',
-        invoice.issuer?.rif || '',
-        invoice.client?.companyName || '',
-        invoice.client?.rif || '',
-        this.formatCurrencyForExport(invoice.financial?.totalSales, currencyDisplay),
-        this.formatCurrencyForExport(invoice.financial?.nonTaxableSales, currencyDisplay),
-        this.formatCurrencyForExport(invoice.financial?.taxableSales, currencyDisplay),
-        this.formatCurrencyForExport(invoice.financial?.taxDebit, currencyDisplay),
-        this.formatCurrencyForExport(invoice.financial?.ivaRetention, currencyDisplay),
-        this.formatCurrencyForExport(invoice.financial?.islrRetention, currencyDisplay),
-        this.formatCurrencyForExport(invoice.financial?.municipalRetention, currencyDisplay),
-        this.formatCurrencyForExport(invoice.financial?.igtf, currencyDisplay),
-        invoice.financial?.currency || 'VES',
-        invoice.financial?.exchangeRate || '1',
-        invoice.items ? invoice.items.length : 0,
-        invoice.notes || '',
-        invoice.createdBy || '',
-        this.formatDateForExport(invoice.createdAt),
-        this.formatDateForExport(invoice.updatedAt)
-      ];
-      csvData.push(row);
-    });
+    // Ajustar anchos de columna básicos
+    ws['!cols'] = [{ wch: 25 }, { wch: 40 }, { wch: 15 }, { wch: 15 }];
 
-    return this.convertToCSV(csvData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Factura");
+
+    XLSX.writeFile(wb, filename, { compression: true });
   }
 
   // Convertir datos a formato CSV
   convertToCSV(data) {
-    return data.map(row => 
+    return data.map(row =>
       row.map(cell => {
-        // Escapar comillas y envolver en comillas si contiene comas, saltos de línea o comillas
         const cellStr = String(cell || '');
         if (cellStr.includes(',') || cellStr.includes('\n') || cellStr.includes('"')) {
           return `"${cellStr.replace(/"/g, '""')}"`;
@@ -191,7 +417,7 @@ class ExportService {
   downloadCSV(csvContent, filename) {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    
+
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
@@ -204,62 +430,50 @@ class ExportService {
     }
   }
 
-  // Exportar factura individual
-  exportInvoice(invoice, format = 'csv') {
+  // Método principal para exportar factura
+  exportInvoice(invoice, format = 'xlsx') {
     try {
       const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `factura_${invoice.invoiceNumber || 'sin_numero'}_${timestamp}.csv`;
-      
+      const baseFilename = `factura_${invoice.invoiceNumber || 'sin_numero'}_${timestamp}`;
+
       if (format === 'csv') {
+        const filename = `${baseFilename}.csv`;
         const csvContent = this.exportInvoiceToCSV(invoice);
         this.downloadCSV(csvContent, filename);
-        return {
-          success: true,
-          message: `Factura exportada como ${filename}`,
-          filename
-        };
+        return { success: true, message: `Factura exportada como ${filename}`, filename };
+      } else if (format === 'xlsx') {
+        const filename = `${baseFilename}.xlsx`;
+        this.exportInvoiceToExcel(invoice, filename);
+        return { success: true, message: `Factura exportada como ${filename}`, filename };
       }
-      
-      return {
-        success: false,
-        message: 'Formato no soportado'
-      };
+
+      return { success: false, message: 'Formato no soportado' };
     } catch (error) {
       console.error('Error al exportar factura:', error);
-      return {
-        success: false,
-        message: 'Error al exportar la factura'
-      };
+      return { success: false, message: 'Error al exportar la factura' };
     }
   }
 
-  // Exportar tabla completa
-  exportTable(invoices, currencyDisplay = 'VES', format = 'csv') {
+  // Método principal para exportar tabla
+  exportTable(invoices, currencyDisplay = 'VES', format = 'xlsx') {
     try {
       const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `facturas_completas_${currencyDisplay}_${timestamp}.csv`;
-      
-      if (format === 'csv') {
-        const csvContent = this.exportTableToCSV(invoices, currencyDisplay);
-        this.downloadCSV(csvContent, filename);
-        return {
-          success: true,
-          message: `Tabla exportada como ${filename}`,
-          filename,
-          recordCount: invoices.length
-        };
+
+      // Detectar tipo de libro
+      const isVentas = invoices.length > 0 && invoices[0].flow === 'VENTA';
+      const bookType = isVentas ? 'ventas' : 'compras';
+      const baseFilename = `libro_${bookType}_${timestamp}`;
+
+      if (format === 'xlsx') {
+        const filename = `${baseFilename}.xlsx`;
+        this.exportTableToExcel(invoices, currencyDisplay, filename);
+        return { success: true, message: `Libro de ${bookType} exportado como ${filename}`, filename, recordCount: invoices.length };
       }
-      
-      return {
-        success: false,
-        message: 'Formato no soportado'
-      };
+
+      return { success: false, message: 'Formato no soportado' };
     } catch (error) {
       console.error('Error al exportar tabla:', error);
-      return {
-        success: false,
-        message: 'Error al exportar la tabla'
-      };
+      return { success: false, message: 'Error al exportar la tabla' };
     }
   }
 
@@ -284,7 +498,3 @@ class ExportService {
 
 const exportService = new ExportService();
 export default exportService;
-
-
-
-

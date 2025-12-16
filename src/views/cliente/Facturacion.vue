@@ -33,17 +33,17 @@
             </v-btn>
           </template>
           <v-list>
-            <v-list-item @click="exportTable('csv', 'all')">
+            <v-list-item @click="exportTable('xlsx', 'all')">
               <v-list-item-title>
-                <v-icon start>mdi-file-delimited</v-icon>
-                Exportar Todo (CSV)
+                <v-icon start>mdi-file-excel</v-icon>
+                Exportar Todo (Excel)
               </v-list-item-title>
-              <v-list-item-subtitle>{{ filteredInvoices.length }} registros</v-list-item-subtitle>
+              <v-list-item-subtitle>{{ invoices.length }} registros</v-list-item-subtitle>
             </v-list-item>
-            <v-list-item @click="exportTable('csv', 'filtered')">
+            <v-list-item @click="exportTable('xlsx', 'filtered')">
               <v-list-item-title>
-                <v-icon start>mdi-file-delimited</v-icon>
-                Solo Filtrados (CSV)
+                <v-icon start>mdi-file-excel</v-icon>
+                Solo Filtrados (Excel)
               </v-list-item-title>
               <v-list-item-subtitle>{{ filteredInvoices.length }} registros</v-list-item-subtitle>
             </v-list-item>
@@ -84,7 +84,7 @@
       <v-col cols="12" sm="6" md="3">
         <CurrencyStatsCard
           title="Monto Total"
-          :value="displayTotalAmount"
+          :value="convertedStatsTotal"
           bg-color="#f0d29b"
           text-color="#010101"
           :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
@@ -266,10 +266,16 @@
         <!-- Columna de total -->
         <template v-slot:item.total="{ item }">
           <div 
-            class="total-amount-display"
+            class="total-amount-display d-flex align-center"
             :class="{ 'amount-changing': isChangingCurrency }"
           >
-            {{ formatCurrency(getDisplayAmount(item.financial.totalSales), currencyDisplay) }}
+            <v-icon
+              :icon="item.flow === 'VENTA' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+              :color="item.flow === 'VENTA' ? 'success' : 'error'"
+              size="small"
+              class="mr-2"
+            ></v-icon>
+            {{ formatCurrency(getDisplayAmount(item), currencyDisplay) }}
           </div>
         </template>
 
@@ -416,10 +422,9 @@
               <v-col cols="12">
                 <v-select
                   v-model="exportOptions.format"
-                  :items="['CSV', 'Excel (Próximamente)']"
+                  :items="['XLSX', 'CSV']"
                   label="Formato de archivo"
                   variant="outlined"
-                  readonly
                 ></v-select>
               </v-col>
               <v-col cols="12">
@@ -517,6 +522,10 @@ export default {
       },
       currencyDisplay: 'VES',
       isChangingCurrency: false,
+      // Conversiones y cacheo
+      convertedStatsTotal: 0,
+      convertedAmounts: {},
+      cachedRate: null,
       
       // Tab actual
       currentTab: 'all', // 'all', 'ventas', 'compras', 'gastos'
@@ -540,7 +549,7 @@ export default {
       
       // Opciones de exportación
       exportOptions: {
-        format: 'CSV',
+        format: 'XLSX',
         scope: 'filtered',
         currency: 'VES',
         includeItems: true,
@@ -569,12 +578,7 @@ export default {
     };
   },
   computed: {
-    displayTotalAmount() {
-      if (this.currencyDisplay === 'USD') {
-        return this.convertAmountToUSD(this.stats.totalAmount);
-      }
-      return this.stats.totalAmount;
-    },
+    // displayTotalAmount removed; use `convertedStatsTotal` instead
     
     ventasCount() {
       if (!this.invoices || !Array.isArray(this.invoices)) return 0;
@@ -619,6 +623,53 @@ export default {
           query: { ...this.$route.query, tab: this.currentTab } 
         }).catch(() => {});
       }
+    }
+    ,
+    currencyDisplay: {
+      async handler(newCurrency) {
+        this.isChangingCurrency = true;
+
+        if (newCurrency === 'USD') {
+          // 1) Obtener la tasa UNA sola vez
+          if (!this.cachedRate) {
+            try {
+              const rate = await bcvService.getCurrentRate();
+              if (rate && rate.success && rate.data) {
+                this.cachedRate = parseFloat(rate.data.dollar);
+                console.log('Tasa cacheada:', this.cachedRate);
+              } else {
+                console.warn('No se pudo obtener la tasa del BCV');
+                this.cachedRate = 0;
+              }
+            } catch (error) {
+              console.error('Error obteniendo tasa:', error);
+              this.cachedRate = 0; // fallback
+            }
+          }
+
+          // 2) Calcular total de stats SÍNCRONAMENTE
+          this.convertedStatsTotal = (this.stats.totalAmount || 0) / (this.cachedRate || 1);
+
+          // 3) Calcular todos los montos de la tabla en un loop síncrono
+          const map = {};
+          for (const invoice of this.filteredInvoices) {
+            const amountVES = invoice.financial?.totalSales || 0;
+            map[invoice.id] = amountVES / (this.cachedRate || 1);
+          }
+          this.convertedAmounts = map;
+          console.log('Conversiones calculadas para', Object.keys(this.convertedAmounts).length, 'facturas');
+        } else {
+          // Resetea a VES
+          this.convertedStatsTotal = this.stats.totalAmount;
+          this.convertedAmounts = {};
+          this.cachedRate = null; // opcional: limpia cache para refrescar en el próximo cambio
+        }
+
+        setTimeout(() => {
+          this.isChangingCurrency = false;
+        }, 300);
+      },
+      immediate: true
     }
   },
   async mounted() {
@@ -677,6 +728,30 @@ export default {
         this.calculateStats();
         
         this.applyFilters();
+        // Si la vista está en USD, convertir montos recién cargados (obtener tasa UNA vez)
+        if (this.currencyDisplay === 'USD') {
+          if (!this.cachedRate) {
+            try {
+              const rate = await bcvService.getCurrentRate();
+              this.cachedRate = parseFloat(rate.data.dollar);
+              console.log('Tasa cacheada:', this.cachedRate);
+            } catch (error) {
+              console.error('Error obteniendo tasa:', error);
+              this.cachedRate = 0;
+            }
+          }
+
+          this.convertedStatsTotal = (this.stats.totalAmount || 0) / (this.cachedRate || 1);
+          const map = {};
+          for (const invoice of this.filteredInvoices) {
+            const amountVES = invoice.financial?.totalSales || 0;
+            map[invoice.id] = amountVES / (this.cachedRate || 1);
+          }
+          this.convertedAmounts = map;
+        } else {
+          this.convertedStatsTotal = this.stats.totalAmount;
+          this.convertedAmounts = {};
+        }
       } catch (error) {
         console.error('❌ Error al cargar facturas:', error);
       } finally {
@@ -825,17 +900,43 @@ export default {
       return colors[status] || 'grey';
     },
     
-    getDisplayAmount(amount) {
+    getDisplayAmount(invoice) {
       if (this.currencyDisplay === 'USD') {
-        return this.convertAmountToUSD(amount);
+        return this.convertedAmounts[invoice.id] != null ? this.convertedAmounts[invoice.id] : 0;
       }
-      return amount;
+      return invoice.financial?.totalSales || 0;
     },
     
-    convertAmountToUSD(amountInVES) {
-      // Tasa de cambio simulada o desde servicio
-      const rate = 36.5; // Ejemplo
-      return (amountInVES || 0) / rate;
+    async convertAmountToUSD(amountInVES) {
+      try {
+        if (!this.cachedRate) {
+          const rate = await bcvService.getCurrentRate();
+          this.cachedRate = parseFloat(rate.data.dollar);
+        }
+        const result = (amountInVES || 0) / (this.cachedRate || 1);
+        console.log('>>>>>>>>>>>>>>>>>>.Tasa de cambio: ', this.cachedRate);
+        console.log('Monto en VES (amountInVES):', amountInVES);
+        console.log('Resultado de conversión:', result);
+        return result;
+      } catch (error) {
+        console.error('Error en conversión:', error);
+        return 0;
+      }
+    },
+
+    async convertAllAmounts() {
+      const map = {};
+      try {
+        const invoices = Array.isArray(this.filteredInvoices) ? this.filteredInvoices : [];
+        const promises = invoices.map(inv => this.convertAmountToUSD(inv.financial?.totalSales || 0));
+        const results = await Promise.all(promises);
+        invoices.forEach((inv, idx) => {
+          map[inv.id] = results[idx];
+        });
+      } catch (e) {
+        console.error('Error convirtiendo montos de facturas:', e);
+      }
+      this.convertedAmounts = map;
     },
     
     toggleCurrency() {
@@ -855,7 +956,11 @@ export default {
       const invoicesToExport = this.exportOptions.scope === 'all' ? this.invoices : this.filteredInvoices;
       
       try {
-        await exportService.exportInvoices(invoicesToExport, this.exportOptions);
+        exportService.exportTable(
+          invoicesToExport, 
+          this.exportOptions.currency, 
+          this.exportOptions.format.toLowerCase()
+        );
         this.showExportDialog = false;
       } catch (error) {
         console.error('Error al exportar:', error);
