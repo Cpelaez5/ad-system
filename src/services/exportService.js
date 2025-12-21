@@ -28,6 +28,9 @@ class ExportService {
 
   // Exportar Libro de Compras (formato SENIAT)
   exportLibroCompras(invoices, userRif = '') {
+    // Filtrar solo facturas fiscales (Category = FACTURA)
+    const fiscalInvoices = invoices.filter(inv => inv.documentCategory === 'FACTURA');
+
     const ws = XLSX.utils.aoa_to_sheet([]);
 
     // Encabezado
@@ -68,7 +71,7 @@ class ExportService {
       creditoFiscal: 0
     };
 
-    invoices.forEach(inv => {
+    fiscalInvoices.forEach(inv => {
       const totalCompras = inv.financial?.totalSales || 0;
       const montoExento = inv.financial?.nonTaxableSales || 0;
       const baseImponible = inv.financial?.taxableSales || 0;
@@ -154,6 +157,9 @@ class ExportService {
 
   // Exportar Libro de Ventas (formato SENIAT)
   exportLibroVentas(invoices, userRif = '') {
+    // Filtrar solo facturas fiscales (Category = FACTURA)
+    const fiscalInvoices = invoices.filter(inv => inv.documentCategory === 'FACTURA');
+
     const ws = XLSX.utils.aoa_to_sheet([]);
 
     // Encabezado
@@ -195,7 +201,7 @@ class ExportService {
       ivaRetenido: 0
     };
 
-    invoices.forEach(inv => {
+    fiscalInvoices.forEach(inv => {
       const totalVentas = inv.financial?.totalSales || 0;
       const ventasExentas = inv.financial?.nonTaxableSales || 0;
       const baseImponible = inv.financial?.taxableSales || 0;
@@ -280,7 +286,7 @@ class ExportService {
   }
 
   // Exportar tabla completa a Excel (detecta automáticamente el tipo)
-  exportTableToExcel(invoices, currencyDisplay, filename) {
+  exportTableToExcel(invoices, currencyDisplay, filename, mode = 'SENIAT') {
     if (!invoices || invoices.length === 0) {
       console.warn('No hay facturas para exportar');
       return;
@@ -291,14 +297,38 @@ class ExportService {
     const isVentas = firstInvoice.flow === 'VENTA';
 
     let ws;
-    if (isVentas) {
-      ws = this.exportLibroVentas(invoices, firstInvoice.issuer?.rif || '');
+    if (mode === 'SENIAT') {
+      if (isVentas) {
+        ws = this.exportLibroVentas(invoices, firstInvoice.issuer?.rif || '');
+      } else {
+        ws = this.exportLibroCompras(invoices, firstInvoice.client?.rif || '');
+      }
     } else {
-      ws = this.exportLibroCompras(invoices, firstInvoice.client?.rif || '');
+      // GENERAL mode - export everything
+      const data = [
+        ['Fecha', 'Tipo', 'Categoría', 'Número', 'Control', isVentas ? 'Cliente' : 'Proveedor', 'RIF', 'Estado', 'Total', 'Moneda']
+      ];
+      invoices.forEach(inv => {
+        data.push([
+          this.formatDateForExport(inv.issueDate),
+          inv.documentType || '',
+          inv.documentCategory || '',
+          inv.invoiceNumber || '',
+          inv.controlNumber || '',
+          isVentas ? (inv.client?.companyName || '') : (inv.issuer?.companyName || ''),
+          isVentas ? (inv.client?.rif || '') : (inv.issuer?.rif || ''),
+          inv.status || '',
+          this.formatCurrencyForExport(inv.financial?.totalSales),
+          inv.financial?.currency || 'VES'
+        ]);
+      });
+      ws = XLSX.utils.aoa_to_sheet(data);
+      // Ajustar anchos de columna
+      ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 15 }, { wch: 6 }];
     }
 
     const wb = XLSX.utils.book_new();
-    const sheetName = isVentas ? 'Libro de Ventas' : 'Libro de Compras';
+    const sheetName = mode === 'SENIAT' ? (isVentas ? 'Libro de Ventas' : 'Libro de Compras') : 'Reporte General';
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
     XLSX.writeFile(wb, filename, { compression: true });
@@ -313,6 +343,7 @@ class ExportService {
       ['Número de Factura', invoice.invoiceNumber || ''],
       ['Número de Control', invoice.controlNumber || ''],
       ['Tipo de Documento', invoice.documentType || ''],
+      ['Categoría', invoice.documentCategory || ''],
       ['Fecha de Emisión', this.formatDateForExport(invoice.issueDate)],
       ['Fecha de Vencimiento', this.formatDateForExport(invoice.dueDate)],
       ['Estado', invoice.status || ''],
@@ -455,19 +486,19 @@ class ExportService {
   }
 
   // Método principal para exportar tabla
-  exportTable(invoices, currencyDisplay = 'VES', format = 'xlsx') {
+  exportTable(invoices, currencyDisplay = 'VES', format = 'xlsx', mode = 'SENIAT') {
     try {
       const timestamp = new Date().toISOString().split('T')[0];
 
       // Detectar tipo de libro
       const isVentas = invoices.length > 0 && invoices[0].flow === 'VENTA';
       const bookType = isVentas ? 'ventas' : 'compras';
-      const baseFilename = `libro_${bookType}_${timestamp}`;
+      const baseFilename = mode === 'SENIAT' ? `libro_${bookType}_${timestamp}` : `reporte_general_${timestamp}`;
 
       if (format === 'xlsx') {
         const filename = `${baseFilename}.xlsx`;
-        this.exportTableToExcel(invoices, currencyDisplay, filename);
-        return { success: true, message: `Libro de ${bookType} exportado como ${filename}`, filename, recordCount: invoices.length };
+        this.exportTableToExcel(invoices, currencyDisplay, filename, mode);
+        return { success: true, message: `Archivo exportado como ${filename}`, filename, recordCount: invoices.length };
       }
 
       return { success: false, message: 'Formato no soportado' };

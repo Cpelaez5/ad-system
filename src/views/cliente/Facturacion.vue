@@ -16,7 +16,7 @@
           @click="openNewInvoiceDialog"
           class="mr-2"
         >
-          Nueva Factura
+          Nuevo Registro
         </v-btn>
         <v-menu>
           <template v-slot:activator="{ props }">
@@ -33,19 +33,25 @@
             </v-btn>
           </template>
           <v-list>
-            <v-list-item @click="exportTable('xlsx', 'all')">
+            <!-- SENIAT Export Option (Contextual) -->
+            <v-list-item 
+              v-if="currentTab !== 'all'"
+              @click="exportTable('xlsx', 'filtered', 'SENIAT')"
+            >
+              <v-list-item-title>
+                <v-icon start color="primary">mdi-book-open-variant</v-icon>
+                Exportar Libro {{ currentTab === 'ventas' ? 'de Ventas' : (currentTab === 'compras' ? 'de Compras' : 'SENIAT') }}
+              </v-list-item-title>
+              <v-list-item-subtitle>Formato SENIAT (Solo Fiscales)</v-list-item-subtitle>
+            </v-list-item>
+
+            <!-- General Export Option -->
+            <v-list-item @click="exportTable('xlsx', 'all', 'GENERAL')">
               <v-list-item-title>
                 <v-icon start>mdi-file-excel</v-icon>
-                Exportar Todo (Excel)
+                Exportar Todo (General)
               </v-list-item-title>
               <v-list-item-subtitle>{{ invoices.length }} registros</v-list-item-subtitle>
-            </v-list-item>
-            <v-list-item @click="exportTable('xlsx', 'filtered')">
-              <v-list-item-title>
-                <v-icon start>mdi-file-excel</v-icon>
-                Solo Filtrados (Excel)
-              </v-list-item-title>
-              <v-list-item-subtitle>{{ filteredInvoices.length }} registros</v-list-item-subtitle>
             </v-list-item>
           </v-list>
         </v-menu>
@@ -261,6 +267,18 @@
         <!-- Columna de fecha -->
         <template v-slot:item.issueDate="{ item }">
           {{ formatDate(item.issueDate) }}
+        </template>
+
+        <!-- Columna de Categoría -->
+        <template v-slot:item.documentCategory="{ item }">
+          <v-chip
+            :color="item.documentCategory === 'FACTURA' ? 'primary' : 'info'"
+            variant="flat"
+            size="x-small"
+            class="font-weight-bold"
+          >
+            {{ item.documentCategory }}
+          </v-chip>
         </template>
 
         <!-- Columna de total -->
@@ -552,6 +570,7 @@ export default {
         format: 'XLSX',
         scope: 'filtered',
         currency: 'VES',
+        mode: 'SENIAT',
         includeItems: true,
         includeMetadata: true
       },
@@ -560,6 +579,7 @@ export default {
       currentUser: null,
       headers: [
         { title: 'Número', key: 'invoiceNumber', sortable: true },
+        { title: 'Categoría', key: 'documentCategory', sortable: true },
         { title: 'Cliente/Proveedor', key: 'client', sortable: true },
         { title: 'Fecha', key: 'issueDate', sortable: true },
         { title: 'Total', key: 'total', sortable: true },
@@ -959,7 +979,8 @@ export default {
         exportService.exportTable(
           invoicesToExport, 
           this.exportOptions.currency, 
-          this.exportOptions.format.toLowerCase()
+          this.exportOptions.format.toLowerCase(),
+          this.exportOptions.mode
         );
         this.showExportDialog = false;
       } catch (error) {
@@ -967,9 +988,10 @@ export default {
       }
     },
     
-    exportTable(format, scope) {
+    exportTable(format, scope, mode = 'SENIAT') {
       this.exportOptions.format = format.toUpperCase();
       this.exportOptions.scope = scope;
+      this.exportOptions.mode = mode;
       this.showExportDialog = true;
     },
     

@@ -1,79 +1,93 @@
 <template>
-  <div class="signup-card animate-slide-in-up">
-    <div class="signup-header">
-      <div class="icon-container animate-micro-rotate">
-        <img src="@/assets/icon-adaptableV2.svg" alt="Logo" class="logo-icon" style="width:48px;height:48px" />
+  <div class="register-client-wizard">
+    <div class="wizard-header mb-6">
+      <h2 class="text-h5 font-weight-bold mb-1">Crear Cuenta</h2>
+      <p class="text-subtitle-2 text-grey">Paso {{ step }} de 2: {{ stepTitle }}</p>
+      
+      <!-- Progress Bar -->
+      <div class="progress-bar mt-3">
+        <div class="progress-fill" :style="{ width: step === 1 ? '50%' : '100%' }"></div>
       </div>
-      <h1 class="signup-title">Registro de Cliente</h1>
-      <p class="signup-subtitle">Completa tu perfil para unirte a <strong>{{ invitation?.organization_name || 'la organización' }}</strong></p>
     </div>
 
-    <form @submit.prevent="registrar" class="signup-form">
-      <!-- Datos Personales -->
-      <h3 class="section-title">Datos de Usuario</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="firstName" class="form-label">Nombre</label>
-          <input id="firstName" v-model="form.first_name" type="text" class="form-input" placeholder="Tu nombre" required />
-        </div>
-        <div class="form-group">
-          <label for="lastName" class="form-label">Apellido</label>
-          <input id="lastName" v-model="form.last_name" type="text" class="form-input" placeholder="Tu apellido" required />
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="email" class="form-label">Correo electrónico</label>
-        <input id="email" v-model="form.email" type="email" class="form-input" readonly disabled />
-        <small class="text-muted">El correo está vinculado a la invitación</small>
-      </div>
-
-      <div class="form-group">
-        <label for="password" class="form-label">Contraseña</label>
-        <input id="password" v-model="form.password" :type="mostrarPassword ? 'text' : 'password'" class="form-input" placeholder="Contraseña" required />
-      </div>
-
-      <div class="form-group">
-        <label for="confirm" class="form-label">Confirmar contraseña</label>
-        <input id="confirm" v-model="form.confirmPassword" :type="mostrarPassword ? 'text' : 'password'" class="form-input" placeholder="Confirmar contraseña" required />
-      </div>
-
-      <!-- Datos de la Empresa Cliente -->
-      <h3 class="section-title mt-4">Datos de tu Empresa/Negocio</h3>
-      <p class="text-caption mb-3">Estos datos son necesarios para la facturación.</p>
+    <form @submit.prevent="handleSubmit" class="wizard-form">
       
-      <div class="form-group">
-        <label for="companyName" class="form-label">Razón Social / Nombre</label>
-        <input id="companyName" v-model="form.company_name" type="text" class="form-input" placeholder="Ej: Inversiones XYZ C.A." required />
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="rif" class="form-label">RIF</label>
-          <input id="rif" v-model="form.rif" type="text" class="form-input" placeholder="J-12345678-9" required />
+      <!-- STEP 1: Account Info -->
+      <div v-if="step === 1" class="step-content animate-fade-in">
+        <div class="form-row">
+          <div class="form-group half">
+            <label class="form-label">Nombre</label>
+            <input v-model="form.first_name" type="text" class="form-input" placeholder="Tu nombre" required />
+          </div>
+          <div class="form-group half">
+            <label class="form-label">Apellido</label>
+            <input v-model="form.last_name" type="text" class="form-input" placeholder="Tu apellido" required />
+          </div>
         </div>
+
         <div class="form-group">
-          <label for="phone" class="form-label">Teléfono</label>
-          <input id="phone" v-model="form.phone" type="tel" class="form-input" placeholder="0414-1234567" />
+          <label class="form-label">Correo electrónico</label>
+          <input 
+            v-model="form.email" 
+            type="email" 
+            class="form-input" 
+            :readonly="!!invitation.email" 
+            :disabled="!!invitation.email" 
+            placeholder="tu@email.com" 
+            required 
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input v-model="form.password" type="password" class="form-input" placeholder="••••••••" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Confirmar contraseña</label>
+          <input v-model="form.confirmPassword" type="password" class="form-input" placeholder="••••••••" required />
         </div>
       </div>
 
-      <div class="form-group">
-        <label for="address" class="form-label">Dirección Fiscal</label>
-        <textarea id="address" v-model="form.address" class="form-input" rows="2" placeholder="Dirección completa" required></textarea>
+      <!-- STEP 2: Business Info -->
+      <div v-if="step === 2" class="step-content animate-fade-in">
+        <div class="form-group">
+          <label class="form-label">Nombre de la Empresa / Negocio</label>
+          <input v-model="form.company_name" type="text" class="form-input" placeholder="Ej: Inversiones XYZ" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label class="form-label">RIF / Identificación</label>
+            <input v-model="form.rif" type="text" class="form-input" placeholder="J-12345678-9" required />
+          </div>
+          <div class="form-group half">
+            <label class="form-label">Teléfono</label>
+            <input v-model="form.phone" type="tel" class="form-input" placeholder="0414-1234567" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Dirección Fiscal</label>
+          <textarea v-model="form.address" class="form-input" rows="3" placeholder="Dirección completa" required></textarea>
+        </div>
       </div>
 
-      <div class="form-extra">
-        <label class="checkbox-container">
-          <input type="checkbox" v-model="mostrarPassword" class="checkbox-input" />
-          <span class="checkbox-label">Mostrar contraseña</span>
-        </label>
+      <!-- Actions -->
+      <div class="wizard-actions mt-6">
+        <button v-if="step === 2" type="button" class="back-btn" @click="step = 1">
+          Atrás
+        </button>
+        
+        <button v-if="step === 1" type="button" class="next-btn" @click="validateStep1">
+          Siguiente
+        </button>
+        
+        <button v-if="step === 2" type="submit" class="submit-btn" :disabled="cargando">
+          <span v-if="!cargando">Completar Registro</span>
+          <div v-else class="spinner"></div>
+        </button>
       </div>
-
-      <button type="submit" class="signup-button" :disabled="cargando || !puedoEnviar">
-        <span v-if="!cargando">Completar Registro</span>
-        <span v-else class="loading-spinner">Procesando...</span>
-      </button>
     </form>
   </div>
 </template>
@@ -82,22 +96,18 @@
 export default {
   name: 'RegisterClient',
   props: {
-    invitation: {
-      type: Object,
-      required: true
-    }
+    invitation: { type: Object, required: true }
   },
   data() {
     return {
+      step: 1,
       cargando: false,
-      mostrarPassword: false,
       form: {
         first_name: '',
         last_name: '',
-        email: this.invitation.email,
+        email: this.invitation.email || '',
         password: '',
         confirmPassword: '',
-        // Datos empresa
         company_name: '',
         rif: '',
         phone: '',
@@ -106,98 +116,68 @@ export default {
     }
   },
   computed: {
-    puedoEnviar() {
-      return this.form.first_name && this.form.last_name && this.form.password && 
-             this.form.company_name && this.form.rif && this.form.address &&
-             (this.form.password === this.form.confirmPassword)
+    stepTitle() {
+      return this.step === 1 ? 'Datos Personales' : 'Datos del Negocio';
     }
   },
   async mounted() {
-    // Si la invitación ya tiene un client_id, intentamos cargar datos existentes de la empresa
     if (this.invitation.client_id) {
       this.cargarDatosEmpresa();
     }
   },
   methods: {
+    validateStep1() {
+      if (!this.form.first_name || !this.form.last_name || !this.form.email || !this.form.password) {
+        alert('Por favor completa todos los campos');
+        return;
+      }
+      if (this.form.password !== this.form.confirmPassword) {
+        alert('Las contraseñas no coinciden');
+        return;
+      }
+      this.step = 2;
+    },
     async cargarDatosEmpresa() {
       try {
         const { supabase } = await import('@/lib/supabaseClient');
-        // Nota: Esto requiere que la tabla clients sea legible públicamente o por token, 
-        // lo cual puede requerir ajuste de RLS o una Edge Function. 
-        // Por ahora asumimos que si tiene invitación, puede leer.
-        // Si falla, el usuario simplemente llenará los datos.
-        const { data, error } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('id', this.invitation.client_id)
-          .maybeSingle();
-          
+        const { data } = await supabase.from('clients').select('*').eq('id', this.invitation.client_id).maybeSingle();
         if (data) {
           this.form.company_name = data.company_name || '';
           this.form.rif = data.rif || '';
           this.form.phone = data.phone || '';
           this.form.address = data.address || '';
         }
-      } catch (e) {
-        // Silenciosamente ignorar error de permisos (anon no puede ver clients)
-        console.log('Info: No se cargaron datos previos de empresa (probablemente por permisos o no existen). El usuario los llenará.');
-      }
+      } catch (e) { console.log('Info: No se cargaron datos previos.'); }
     },
-    
-    async registrar() {
-      if (!this.puedoEnviar) return;
-      this.cargando = true;
+    async handleSubmit() {
+      if (!this.form.company_name || !this.form.rif || !this.form.address) {
+        alert('Por favor completa los datos del negocio');
+        return;
+      }
       
+      this.cargando = true;
       try {
         const { supabase } = await import('@/lib/supabaseClient');
 
-        // 1. Registro en Auth
-        const userMeta = {
-          first_name: this.form.first_name,
-          last_name: this.form.last_name,
-          username: this.form.email.split('@')[0],
-          role: 'cliente',
-          organization_id: this.invitation.organization_id,
-          client_id: this.invitation.client_id
-        };
-
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: this.form.email,
-          password: this.form.password,
-          options: {
-            data: userMeta
+        // Use Edge Function for secure registration
+        const { data, error } = await supabase.functions.invoke('register-client', {
+          body: {
+            email: this.form.email,
+            password: this.form.password,
+            first_name: this.form.first_name,
+            last_name: this.form.last_name,
+            company_name: this.form.company_name,
+            rif: this.form.rif,
+            phone: this.form.phone,
+            address: this.form.address,
+            organization_id: this.invitation.organization_id
           }
         });
 
-        if (authError) throw authError;
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
 
-        // 2. Actualizar datos de la empresa (clients)
-        if (authData.user && this.invitation.client_id) {
-            // Esperar un momento para que el trigger procese
-            await new Promise(r => setTimeout(r, 1000));
-            
-            const { error: clientError } = await supabase
-              .from('clients')
-              .update({
-                company_name: this.form.company_name,
-                rif: this.form.rif,
-                address: this.form.address,
-                phone: this.form.phone
-              })
-              .eq('id', this.invitation.client_id);
-              
-            if (clientError) {
-              console.error('Error al actualizar datos de empresa:', clientError);
-            }
-            
-            // 3. Marcar invitación como aceptada
-            await supabase
-              .from('invitations')
-              .update({ status: 'accepted' })
-              .eq('id', this.invitation.id);
-        }
-
-        alert('Registro completado exitosamente.');
+        alert('Registro completado exitosamente. Por favor inicia sesión.');
         this.$router.push('/login');
 
       } catch (e) {
@@ -212,20 +192,72 @@ export default {
 </script>
 
 <style scoped>
-/* Reutilizar estilos */
-.signup-card { background: rgba(255,255,255,0.98); border-radius: 14px; padding: 36px; box-shadow: 0 18px 36px rgba(0,0,0,0.12); }
-.signup-header { text-align:center; margin-bottom:18px }
-.signup-title { font-size:24px; color:#A81C22; margin:6px 0 }
-.signup-subtitle { color:#666; font-size:14px }
-.section-title { font-size: 16px; color: #333; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
-.form-row { display:flex; gap:12px }
-.form-group { margin-bottom:14px; flex:1 }
-.form-label { display:block; font-weight:600; margin-bottom:6px }
-.form-input { width:100%; padding:10px 12px; border-radius:8px; border:1px solid #e0e0e0 }
-.form-extra { margin-bottom:12px }
-.signup-button { width:100%; padding:12px; background:linear-gradient(135deg,#A81C22,#E0B04F); color:white; border:none; border-radius:8px; font-weight:700; cursor: pointer; }
-.signup-button:disabled { opacity: 0.7; cursor: not-allowed; }
-.text-muted { color: #888; font-size: 12px; }
-.checkbox-container { display:flex; align-items:center; gap:8px }
-@media (max-width:480px) { .form-row { flex-direction:column } }
+.wizard-header { text-align: left; }
+.progress-bar { height: 4px; background: #f0f0f0; border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: #A81C22; transition: width 0.3s ease; }
+
+.form-row { display: flex; gap: 16px; }
+.half { flex: 1; }
+
+.form-group { margin-bottom: 20px; }
+.form-label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  background: #f9f9f9;
+}
+.form-input:focus {
+  outline: none;
+  border-color: #A81C22;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(168, 28, 34, 0.1);
+}
+
+.wizard-actions { display: flex; gap: 12px; }
+
+.next-btn, .submit-btn {
+  flex: 1;
+  padding: 14px;
+  background: #A81C22;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.next-btn:hover, .submit-btn:hover:not(:disabled) { background: #8B1A1F; transform: translateY(-2px); }
+
+.back-btn {
+  padding: 14px 24px;
+  background: white;
+  color: #666;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.back-btn:hover { background: #f5f5f5; color: #333; }
+
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.animate-fade-in { animation: fadeIn 0.5s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 480px) {
+  .form-row { flex-direction: column; gap: 0; }
+}
 </style>

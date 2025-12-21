@@ -251,14 +251,28 @@
                 <v-col cols="12" md="4">
                   <v-select
                     v-model="formData.documentType"
-                    :items="documentTypes"
+                    :items="availableDocumentTypes"
                     label="Tipo de Documento"
                     :rules="[v => !!v || 'El tipo de documento es requerido']"
                     required
                     variant="outlined"
                     class="animated-field"
                     prepend-inner-icon="mdi-file-document"
-                  ></v-select>
+                    item-title="title"
+                    item-value="type"
+                  >
+                    <template v-slot:item="{ props, item }">
+                      <v-list-item v-bind="props" :subtitle="item.raw.subtitle">
+                        <template v-slot:prepend>
+                          <v-icon :color="item.raw.color" class="mr-2">{{ item.raw.icon }}</v-icon>
+                        </template>
+                      </v-list-item>
+                    </template>
+                    <template v-slot:selection="{ item }">
+                      <v-icon :color="item.raw.color" class="mr-2" size="small">{{ item.raw.icon }}</v-icon>
+                      {{ item.raw.title }}
+                    </template>
+                  </v-select>
                 </v-col>
                 <v-col cols="12" md="4">
                   <v-text-field
@@ -945,6 +959,21 @@ export default {
   computed: {
     isEditing() {
       return !!this.invoice;
+    },
+    availableDocumentTypes() {
+      if (this.formData.flow === 'VENTA') {
+        return [
+          { title: 'Factura de Venta', type: 'FACTURA', category: 'FACTURA', icon: 'mdi-file-document-check', color: 'success', subtitle: 'Para declarar ingresos (Fiscal)' },
+          { title: 'Nota de Entrega', type: 'RECIBO', category: 'RECIBO', icon: 'mdi-file-document-outline', color: 'info', subtitle: 'Recibo simple (No Fiscal)' },
+          { title: 'Nota de Crédito', type: 'NOTA DE CRÉDITO', category: 'FACTURA', icon: 'mdi-credit-card-refund', color: 'warning', subtitle: 'Devolución al cliente (Fiscal)' }
+        ];
+      } else {
+        return [
+          { title: 'Factura de Compra', type: 'FACTURA', category: 'FACTURA', icon: 'mdi-file-document-check', color: 'success', subtitle: 'Para declarar gastos (Fiscal)' },
+          { title: 'Nota de Entrega', type: 'RECIBO', category: 'RECIBO', icon: 'mdi-file-document-outline', color: 'info', subtitle: 'Recibo simple (No Fiscal)' },
+          { title: 'Nota de Débito', type: 'NOTA DE DÉBITO', category: 'FACTURA', icon: 'mdi-cash-plus', color: 'error', subtitle: 'Cargo adicional (Fiscal)' }
+        ];
+      }
     }
   },
   watch: {
@@ -960,12 +989,22 @@ export default {
       },
       immediate: true
     },
-    'formData.issueDate': {
-      handler(newDate) {
         if (newDate) {
           this.fetchExchangeRate(newDate);
         }
       }
+    },
+    'formData.documentType': {
+      handler(newType) {
+        if (!newType) return;
+        // Auto-set category based on type
+        if (newType === 'RECIBO') {
+          this.formData.documentCategory = 'RECIBO';
+        } else {
+          this.formData.documentCategory = 'FACTURA';
+        }
+      },
+      immediate: true
     }
   },
   async mounted() {

@@ -33,10 +33,15 @@ const Usuarios = () => import('../views/admin/Usuarios.vue')
 import TestForm from '@/components/common/TestForm.vue'
 
 // Definir las rutas del sistema
+import LandingPage from '@/views/LandingPage.vue'
+
+// Definir las rutas del sistema
 const routes = [
   {
     path: '/',
-    redirect: '/dashboard'
+    name: 'LandingPage',
+    component: LandingPage,
+    meta: { requiresAuth: false }
   },
   {
     path: '/organizacion/gastos',

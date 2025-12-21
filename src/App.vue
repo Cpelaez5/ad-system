@@ -5,7 +5,7 @@
     <NotificationSystem />
     
     <!-- Barra de navegación principal -->
-    <AppNavigation />
+    <AppNavigation v-if="showNavigation" />
     
     <!-- Contenido principal -->
     <v-main>
@@ -35,6 +35,12 @@ export default {
     AppFooter,
     NotificationSystem,
     PageTransition
+  },
+  computed: {
+    showNavigation() {
+      const publicRoutes = ['LandingPage', 'Login', 'Register'];
+      return !publicRoutes.includes(this.$route.name);
+    }
   }
 }
 </script>
