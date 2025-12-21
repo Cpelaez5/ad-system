@@ -177,8 +177,17 @@ export default {
         if (error) throw error;
         if (data.error) throw new Error(data.error);
 
-        alert('Registro completado exitosamente. Por favor inicia sesión.');
-        this.$router.push('/login');
+        const { ONBOARDING_V1 } = await import('@/config/featureFlags');
+
+        if (ONBOARDING_V1) {
+          this.$router.push({ 
+            path: '/registration-success', 
+            query: { email: this.form.email } 
+          });
+        } else {
+          alert('Registro completado exitosamente. Por favor inicia sesión.');
+          this.$router.push('/login');
+        }
 
       } catch (e) {
         console.error('Error:', e);

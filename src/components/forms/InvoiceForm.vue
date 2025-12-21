@@ -989,6 +989,8 @@ export default {
       },
       immediate: true
     },
+    'formData.issueDate': {
+      handler(newDate) {
         if (newDate) {
           this.fetchExchangeRate(newDate);
         }

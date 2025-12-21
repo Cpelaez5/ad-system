@@ -66,10 +66,36 @@ serve(async (req) => {
             throw authError
         }
 
-        // 3. Ensure Public User is Linked (Redundant if trigger works, but safe)
-        // The trigger handle_new_user should have already created the public user with client_id
-        // But we can double check or update if needed. 
-        // For now, we trust the trigger or the fact that createUser succeeded.
+        const userId = authData.user.id
+
+        // 3. Update Public User Record DIRECTLY
+        // Initialize Trial Data
+        const trialStart = new Date().toISOString()
+        const trialEnd = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+
+        const { error: userUpdateError } = await supabaseAdmin
+            .from('users')
+            .update({
+                role: 'cliente',
+                organization_id: organization_id,
+                client_id: clientData.id,
+                first_name,
+                last_name,
+                username: email.split('@')[0],
+                trial_start: trialStart,
+                trial_end: trialEnd,
+                plan_id: 'free_trial',
+                storage_limit_bytes: 5368709120 // 5GB
+            })
+            .eq('id', userId)
+
+        if (userUpdateError) {
+            console.error('Error updating public user record:', userUpdateError)
+            // Attempt rollback
+            await supabaseAdmin.auth.admin.deleteUser(userId)
+            await supabaseAdmin.from('clients').delete().eq('id', clientData.id)
+            throw new Error('Error updating user profile: ' + userUpdateError.message)
+        }
 
         return new Response(
             JSON.stringify({ user: authData.user, client: clientData }),

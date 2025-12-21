@@ -505,7 +505,9 @@ const userService = {
       createdAt: userData.created_at,
       organization: userData.organizations,
       organization_id: userData.organization_id,
-      client_id: userData.client_id
+      client_id: userData.client_id,
+      plan_id: userData.plan_id,
+      trial_end: userData.trial_end
     };
   },
 

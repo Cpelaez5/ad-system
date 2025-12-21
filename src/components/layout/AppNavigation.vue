@@ -1,75 +1,107 @@
 <template>
-	<v-app-bar
-		color="white"
-		elevation="0"
-		class="app-bar"
-		style="border-bottom: 1px solid #E0E0E0; z-index: 1000;"
-	>
-		<!-- Logo y título -->
-		<v-toolbar-title
-			:class="['text-h5', 'font-weight-bold', 'animate-fade-in', 'animate-delay-200', { 'title-adjusted': sidebarExpanded }]"
-			style="color: #000000; font-weight: 800 !important;"
-		>
-			{{ getCurrentPageTitle() }}
-		</v-toolbar-title>
+  <div class="navigation-wrapper">
+    <!-- Trial Banner - Sticky at top -->
+    <div v-if="showTrialBanner" class="trial-banner-container">
+      <div class="trial-banner" :class="getTrialBannerClass()">
+        <v-container fluid class="py-2">
+          <div class="d-flex align-center justify-center">
+            <v-icon size="20" class="mr-2">mdi-clock-alert-outline</v-icon>
+            <span class="text-body-2 font-weight-bold">
+              {{ getTrialMessage() }}
+            </span>
+            <v-btn 
+              size="small" 
+              variant="outlined" 
+              class="ml-4 trial-cta-btn"
+              to="/pricing"
+            >
+              <v-icon size="16" class="mr-1">mdi-rocket-launch</v-icon>
+              Ver Planes
+            </v-btn>
+          </div>
+        </v-container>
+      </div>
+    </div>
 
-		<v-spacer />
+    <!-- App Bar -->
+    <v-app-bar
+      color="white"
+      elevation="0"
+      class="app-bar"
+      style="border-bottom: 1px solid #E0E0E0;"
+    >
+      <!-- Logo y título -->
+      <v-toolbar-title
+        :class="['text-h5', 'font-weight-bold', 'animate-fade-in', 'animate-delay-200', { 'title-adjusted': sidebarExpanded }]"
+        style="color: #000000; font-weight: 800 !important;"
+      >
+        {{ getCurrentPageTitle() }}
+      </v-toolbar-title>
 
-		<!-- Tasa del BCV -->
-		<div class="bcv-rate-display mr-4">
-			<v-chip
-				:color="getBCVChipColor()"
-				variant="tonal"
-				size="small"
-				class="animate-fade-in animate-delay-300"
-			>
-				<v-icon size="16" class="mr-1">mdi-currency-usd</v-icon>
-				<span class="font-weight-medium">{{ getBCVRate() }}</span>
-				<v-icon
-					size="12"
-					class="ml-1 cursor-pointer"
-					@click="refreshBCVRate"
-					:class="{ 'animate-spin': bcvLoading }"
-				>
-					mdi-refresh
-				</v-icon>
-			</v-chip>
-		</div>
+      <v-spacer />
 
-		<!-- Menú de usuario -->
-		<v-btn id="user-menu-btn" color="primary" variant="text" @click="handleUserButtonClick">
-			<v-icon>mdi-account-circle</v-icon>
-			<span class="ml-2 d-none d-md-inline">{{ currentUser?.firstName || 'Usuario' }}</span>
-		</v-btn>
+      <!-- Tasa del BCV -->
+      <div class="bcv-rate-display mr-4">
+        <v-chip
+          :color="getBCVChipColor()"
+          variant="tonal"
+          size="small"
+          class="animate-fade-in animate-delay-300"
+        >
+          <v-icon size="16" class="mr-1">mdi-currency-usd</v-icon>
+          <span class="font-weight-medium">{{ getBCVRate() }}</span>
+          <v-icon
+            size="12"
+            class="ml-1 cursor-pointer"
+            @click="refreshBCVRate"
+            :class="{ 'animate-spin': bcvLoading }"
+          >
+            mdi-refresh
+          </v-icon>
+        </v-chip>
+      </div>
 
-		<v-menu activator="#user-menu-btn">
-			<v-list>
-				<v-list-item>
-					<v-list-item-title>{{ currentUser?.firstName || 'Usuario' }} {{ currentUser?.lastName || '' }}</v-list-item-title>
-					<v-list-item-subtitle>{{ getRoleName(currentUser?.role) }}</v-list-item-subtitle>
-				</v-list-item>
-				<v-divider />
-				<v-list-item @click="goToProfile">
-					<v-list-item-title>Mi Perfil</v-list-item-title>
-				</v-list-item>
-				<v-list-item @click="goToSettings">
-					<v-list-item-title>Configuración</v-list-item-title>
-				</v-list-item>
-				<v-divider />
-				<v-list-item @click="logout">
-					<v-list-item-title>Cerrar Sesión</v-list-item-title>
-				</v-list-item>
-			</v-list>
-		</v-menu>
-	</v-app-bar>
+      <!-- Menú de usuario -->
+      <v-btn id="user-menu-btn" color="primary" variant="text" @click="handleUserButtonClick">
+        <v-icon>mdi-account-circle</v-icon>
+        <span class="ml-2 d-none d-md-inline">{{ currentUser?.firstName || 'Usuario' }}</span>
+      </v-btn>
 
-	<!-- Navegación lateral (extraída a componente Sidebar.vue) -->
-	<Sidebar />
+      <v-menu activator="#user-menu-btn">
+        <v-list>
+          <v-list-item>
+            <v-list-item-title>{{ currentUser?.firstName || 'Usuario' }} {{ currentUser?.lastName || '' }}</v-list-item-title>
+            <v-list-item-subtitle>{{ getRoleName(currentUser?.role) }}</v-list-item-subtitle>
+            <v-list-item-subtitle v-if="userPlan" class="mt-1">
+              <v-chip size="x-small" :color="getPlanColor(userPlan)" variant="tonal">
+                {{ getPlanName(userPlan) }}
+              </v-chip>
+            </v-list-item-subtitle>
+          </v-list-item>
+          <v-divider />
+          <v-list-item @click="goToProfile">
+            <v-list-item-title>Mi Perfil</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="goToSettings">
+            <v-list-item-title>Configuración</v-list-item-title>
+          </v-list-item>
+          <v-divider />
+          <v-list-item @click="logout">
+            <v-list-item-title>Cerrar Sesión</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+    </v-app-bar>
+
+    <!-- Navegación lateral (extraída a componente Sidebar.vue) -->
+    <Sidebar />
+  </div>
 </template>
 
 <script>
 import bcvService from '@/services/bcvService.js';
 import Sidebar from './Sidebar.vue';
+import { supabase } from '@/lib/supabaseClient';
 
 export default {
 	name: 'AppNavigation',
@@ -79,7 +111,10 @@ export default {
 			bcvRate: null,
 			bcvLoading: false,
 			bcvError: false,
-			sidebarExpanded: false
+			sidebarExpanded: false,
+			showTrialBanner: false,
+			trialDaysLeft: 0,
+			userPlan: null
 		}
 	},
 	computed: {
@@ -94,6 +129,7 @@ export default {
 	},
 	async mounted() {
 		await this.loadBCVRate();
+		await this.checkTrialStatus();
 		// Actualizar cada 10 minutos para reducir spam en consola
 		this.bcvInterval = setInterval(() => {
 			this.loadBCVRate();
@@ -115,6 +151,79 @@ export default {
 		}
 	},
 	methods: {
+    async checkTrialStatus() {
+      try {
+        const { ONBOARDING_V1 } = await import('@/config/featureFlags');
+        if (!ONBOARDING_V1) return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('users')
+          .select('trial_end, plan_id')
+          .eq('id', user.id)
+          .single();
+
+        if (!profile) return;
+
+        // Store user plan for display
+        this.userPlan = profile.plan_id;
+
+        // Show banner only for free trial users
+        if (profile.plan_id === 'free_trial' && profile.trial_end) {
+          const end = new Date(profile.trial_end);
+          const now = new Date();
+          const diffTime = end - now;
+          this.trialDaysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          this.showTrialBanner = this.trialDaysLeft >= 0;
+        }
+      } catch (error) {
+        console.error('Error checking trial status:', error);
+      }
+    },
+
+    getPlanName(planId) {
+      const plans = {
+        'free_trial': 'Prueba Gratuita',
+        'basic': 'Plan Básico',
+        'pro': 'Plan Profesional',
+        'enterprise': 'Plan Empresarial'
+      };
+      return plans[planId] || planId || 'Sin Plan';
+    },
+
+    getPlanColor(planId) {
+      const colors = {
+        'free_trial': 'warning',
+        'basic': 'info',
+        'pro': 'success',
+        'enterprise': 'purple'
+      };
+      return colors[planId] || 'grey';
+    },
+
+    getTrialMessage() {
+      if (this.trialDaysLeft === 0) {
+        return '¡Tu prueba gratuita termina hoy! Actualiza tu plan para continuar.';
+      } else if (this.trialDaysLeft === 1) {
+        return '¡Tu prueba gratuita termina mañana! Actualiza tu plan ahora.';
+      } else if (this.trialDaysLeft <= 3) {
+        return `¡Solo ${this.trialDaysLeft} días restantes en tu prueba gratuita!`;
+      } else {
+        return `Tienes ${this.trialDaysLeft} días restantes en tu prueba gratuita.`;
+      }
+    },
+
+    getTrialBannerClass() {
+      if (this.trialDaysLeft <= 1) {
+        return 'trial-urgent';
+      } else if (this.trialDaysLeft <= 3) {
+        return 'trial-warning';
+      } else {
+        return 'trial-info';
+      }
+    },
 		getCurrentPageTitle() {
 			const routeName = this.$route.name
 			const pageTitles = {
@@ -265,6 +374,66 @@ export default {
 </script>
 
 <style scoped>
+/* ========================================
+	 NAVIGATION WRAPPER
+	 ======================================== */
+.navigation-wrapper {
+	position: relative;
+	width: 100%;
+}
+
+/* ========================================
+	 TRIAL BANNER STYLES
+	 ======================================== */
+.trial-banner-container {
+	position: sticky;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 1050;
+	width: 100%;
+}
+
+.trial-banner {
+	width: 100%;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	transition: all 0.3s ease;
+}
+
+.trial-info {
+	background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+	color: white;
+}
+
+.trial-warning {
+	background: linear-gradient(135deg, #ffb74d 0%, #ffa726 100%);
+	color: white;
+}
+
+.trial-urgent {
+	background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
+	color: white;
+	animation: pulse-urgent 2s ease-in-out infinite;
+}
+
+@keyframes pulse-urgent {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.9; }
+}
+
+.trial-cta-btn {
+	border-color: white !important;
+	color: white !important;
+	font-weight: 600;
+	transition: all 0.2s ease;
+}
+
+.trial-cta-btn:hover {
+	background-color: rgba(255, 255, 255, 0.2) !important;
+	transform: translateY(-2px);
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* ========================================
 	 APP BAR STYLES
 	 ======================================== */

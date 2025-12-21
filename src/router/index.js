@@ -74,6 +74,17 @@ const routes = [
     meta: { requiresAuth: true, title: 'Área de Contador', roles: ['admin', 'contador'] }
   },
   {
+    path: '/registration-success',
+    name: 'RegistrationSuccess',
+    component: () => import('@/views/auth/RegistrationSuccess.vue')
+  },
+  {
+    path: '/welcome',
+    name: 'Welcome',
+    component: () => import('@/views/onboarding/Welcome.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/login',
     name: 'Login',
     component: Login,
@@ -257,6 +268,13 @@ router.beforeEach(async (to, from, next) => {
             alert(`Tu usuario tiene un rol no válido (${userRole}). Por favor, contacta al administrador.`)
             next('/login')
             return
+          }
+
+          // Redirigir a Welcome si es cliente, está en prueba y no ha visto la bienvenida
+          if (userRole === 'cliente' && currentUser.plan_id === 'free_trial' && !localStorage.getItem('welcome_seen') && to.path !== '/welcome') {
+            console.log('🔄 Redirigiendo a Welcome (Onboarding)');
+            next('/welcome');
+            return;
           }
 
           // Redirigir clientes desde /dashboard a /cliente/dashboard

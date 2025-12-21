@@ -55,6 +55,8 @@
               <th>Nombre</th>
               <th>Email</th>
               <th>Rol</th>
+              <th>Plan</th>
+              <th>Fin Prueba</th>
               <th>Estado</th>
               <th>Último Login</th>
               <th>Acciones</th>
@@ -84,6 +86,12 @@
                 </span>
               </td>
               <td>
+                <span class="plan-badge">{{ getPlanName(user.plan_id) }}</span>
+              </td>
+              <td>
+                {{ formatDate(user.trial_end) }}
+              </td>
+              <td>
                 <span 
                   class="status-badge"
                   :class="{ active: user.isActive, inactive: !user.isActive }"
@@ -109,6 +117,14 @@
                   title="Editar usuario"
                 >
                   <i class="mdi mdi-pencil"></i>
+                </button>
+                <button 
+                  class="btn-action btn-trial animate-micro-bounce"
+                  @click="editTrial(user)"
+                  v-if="hasPermission('users.update')"
+                  title="Gestionar Prueba/Plan"
+                >
+                  <i class="mdi mdi-calendar-clock"></i>
                 </button>
                 <button 
                   class="btn-action btn-delete animate-micro-bounce"
@@ -305,11 +321,57 @@
         </div>
       </div>
     </div>
+
+
+    <!-- Modal de Gestión de Prueba -->
+    <div v-if="showTrialModal" class="modal-overlay animate-fade-in" @click="closeTrialModal">
+      <div class="modal-content animate-scale-in" @click.stop>
+        <div class="modal-header">
+          <h2>Gestionar Prueba y Plan</h2>
+          <button class="btn-close animate-micro-rotate" @click="closeTrialModal">
+            <i class="mdi mdi-close"></i>
+          </button>
+        </div>
+        
+        <form @submit.prevent="saveTrial" class="modal-form">
+          <div class="form-group">
+            <label class="form-label">Plan Actual</label>
+            <select v-model="trialForm.plan_id" class="form-select" required>
+              <option value="free_trial">Prueba Gratuita</option>
+              <option value="basic">Básico</option>
+              <option value="pro">Profesional</option>
+              <option value="enterprise">Empresarial</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Fin de la Prueba / Suscripción</label>
+            <input
+              v-model="trialForm.trial_end"
+              type="datetime-local"
+              class="form-input"
+            />
+            <small class="text-caption text-medium-emphasis">Dejar vacío para indefinido</small>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" @click="closeTrialModal">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-primary" :disabled="loading">
+              <span v-if="!loading">Guardar Cambios</span>
+              <span v-else class="loading-spinner">Guardando...</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import userService from '@/services/userService.js'
+import { supabase } from '@/lib/supabaseClient'
 
 export default {
   name: 'Usuarios',
@@ -323,6 +385,12 @@ export default {
       statusFilter: '',
       showModal: false,
       showDetailsModal: false,
+      showTrialModal: false,
+      trialForm: {
+        userId: null,
+        plan_id: 'free_trial',
+        trial_end: ''
+      },
       isEditing: false,
       loading: false,
       selectedUser: null,
@@ -460,6 +528,63 @@ export default {
       this.showDetailsModal = false
       this.selectedUser = null
     },
+
+    openTrialModal() {
+      this.showTrialModal = true
+    },
+
+    closeTrialModal() {
+      this.showTrialModal = false
+      this.trialForm = {
+        userId: null,
+        plan_id: 'free_trial',
+        trial_end: ''
+      }
+    },
+
+    editTrial(user) {
+      this.trialForm = {
+        userId: user.id,
+        plan_id: user.plan_id || 'free_trial',
+        trial_end: user.trial_end ? new Date(user.trial_end).toISOString().slice(0, 16) : ''
+      }
+      this.openTrialModal()
+    },
+
+    async saveTrial() {
+      try {
+        this.loading = true
+        console.log('💾 Iniciando actualización de prueba/plan:', this.trialForm)
+        
+        const updates = {
+          plan_id: this.trialForm.plan_id,
+          trial_end: this.trialForm.trial_end ? new Date(this.trialForm.trial_end).toISOString() : null
+        }
+        console.log('📤 Payload a enviar:', updates)
+
+        const { data, error } = await supabase
+          .from('users')
+          .update(updates)
+          .eq('id', this.trialForm.userId)
+          .select()
+
+        if (error) {
+          console.error('❌ Error de Supabase:', error)
+          throw error
+        }
+
+        console.log('✅ Actualización exitosa:', data)
+
+        await this.loadData()
+        this.closeTrialModal()
+        alert('Plan y prueba actualizados correctamente')
+      } catch (error) {
+        console.error('Error actualizando prueba:', error)
+        alert('Error al actualizar: ' + error.message)
+      } finally {
+        this.loading = false
+      }
+    },
     
     // Métodos de utilidad
     getRoleName(role) {
@@ -498,6 +623,16 @@ export default {
       })
     },
     
+    getPlanName(planId) {
+      const plans = {
+        'free_trial': 'Prueba Gratuita',
+        'basic': 'Básico',
+        'pro': 'Profesional',
+        'enterprise': 'Empresarial'
+      }
+      return plans[planId] || planId || 'N/A'
+    },
+
     hasPermission(permission) {
       // En un sistema real, esto vendría del usuario autenticado
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
@@ -754,6 +889,11 @@ export default {
 .btn-delete {
   background: #ffebee;
   color: #f44336;
+}
+
+.btn-trial {
+  background: #f3e5f5;
+  color: #9c27b0;
 }
 
 .btn-action:hover {
@@ -1013,5 +1153,15 @@ export default {
   .modal-actions {
     flex-direction: column;
   }
+}
+
+
+.plan-badge {
+  background: #e0f2f1;
+  color: #00695c;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
 }
 </style>
