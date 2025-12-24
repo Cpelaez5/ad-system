@@ -1,6 +1,9 @@
 <template>
   <v-app>
     
+    <!-- Trial Banner - Fixed at top -->
+    <TrialBanner v-if="showNavigation" />
+    
     <!-- Sistema de notificaciones -->
     <NotificationSystem />
     
@@ -8,7 +11,7 @@
     <AppNavigation v-if="showNavigation" />
     
     <!-- Contenido principal -->
-    <v-main>
+    <v-main :style="mainContentStyle">
       <router-view v-slot="{ Component }">
         <PageTransition name="fade" mode="out-in">
           <component :is="Component" />
@@ -23,6 +26,7 @@
 
 <script>
 import AppNavigation from './components/layout/AppNavigation.vue'
+import TrialBanner from './components/layout/TrialBanner.vue'
 import AppFooter from './components/layout/AppFooter.vue'
 import NotificationSystem from './components/common/NotificationSystem.vue'
 import PageTransition from './components/common/PageTransition.vue'
@@ -32,14 +36,22 @@ export default {
   name: 'App',
   components: {
     AppNavigation,
+    TrialBanner,
     AppFooter,
     NotificationSystem,
     PageTransition
   },
   computed: {
     showNavigation() {
-      const publicRoutes = ['LandingPage', 'Login', 'Register'];
+      const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing'];
       return !publicRoutes.includes(this.$route.name);
+    },
+    mainContentStyle() {
+      // Add padding-top when banner is visible to prevent content overlap
+      // The banner checks this internally, so we just provide extra space
+      return {
+        'padding-top': '0px' // Banner is fixed, v-main handles its own padding
+      };
     }
   }
 }

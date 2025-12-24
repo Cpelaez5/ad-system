@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 // Vistas compartidas (accesibles por todos los usuarios autenticados)
 import Dashboard from '@/views/shared/Dashboard.vue'
 import Login from '@/views/shared/Login.vue'
+import Pricing from '../views/Pricing.vue'
 const Register = () => import('@/views/auth/Register.vue')
 const OCRDemo = () => import('@/views/shared/OCRDemo.vue')
 
@@ -194,6 +195,12 @@ const routes = [
     name: 'Settings',
     component: Dashboard, // Temporalmente usar Dashboard
     meta: { requiresAuth: true, title: 'Configuración' }
+  },
+  {
+    path: '/pricing',
+    name: 'Pricing',
+    component: Pricing,
+    meta: { requiresAuth: false, title: 'Planes y Precios' }
   }
 ]
 
