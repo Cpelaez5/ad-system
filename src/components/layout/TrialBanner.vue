@@ -1,25 +1,35 @@
 <template>
-  <div v-if="showTrialBanner" class="trial-banner-wrapper">
-    <div class="trial-banner" :class="getTrialBannerClass()">
-      <v-container fluid class="py-2">
-        <div class="d-flex align-center justify-center">
-          <v-icon size="20" class="mr-2">mdi-clock-alert-outline</v-icon>
-          <span class="text-body-2 font-weight-bold">
-            {{ getTrialMessage() }}
-          </span>
-          <v-btn 
-            size="small" 
-            variant="outlined" 
-            class="ml-4 trial-cta-btn"
-            to="/pricing"
-          >
-            <v-icon size="16" class="mr-1">mdi-rocket-launch</v-icon>
-            Ver Planes
-          </v-btn>
-        </div>
-      </v-container>
+  <v-system-bar
+    v-if="showTrialBanner"
+    :color="getTrialBannerColor()"
+    class="trial-banner"
+    height="40"
+    app
+    style="z-index: 1200;"
+  >
+    <div 
+      class="d-flex align-center justify-center w-100 h-100"
+      :style="{ 
+        'padding-left': sidebarExpanded ? '270px' : '70px',
+        'transition': 'padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }"
+    >
+      <v-icon size="20" class="mr-2" color="white">mdi-clock-alert-outline</v-icon>
+      <span class="text-body-2 font-weight-bold text-white text-truncate">
+        {{ getTrialMessage() }}
+      </span>
+      <v-btn 
+        size="small" 
+        variant="outlined" 
+        class="ml-4 trial-cta-btn text-none"
+        href="/#pricing"
+        style="min-width: 120px;"
+      >
+        <v-icon size="16" class="mr-1">mdi-rocket-launch</v-icon>
+        Ver Planes
+      </v-btn>
     </div>
-  </div>
+  </v-system-bar>
 </template>
 
 <script>
@@ -27,11 +37,23 @@ import { supabase } from '@/lib/supabaseClient';
 
 export default {
   name: 'TrialBanner',
+  props: {
+    sidebarExpanded: {
+      type: Boolean,
+      default: false
+    }
+  },
+  emits: ['visibility-change'],
   data() {
     return {
       showTrialBanner: false,
       trialDaysLeft: 0
     };
+  },
+  watch: {
+    showTrialBanner(val) {
+      this.$emit('visibility-change', val);
+    }
   },
   async mounted() {
     await this.checkTrialStatus();
@@ -68,23 +90,23 @@ export default {
 
     getTrialMessage() {
       if (this.trialDaysLeft === 0) {
-        return '¡Tu prueba gratuita termina hoy! Actualiza tu plan para continuar.';
+        return '¡Tu prueba termina hoy!';
       } else if (this.trialDaysLeft === 1) {
-        return '¡Tu prueba gratuita termina mañana! Actualiza tu plan ahora.';
+        return '¡Tu prueba termina mañana!';
       } else if (this.trialDaysLeft <= 3) {
-        return `¡Solo ${this.trialDaysLeft} días restantes en tu prueba gratuita!`;
+        return `¡Solo ${this.trialDaysLeft} días restantes!`;
       } else {
         return `Tienes ${this.trialDaysLeft} días restantes en tu prueba gratuita.`;
       }
     },
 
-    getTrialBannerClass() {
+    getTrialBannerColor() {
       if (this.trialDaysLeft <= 1) {
-        return 'trial-urgent';
+        return '#ef5350'; // red
       } else if (this.trialDaysLeft <= 3) {
-        return 'trial-warning';
+        return '#ffa726'; // orange
       } else {
-        return 'trial-info';
+        return '#29b6f6'; // light blue
       }
     }
   }
@@ -92,44 +114,12 @@ export default {
 </script>
 
 <style scoped>
-.trial-banner-wrapper {
-  position: relative;
-  width: 100%;
-  z-index: 999;
-}
-
-.trial-banner {
-  width: 100%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.trial-info {
-  background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
-  color: white;
-}
-
-.trial-warning {
-  background: linear-gradient(135deg, #ffb74d 0%, #ffa726 100%);
-  color: white;
-}
-
-.trial-urgent {
-  background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
-  color: white;
-  animation: pulse-urgent 2s ease-in-out infinite;
-}
-
-@keyframes pulse-urgent {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.9; }
-}
-
 .trial-cta-btn {
   border-color: white !important;
   color: white !important;
   font-weight: 600;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .trial-cta-btn:hover {

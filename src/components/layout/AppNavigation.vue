@@ -1,4 +1,10 @@
 <template>
+  <TrialBanner 
+    @visibility-change="handleBannerVisibility"
+    :sidebar-expanded="sidebarExpanded"
+    style="z-index: 900 !important;"
+  />
+
   <!-- App Bar -->
   <v-app-bar
     color="white"
@@ -76,18 +82,20 @@
 <script>
 import bcvService from '@/services/bcvService.js';
 import Sidebar from './Sidebar.vue';
+import TrialBanner from './TrialBanner.vue';
 import { supabase } from '@/lib/supabaseClient';
 
 export default {
 	name: 'AppNavigation',
-	components: { Sidebar },
+	components: { Sidebar, TrialBanner },
 	data() {
 		return {
 			bcvRate: null,
 			bcvLoading: false,
 			bcvError: false,
 			sidebarExpanded: false,
-			userPlan: null
+			userPlan: null,
+      showTrialBanner: false
 		}
 	},
 	computed: {
@@ -124,6 +132,10 @@ export default {
 		}
 	},
 	methods: {
+    handleBannerVisibility(isVisible) {
+      this.showTrialBanner = isVisible;
+      this.$emit('banner-visibility-change', isVisible);
+    },
     async loadUserPlan() {
       try {
         const { data: { user } } = await supabase.auth.getUser();

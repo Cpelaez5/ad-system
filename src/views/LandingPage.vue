@@ -6,6 +6,7 @@
         <span class="brand-name">Sistema Contable</span>
       </div>
       <div class="nav-buttons">
+        <a href="#pricing" class="nav-btn text-grey-darken-2" @click.prevent="scrollToPricing">Precios</a>
         <router-link to="/login" class="nav-btn login-btn">Iniciar Sesión</router-link>
         <router-link :to="{ path: '/signup', query: { type: 'public_client' }}" class="nav-btn register-btn">Registrarse</router-link>
       </div>
@@ -56,6 +57,9 @@
         </div>
       </div>
     </main>
+
+    <!-- Pricing Section -->
+    <PricingSection @select-plan="handlePlanSelection" />
     
     <div class="background-shapes">
       <div class="shape shape-1"></div>
@@ -65,8 +69,31 @@
 </template>
 
 <script>
+import PricingSection from '@/components/sections/PricingSection.vue'
+
 export default {
-  name: 'LandingPage'
+  name: 'LandingPage',
+  components: {
+    PricingSection
+  },
+  methods: {
+    scrollToPricing() {
+      const element = document.getElementById('pricing');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    },
+    handlePlanSelection(planId) {
+      // Redirect to signup with plan pre-selected
+      this.$router.push({ 
+        path: '/signup', 
+        query: { 
+          type: 'public_client',
+          plan: planId 
+        } 
+      });
+    }
+  }
 }
 </script>
 
@@ -167,6 +194,7 @@ export default {
 .highlight {
   background: linear-gradient(135deg, #A81C22, #E0B04F);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
