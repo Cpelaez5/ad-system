@@ -515,6 +515,7 @@ import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
 import InvoiceForm from '@/components/forms/InvoiceForm.vue';
 import userService from '@/services/userService.js';
+import dayjs from 'dayjs';
 
 export default {
   name: 'Facturacion',
@@ -884,7 +885,7 @@ export default {
       }
     },
     
-    exportWithOptions() {
+    async exportWithOptions() {
       try {
         console.log('📤 Exportando con opciones avanzadas...', this.exportOptions);
         
@@ -892,24 +893,42 @@ export default {
         const dataToExport = this.exportOptions.scope === 'all' ? this.invoices : this.filteredInvoices;
         const currency = this.exportOptions.currency;
         
-        const result = exportService.exportTable(dataToExport, currency, this.exportOptions.format.toLowerCase());
-        
-        if (result.success) {
-          console.log('✅ Exportación avanzada exitosa:', result.filename);
-          console.log('📊 Registros exportados:', result.recordCount);
-          
-          // Generar resumen de exportación
-          const summary = exportService.generateExportSummary(dataToExport, currency);
-          console.log('📈 Resumen de exportación:', summary);
-          
-          // Cerrar diálogo
-          this.showExportDialog = false;
-          
-          // Aquí podrías mostrar una notificación de éxito con el resumen
-        } else {
-          console.error('❌ Error al exportar con opciones:', result.message);
-          // Aquí podrías mostrar una notificación de error
+        // Preparar información de la empresa para el encabezado
+        let companyInfo = null;
+        if (this.clientFilter) {
+          const selectedClient = this.clientsList.find(c => c.id === this.clientFilter);
+          if (selectedClient) {
+            companyInfo = {
+              name: selectedClient.company_name,
+              rif: selectedClient.rif,
+              period: dayjs().format('MMM YY').toLowerCase()
+            };
+          }
         }
+        
+        if (!companyInfo) {
+          // Fallback a la organización del contador
+          const orgProfile = Array.isArray(this.currentUser?.organization) 
+            ? this.currentUser.organization[0] 
+            : (this.currentUser?.organization || {});
+            
+          companyInfo = {
+            name: orgProfile.name || 'Mi Empresa',
+            rif: orgProfile.rif || 'J-00000000-0',
+            period: dayjs().format('MMM YY').toLowerCase()
+          };
+        }
+
+        await exportService.exportTable(
+          dataToExport, 
+          currency, 
+          this.exportOptions.format.toLowerCase(),
+          this.exportOptions.mode || 'SENIAT',
+          companyInfo
+        );
+        
+        console.log('✅ Exportación avanzada solicitada');
+        this.showExportDialog = false;
       } catch (error) {
         console.error('❌ Error al exportar con opciones:', error);
       }

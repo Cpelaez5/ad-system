@@ -519,6 +519,7 @@ import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
 import ClientInvoiceForm from '@/components/forms/client/ClientInvoiceForm.vue';
 import userService from '@/services/userService.js';
+import dayjs from 'dayjs';
 
 export default {
   name: 'FacturacionCliente',
@@ -976,11 +977,24 @@ export default {
       const invoicesToExport = this.exportOptions.scope === 'all' ? this.invoices : this.filteredInvoices;
       
       try {
-        exportService.exportTable(
+        // Preparar información de la empresa para el encabezado
+        const clientProfile = this.currentUser?.client || {};
+        const orgProfile = Array.isArray(this.currentUser?.organization) 
+          ? this.currentUser.organization[0] 
+          : (this.currentUser?.organization || {});
+
+        const companyInfo = {
+          name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
+          rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
+          period: dayjs().format('MMM YY').toLowerCase()
+        };
+
+        await exportService.exportTable(
           invoicesToExport, 
           this.exportOptions.currency, 
           this.exportOptions.format.toLowerCase(),
-          this.exportOptions.mode
+          this.exportOptions.mode,
+          companyInfo
         );
         this.showExportDialog = false;
       } catch (error) {

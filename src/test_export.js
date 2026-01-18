@@ -41,11 +41,6 @@ console.log('\n🧪 Test 1: SENIAT Export (Filtering)');
 try {
     const ws = exportService.exportLibroVentas(invoices, 'J-000000000');
 
-    // Count rows with data (approximate)
-    // We know headers take up ~8 rows.
-    // We expect 2 data rows + totals.
-
-    // Let's check if the non-fiscal client is present
     let foundNonFiscal = false;
     let foundFiscal1 = false;
     let foundFiscal2 = false;
@@ -70,12 +65,9 @@ try {
     console.error('❌ FAIL: Error executing exportLibroVentas:', error);
 }
 
-// Test 2: General Export (Should include all)
+// Test 2: General Export Logic
 console.log('\n🧪 Test 2: General Export Logic');
 try {
-    // We can't easily test exportTableToExcel because it writes to file/disk and might fail in this env if dependencies aren't perfect for Node.
-    // But we can verify the logic by creating the data array manually as the method does.
-
     const data = [];
     invoices.forEach(inv => {
         data.push([inv.invoiceNumber]);

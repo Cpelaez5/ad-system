@@ -781,6 +781,8 @@ import bcvService from '@/services/bcvService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
 
+import { supabase } from '@/lib/supabaseClient';
+
 export default {
   name: 'ClientInvoiceForm',
   components: {
@@ -997,7 +999,38 @@ export default {
   methods: {
     async loadCurrentUser() {
       try {
-        const user = await userService.getCurrentUser();
+        let user = await userService.getCurrentUser();
+        
+        // Verificación robusta: Si es cliente y faltan datos, intentar recargar directamente
+        if (user && user.role === 'cliente' && !user.client) {
+          console.warn('⚠️ [ClientInvoiceForm] Usuario cliente sin datos de perfil, intentando recuperar...');
+          try {
+            // 1. Verificar client_id en tabla users
+            const { data: userProfile } = await supabase
+              .from('users')
+              .select('client_id')
+              .eq('id', user.id)
+              .maybeSingle();
+              
+            if (userProfile && userProfile.client_id) {
+              // 2. Obtener datos del cliente
+              const { data: clientData } = await supabase
+                .from('clients')
+                .select('*')
+                .eq('id', userProfile.client_id)
+                .maybeSingle();
+                
+              if (clientData) {
+                console.log('✅ [ClientInvoiceForm] Datos de cliente recuperados manualmente:', clientData);
+                user.client = clientData;
+                user.client_id = userProfile.client_id;
+              }
+            }
+          } catch (err) {
+            console.error('❌ Error recuperando datos de cliente:', err);
+          }
+        }
+        
         console.log('👤 [ClientInvoiceForm] Usuario cargado:', user);
         this.currentUser = user;
         
