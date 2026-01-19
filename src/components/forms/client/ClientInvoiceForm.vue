@@ -1303,58 +1303,106 @@ export default {
     },
 
     mapExtractedDataToForm(data) {
+      console.log('🔄 Mapeando datos extraídos al formulario:', data);
+      
       // Reset ivaFromAI flag
       this.ivaFromAI = false;
       
-      // 1. Información Básica
+      // 1. Información Básica y Documento
       if (data.invoiceNumber) this.formData.invoiceNumber = data.invoiceNumber;
+      if (data.controlNumber) this.formData.controlNumber = data.controlNumber;
       if (data.issueDate) this.formData.issueDate = data.issueDate;
       if (data.dueDate) this.formData.dueDate = data.dueDate;
-      if (data.currency) this.formData.financial.currency = data.currency;
       
-      // 2. Mapeo inteligente según flujo
-      if (this.formData.flow === 'VENTA') {
-        // Si es venta, los datos extraídos del "Cliente" van a mi cliente
-        if (data.client) {
-            if (data.client.companyName) this.formData.client.companyName = data.client.companyName;
-            if (data.client.rif) this.formData.client.rif = data.client.rif;
-            if (data.client.address) this.formData.client.address = data.client.address;
-        }
-      } else {
-        // Si es compra, los datos extraídos del "Emisor" van al proveedor
-        if (data.issuer) {
-            if (data.issuer.companyName) this.formData.issuer.companyName = data.issuer.companyName;
-            if (data.issuer.rif) this.formData.issuer.rif = data.issuer.rif;
-            if (data.issuer.address) this.formData.issuer.address = data.issuer.address;
+      // Mapeo Inteligente de Document Type
+      if (data.documentCategory) {
+        this.formData.documentCategory = data.documentCategory; // FACTURA vs RECIBO
+        
+        // Si detectó tipo específico, tratar de mapearlo
+        if (data.documentType) {
+          const typeMap = {
+            'FACTURA': 'FACTURA',
+            'NOTA DE CRÉDITO': 'NOTA DE CRÉDITO',
+            'NOTA DE DÉBITO': 'NOTA DE DÉBITO',
+            'RECIBO': 'RECIBO',
+            'COMPROBANTE': 'RECIBO'
+          };
+          // Solo asignar si es un tipo conocido, sino dejar default
+          if (typeMap[data.documentType?.toUpperCase()]) {
+             this.formData.documentType = typeMap[data.documentType.toUpperCase()];
+          }
         }
       }
+
+      // 2. Mapeo Inteligente de Flujo (Si se detectó con alta confianza)
+      // Solo cambiamos el flujo si el usuario no ha avanzado mucho o explícitamente aceptamos recomendaciones
+      if (data.detectedFlow && data.confidence > 0.8) {
+        console.log(`🤖 Flujo sugerido por IA: ${data.detectedFlow}`);
+        // Nota: Cambiar el flijo programáticamente puede ser intrusivo, 
+        // idealmente deberíamos preguntar, pero por ahora lo asignamos si coincide con lógica simple
+        this.formData.flow = data.detectedFlow;
+      }
       
-      // 3. Items
+      // 3. Datos de Partes (Emisor/Cliente)
+      const targetParty = this.formData.flow === 'VENTA' ? 'client' : 'issuer';
+      const sourceParty = this.formData.flow === 'VENTA' ? data.client : data.issuer;
+      
+      if (sourceParty) {
+         if (sourceParty.companyName) this.formData[targetParty].companyName = sourceParty.companyName;
+         if (sourceParty.rif) this.formData[targetParty].rif = sourceParty.rif;
+         if (sourceParty.address) this.formData[targetParty].address = sourceParty.address;
+         if (sourceParty.phone) this.formData[targetParty].phone = sourceParty.phone;
+         if (sourceParty.email) this.formData[targetParty].email = sourceParty.email;
+         if (sourceParty.website) this.formData[targetParty].website = sourceParty.website;
+         // Taxpayer Type si viene
+         if (sourceParty.taxpayerType) this.formData[targetParty].taxpayerType = sourceParty.taxpayerType;
+      }
+
+      // 4. Items
       if (data.items && data.items.length > 0) {
         this.formData.items = data.items.map(item => ({
-          description: item.description || '',
-          quantity: item.quantity || 1,
-          unitPrice: item.unitPrice || 0,
-          total: item.amount || (item.quantity * item.unitPrice) || 0
+          description: item.description || 'Item sin descripción',
+          quantity: parseFloat(item.quantity) || 1,
+          unitPrice: parseFloat(item.unitPrice) || 0,
+          total: parseFloat(item.amount) || ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0))
         }));
         this.showItems = true;
       }
       
-      // 4. Financiero
-      if (data.total) this.formData.financial.totalSales = data.total;
-      if (data.subtotal) this.formData.financial.taxableSales = data.subtotal;
-      
-      // Si la IA extrajo el IVA, marcarlo para no recalcularlo
-      if (data.tax) {
-        this.formData.financial.taxDebit = data.tax;
-        this.ivaFromAI = true;
-        console.log('📊 IVA extraído por IA:', data.tax);
+      // 5. Financiero (Mapeo Completo)
+      if (data.financial) {
+        if (data.financial.total !== undefined) this.formData.financial.totalSales = parseFloat(data.financial.total);
+        if (data.financial.exemptAmount !== undefined) this.formData.financial.nonTaxableSales = parseFloat(data.financial.exemptAmount);
+        if (data.financial.taxableAmount !== undefined) this.formData.financial.taxableSales = parseFloat(data.financial.taxableAmount);
+        if (data.financial.igtf !== undefined) this.formData.financial.igtf = parseFloat(data.financial.igtf);
+        
+        // Retenciones
+        if (data.financial.ivaRetention !== undefined) this.formData.financial.ivaRetention = parseFloat(data.financial.ivaRetention);
+        if (data.financial.islrRetention !== undefined) this.formData.financial.islrRetention = parseFloat(data.financial.islrRetention);
+        
+        // IVA (manejo especial flag)
+        if (data.financial.taxAmount !== undefined) {
+           this.formData.financial.taxDebit = parseFloat(data.financial.taxAmount);
+           this.ivaFromAI = true;
+        }
+      } else {
+        // Fallback a estructura plana antigua si no viene 'financial' (retrocompatibilidad)
+        if (data.total) this.formData.financial.totalSales = data.total;
+        if (data.subtotal) this.formData.financial.taxableSales = data.subtotal;
+        if (data.tax) {
+            this.formData.financial.taxDebit = data.tax;
+            this.ivaFromAI = true;
+        }
       }
       
-      // 5. Notas
-      if (data.notes) {
-        this.formData.notes = data.notes;
-      }
+      // Moneda
+      if (data.currency) this.formData.financial.currency = data.currency;
+
+      // 6. Notas
+      if (data.notes) this.formData.notes = data.notes;
+      
+      // Notificar éxito
+      this.showSnackbar('Datos extraídos con IA correctamente', 'success');
     },
     
     addItem() {

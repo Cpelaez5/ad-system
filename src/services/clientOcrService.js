@@ -10,121 +10,78 @@
 
 import BaseOCRService from './baseOcrService'
 
-// Prompt optimizado para extracción según tipo de factura
-const VENTA_EXTRACTION_PROMPT = `Analiza esta factura y extrae SOLO los datos del COMPRADOR/CLIENTE.
+// Prompt unificado y mejorado para extracción completa (con instrucciones precisas de formato)
+const ENHANCED_EXTRACTION_PROMPT = `Analiza este documento comercial (imagen OCR) y extrae TODOS los datos disponibles con máxima precisión.
 
-IMPORTANTE: Retorna SOLO el objeto JSON, sin texto adicional, sin markdown, sin explicaciones.
+OBJETIVO PRINCIPAL:
+1. IDENTIFICAR TIPO: Determina si es FACTURA (Fiscal, con Nro Control), NOTA DE ENTREGA/RECIBO (No Fiscal), o NOTA CRÉDITO/DÉBITO.
+2. DETECTAR FLUJO: Determina si es una COMPRA (Usuario es CLIENTE/RECEPTOR) o VENTA (Usuario es EMISOR/PROVEEDOR) basándote en el Contexto del Usuario provisto.
+3. EXTRAER DATOS: Extrae cada campo posible, incluyendo montos desglosados, impuestos, y validando formatos numéricos.
 
-Estructura requerida:
-{
-  "invoiceNumber": "número de factura completo",
-  "issueDate": "fecha de emisión en formato YYYY-MM-DD",
-  "dueDate": "fecha de vencimiento en formato YYYY-MM-DD o null",
-  "client": {
-    "companyName": "nombre completo de la empresa COMPRADORA",
-    "rif": "RIF del COMPRADOR en formato J-12345678-9",
-    "address": "dirección completa del COMPRADOR",
-    "phone": "teléfono del COMPRADOR o null",
-    "email": "email del COMPRADOR o null"
-  },
-  "items": [
-    {
-      "description": "descripción del producto o servicio",
-      "quantity": número,
-      "unitPrice": número,
-      "amount": número
-    }
-  ],
-  "subtotal": número,
-  "tax": número del impuesto,
-  "taxRate": porcentaje del impuesto (ej: 16 para 16%),
-  "total": número total,
-  "currency": "VES" o "USD",
-  "notes": "observaciones o null"
-}
-
-Reglas:
-- Si un campo no está presente, usa null
-- Los números deben ser sin formato (sin puntos, comas, símbolos)
-- Las fechas en formato YYYY-MM-DD
-- El RIF debe incluir el prefijo (J-, V-, G-, etc.)
-- Retorna SOLO el JSON`
-
-const COMPRA_EXTRACTION_PROMPT = `Analiza esta factura y extrae SOLO los datos del EMISOR/PROVEEDOR.
-
-IMPORTANTE: Retorna SOLO el objeto JSON, sin texto adicional, sin markdown, sin explicaciones.
-
-Estructura requerida:
-{
-  "invoiceNumber": "número de factura completo",
-  "issueDate": "fecha de emisión en formato YYYY-MM-DD",
-  "dueDate": "fecha de vencimiento en formato YYYY-MM-DD o null",
-  "issuer": {
-    "companyName": "nombre completo de la empresa EMISORA/PROVEEDORA",
-    "rif": "RIF del EMISOR en formato J-12345678-9",
-    "address": "dirección completa del EMISOR",
-    "phone": "teléfono del EMISOR o null",
-    "email": "email del EMISOR o null"
-  },
-  "items": [
-    {
-      "description": "descripción del producto o servicio",
-      "quantity": número,
-      "unitPrice": número,
-      "amount": número
-    }
-  ],
-  "subtotal": número,
-  "tax": número del impuesto,
-  "taxRate": porcentaje del impuesto (ej: 16 para 16%),
-  "total": número total,
-  "currency": "VES" o "USD",
-  "notes": "observaciones o null"
-}
-
-Reglas:
-- Si un campo no está presente, usa null
-- Los números deben ser sin formato (sin puntos, comas, símbolos)
-- Las fechas en formato YYYY-MM-DD
-- El RIF debe incluir el prefijo (J-, V-, G-, etc.)
-- Retorna SOLO el JSON`
-
-const AUTO_DETECT_PROMPT = `Analiza esta factura y determina si es una factura de VENTA o de COMPRA basándote en los datos del usuario proporcionados.
-
-Contexto del Usuario (quien sube la factura):
-- Nombre Empresa: {companyName}
+Contexto del Usuario (quien sube el documento):
+- Nombre: {companyName}
 - RIF: {rif}
 
-Reglas de Detección:
-1. Si el EMISOR de la factura coincide con el Contexto del Usuario (Nombre o RIF) -> Es VENTA
-2. Si el CLIENTE de la factura coincide con el Contexto del Usuario -> Es COMPRA
-3. Si no coincide ninguno, asume COMPRA (gasto genérico)
-
-Retorna SOLO un objeto JSON con esta estructura:
+Estructura JSON Requerida (Retorna SOLO esto):
 {
-  "detectedFlow": "VENTA" o "COMPRA",
-  "reasoning": "breve explicación",
-  "data": {
-    // Si es VENTA, extrae datos del CLIENTE/COMPRADOR
-    // Si es COMPRA, extrae datos del EMISOR/PROVEEDOR
-    "invoiceNumber": "...",
-    "issueDate": "YYYY-MM-DD",
-    "dueDate": "YYYY-MM-DD",
-    "party": { // Datos de la contraparte (Cliente en Venta, Emisor en Compra)
-      "companyName": "...",
-      "rif": "...",
-      "address": "...",
-      "phone": "...",
-      "email": "..."
-    },
-    "items": [...],
-    "subtotal": 0.0,
-    "tax": 0.0,
-    "total": 0.0,
-    "currency": "VES"
-  }
+  "documentType": "FACTURA|NOTA DE CRÉDITO|NOTA DE DÉBITO|RECIBO|COMPROBANTE",
+  "documentCategory": "FACTURA" (si es fiscal/legal) o "RECIBO" (si es nota entrega/interno),
+  "detectedFlow": "VENTA|COMPRA",
+  "reasoning": "Breve explicación de por qué clasificaste así el documento",
+
+  "invoiceNumber": "Número de documento completo (ej: A-000123)",
+  "controlNumber": "Número de control (formato fiscal serie-número) o null",
+  "issueDate": "YYYY-MM-DD",
+  "dueDate": "YYYY-MM-DD o null",
+  
+  "issuer": {
+    "companyName": "Nombre/Razón Social del EMISOR",
+    "rif": "RIF del EMISOR (ej: J-12345678-9)",
+    "address": "Dirección fiscal del EMISOR o null",
+    "phone": "Teléfono del EMISOR o null",
+    "email": "Correo del EMISOR o null",
+    "website": "Web del EMISOR o null"
+  },
+  
+  "client": {
+    "companyName": "Nombre/Razón Social del CLIENTE/RECEPTOR",
+    "rif": "RIF del CLIENTE (ej: J-12345678-9) o null",
+    "address": "Dirección del CLIENTE o null",
+    "phone": "Teléfono del CLIENTE o null",
+    "email": "Correo del CLIENTE o null"
+  },
+  
+  "items": [
+    {
+      "description": "Descripción del item",
+      "quantity": 1.0,
+      "unitPrice": 0.00,
+      "amount": 0.00
+    }
+  ],
+  
+  "financial": {
+    "subtotal": 0.00,
+    "exemptAmount": 0.00,
+    "taxableAmount": 0.00,
+    "taxRate": 16.00,
+    "taxAmount": 0.00,
+    "igtf": 0.00,
+    "total": 0.00,
+    "ivaRetention": 0.00,
+    "islrRetention": 0.00
+  },
+  
+  "currency": "VES|USD|EUR",
+  "notes": "Observaciones adicionales o null"
 }
-`
+
+REGLAS DE EXTRACCIÓN:
+- Si el documento menciona "CONTROL N°" o "NRO CONTROL", es CASI SEGURO una FACTURA FISCAL.
+- Si dice "NOTA DE ENTREGA" o no tiene control, suele ser RECIBO.
+- IMPORTANTE NÚMEROS: Usa formato estándar JSON (punto para decimales). Ej: 1250.50. NO uses separadores de miles ni formato español con coma.
+- MONEDA: Si el símbolo es "Bs", "Bolívares" o ambiguo, asume "VES". Solo usa "USD" o "EUR" si es explícito.
+- Retorna SOLO el JSON válido.`;
 
 class ClientOCRService extends BaseOCRService {
   constructor() {
@@ -142,64 +99,34 @@ class ClientOCRService extends BaseOCRService {
    */
   async extractInvoiceData(file, flowType = null, userContext = null) {
     try {
-      console.log(`📄 [Cliente] Procesando factura. Tipo: ${flowType || 'AUTO-DETECTAR'}`)
+      console.log(`📄 [Cliente] Procesando documento. Contexto:`, userContext);
 
       // Procesar archivo y obtener texto
       const text = await this.processFile(file)
 
-      let prompt = '';
-
-      if (flowType) {
-        // Flujo manual
-        prompt = flowType === 'VENTA' ? VENTA_EXTRACTION_PROMPT : COMPRA_EXTRACTION_PROMPT;
-      } else {
-        // Auto-detección
-        const contextStr = userContext
-          ? `Nombre: ${userContext.companyName || 'N/A'}, RIF: ${userContext.rif || 'N/A'}`
-          : 'No especificado';
-
-        prompt = AUTO_DETECT_PROMPT
-          .replace('{companyName}', userContext?.companyName || 'Desconocido')
-          .replace('{rif}', userContext?.rif || 'Desconocido');
-      }
+      // Preparar el prompt con el contexto del usuario (para ayudar a detectar el flujo)
+      const prompt = ENHANCED_EXTRACTION_PROMPT
+        .replace('{companyName}', userContext?.companyName || 'Desconocido')
+        .replace('{rif}', userContext?.rif || 'Desconocido');
 
       console.log('📝 Analizando texto con DeepSeek (temperatura 0.0)...')
       const response = await this.analyzeTextWithDeepSeek(text, prompt)
 
       const rawData = this.parseJSONResponse(response)
+      console.log('🤖 Respuesta IA Cruda:', rawData);
 
-      // Normalizar respuesta si viene de auto-detección
+      // El resultado ya viene estructurado según el prompt unificado
       let data = rawData;
-      if (!flowType && rawData.detectedFlow) {
-        console.log(`🤖 Flujo detectado: ${rawData.detectedFlow} (${rawData.reasoning})`);
 
-        // Reestructurar datos para coincidir con el formato esperado por el frontend
-        data = {
-          ...rawData.data,
-          detectedFlow: rawData.detectedFlow,
-          reasoning: rawData.reasoning
-        };
-
-        // Mapear 'party' al campo correcto
-        if (rawData.detectedFlow === 'VENTA') {
-          data.client = rawData.data.party;
-        } else {
-          data.issuer = rawData.data.party;
-        }
-
-        // Asignar flowType detectado para cálculo de confianza
-        flowType = rawData.detectedFlow;
-      }
-
-      // Calcular confianza según tipo
-      const requiredFields = flowType === 'VENTA'
-        ? ['invoiceNumber', 'issueDate', 'client.companyName', 'client.rif', 'total']
-        : ['invoiceNumber', 'issueDate', 'issuer.companyName', 'issuer.rif', 'total']
+      // Calcular confianza
+      // Campos mínimos para considerar válida la extracción
+      const requiredFields = ['invoiceNumber', 'issueDate', 'total', 'items'];
+      if (data.detectedFlow === 'VENTA') requiredFields.push('client.companyName');
+      else requiredFields.push('issuer.companyName');
 
       data.confidence = this.calculateConfidence(data, requiredFields)
-      data.flowType = flowType
 
-      console.log(`✅ [Cliente] Extracción completada con confianza: ${Math.round(data.confidence * 100)}%`)
+      console.log(`✅ [Cliente] Extracción completada. Tipo: ${data.documentType}, Flujo: ${data.detectedFlow}, Confianza: ${Math.round(data.confidence * 100)}%`)
 
       return data
 
@@ -251,5 +178,3 @@ class ClientOCRService extends BaseOCRService {
 
 // Exportar instancia singleton
 export default new ClientOCRService()
-
-

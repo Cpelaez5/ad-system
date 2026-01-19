@@ -2,6 +2,7 @@
  * Base OCR Service - Funcionalidades compartidas
  * 
  * Proporciona utilidades comunes para OCR:
+ * - Extracción directa de texto de PDF (Parsing)
  * - Conversión de PDF a imagen
  * - Compresión de imágenes
  * - OCR con Tesseract
@@ -30,17 +31,62 @@ class BaseOCRService {
     }
 
     /**
+     * Intenta extraer texto directamente del PDF (Parseo Digital)
+     * Retorna el texto si tiene éxito y es suficiente, o null si falla/es escaneo
+     */
+    async extractTextFromPdf(file) {
+        try {
+            const pdfjsLib = await import('pdfjs-dist')
+            const workerUrl = new URL(
+                'pdfjs-dist/build/pdf.worker.min.mjs',
+                import.meta.url
+            ).href
+            pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
+
+            const arrayBuffer = await file.arrayBuffer()
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+
+            let fullText = ''
+
+            // Extraer texto de todas las páginas (limitado a las primeras 3 para eficiencia)
+            const maxPages = Math.min(pdf.numPages, 3)
+
+            for (let i = 1; i <= maxPages; i++) {
+                const page = await pdf.getPage(i)
+                const textContent = await page.getTextContent()
+
+                // Unir items con espacios, intentando preservar estructura básica
+                const pageText = textContent.items
+                    .map(item => item.str)
+                    .join(' ')
+
+                fullText += pageText + '\n'
+            }
+
+            // Validar si extrajo suficiente texto (si es < 50 chars, probablemente es imagen pegada en PDF)
+            if (fullText.trim().length < 50) {
+                console.log('⚠️ PDF parece ser escaneado (poco texto detectado).')
+                return null
+            }
+
+            return this.postProcessText(fullText)
+
+        } catch (error) {
+            console.warn('⚠️ Falló extracción directa de PDF, usando OCR fallback:', error)
+            return null
+        }
+    }
+
+    /**
      * Convierte PDF a imagen usando PDF.js
      */
     async convertPdfToImage(file) {
         try {
             const pdfjsLib = await import('pdfjs-dist')
-
             const workerUrl = new URL(
                 'pdfjs-dist/build/pdf.worker.min.mjs',
                 import.meta.url
             ).href
-
             pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 
             const arrayBuffer = await file.arrayBuffer()
@@ -174,16 +220,30 @@ class BaseOCRService {
     }
 
     /**
-     * Procesa archivo: PDF → Imagen → Compresión → OCR
+     * Procesa archivo: Intenta PDF Parse primero, luego Fallback a OCR
      */
     async processFile(file) {
         console.log('📄 Procesando archivo:', file.name)
-
         this.validateFile(file)
 
+        // ESTRATEGIA HÍBRIDA:
+        // 1. Si es PDF, intentar extraer texto directo (Digital Parsing)
+        if (file.type === 'application/pdf') {
+            console.log('📑 Intentando extracción digital directa de PDF...')
+            const directText = await this.extractTextFromPdf(file)
+
+            if (directText) {
+                console.log('✨ Texto extraído digitalmente (sin OCR). Calidad 100%.')
+                return directText
+            } else {
+                console.log('⚠️ PDF parece escaneado o protegido. Iniciando fallback a OCR...')
+            }
+        }
+
+        // 2. Fallback: Convertir a imagen (si es PDF) y aplicar OCR
         let imageFile = file
         if (file.type === 'application/pdf') {
-            console.log('📑 Convirtiendo PDF a imagen...')
+            console.log('📑 Convirtiendo PDF a imagen para OCR...')
             imageFile = await this.convertPdfToImage(file)
         }
 
@@ -241,7 +301,7 @@ class BaseOCRService {
             // Normalizar moneda
             if (data.currency) {
                 data.currency = data.currency.toUpperCase()
-                if (data.currency === 'BS' || data.currency === 'BSF' || data.currency === 'BSS') {
+                if (data.currency === 'BS' || data.currency === 'BSF' || data.currency === 'BSS' || data.currency === 'BOLIVARES') {
                     data.currency = 'VES'
                 }
             }
