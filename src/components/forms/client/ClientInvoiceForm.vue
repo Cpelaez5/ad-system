@@ -3,7 +3,7 @@
     <v-card>
       <v-card-title class="d-flex align-center">
         <v-icon left>mdi-receipt-long</v-icon>
-        {{ isEditing ? 'Editar Factura' : 'Nueva Factura' }}
+        {{ isEditing ? 'Editar Documento' : 'Nuevo Documento' }}
       </v-card-title>
       
       <!-- Stepper para navegación por pasos -->
@@ -13,7 +13,7 @@
             :complete="currentStep > 1"
             :value="1"
             title="Información Básica"
-            subtitle="Datos generales de la factura"
+            subtitle="Datos generales del documento"
           ></v-stepper-item>
           
           <v-divider></v-divider>
@@ -65,7 +65,7 @@
                   <v-expansion-panel-title>
                     <div class="d-flex align-center">
                       <v-icon class="mr-2" color="primary">mdi-file-upload</v-icon>
-                      <span class="font-weight-medium">Escanear Factura con IA</span>
+                      <span class="font-weight-medium">Escanear Documento con IA</span>
                       <v-chip size="x-small" color="success" variant="tonal" class="ml-2">Opcional</v-chip>
                     </div>
                   </v-expansion-panel-title>
@@ -100,7 +100,7 @@
               <v-sheet variant="outlined" class="mb-6 rounded-lg border-2 pa-4">
                 <div class="d-flex align-center mb-4">
                   <v-icon color="primary" size="24" class="mr-2">mdi-swap-horizontal-circle</v-icon>
-                  <span class="text-h6 font-weight-medium">Tipo de Factura</span>
+                  <span class="text-h6 font-weight-medium">Tipo de Registro</span>
                   <v-chip size="small" color="primary" variant="tonal" class="ml-2">Requerido</v-chip>
                 </div>
                 
@@ -205,13 +205,13 @@
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model="formData.invoiceNumber"
-                    label="Número de Factura"
-                    :rules="[v => !!v || 'El número de factura es requerido']"
+                    label="Número de Documento"
+                    :rules="[v => !!v || 'El número de documento es requerido']"
                     required
                     variant="outlined"
                     class="animated-field"
                     prepend-inner-icon="mdi-receipt-text"
-                    hint="Ej: F-2024-001"
+                    hint="Ej: F-2024-001 o R-2024-001"
                     persistent-hint
                   ></v-text-field>
                 </v-col>
@@ -262,7 +262,7 @@
                     variant="outlined"
                     class="animated-field"
                     prepend-inner-icon="mdi-calendar"
-                    hint="Fecha en que se emite la factura"
+                    hint="Fecha del documento"
                     persistent-hint
                   ></v-text-field>
                 </v-col>
@@ -282,7 +282,7 @@
                   <v-select
                     v-model="formData.status"
                     :items="invoiceStatuses"
-                    label="Estado de la Factura"
+                    label="Estado del Documento"
                     variant="outlined"
                     class="animated-field"
                     prepend-inner-icon="mdi-flag"
@@ -481,39 +481,50 @@
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model.number="formData.financial.totalSales"
-                    label="Total de Ventas"
+                    label="Monto Total del Documento"
                     type="number"
                     step="0.01"
-                    :rules="[v => v > 0 || 'El total debe ser mayor a 0']"
+                    :rules="[v => v > 0 || 'El monto total debe ser mayor a 0']"
                     required
                     variant="outlined"
+                    :prefix="currencySymbol"
+                    hint="Ingresa el monto total y el IVA se calculará automáticamente"
+                    persistent-hint
+                    @update:model-value="autoCalculateFinancials"
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model.number="formData.financial.nonTaxableSales"
-                    label="Ventas No Gravadas"
+                    label="Base Exenta (No Gravada)"
                     type="number"
                     step="0.01"
                     variant="outlined"
+                    hint="Monto exento de IVA"
+                    persistent-hint
+                    @update:model-value="autoCalculateFinancials"
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model.number="formData.financial.taxableSales"
-                    label="Ventas Gravadas"
+                    label="Base Imponible (Gravada)"
                     type="number"
                     step="0.01"
                     variant="outlined"
+                    hint="Se calcula automáticamente: Total - Exento"
+                    persistent-hint
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model.number="formData.financial.taxDebit"
-                    label="IVA Débito"
+                    label="IVA (16%)"
                     type="number"
                     step="0.01"
                     variant="outlined"
+                    hint="Se calcula automáticamente: 16% de la Base Imponible"
+                    persistent-hint
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
@@ -812,6 +823,9 @@ export default {
       extracting: false,
       extractionResult: null,
       
+      // Flag para indicar si el IVA fue extraído por IA
+      ivaFromAI: false,
+      
       // Usuario actual (Cliente)
       currentUser: null,
       
@@ -946,6 +960,16 @@ export default {
           { title: 'Nota de Débito', type: 'NOTA DE DÉBITO', category: 'FACTURA', icon: 'mdi-cash-plus', color: 'error', subtitle: 'Cargo adicional (Fiscal)' }
         ];
       }
+    },
+    
+    // Símbolo de moneda dinámico según la selección
+    currencySymbol() {
+      const symbols = {
+        'VES': 'Bs',
+        'USD': '$',
+        'EUR': '€'
+      };
+      return symbols[this.formData.financial.currency] || 'Bs';
     }
   },
   watch: {
@@ -1144,6 +1168,30 @@ export default {
       return colors[status] || 'grey';
     },
     
+    // Auto-calcular campos financieros
+    autoCalculateFinancials() {
+      const total = parseFloat(this.formData.financial.totalSales) || 0;
+      const exento = parseFloat(this.formData.financial.nonTaxableSales) || 0;
+      
+      // Base Imponible = Total - Exento
+      const baseImponible = Math.max(0, total - exento);
+      this.formData.financial.taxableSales = parseFloat(baseImponible.toFixed(2));
+      
+      // IVA = 16% de la Base Imponible (solo si no fue extraído por IA)
+      if (!this.ivaFromAI) {
+        const iva = baseImponible * 0.16;
+        this.formData.financial.taxDebit = parseFloat(iva.toFixed(2));
+      }
+      
+      console.log('📊 Auto-cálculo financiero:', {
+        total,
+        exento,
+        baseImponible: this.formData.financial.taxableSales,
+        iva: this.formData.financial.taxDebit,
+        ivaFromAI: this.ivaFromAI
+      });
+    },
+    
     validateStep(step) {
       switch(step) {
         case 1:
@@ -1255,6 +1303,9 @@ export default {
     },
 
     mapExtractedDataToForm(data) {
+      // Reset ivaFromAI flag
+      this.ivaFromAI = false;
+      
       // 1. Información Básica
       if (data.invoiceNumber) this.formData.invoiceNumber = data.invoiceNumber;
       if (data.issueDate) this.formData.issueDate = data.issueDate;
@@ -1292,7 +1343,13 @@ export default {
       // 4. Financiero
       if (data.total) this.formData.financial.totalSales = data.total;
       if (data.subtotal) this.formData.financial.taxableSales = data.subtotal;
-      if (data.tax) this.formData.financial.taxDebit = data.tax;
+      
+      // Si la IA extrajo el IVA, marcarlo para no recalcularlo
+      if (data.tax) {
+        this.formData.financial.taxDebit = data.tax;
+        this.ivaFromAI = true;
+        console.log('📊 IVA extraído por IA:', data.tax);
+      }
       
       // 5. Notas
       if (data.notes) {
