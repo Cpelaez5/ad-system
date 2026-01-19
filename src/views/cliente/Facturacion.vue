@@ -33,25 +33,50 @@
             </v-btn>
           </template>
           <v-list>
-            <!-- SENIAT Export Option (Contextual) -->
-            <v-list-item 
-              v-if="currentTab !== 'all'"
-              @click="exportTable('xlsx', 'filtered', 'SENIAT')"
-            >
-              <v-list-item-title>
-                <v-icon start color="primary">mdi-book-open-variant</v-icon>
-                Exportar Libro {{ currentTab === 'ventas' ? 'de Ventas' : (currentTab === 'compras' ? 'de Compras' : 'SENIAT') }}
-              </v-list-item-title>
-              <v-list-item-subtitle>Formato SENIAT (Solo Fiscales)</v-list-item-subtitle>
+            <!-- Libros Fiscales (SENIAT) -->
+            <v-list-subheader class="text-primary font-weight-bold">
+              <v-icon start size="small">mdi-gavel</v-icon>
+              Libros Fiscales (SENIAT)
+            </v-list-subheader>
+            
+            <v-list-item @click="exportFiscal('COMPRA')">
+              <template v-slot:prepend>
+                <v-icon color="blue">mdi-book-open-variant</v-icon>
+              </template>
+              <v-list-item-title>Libro de Compras</v-list-item-title>
+              <v-list-item-subtitle>Solo facturas fiscales (compras y gastos)</v-list-item-subtitle>
             </v-list-item>
-
-            <!-- General Export Option -->
-            <v-list-item @click="exportTable('xlsx', 'all', 'GENERAL')">
-              <v-list-item-title>
-                <v-icon start>mdi-file-excel</v-icon>
-                Exportar Todo (General)
-              </v-list-item-title>
-              <v-list-item-subtitle>{{ invoices.length }} registros</v-list-item-subtitle>
+            
+            <v-list-item @click="exportFiscal('VENTA')">
+              <template v-slot:prepend>
+                <v-icon color="green">mdi-book-open-variant</v-icon>
+              </template>
+              <v-list-item-title>Libro de Ventas</v-list-item-title>
+              <v-list-item-subtitle>Solo facturas fiscales de ventas</v-list-item-subtitle>
+            </v-list-item>
+            
+            <v-divider class="my-2"></v-divider>
+            
+            <!-- Reportes Generales -->
+            <v-list-subheader class="text-grey-darken-1 font-weight-bold">
+              <v-icon start size="small">mdi-file-chart</v-icon>
+              Reportes Generales
+            </v-list-subheader>
+            
+            <v-list-item @click="exportGeneral('COMPRA')">
+              <template v-slot:prepend>
+                <v-icon color="orange">mdi-file-excel</v-icon>
+              </template>
+              <v-list-item-title>Compras General</v-list-item-title>
+              <v-list-item-subtitle>Facturas + Recibos de compras y gastos</v-list-item-subtitle>
+            </v-list-item>
+            
+            <v-list-item @click="exportGeneral('VENTA')">
+              <template v-slot:prepend>
+                <v-icon color="teal">mdi-file-excel</v-icon>
+              </template>
+              <v-list-item-title>Ventas General</v-list-item-title>
+              <v-list-item-subtitle>Facturas + Recibos de ventas</v-list-item-subtitle>
             </v-list-item>
           </v-list>
         </v-menu>
@@ -1007,6 +1032,73 @@ export default {
       this.exportOptions.scope = scope;
       this.exportOptions.mode = mode;
       this.showExportDialog = true;
+    },
+    
+    // Exportar solo facturas fiscales (para libros SENIAT)
+    async exportFiscal(flowType) {
+      try {
+        // Filtrar solo facturas fiscales del tipo de flujo especificado
+        const fiscalInvoices = this.invoices.filter(inv => 
+          inv.documentType === 'FACTURA' && 
+          (flowType === 'COMPRA' ? inv.flow === 'COMPRA' : inv.flow === 'VENTA')
+        );
+        
+        if (fiscalInvoices.length === 0) {
+          alert(`No hay facturas fiscales de ${flowType === 'COMPRA' ? 'compras/gastos' : 'ventas'} para exportar.`);
+          return;
+        }
+        
+        await this.startExport(fiscalInvoices, flowType, 'SENIAT');
+      } catch (error) {
+        console.error('Error al exportar libro fiscal:', error);
+      }
+    },
+    
+    // Exportar todo (facturas + recibos)
+    async exportGeneral(flowType) {
+      try {
+        // Filtrar todos los registros del tipo de flujo (facturas + recibos)
+        const allRecords = this.invoices.filter(inv => 
+          flowType === 'COMPRA' ? inv.flow === 'COMPRA' : inv.flow === 'VENTA'
+        );
+        
+        if (allRecords.length === 0) {
+          alert(`No hay registros de ${flowType === 'COMPRA' ? 'compras/gastos' : 'ventas'} para exportar.`);
+          return;
+        }
+        
+        await this.startExport(allRecords, flowType, 'GENERAL');
+      } catch (error) {
+        console.error('Error al exportar reporte general:', error);
+      }
+    },
+    
+    // Iniciar exportación con los datos preparados
+    async startExport(invoicesToExport, flowType, mode) {
+      try {
+        // Preparar información de la empresa
+        const clientProfile = this.currentUser?.client || {};
+        const orgProfile = Array.isArray(this.currentUser?.organization) 
+          ? this.currentUser.organization[0] 
+          : (this.currentUser?.organization || {});
+        
+        const companyInfo = {
+          name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
+          rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
+          period: dayjs().format('MMM YY').toLowerCase()
+        };
+        
+        const filename = mode === 'SENIAT' 
+          ? `Libro_${flowType === 'VENTA' ? 'Ventas' : 'Compras'}_${dayjs().format('YYYY-MM')}.xlsx`
+          : `Reporte_${flowType}_General_${dayjs().format('YYYY-MM')}.xlsx`;
+        
+        await exportService.exportTable(invoicesToExport, 'VES', filename, mode, companyInfo);
+        
+        console.log(`✅ Exportación exitosa: ${filename} (${invoicesToExport.length} registros)`);
+      } catch (error) {
+        console.error('Error en startExport:', error);
+        throw error;
+      }
     },
     
     exportInvoice(invoice) {
