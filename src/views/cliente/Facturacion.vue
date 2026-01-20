@@ -87,7 +87,7 @@
     <v-row class="mb-6">
       <v-col cols="12" sm="6" md="3">
         <StatsCard
-          title="Total Facturas"
+          title="Total de documentos"
           :value="stats.total"
           bg-color="#02254d"
           text-color="white"
@@ -294,17 +294,7 @@
           {{ formatDate(item.issueDate) }}
         </template>
 
-        <!-- Columna de Categoría -->
-        <template v-slot:item.documentCategory="{ item }">
-          <v-chip
-            :color="item.documentCategory === 'FACTURA' ? 'primary' : 'info'"
-            variant="flat"
-            size="x-small"
-            class="font-weight-bold"
-          >
-            {{ item.documentCategory }}
-          </v-chip>
-        </template>
+
 
         <!-- Columna de total -->
         <template v-slot:item.total="{ item }">
@@ -605,7 +595,7 @@ export default {
       currentUser: null,
       headers: [
         { title: 'Número', key: 'invoiceNumber', sortable: true },
-        { title: 'Categoría', key: 'documentCategory', sortable: true },
+
         { title: 'Cliente/Proveedor', key: 'client', sortable: true },
         { title: 'Fecha', key: 'issueDate', sortable: true },
         { title: 'Total', key: 'total', sortable: true },
@@ -806,16 +796,26 @@ export default {
     },
     
     calculateStats() {
+      // Usar filteredInvoices en lugar de invoices para que las tarjetas reflejen lo que se ve
+      const sourceData = this.filteredInvoices;
+      
       this.stats = {
-        total: this.invoices.length,
+        total: sourceData.length,
         byStatus: {},
         totalAmount: 0
       };
       
-      this.invoices.forEach(inv => {
+      sourceData.forEach(inv => {
         this.stats.byStatus[inv.status] = (this.stats.byStatus[inv.status] || 0) + 1;
         this.stats.totalAmount += (inv.financial?.totalSales || 0);
       });
+      
+      // Si estamos en modo USD, recalcular el total convertido de las stats inmediatamente
+      if (this.currencyDisplay === 'USD' && this.cachedRate) {
+         this.convertedStatsTotal = this.stats.totalAmount / this.cachedRate;
+      } else {
+         this.convertedStatsTotal = this.stats.totalAmount;
+      }
     },
     
     // loadStats() eliminado porque calculamos localmente
@@ -859,14 +859,28 @@ export default {
       if (this.dateFromFilter) {
         filtered = filtered.filter(invoice => invoice.issueDate >= this.dateFromFilter);
       }
-      
-      // Filtro por fecha hasta
+
+      // Filtro por fecha hasta (falta en el código original, lo agrego si estaba cortado o incompleto)
       if (this.dateToFilter) {
         filtered = filtered.filter(invoice => invoice.issueDate <= this.dateToFilter);
       }
-      
+
       this.filteredInvoices = filtered;
+      
+      // IMPORTANTE: Recalcular estadísticas basadas en los datos filtrados
+      this.calculateStats();
+      
+      // Actualizar conversiones de items individuales si es necesario
+      if (this.currencyDisplay === 'USD' && this.cachedRate) {
+           const map = {};
+           for (const invoice of this.filteredInvoices) {
+             const amountVES = invoice.financial?.totalSales || 0;
+             map[invoice.id] = amountVES / this.cachedRate;
+           }
+           this.convertedAmounts = map;
+      }
     },
+
     
     clearFilters() {
       this.searchQuery = '';

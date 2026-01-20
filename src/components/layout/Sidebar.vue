@@ -49,34 +49,15 @@
           value="cliente-mi-area"
         ></v-list-item>
 
-        <v-list-group value="cliente-facturacion">
-          <template #activator="{ props }">
-            <v-list-item
-              v-bind="props"
-              prepend-icon="mdi-receipt"
-              title="Facturación"
-              value="cliente-facturacion"
-            />
-          </template>
-          <v-list-item
-            :to="{ name: 'ClienteGastos' }"
-            prepend-icon="mdi-cash-minus"
-            title="Mis Gastos"
-            value="cliente-gastos"
-          ></v-list-item>
-          <v-list-item
-            :to="{ name: 'ClienteVentas' }"
-            prepend-icon="mdi-cash-plus"
-            title="Mis Ventas"
-            value="cliente-ventas"
-          ></v-list-item>
-          <v-list-item
-            :to="{ name: 'ClienteCompras' }"
-            prepend-icon="mdi-cart"
-            title="Mis Compras"
-            value="cliente-compras"
-          ></v-list-item>
-        </v-list-group>
+      
+        <v-list-item
+          v-if="isCliente"
+          :to="{ name: 'ClienteVentas' }"
+          prepend-icon="mdi-receipt"
+          title="Facturación"
+          value="cliente-facturacion"
+        ></v-list-item>
+       
 
         <v-list-item
           :to="{ name: 'ClienteArchivo' }"
@@ -85,6 +66,7 @@
           value="cliente-archivo"
         ></v-list-item>
       </template>
+
 
       <!-- Contador y Admin: Área de Contador, Clientes, Facturación -->
       <template v-if="isContador || isAdmin">
