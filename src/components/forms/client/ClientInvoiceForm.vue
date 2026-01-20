@@ -95,6 +95,53 @@
                   </v-expansion-panel-text>
                 </v-expansion-panel>
               </v-expansion-panels>
+              
+              <!-- Archivo Seleccionado (Pendiente de Subir) -->
+              <v-fade-transition>
+                <v-card v-if="uploadedFile" class="mb-6 border-dashed" variant="outlined" color="primary">
+                  <v-card-text class="d-flex align-center py-3">
+                    <v-avatar color="primary" variant="tonal" size="40" class="mr-3">
+                      <v-icon>mdi-file-document-outline</v-icon>
+                    </v-avatar>
+                    <div>
+                      <div class="text-subtitle-2 font-weight-bold text-primary">Documento listo para subir</div>
+                      <div class="text-caption text-medium-emphasis">{{ uploadedFile.name }} ({{ (uploadedFile.size / 1024).toFixed(0) }} KB)</div>
+                    </div>
+                    <v-spacer></v-spacer>
+                    <v-tooltip text="Eliminar archivo">
+                      <template v-slot:activator="{ props }">
+                        <v-btn v-bind="props" icon="mdi-close" variant="text" color="error" size="small" @click="uploadedFile = null"></v-btn>
+                      </template>
+                    </v-tooltip>
+                  </v-card-text>
+                </v-card>
+              </v-fade-transition>
+
+              <!-- Archivos Ya Guardados (Modo Edición) -->
+              <v-card v-if="formData.attachments && formData.attachments.length > 0" class="mb-6 bg-grey-lighten-4" variant="flat">
+                <v-card-title class="text-subtitle-2 py-2 px-4 d-flex align-center">
+                  <v-icon size="small" class="mr-2">mdi-paperclip</v-icon>
+                  Documentos Adjuntos
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-list density="compact" class="bg-transparent py-0">
+                  <v-list-item 
+                    v-for="(file, i) in formData.attachments" 
+                    :key="i"
+                    :prepend-icon="file.fileType === 'application/pdf' ? 'mdi-file-pdf-box' : 'mdi-file-image'"
+                    lines="one"
+                  >
+                    <v-list-item-title>
+                      <a :href="file.url" target="_blank" class="text-decoration-none text-primary font-weight-medium">
+                        {{ file.fileName || 'Ver Documento' }}
+                      </a>
+                    </v-list-item-title>
+                    <template v-slot:append>
+                       <v-icon color="success" size="small">mdi-check-circle</v-icon>
+                    </template>
+                  </v-list-item>
+                </v-list>
+              </v-card>
 
               <!-- Selector de Tipo de Flujo -->
               <v-sheet variant="outlined" class="mb-6 rounded-lg border-2 pa-4">
@@ -1447,6 +1494,25 @@ export default {
           clientId: this.currentUser?.id || null, 
           flow: this.formData.flow
         };
+
+        // SUBIR ARCHIVO ADJUNTO SI EXISTE
+        if (this.uploadedFile) {
+           this.loading = true; // Asegurar loading
+           try {
+             const uploadRes = await invoiceService.uploadAttachment(this.uploadedFile);
+             if (uploadRes.success) {
+                // Agregar a adjuntos. Mantenemos array por si en futuro son múltiples
+                invoiceData.attachments = [uploadRes]; 
+             } else {
+                throw new Error('Error al subir el archivo: ' + uploadRes.message);
+             }
+           } catch (uploadError) {
+             console.error('Error subiendo archivo:', uploadError);
+             this.showSnackbar('Error al subir el documento: ' + uploadError.message, 'error');
+             this.loading = false;
+             return; // Detener guardado si falla subida
+           }
+        }
         
         let response;
         if (this.isEditing) {

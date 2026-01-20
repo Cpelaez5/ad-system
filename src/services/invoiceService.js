@@ -743,26 +743,82 @@ class InvoiceService {
     }
   }
 
-  // Subir archivo adjunto (simulado - para futuro Supabase Storage)
+  // Subir archivo adjunto a Supabase Storage con compresión
   async uploadAttachment(file) {
     try {
-      console.log('🔄 Subiendo archivo adjunto (simulado)...')
+      console.log('🔄 Subiendo archivo adjunto a Supabase Storage...')
 
-      // Simular subida de archivo
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      const organizationId = getCurrentOrganizationId()
+      if (!organizationId) {
+        throw new Error('No hay organization_id para guardar el archivo')
+      }
 
-      // Retornar URL simulada
+      // Optimización de espacio: Comprimir imágenes antes de subir
+      let fileToUpload = file
+
+      // Solo intentar comprimir si es imagen (JPG, PNG, etc.)
+      if (file.type && file.type.startsWith('image/')) {
+        try {
+          console.log('🗜️ Optimizando imagen para ahorrar espacio...')
+          // Importar dinámicamente BaseOCRService
+          const BaseOCRService = (await import('./baseOcrService')).default
+          const ocrService = new BaseOCRService()
+
+          // Comprimir
+          fileToUpload = await ocrService.compressImage(file)
+
+          // Log de ahorro
+          const originalSize = (file.size / 1024).toFixed(0)
+          const newSize = (fileToUpload.size / 1024).toFixed(0)
+          console.log(`✅ Imagen comprimida: ${originalSize}KB -> ${newSize}KB`)
+
+        } catch (compressionError) {
+          console.warn('⚠️ Falló compresión de imagen, se subirá el original:', compressionError)
+          // Fallback: usar archivo original
+          fileToUpload = file
+        }
+      }
+
+      // Crear nombre de archivo único
+      const timestamp = new Date().getTime()
+      const fileExt = fileToUpload.name.split('.').pop()
+      const fileName = `${timestamp}_${Math.random().toString(36).substring(7)}.${fileExt}`
+      const filePath = `${organizationId}/${fileName}`
+
+      console.log('📂 Ruta de archivo:', filePath)
+
+      // Subir archivo al bucket 'invoices'
+      const { data, error } = await supabase.storage
+        .from('invoices')
+        .upload(filePath, fileToUpload, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (error) {
+        console.error('❌ Error Upload Supabase:', error)
+        throw error
+      }
+
+      // Obtener URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('invoices')
+        .getPublicUrl(filePath)
+
+      console.log('✅ Archivo subido exitosamente:', publicUrl)
+
       return {
         success: true,
-        url: `https://storage.supabase.co/attachments/${file.name}`,
+        url: publicUrl,
+        path: filePath,
         fileName: file.name,
-        fileSize: file.size,
+        fileSize: fileToUpload.size,
         fileType: file.type
       }
 
     } catch (error) {
       console.error('❌ Error al subir archivo:', error)
-      return { success: false, message: 'Error al subir archivo' }
+      return { success: false, message: `Error al subir archivo: ${error.message}` }
     }
   }
 }
