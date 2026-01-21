@@ -33,9 +33,11 @@ class InvoiceService {
 
   // Obtener facturas de la organización actual, opcionalmente filtradas por flujo y cliente
   // organizationOnly: si es true, solo devuelve facturas de la organización (client_id IS NULL)
-  async getInvoices({ flow = 'VENTA', clientId, organizationOnly = false } = {}) {
+  // Listar facturas
+  async getInvoices({ flow = 'VENTA', organizationOnly = false, clientId = null } = {}, options = { trashed: false }) {
     try {
-      console.log('🔄 Obteniendo facturas desde Supabase...', { flow, clientId, organizationOnly })
+      console.log('🔄 Obteniendo facturas desde Supabase...')
+      console.log('📝 Filtros:', { flow, organizationOnly, clientId, trashed: options.trashed })
 
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
@@ -88,8 +90,17 @@ class InvoiceService {
         query = query.eq('client_id', clientId)
       }
 
+      // Filtros de Papelera
+      // Por defecto (trashed=false), NO mostrar eliminadas (deleted_at IS NULL)
+      // Si trashed=true, SOLO mostrar eliminadas (deleted_at IS NOT NULL)
+      if (options.trashed) {
+        query = query.not('deleted_at', 'is', null)
+      } else {
+        query = query.is('deleted_at', null)
+      }
+
       // Aplicar orden al final
-      query = query.order('created_at', { ascending: false })
+      query = query.order('deleted_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false })
 
       const { data: invoices, error } = await query
 
@@ -267,21 +278,98 @@ class InvoiceService {
 
       console.log('📝 Datos a insertar:', invoiceRecord)
 
-      const { data: newInvoice, error } = await supabase
-        .from('invoices')
-        .insert(invoiceRecord)
-        .select()
-        .single()
+      // Lógica de reintento para conflictos de numéro de factura (código 23505)
+      let attempts = 0;
+      const maxAttempts = 5; // Aumentamos intentos
+      let lastError = null;
+      let newInvoice = null;
 
-      if (error) {
-        console.error('❌ Error al crear factura en Supabase:', error)
-        console.error('❌ Detalles del error:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        })
-        return { success: false, message: `Error al crear factura: ${error.message}` }
+      while (attempts < maxAttempts) {
+        attempts++;
+        console.log(`🔄 Intento ${attempts}/${maxAttempts} para crear factura con número: ${invoiceRecord.invoice_number}...`)
+
+        const { data, error } = await supabase
+          .from('invoices')
+          .insert(invoiceRecord)
+          .select()
+          .single()
+
+        if (!error) {
+          newInvoice = data;
+          break; // Éxito
+        }
+
+        // Si es error de duplicado (conflicto)
+        if (error.code === '23505' && error.message.includes('invoice_number')) {
+          console.warn(`⚠️ Conflicto de número de factura (${invoiceRecord.invoice_number}). Generando nuevo número...`);
+
+          const currentFailedNum = invoiceRecord.invoice_number;
+          let nextNum = await this.getNextInvoiceNumber();
+
+          // Si el DB nos devuelve el MIMSO número que acaba de fallar (posiblemente por RLS ocultando el existente),
+          // lo incrementamos manualmente.
+          if (nextNum === currentFailedNum) {
+            console.warn('⚠️ getNextInvoiceNumber devolvió el mismo número fallido. Incrementando manualmente...');
+
+            // Intentar parsear y sumar 1
+            const match = currentFailedNum.match(/^(.*?)-(\d+)$/);
+            if (match) {
+              const prefix = match[1];
+              const numPart = parseInt(match[2]);
+              // Mantener padding
+              const newNumPart = (numPart + 1).toString().padStart(match[2].length, '0');
+              nextNum = `${prefix}-${newNumPart}`;
+            } else {
+              // Fallback simple si no tiene formato estándar
+              nextNum = `${currentFailedNum}-1`;
+            }
+          }
+
+          invoiceRecord.invoice_number = nextNum;
+
+          // LOGICA MEJORADA: Enforzar incremento monotónico
+          // Si el "nextNum" que nos dio la base de datos es MENOR o IGUAL al que acabamos de fallar,
+          // significa que la BD está retornando un número viejo (por RLS o delay).
+          // En ese caso, ignoramos la BD y forzamos (currentFailedNum + 1)
+          try {
+            const parseInvoiceNum = (numStr) => {
+              const match = numStr.match(/^(.*?)-(\d+)$/);
+              if (!match) return { prefix: numStr, val: 0, raw: numStr };
+              return { prefix: match[1], val: parseInt(match[2], 10), raw: numStr, len: match[2].length };
+            };
+
+            const current = parseInvoiceNum(currentFailedNum);
+            const next = parseInvoiceNum(nextNum);
+
+            // Solo comparamos si los prefijos son iguales (ej: F-2024 vs F-2024)
+            if (current.prefix === next.prefix) {
+              if (next.val <= current.val) {
+                console.warn(`⚠️ Monotonicidad violada: DB sugirió ${nextNum} pero acabamos de fallar con ${currentFailedNum}. Forzando incremento...`);
+                const newVal = current.val + 1;
+                // Reconstruir string manteniendo padding
+                const newNumPart = newVal.toString().padStart(current.len, '0');
+                invoiceRecord.invoice_number = `${current.prefix}-${newNumPart}`;
+              }
+            }
+          } catch (err) {
+            console.error('Error calculando incremento monotónico:', err);
+            // Fallback al nextNum original
+            invoiceRecord.invoice_number = nextNum;
+          }
+          // Continuar al siguiente intento
+        } else {
+          // Otro tipo de error, abortar
+          console.error('❌ Error al crear factura en Supabase:', error)
+          lastError = error;
+          break;
+        }
+      }
+
+      if (!newInvoice) {
+        // Falló después de reintentos o por otro error
+        const finalError = lastError || { message: 'No se pudo crear la factura tras varios intentos de numeración' };
+        console.error('❌ Fallo definitivo al crear factura:', finalError);
+        return { success: false, message: `Error al crear factura: ${finalError.message}` }
       }
 
       console.log('✅ Factura creada exitosamente en Supabase:', newInvoice.id)
@@ -412,10 +500,10 @@ class InvoiceService {
     }
   }
 
-  // Eliminar factura (soft delete)
+  // Eliminar factura (enviar a papelera)
   async deleteInvoice(id) {
     try {
-      console.log('🔄 Eliminando factura en Supabase (soft delete)...')
+      console.log('🔄 Enviando factura a papelera (soft delete)...')
 
       const organizationId = getCurrentOrganizationId()
       if (!organizationId) {
@@ -423,52 +511,81 @@ class InvoiceService {
         return { success: false, message: 'No hay organización disponible' }
       }
 
-      // Soft delete: marcar como anulada
+      // Soft delete: marcar deleted_at
       const { data: deletedInvoice, error } = await supabase
         .from('invoices')
-        .update({ status: 'ANULADA' })
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
         .eq('organization_id', organizationId)
         .select()
         .single()
 
       if (error) {
-        console.error('❌ Error al eliminar factura en Supabase:', error.message)
-        return { success: false, message: `Error al eliminar factura: ${error.message}` }
+        console.error('❌ Error al enviar factura a papelera:', error.message)
+        return { success: false, message: `Error al enviar a papelera: ${error.message}` }
       }
 
-      console.log('✅ Factura eliminada (soft delete) en Supabase:', deletedInvoice.id)
-
-      // Transformar respuesta para el frontend
-      const transformedInvoice = {
-        id: deletedInvoice.id,
-        invoiceNumber: deletedInvoice.invoice_number,
-        controlNumber: deletedInvoice.control_number,
-        documentType: deletedInvoice.document_type,
-        issueDate: deletedInvoice.issue_date,
-        dueDate: deletedInvoice.due_date,
-        status: 'ANULADA',
-        issuer: deletedInvoice.issuer || {},
-        client: deletedInvoice.client_info || {},
-        financial: deletedInvoice.financial || {},
-        items: deletedInvoice.items || [],
-        attachments: deletedInvoice.attachments || [],
-        notes: deletedInvoice.notes,
-        createdBy: deletedInvoice.created_by,
-        createdAt: deletedInvoice.created_at,
-        updatedAt: deletedInvoice.updated_at,
-        clientId: deletedInvoice.client_id
-      }
+      console.log('✅ Factura enviada a papelera:', deletedInvoice.id)
 
       return {
         success: true,
-        data: transformedInvoice,
-        message: 'Factura eliminada exitosamente'
+        data: deletedInvoice,
+        message: 'Factura enviada a la papelera exitosamente'
       }
 
     } catch (error) {
       console.error('❌ Error inesperado al eliminar factura:', error)
       return { success: false, message: 'Error inesperado al eliminar factura' }
+    }
+  }
+
+  // Restaurar factura de papelera
+  async restoreInvoice(id) {
+    try {
+      console.log('🔄 Restaurando factura de papelera...')
+      const organizationId = getCurrentOrganizationId()
+
+      const { data, error } = await supabase
+        .from('invoices')
+        .update({ deleted_at: null })
+        .eq('id', id)
+        .eq('organization_id', organizationId)
+        .select()
+        .single()
+
+      if (error) throw error;
+
+      console.log('✅ Factura restaurada:', data.id);
+      return { success: true, message: 'Factura restaurada exitosamente' };
+
+    } catch (error) {
+      console.error('❌ Error restaurando factura:', error);
+      return { success: false, message: 'Error al restaurar factura' };
+    }
+  }
+
+  // Eliminar factura permanentemente (Hard Delete)
+  async hardDeleteInvoice(id) {
+    try {
+      console.log('🔥 Eliminando factura permanentemente (HARD DELETE)...')
+      const organizationId = getCurrentOrganizationId()
+
+      const { data, error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', id)
+        .eq('organization_id', organizationId)
+        .select()
+        .single()
+
+      if (error) throw error;
+
+      console.log('✅mm Factura eliminada permanentemente:', id)
+      return { success: true, message: 'Factura eliminada definitivamente' }
+
+    } catch (error) {
+      console.error('❌ Error hard delete:', error);
+      return { success: false, message: 'Error al eliminar permanentemente' };
     }
   }
 
@@ -507,6 +624,7 @@ class InvoiceService {
         .from('invoices')
         .select('status, financial')
         .eq('organization_id', organizationId)
+        .is('deleted_at', null) // Ignorar papelera en estadísticas
 
       if (error) {
         console.error('❌ Error al obtener facturas para estadísticas:', error.message)
@@ -587,6 +705,7 @@ class InvoiceService {
           )
         `)
         .eq('organization_id', organizationId)
+        .is('deleted_at', null) // Excluir papelera en búsqueda por defecto
         .eq('flow', flow)
         .or(`invoice_number.ilike.%${searchTerm}%,control_number.ilike.%${searchTerm}%,client_info->>companyName.ilike.%${searchTerm}%`)
 

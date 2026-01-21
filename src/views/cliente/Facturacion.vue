@@ -164,6 +164,14 @@
             {{ gastosCount }}
           </v-chip>
         </v-tab>
+
+        <v-tab value="trash" class="text-none font-weight-medium">
+          <v-icon start size="24" color="grey">mdi-delete</v-icon>
+          Papelera
+          <v-chip size="small" class="ml-2" color="grey" variant="tonal">
+            {{ trashCount }}
+          </v-chip>
+        </v-tab>
       </v-tabs>
     </v-card>
 
@@ -323,40 +331,63 @@
           </v-chip>
         </template>
 
-        <!-- Columna de acciones -->
+
         <template v-slot:item.actions="{ item }">
-          <v-btn
-            icon="mdi-eye"
-            size="small"
-            color="info"
-            variant="text"
-            @click="viewInvoice(item)"
-            title="Ver detalles"
-          ></v-btn>
-          <v-btn
-            icon="mdi-pencil"
-            size="small"
-            color="warning"
-            variant="text"
-            @click="editInvoice(item)"
-            title="Editar"
-          ></v-btn>
-          <v-btn
-            icon="mdi-download"
-            size="small"
-            color="success"
-            variant="text"
-            @click="exportInvoice(item)"
-            title="Exportar factura"
-          ></v-btn>
-          <v-btn
-            icon="mdi-delete"
-            size="small"
-            color="error"
-            variant="text"
-            @click="deleteInvoice(item)"
-            title="Eliminar"
-          ></v-btn>
+          <!-- Acciones para items NORMALES -->
+          <div v-if="currentTab !== 'trash'" class="d-flex">
+            <v-btn
+              icon="mdi-eye"
+              size="small"
+              color="info"
+              variant="text"
+              @click="viewInvoice(item)"
+              title="Ver detalles"
+            ></v-btn>
+            <v-btn
+              icon="mdi-pencil"
+              size="small"
+              color="warning"
+              variant="text"
+              @click="editInvoice(item)"
+              title="Editar"
+            ></v-btn>
+            <v-btn
+              icon="mdi-download"
+              size="small"
+              color="success"
+              variant="text"
+              @click="exportInvoice(item)"
+              title="Exportar factura"
+            ></v-btn>
+            <v-btn
+              icon="mdi-delete"
+              size="small"
+              color="error"
+              variant="text"
+              @click="deleteInvoice(item)"
+              title="Mover a papelera"
+            ></v-btn>
+          </div>
+
+          <!-- Acciones para PAPELERA -->
+          <div v-else class="d-flex">
+             <v-btn
+              icon="mdi-refresh"
+              size="small"
+              color="success"
+              variant="text"
+              @click="restoreInvoice(item)"
+              title="Restaurar"
+            ></v-btn>
+            <v-btn
+              icon="mdi-delete-forever"
+              size="small"
+              color="error"
+              variant="text"
+              @click="deleteInvoice(item)"
+              title="Eliminar definitivamente"
+            ></v-btn>
+          </div>
         </template>
       </v-data-table>
     </v-card>
@@ -376,8 +407,11 @@
       <v-card>
         <v-card-title>Confirmar Eliminación</v-card-title>
         <v-card-text>
-          ¿Está seguro de que desea eliminar la factura <strong>{{ invoiceToDelete?.invoiceNumber }}</strong>?
-          Esta acción no se puede deshacer.
+          <div v-if="currentTab === 'trash'" class="text-error font-weight-bold mb-2">
+            ⚠️ Atención: Borrado Definitivo
+          </div>
+          ¿Está seguro de que desea {{ currentTab === 'trash' ? 'eliminar DEFINITIVAMENTE' : 'enviar a la papelera' }} la factura <strong>{{ invoiceToDelete?.invoiceNumber }}</strong>?
+          {{ currentTab === 'trash' ? 'Esta acción NO se puede deshacer.' : 'Podrá restaurarla luego desde la papelera.' }}
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
@@ -548,6 +582,7 @@ export default {
     return {
       loading: false,
       invoices: [],
+      trashInvoices: [], 
       filteredInvoices: [],
       stats: {
         total: 0,
@@ -634,7 +669,11 @@ export default {
         inv.flow === 'COMPRA' && (inv.expense_type === 'GASTO' || !inv.expense_type)
       ).length;
     },
-    
+
+    trashCount() {
+       return this.trashInvoices ? this.trashInvoices.length : 0;
+    },
+
     activeFiltersCount() {
       let count = 0;
       if (this.searchQuery) count++;
@@ -649,6 +688,11 @@ export default {
         return 'COMPRA';
       }
       return 'VENTA';
+    },
+    
+    // Titulo dinámico para el botón de borrar
+    deleteButtonText() {
+       return this.currentTab === 'trash' ? 'Eliminar Definitivamente' : 'Mover a Papelera';
     }
   },
   watch: {
@@ -758,7 +802,17 @@ export default {
         });
         
         this.invoices = [...mySales, ...myPurchases];
-        console.log('📋 Facturas cargadas:', this.invoices.length);
+        
+        // 3. Cargar Papelera (trashed=true)
+        const trashSales = await invoiceService.getInvoices({ flow: 'VENTA' }, { trashed: true });
+        const trashPurchases = await invoiceService.getInvoices({ 
+           flow: 'COMPRA', 
+           clientId: this.currentUser.client_id || this.currentUser.id 
+        }, { trashed: true });
+        this.trashInvoices = [...trashSales, ...trashPurchases];
+        
+        console.log('📋 Facturas activas:', this.invoices.length);
+        console.log('🗑️ Facturas en papelera:', this.trashInvoices.length);
         
         // Recalcular stats localmente
         this.calculateStats();
@@ -821,7 +875,9 @@ export default {
     // loadStats() eliminado porque calculamos localmente
     
     applyFilters() {
-      let filtered = [...this.invoices];
+      // Seleccionar lista origen segun tab
+      let sourceList = this.currentTab === 'trash' ? this.trashInvoices : this.invoices;
+      let filtered = [...sourceList];
       
       // Filtro por tab
       switch(this.currentTab) {
@@ -838,6 +894,7 @@ export default {
             inv.flow === 'COMPRA' && (inv.expense_type === 'GASTO' || !inv.expense_type)
           );
           break;
+        // caso trash ya está cubierto por sourceList, pero si quisiéramos filtrar trash por tipo...
       }
       
       // Filtro por búsqueda
@@ -914,13 +971,27 @@ export default {
       if (!this.invoiceToDelete) return;
       
       try {
-        await invoiceService.deleteInvoice(this.invoiceToDelete.id);
-        await this.loadInvoices();
+        if (this.currentTab === 'trash') {
+            await invoiceService.hardDeleteInvoice(this.invoiceToDelete.id);
+        } else {
+            await invoiceService.deleteInvoice(this.invoiceToDelete.id);
+        }
+        
+        await this.loadInvoices(); // Recarga todo (invoices y trashInvoices)
         this.deleteDialog = false;
         this.invoiceToDelete = null;
       } catch (error) {
         console.error('❌ Error al eliminar factura:', error);
       }
+    },
+
+    async restoreInvoice(invoice) {
+        try {
+            await invoiceService.restoreInvoice(invoice.id);
+            await this.loadInvoices(); // Mueve de trash a active
+        } catch (error) {
+            console.error('❌ Error al restaurar factura:', error);
+        }
     },
     
     closeInvoiceDialog() {

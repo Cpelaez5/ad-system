@@ -1532,7 +1532,10 @@ export default {
             
             // 3. Si estamos en modo EDICIÓN, actualizar el registro inmediatamente para que persista
             if (this.isEditing && this.invoice && this.invoice.id) {
+               // IMPORTANTE: Enviar TODO el formData, no solo attachments, para evitar sobrescribir con nulls
+               // si el servicio espera un objeto completo o rellena con defaults.
                await invoiceService.updateInvoice(this.invoice.id, { 
+                   ...this.formData,
                    attachments: this.formData.attachments 
                });
             }
