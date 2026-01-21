@@ -30,9 +30,9 @@ Estructura JSON Requerida (Retorna SOLO esto):
   "documentType": "FACTURA|NOTA DE CRÉDITO|NOTA DE DÉBITO|RECIBO|COMPROBANTE",
   "documentCategory": "FACTURA" (si es fiscal/legal) o "RECIBO" (si es nota entrega/interno),
   "detectedFlow": "VENTA|COMPRA|GASTO",
-  "reasoning": "Breve explicación de por qué clasificaste así el documento (ej: 'Es recibo de luz CORPOELEC -> GASTO')",
+  "impression": "Breve análisis de si la imagen es legible y parece auténtica",
 
-  "invoiceNumber": "Número de documento completo (ej: A-000123)",
+  "invoiceNumber": "Número EXACTO del documento. IMPORTANTE: Preserva ceros a la izquierda, guiones y letras. (Ej: '000045', 'F-12345', 'NE-001'). NO ELIMINES NADA.",
   "controlNumber": "Número de control (formato fiscal serie-número) o null",
   "issueDate": "YYYY-MM-DD",
   "dueDate": "YYYY-MM-DD o null",

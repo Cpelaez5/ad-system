@@ -265,15 +265,21 @@
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model="formData.invoiceNumber"
-                    label="Número de Documento"
-                    :rules="[v => !!v || 'El número de documento es requerido']"
+                    :label="formData.documentType === 'RECIBO' ? 'Nro. de Nota / Identificador' : 'Nro. de Factura'"
+                    :rules="invoiceNumberRules"
+                    :error-messages="duplicateError"
                     required
                     variant="outlined"
                     class="animated-field"
-                    prepend-inner-icon="mdi-receipt-text"
-                    hint="Ej: F-2024-001 o R-2024-001"
-                    persistent-hint
-                  ></v-text-field>
+                    prepend-inner-icon="mdi-pound"
+                    @blur="checkDuplicateInvoice"
+                    :loading="checkingDuplicate"
+                  >
+                    <template v-slot:append-inner>
+                        <v-icon v-if="isDuplicate" color="error" title="Factura duplicada">mdi-alert-circle</v-icon>
+                        <v-icon v-if="!isDuplicate && formData.invoiceNumber && !checkingDuplicate" color="success">mdi-check-circle</v-icon>
+                    </template>
+                  </v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
                   <v-text-field
@@ -997,8 +1003,16 @@ export default {
         ],
         
         notes: '',
-        attachments: []
+        attachments: [],
+        manualEdits: [] // Registro de cambios manuales
       },
+      
+      // Control de Duplicados
+      isDuplicate: false,
+      checkingDuplicate: false,
+      duplicateError: '',
+      invoiceCheckTimer: null,
+      originalInvoiceNumber: '', // Para detectar cambios manuales post-OCR
       
       documentTypes: [
         'FACTURA',
@@ -1041,6 +1055,14 @@ export default {
       return !!this.invoice;
     },
     
+    invoiceNumberRules() {
+        const rules = [v => !!v || 'El número es requerido'];
+        if (this.isDuplicate) {
+            rules.push(() => 'Este número de factura ya está registrado');
+        }
+        return rules;
+    },
+    
     // Campos del emisor son readonly cuando es VENTA (el cliente es el emisor)
     issuerFieldsReadonly() {
       return this.formData.flow === 'VENTA';
@@ -1079,6 +1101,35 @@ export default {
   },
 
   watch: {
+    // Detectar cambios en número de factura para validación de duplicados
+    'formData.invoiceNumber': function(newVal) {
+      if (!newVal) {
+        this.isDuplicate = false;
+        this.duplicateError = '';
+        return;
+      }
+      
+      // Tracking de cambios manuales (si vino de OCR)
+      if (this.originalInvoiceNumber && newVal !== this.originalInvoiceNumber) {
+          // Solo registramos si no estaba ya registrado este cambio específico
+          const alreadyLogged = this.formData.manualEdits.some(e => e.field === 'invoiceNumber' && e.value === newVal);
+          if (!alreadyLogged) {
+            this.formData.manualEdits.push({
+                field: 'invoiceNumber',
+                oldValue: this.originalInvoiceNumber,
+                value: newVal,
+                timestamp: new Date().toISOString()
+            });
+          }
+      }
+
+      // Debounce para validación
+      if (this.invoiceCheckTimer) clearTimeout(this.invoiceCheckTimer);
+      this.invoiceCheckTimer = setTimeout(() => {
+        this.checkDuplicateInvoice();
+      }, 600);
+    },
+
     invoice: {
       handler(newInvoice) {
         if (newInvoice) {
@@ -1164,6 +1215,41 @@ export default {
     });
   },
   methods: {
+    // Validar duplicados contra el backend
+    async checkDuplicateInvoice() {
+        if (!this.formData.invoiceNumber) return;
+        
+        // Si estamos editando y el número es igual al original de la factura, no es duplicado
+        if (this.isEditing && this.invoice && this.formData.invoiceNumber === this.invoice.invoiceNumber) {
+            this.isDuplicate = false;
+            this.duplicateError = '';
+            return;
+        }
+
+        this.checkingDuplicate = true;
+        try {
+            // validateUniqueInvoiceNumber retorna TRUE si es único (no existe)
+            // Pasamos excludeId si estamos editando para ignorarnos a nosotros mismos
+            const isUnique = await invoiceService.validateUniqueInvoiceNumber(
+                this.formData.invoiceNumber, 
+                this.isEditing ? this.invoice?.id : null
+            );
+
+            if (!isUnique) {
+                this.isDuplicate = true;
+                this.duplicateError = 'Este número de factura ya existe en el sistema';
+                this.showSnackbar('Número de factura duplicado', 'warning');
+            } else {
+                this.isDuplicate = false;
+                this.duplicateError = '';
+            }
+        } catch (e) {
+            console.error('Error validando duplicado:', e);
+        } finally {
+            this.checkingDuplicate = false;
+        }
+    },
+
     async loadCurrentUser() {
       try {
         let user = await userService.getCurrentUser();
@@ -1482,7 +1568,14 @@ export default {
       this.totalFromAI = false;
       
       // 1. Información Básica y Documento
-      if (data.invoiceNumber) this.formData.invoiceNumber = data.invoiceNumber;
+      if (data.invoiceNumber) {
+          this.formData.invoiceNumber = data.invoiceNumber;
+          this.originalInvoiceNumber = data.invoiceNumber;
+          // Validar inmediatamente
+          this.$nextTick(() => {
+              this.checkDuplicateInvoice();
+          });
+      }
       if (data.controlNumber) this.formData.controlNumber = data.controlNumber;
       if (data.issueDate) this.formData.issueDate = data.issueDate;
       if (data.dueDate) this.formData.dueDate = data.dueDate;
