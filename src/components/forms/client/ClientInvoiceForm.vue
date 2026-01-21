@@ -1221,16 +1221,13 @@ export default {
           this.formData.financial.exchangeRate = result.data.dollar;
           this.showSnackbar(`Tasa actualizada: ${result.data.dollar.toFixed(4)} VES/USD`, 'success');
         } else {
-          console.warn('⚠️ No se encontró tasa para la fecha, usando actual...');
-          // Fallback a tasa actual si falla la histórica
-          const currentRate = await bcvService.getCurrentRate();
-          if (currentRate.success && currentRate.data && currentRate.data.dollar) {
-            this.formData.financial.exchangeRate = currentRate.data.dollar;
-            this.showSnackbar(`Usando tasa actual: ${currentRate.data.dollar.toFixed(4)} VES/USD`, 'info');
-          }
+          console.warn('⚠️ No se encontró tasa para la fecha ingresada.');
+          this.showSnackbar('No se encontró tasa para esta fecha. Por favor ingrese el monto manualmente.', 'warning');
+          // No sobrescribimos con la actual para obligar/inducir a la verificación manual
         }
       } catch (error) {
         console.error('❌ Error al obtener tasa de cambio:', error);
+        this.showSnackbar('Error buscando tasa. Ingrese manualmente.', 'error');
       }
     },
     
