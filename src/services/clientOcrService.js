@@ -16,9 +16,9 @@ const ENHANCED_EXTRACTION_PROMPT = `Analiza este documento comercial (imagen OCR
 OBJETIVO PRINCIPAL:
 1. IDENTIFICAR TIPO: Determina si es FACTURA (Fiscal, con Nro Control), NOTA DE ENTREGA/RECIBO (No Fiscal), o NOTA CRÉDITO/DÉBITO.
 2. DETECTAR FLUJO: 
-   - VENTA: El Usuario (Contexto) es el EMISOR/PROVEEDOR.
-   - COMPRA: El Usuario es el CLIENTE y está adquiriendo insumos o productos puntuales.
-   - GASTO: El Usuario es el CLIENTE y es un SERVICIO RECURRENTE (Luz, Agua, Internet, Condominio, Teléfono).
+   - VENTA: PRIMORDIAL. Si el Usuario (Contexto) es el EMISOR/PROVEEDOR, es SIEMPRE VENTA (incluso si vende servicios).
+   - COMPRA: El Usuario es el CLIENTE/PAGADOR y adquiere BIENES TANGIBLES (Insumos, Inventario, Equipos).
+   - GASTO: El Usuario es el CLIENTE/PAGADOR y paga por un SERVICIO o INTANGIBLE (Luz, Alquiler, Honorarios, Mantenimiento).
 3. EXTRAER DATOS: Extrae cada campo posible, incluyendo montos desglosados, impuestos, y validando formatos numéricos.
 
 Contexto del Usuario (quien sube el documento):

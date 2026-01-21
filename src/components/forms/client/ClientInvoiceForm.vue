@@ -1604,14 +1604,12 @@ export default {
         if (data.detectedFlow === 'GASTO') {
             this.formData.flow = 'COMPRA';
             this.formData.expense_type = 'GASTO';
+        } else if (data.detectedFlow === 'COMPRA') {
+            this.formData.flow = 'COMPRA';
+            // Asegurar que se marque como compra de bienes
+            this.formData.expense_type = 'COMPRA';
         } else {
             this.formData.flow = data.detectedFlow;
-            if (data.detectedFlow === 'COMPRA') {
-                 // Si es compra genérica, asumimos Compra de Bienes/Servicios, salvo que ya esté Gasto
-                 if (this.formData.expense_type !== 'GASTO') {
-                     this.formData.expense_type = 'COMPRA';
-                 }
-            }
         }
       }
       
