@@ -570,6 +570,37 @@ class InvoiceService {
       console.log('🔥 Eliminando factura permanentemente (HARD DELETE)...')
       const organizationId = getCurrentOrganizationId()
 
+      // 1. Obtener la factura para ver si tiene adjuntos
+      const { data: invoiceToDelete, error: fetchError } = await supabase
+        .from('invoices')
+        .select('attachments')
+        .eq('id', id)
+        .eq('organization_id', organizationId)
+        .single();
+
+      if (fetchError) {
+        console.warn('⚠️ No se pudo obtener info de adjuntos antes de borrar. Se procederá a borrar el registro.', fetchError);
+      } else if (invoiceToDelete && invoiceToDelete.attachments && invoiceToDelete.attachments.length > 0) {
+        console.log(`🗑️ Eliminando ${invoiceToDelete.attachments.length} archivos adjuntos...`);
+
+        // Eliminar cada archivo del Storage
+        // Recorremos los adjuntos y borramos si tienen path
+        const deletePromises = invoiceToDelete.attachments
+          .filter(att => att.path)
+          .map(att => this.deleteAttachment(att.path));
+
+        const results = await Promise.allSettled(deletePromises);
+
+        // Loggear resultados (opcional)
+        results.forEach((res, idx) => {
+          if (res.status === 'rejected') {
+            console.error(`❌ Error al eliminar adjunto ${idx}:`, res.reason);
+          }
+        });
+        console.log('✅ Limpieza de archivos completada.');
+      }
+
+      // 2. Eliminar el registro de la base de datos
       const { data, error } = await supabase
         .from('invoices')
         .delete()
