@@ -893,7 +893,14 @@ export default {
         // TODO: Agregar soporte EUR cuando exista API
         // else if (currency === 'EUR') { ... }
 
-        this.stats.totalAmount += amount;
+        // LOGICA DE NETEO (Solo para vista global 'all')
+        // Si estamos viendo "Todas", restamos los egresos (Compras/Gastos)
+        // Si estamos viendo pestañas específicas, sumamos el valor absoluto (Total de Compras, Total de Ventas)
+        if (this.currentTab === 'all' && inv.flow === 'COMPRA') {
+            this.stats.totalAmount -= amount;
+        } else {
+            this.stats.totalAmount += amount;
+        }
       });
       
       // Actualizar el total visual convertido
