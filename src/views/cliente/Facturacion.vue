@@ -276,6 +276,7 @@
         :loading="loading"
         class="elevation-1"
         :items-per-page="10"
+        v-model:sort-by="sortBy"
       >
         <!-- Columna de número de factura -->
         <template v-slot:item.invoiceNumber="{ item }">
@@ -599,6 +600,9 @@ export default {
       // Tab actual
       currentTab: 'all', // 'all', 'ventas', 'compras', 'gastos'
       
+      // Ordenamiento por defecto
+      sortBy: [{ key: 'invoiceNumber', order: 'asc' }],
+            
       // Filtros
       searchQuery: '',
       statusFilter: null,
@@ -1138,6 +1142,37 @@ export default {
       }, 300);
     },
     
+    // Helper para ordenar facturas según la UI
+    getSortedInvoices(invoices) {
+      if (!this.sortBy || this.sortBy.length === 0) return invoices;
+      
+      const { key, order } = this.sortBy[0];
+      const factor = order === 'desc' ? -1 : 1;
+      
+      return [...invoices].sort((a, b) => {
+        let valA = a[key];
+        let valB = b[key];
+        
+        // Si ordenamos por monto (total), puede requerir manejo especial si usamos display amounts, 
+        // pero aquí usaremos el valor crudo del objeto.
+        if (key === 'total') {
+             valA = a.financial?.totalSales || 0;
+             valB = b.financial?.totalSales || 0;
+        }
+        else if (key === 'client') {
+             // Ordenar por nombre de cliente/emisor
+             const nameA = a.flow === 'VENTA' ? (a.client?.companyName || '') : (a.issuer?.companyName || '');
+             const nameB = b.flow === 'VENTA' ? (b.client?.companyName || '') : (b.issuer?.companyName || '');
+             valA = nameA.toLowerCase();
+             valB = nameB.toLowerCase();
+        }
+
+        if (valA < valB) return -1 * factor;
+        if (valA > valB) return 1 * factor;
+        return 0;
+      });
+    },
+
     // Exportación
     getExportRecordCount() {
       return this.exportOptions.scope === 'all' ? this.invoices.length : this.filteredInvoices.length;
@@ -1159,8 +1194,11 @@ export default {
           period: dayjs().format('MMM YY').toLowerCase()
         };
 
+        // Aplicar ordenamiento seleccionado
+        const sortedInvoices = this.getSortedInvoices(invoicesToExport);
+
         await exportService.exportTable(
-          invoicesToExport, 
+          sortedInvoices, 
           this.exportOptions.currency, 
           this.exportOptions.format.toLowerCase(),
           this.exportOptions.mode,
@@ -1237,7 +1275,11 @@ export default {
           ? `Libro_${flowType === 'VENTA' ? 'Ventas' : 'Compras'}_${dayjs().format('YYYY-MM')}.xlsx`
           : `Reporte_${flowType}_General_${dayjs().format('YYYY-MM')}.xlsx`;
         
-        await exportService.exportTable(invoicesToExport, 'VES', filename, mode, companyInfo);
+        // Aplicar ordenamiento seleccionado antes de enviar al servicio de exportación
+        const sortedInvoices = this.getSortedInvoices(invoicesToExport);
+
+        await exportService.exportTable(sortedInvoices, 'VES', filename, mode, companyInfo);
+
         
         console.log(`✅ Exportación exitosa: ${filename} (${invoicesToExport.length} registros)`);
       } catch (error) {
