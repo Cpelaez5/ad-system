@@ -137,7 +137,20 @@
                       </a>
                     </v-list-item-title>
                     <template v-slot:append>
-                       <v-icon color="success" size="small">mdi-check-circle</v-icon>
+                       <v-icon color="success" size="small" class="mr-2">mdi-check-circle</v-icon>
+                       <v-tooltip text="Eliminar archivo">
+                          <template v-slot:activator="{ props }">
+                            <v-btn
+                              v-bind="props"
+                              icon="mdi-delete"
+                              variant="text"
+                              color="error"
+                              size="small"
+                              :loading="deletingAttachmentIndex === i"
+                              @click="confirmDeleteAttachment(i)"
+                            ></v-btn>
+                          </template>
+                       </v-tooltip>
                     </template>
                   </v-list-item>
                 </v-list>
@@ -337,16 +350,16 @@
                     persistent-hint
                   >
                     <template v-slot:item="{ props, item }">
-                      <v-list-item v-bind="props">
+                      <v-list-item v-bind="props" title="">
                         <template v-slot:prepend>
                           <v-icon :color="getStatusColor(item.value)">mdi-circle</v-icon>
                         </template>
+                        <v-list-item-title>
+                          <v-chip :color="getStatusColor(item.value)" size="small">
+                            {{ item.value }}
+                          </v-chip>
+                        </v-list-item-title>
                       </v-list-item>
-                    </template>
-                    <template v-slot:selection="{ item }">
-                      <v-chip :color="getStatusColor(item.value)" size="small">
-                        {{ item.value }}
-                      </v-chip>
                     </template>
                   </v-select>
                 </v-col>
@@ -828,6 +841,21 @@
       :message="snackbar.message"
       :timeout="snackbar.timeout"
     />
+
+    <!-- Dialogo de confirmación eliminar archivo -->
+    <v-dialog v-model="showDeleteAttachmentDialog" max-width="400">
+      <v-card>
+        <v-card-title class="text-h6">¿Eliminar archivo?</v-card-title>
+        <v-card-text>
+          Esta acción eliminará el archivo PDF adjunto pero mantendrá el resto de la factura. ¿Desea continuar?
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey-darken-1" variant="text" @click="showDeleteAttachmentDialog = false">Cancelar</v-btn>
+          <v-btn color="error" variant="flat" @click="deleteAttachment">Eliminar</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-form>
 </template>
 
@@ -864,6 +892,11 @@ export default {
       loading: false,
       currentStep: 1,
       showItems: false,
+      
+      // Eliminar archivo
+      showDeleteAttachmentDialog: false,
+      attachmentToDeleteIndex: -1,
+      deletingAttachmentIndex: -1,
       
       // Archivo subido
       uploadedFile: null,
@@ -1066,6 +1099,10 @@ export default {
     
     // Cargar datos del usuario actual (Cliente)
     await this.loadCurrentUser();
+    console.log('✅ ClientInvoiceForm mounted. Checks:', {
+        hasDelete: typeof this.confirmDeleteAttachment === 'function',
+        methods: this.$options.methods
+    });
   },
   methods: {
     async loadCurrentUser() {
@@ -1467,6 +1504,50 @@ export default {
       }
     },
     
+    async confirmDeleteAttachment(index) {
+        this.attachmentToDeleteIndex = index;
+        this.showDeleteAttachmentDialog = true;
+    },
+
+    async deleteAttachment() {
+        if (this.attachmentToDeleteIndex === -1) return;
+        
+        const index = this.attachmentToDeleteIndex;
+        const attachment = this.formData.attachments[index];
+        
+        this.showDeleteAttachmentDialog = false; // Cerrar dialogo
+        this.deletingAttachmentIndex = index; // Mostrar spinner en el item específico
+        
+        try {
+            // 1. Eliminar de Supabase Storage
+            if (attachment.path) {
+                const res = await invoiceService.deleteAttachment(attachment.path);
+                if (!res.success) {
+                    throw new Error(res.message);
+                }
+            }
+            
+            // 2. Eliminar del array local
+            this.formData.attachments.splice(index, 1);
+            
+            // 3. Si estamos en modo EDICIÓN, actualizar el registro inmediatamente para que persista
+            if (this.isEditing && this.invoice && this.invoice.id) {
+               await invoiceService.updateInvoice(this.invoice.id, { 
+                   attachments: this.formData.attachments 
+               });
+            }
+            
+            this.showSnackbar('Archivo eliminado correctamente', 'success');
+            
+        } catch (error) {
+            console.error('Error eliminando archivo:', error);
+            this.showSnackbar('Error al eliminar el archivo: ' + error.message, 'error');
+        } finally {
+             this.deletingAttachmentIndex = -1;
+             this.attachmentToDeleteIndex = -1;
+        }
+    },
+
     async handleSubmit() {
       if (!this.$refs.form.validate()) {
         this.showSnackbar('Por favor complete todos los campos obligatorios', 'error');

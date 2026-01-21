@@ -821,6 +821,28 @@ class InvoiceService {
       return { success: false, message: `Error al subir archivo: ${error.message}` }
     }
   }
+
+  // Eliminar archivo adjunto de Supabase Storage
+  async deleteAttachment(filePath) {
+    try {
+      console.log('🗑️ Eliminando archivo de Supabase Storage:', filePath)
+
+      const { data, error } = await supabase.storage
+        .from('invoices')
+        .remove([filePath])
+
+      if (error) {
+        console.error('❌ Error Delete Supabase:', error)
+        throw error
+      }
+
+      console.log('✅ Archivo eliminado exitosamente')
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Error al eliminar archivo:', error)
+      return { success: false, message: `Error al eliminar archivo: ${error.message}` }
+    }
+  }
 }
 
 // Crear instancia única del servicio
