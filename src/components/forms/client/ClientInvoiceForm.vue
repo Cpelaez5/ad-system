@@ -537,7 +537,56 @@
           <!-- Paso 3: Detalles Financieros -->
           <v-stepper-window-item :value="3">
             <v-container fluid class="pa-6">
+              <!-- Switch de Modo Manual -->
               <v-row>
+                <v-col cols="12" class="d-flex justify-end">
+                   <v-switch
+                    v-model="manualAdjustment"
+                    label="Ajuste Manual de Cálculos"
+                    color="warning"
+                    hide-details
+                    inset
+                  ></v-switch>
+                </v-col>
+              </v-row>
+
+              <v-row>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model.number="formData.financial.taxableSales"
+                    label="Base Imponible (Gravada)"
+                    type="number"
+                    step="0.01"
+                    variant="outlined"
+                    hint="Monto base para el cálculo de IVA"
+                    persistent-hint
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="12" md="6">
+                   <v-text-field
+                    v-model.number="formData.financial.nonTaxableSales"
+                    label="Base Exenta (No Gravada)"
+                    type="number"
+                    step="0.01"
+                    variant="outlined"
+                    hint="Monto exento de IVA (suma al total)"
+                    persistent-hint
+                  ></v-text-field>
+                </v-col>
+
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model.number="formData.financial.taxDebit"
+                    label="IVA (16%)"
+                    type="number"
+                    step="0.01"
+                    variant="outlined"
+                    :readonly="!manualAdjustment"
+                    :hint="manualAdjustment ? 'Ingrese el monto del IVA manualmente' : 'Se calcula automáticamente: 16% de la Base'"
+                    persistent-hint
+                  ></v-text-field>
+                </v-col>
+
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model.number="formData.financial.totalSales"
@@ -548,45 +597,12 @@
                     required
                     variant="outlined"
                     :prefix="currencySymbol"
-                    hint="Ingresa el monto total y el IVA se calculará automáticamente"
-                    persistent-hint
-                    @update:model-value="autoCalculateFinancials"
-                  ></v-text-field>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model.number="formData.financial.nonTaxableSales"
-                    label="Base Exenta (No Gravada)"
-                    type="number"
-                    step="0.01"
-                    variant="outlined"
-                    hint="Monto exento de IVA"
-                    persistent-hint
-                    @update:model-value="autoCalculateFinancials"
-                  ></v-text-field>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model.number="formData.financial.taxableSales"
-                    label="Base Imponible (Gravada)"
-                    type="number"
-                    step="0.01"
-                    variant="outlined"
-                    hint="Se calcula automáticamente: Total - Exento"
+                    :readonly="!manualAdjustment"
+                    :hint="manualAdjustment ? 'Ingrese el total manualmente' : 'Suma de Base + Exento + IVA'"
                     persistent-hint
                   ></v-text-field>
                 </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model.number="formData.financial.taxDebit"
-                    label="IVA (16%)"
-                    type="number"
-                    step="0.01"
-                    variant="outlined"
-                    hint="Se calcula automáticamente: 16% de la Base Imponible"
-                    persistent-hint
-                  ></v-text-field>
-                </v-col>
+                
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model.number="formData.financial.ivaRetention"
@@ -910,12 +926,21 @@ export default {
       currentUser: null,
       
       // Snackbar
+      ivas: [], // No se usa actualmente
       snackbar: {
         show: false,
         message: '',
         type: 'info',
         timeout: 4000
       },
+      
+      // Control de ajuste manual
+      manualAdjustment: false,
+      
+      // Flags para control de origen de datos (IA vs Manual)
+      ivaFromAI: false,
+      baseFromAI: false,
+      totalFromAI: false,
       
       // Datos del formulario
       formData: {
@@ -1052,11 +1077,16 @@ export default {
       return symbols[this.formData.financial.currency] || 'Bs';
     }
   },
+
   watch: {
     invoice: {
       handler(newInvoice) {
         if (newInvoice) {
-          this.formData = { ...newInvoice };
+          this.formData = { 
+            ...newInvoice,
+            // Asegurar que expense_type se cargue (si es compra antigua sin campo, default a COMPRA)
+            expense_type: newInvoice.expense_type || (newInvoice.flow === 'COMPRA' ? 'COMPRA' : null)
+          };
         }
       },
       immediate: true
@@ -1080,6 +1110,35 @@ export default {
         }
       },
       immediate: true
+    },
+    
+    // --> LOGICA DE CALCULO AUTOMATICO <--
+    
+    // 1. Si cambia Base Imponible -> Calcular IVA y Total
+    'formData.financial.taxableSales': function(newVal) {
+        // Si es ajuste manual, no hacer nada
+        if (this.manualAdjustment) return;
+        
+        // Si viene de IA (carga inicial), respetarlo y no recalcular INMEDIATAMENTE si ya tenemos IVA
+        // Pero si el usuario lo edita, flags de IA deberían limpiarse (lo haremos en @input del campo)
+        
+        this.calculateFromBase();
+    },
+    
+    // 2. Si cambia Exento -> Recalcular Total
+    'formData.financial.nonTaxableSales': function(newVal) {
+        if (this.manualAdjustment) return;
+        this.calculateTotals();
+    },
+    
+    // 3. Monitor de cambio de modo manual
+    manualAdjustment(val) {
+        if (val) {
+            this.showSnackbar('Modo manual activado: Cálculos automáticos detenidos.', 'warning');
+        } else {
+            this.showSnackbar('Modo automático reactivado: Recalculando valores...', 'info');
+            this.calculateFromBase();
+        }
     }
   },
   async mounted() {
@@ -1252,28 +1311,44 @@ export default {
       return colors[status] || 'grey';
     },
     
-    // Auto-calcular campos financieros
-    autoCalculateFinancials() {
-      const total = parseFloat(this.formData.financial.totalSales) || 0;
-      const exento = parseFloat(this.formData.financial.nonTaxableSales) || 0;
-      
-      // Base Imponible = Total - Exento
-      const baseImponible = Math.max(0, total - exento);
-      this.formData.financial.taxableSales = parseFloat(baseImponible.toFixed(2));
-      
-      // IVA = 16% de la Base Imponible (solo si no fue extraído por IA)
-      if (!this.ivaFromAI) {
-        const iva = baseImponible * 0.16;
+    // Calcular totales desde Base Imponible
+    calculateFromBase() {
+        if (this.manualAdjustment) return;
+        
+        const base = parseFloat(this.formData.financial.taxableSales) || 0;
+        const exento = parseFloat(this.formData.financial.nonTaxableSales) || 0;
+        const igtf = parseFloat(this.formData.financial.igtf) || 0;
+        
+        // IVA = 16% Base
+        // Solo calcular si NO vino de la IA, O si vino de IA pero estamos editando la base manualmente (baseFromAI lo resetearemos al editar)
+        // Simplificación: Si el usuario edita Base, recalculamos IVA aunque viniera de IA originalmente?
+        // Regla de usuario: "si la IA consigue esos datos... no debe haber conflicto... si la IA solo consigue uno... procurar sacar el calculo"
+        // Si el usuario toca el campo, asumimos que quiere recalcular.
+        
+        const iva = base * 0.16;
         this.formData.financial.taxDebit = parseFloat(iva.toFixed(2));
-      }
-      
-      console.log('📊 Auto-cálculo financiero:', {
-        total,
-        exento,
-        baseImponible: this.formData.financial.taxableSales,
-        iva: this.formData.financial.taxDebit,
-        ivaFromAI: this.ivaFromAI
-      });
+        
+        this.calculateTotals();
+    },
+    
+    // Sumar todo para el Total Final
+    calculateTotals() {
+        if (this.manualAdjustment) return;
+        
+        const base = parseFloat(this.formData.financial.taxableSales) || 0;
+        const exento = parseFloat(this.formData.financial.nonTaxableSales) || 0;
+        const iva = parseFloat(this.formData.financial.taxDebit) || 0;
+        const igtf = parseFloat(this.formData.financial.igtf) || 0;
+        
+        const total = base + exento + iva + igtf;
+        this.formData.financial.totalSales = parseFloat(total.toFixed(2));
+        
+        console.log('📊 Recálculo financiero:', { base, iva, exento, total });
+    },
+    
+    // Auto-calcular campos financieros (LEGACY - Reemplazado por lógica arriba, mantenemos por compatibilidad si algo lo llama)
+    autoCalculateFinancials() {
+       this.calculateFromBase();
     },
     
     validateStep(step) {
@@ -1357,11 +1432,26 @@ export default {
         if (data.detectedFlow) {
             console.log(`🤖 Flujo detectado por IA: ${data.detectedFlow}`);
             
-            if (!this.formData.flow || this.formData.flow !== data.detectedFlow) {
-                this.formData.flow = data.detectedFlow;
+            let targetFlow = data.detectedFlow;
+            let targetExpenseType = 'COMPRA'; // Default
+
+            if (data.detectedFlow === 'GASTO') {
+                targetFlow = 'COMPRA';
+                targetExpenseType = 'GASTO';
+            }
+
+            if (!this.formData.flow || this.formData.flow !== targetFlow || (targetFlow === 'COMPRA' && this.formData.expense_type !== targetExpenseType)) {
+                this.formData.flow = targetFlow;
+                if (targetFlow === 'COMPRA') {
+                    this.formData.expense_type = targetExpenseType;
+                }
+                
                 // Actualizar UI y datos según el nuevo flujo
                 this.handleFlowChange();
-                this.showSnackbar(`Tipo de factura detectado: ${data.detectedFlow}`, 'success');
+                
+                let flowLabel = data.detectedFlow;
+                if (data.detectedFlow === 'GASTO') flowLabel = 'GASTO (Compra)';
+                this.showSnackbar(`Tipo de factura detectado: ${flowLabel}`, 'success');
             }
         }
         
@@ -1389,8 +1479,10 @@ export default {
     mapExtractedDataToForm(data) {
       console.log('🔄 Mapeando datos extraídos al formulario:', data);
       
-      // Reset ivaFromAI flag
+      // Reset flags de IA
       this.ivaFromAI = false;
+      this.baseFromAI = false;
+      this.totalFromAI = false;
       
       // 1. Información Básica y Documento
       if (data.invoiceNumber) this.formData.invoiceNumber = data.invoiceNumber;
@@ -1400,9 +1492,7 @@ export default {
       
       // Mapeo Inteligente de Document Type
       if (data.documentCategory) {
-        this.formData.documentCategory = data.documentCategory; // FACTURA vs RECIBO
-        
-        // Si detectó tipo específico, tratar de mapearlo
+        this.formData.documentCategory = data.documentCategory;
         if (data.documentType) {
           const typeMap = {
             'FACTURA': 'FACTURA',
@@ -1411,23 +1501,31 @@ export default {
             'RECIBO': 'RECIBO',
             'COMPROBANTE': 'RECIBO'
           };
-          // Solo asignar si es un tipo conocido, sino dejar default
           if (typeMap[data.documentType?.toUpperCase()]) {
              this.formData.documentType = typeMap[data.documentType.toUpperCase()];
           }
         }
       }
 
-      // 2. Mapeo Inteligente de Flujo (Si se detectó con alta confianza)
-      // Solo cambiamos el flujo si el usuario no ha avanzado mucho o explícitamente aceptamos recomendaciones
+      // 2. Mapeo Inteligente de Flujo
       if (data.detectedFlow && data.confidence > 0.8) {
         console.log(`🤖 Flujo sugerido por IA: ${data.detectedFlow}`);
-        // Nota: Cambiar el flijo programáticamente puede ser intrusivo, 
-        // idealmente deberíamos preguntar, pero por ahora lo asignamos si coincide con lógica simple
-        this.formData.flow = data.detectedFlow;
+        // La lógica principal ya se manejó en handleExtractedData, pero aquí reforzamos
+        if (data.detectedFlow === 'GASTO') {
+            this.formData.flow = 'COMPRA';
+            this.formData.expense_type = 'GASTO';
+        } else {
+            this.formData.flow = data.detectedFlow;
+            if (data.detectedFlow === 'COMPRA') {
+                 // Si es compra genérica, asumimos Compra de Bienes/Servicios, salvo que ya esté Gasto
+                 if (this.formData.expense_type !== 'GASTO') {
+                     this.formData.expense_type = 'COMPRA';
+                 }
+            }
+        }
       }
       
-      // 3. Datos de Partes (Emisor/Cliente)
+      // 3. Datos de Partes
       const targetParty = this.formData.flow === 'VENTA' ? 'client' : 'issuer';
       const sourceParty = this.formData.flow === 'VENTA' ? data.client : data.issuer;
       
@@ -1438,7 +1536,6 @@ export default {
          if (sourceParty.phone) this.formData[targetParty].phone = sourceParty.phone;
          if (sourceParty.email) this.formData[targetParty].email = sourceParty.email;
          if (sourceParty.website) this.formData[targetParty].website = sourceParty.website;
-         // Taxpayer Type si viene
          if (sourceParty.taxpayerType) this.formData[targetParty].taxpayerType = sourceParty.taxpayerType;
       }
 
@@ -1453,30 +1550,50 @@ export default {
         this.showItems = true;
       }
       
-      // 5. Financiero (Mapeo Completo)
+      // 5. Financiero (Mapeo Completo con Flags)
       if (data.financial) {
-        if (data.financial.total !== undefined) this.formData.financial.totalSales = parseFloat(data.financial.total);
+        if (data.financial.total !== undefined) {
+            this.formData.financial.totalSales = parseFloat(data.financial.total);
+            this.totalFromAI = true;
+        }
         if (data.financial.exemptAmount !== undefined) this.formData.financial.nonTaxableSales = parseFloat(data.financial.exemptAmount);
-        if (data.financial.taxableAmount !== undefined) this.formData.financial.taxableSales = parseFloat(data.financial.taxableAmount);
-        if (data.financial.igtf !== undefined) this.formData.financial.igtf = parseFloat(data.financial.igtf);
         
-        // Retenciones
+        if (data.financial.taxableAmount !== undefined) {
+             this.formData.financial.taxableSales = parseFloat(data.financial.taxableAmount);
+             this.baseFromAI = true;
+        }
+        
+        if (data.financial.igtf !== undefined) this.formData.financial.igtf = parseFloat(data.financial.igtf);
         if (data.financial.ivaRetention !== undefined) this.formData.financial.ivaRetention = parseFloat(data.financial.ivaRetention);
         if (data.financial.islrRetention !== undefined) this.formData.financial.islrRetention = parseFloat(data.financial.islrRetention);
         
-        // IVA (manejo especial flag)
+        // IVA
         if (data.financial.taxAmount !== undefined) {
            this.formData.financial.taxDebit = parseFloat(data.financial.taxAmount);
            this.ivaFromAI = true;
         }
       } else {
-        // Fallback a estructura plana antigua si no viene 'financial' (retrocompatibilidad)
-        if (data.total) this.formData.financial.totalSales = data.total;
-        if (data.subtotal) this.formData.financial.taxableSales = data.subtotal;
+        // Fallback
+        if (data.total) {
+            this.formData.financial.totalSales = data.total;
+            this.totalFromAI = true;
+        }
+        if (data.subtotal) {
+            this.formData.financial.taxableSales = data.subtotal;
+            this.baseFromAI = true;
+        }
         if (data.tax) {
             this.formData.financial.taxDebit = data.tax;
             this.ivaFromAI = true;
         }
+      }
+      
+      // Logic de completado: si falta IVA pero tenemos Base, y no estamos en manual
+      if (!this.manualAdjustment) {
+          if (this.baseFromAI && !this.ivaFromAI) {
+              console.log('🤖 IA trajo Base pero no IVA. Calculando IVA automáticamente...');
+              this.calculateFromBase();
+          }
       }
       
       // Moneda
@@ -1485,7 +1602,6 @@ export default {
       // 6. Notas
       if (data.notes) this.formData.notes = data.notes;
       
-      // Notificar éxito
       this.showSnackbar('Datos extraídos con IA correctamente', 'success');
     },
     

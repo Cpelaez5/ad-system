@@ -316,7 +316,7 @@
               size="small"
               class="mr-2"
             ></v-icon>
-            {{ formatCurrency(getDisplayAmount(item), currencyDisplay) }}
+            {{ getFormattedDisplayAmount(item) }}
           </div>
         </template>
 
@@ -659,14 +659,14 @@ export default {
     comprasCount() {
       if (!this.invoices || !Array.isArray(this.invoices)) return 0;
       return this.invoices.filter(inv => 
-        inv.flow === 'COMPRA' && inv.expense_type === 'COMPRA'
+        inv.flow === 'COMPRA' && (inv.expense_type === 'COMPRA' || !inv.expense_type)
       ).length;
     },
     
     gastosCount() {
       if (!this.invoices || !Array.isArray(this.invoices)) return 0;
       return this.invoices.filter(inv => 
-        inv.flow === 'COMPRA' && (inv.expense_type === 'GASTO' || !inv.expense_type)
+        inv.flow === 'COMPRA' && inv.expense_type === 'GASTO'
       ).length;
     },
 
@@ -757,9 +757,16 @@ export default {
       this.currentTab = this.$route.query.tab;
     }
     
+    // Cargar tasa inmediatamente para cálculos correctos
+    try {
+        const rate = await bcvService.getCurrentRate();
+        if (rate?.data?.dollar) {
+            this.cachedRate = parseFloat(rate.data.dollar);
+        }
+    } catch (e) { console.error('Error cargando tasa inicial:', e); }
+
     await this.loadUser();
     await this.loadInvoices();
-    // await this.loadStats(); // Stats might need to be recalculated locally if API returns all org stats
   },
   methods: {
     async loadUser() {
@@ -849,10 +856,24 @@ export default {
       }
     },
     
-    calculateStats() {
-      // Usar filteredInvoices en lugar de invoices para que las tarjetas reflejen lo que se ve
+    async calculateStats() {
       const sourceData = this.filteredInvoices;
       
+      // Asegurar que tenemos tasa para cálculos
+      let currentRate = this.cachedRate;
+      if (!currentRate) {
+          try {
+             // Intentar recuperar de cache síncrono o esperar la promesa si fuese necesario (aquí asumimos disponibilidad o fallback)
+             // Si el componente ya montó, deberíamos tener la tasa. Sino, intentamos pedirla rápido.
+             const rateData = await bcvService.getCurrentRate();
+             if (rateData?.data?.dollar) {
+                currentRate = parseFloat(rateData.data.dollar);
+                this.cachedRate = currentRate;
+             }
+          } catch(e) { console.error('Error fetching rate for stats:', e); }
+      }
+      currentRate = currentRate || 1; // Fallback to 1 to avoid NaN
+
       this.stats = {
         total: sourceData.length,
         byStatus: {},
@@ -861,12 +882,23 @@ export default {
       
       sourceData.forEach(inv => {
         this.stats.byStatus[inv.status] = (this.stats.byStatus[inv.status] || 0) + 1;
-        this.stats.totalAmount += (inv.financial?.totalSales || 0);
+        
+        let amount = inv.financial?.totalSales || 0;
+        const currency = inv.financial?.currency || 'VES';
+
+        // NORMALIZAR A VES (Moneda Base del Sistema)
+        if (currency === 'USD') {
+             amount = amount * currentRate;
+        } 
+        // TODO: Agregar soporte EUR cuando exista API
+        // else if (currency === 'EUR') { ... }
+
+        this.stats.totalAmount += amount;
       });
       
-      // Si estamos en modo USD, recalcular el total convertido de las stats inmediatamente
-      if (this.currencyDisplay === 'USD' && this.cachedRate) {
-         this.convertedStatsTotal = this.stats.totalAmount / this.cachedRate;
+      // Actualizar el total visual convertido
+      if (this.currencyDisplay === 'USD' && currentRate) {
+         this.convertedStatsTotal = this.stats.totalAmount / currentRate;
       } else {
          this.convertedStatsTotal = this.stats.totalAmount;
       }
@@ -885,13 +917,15 @@ export default {
           filtered = filtered.filter(inv => inv.flow === 'VENTA');
           break;
         case 'compras':
+          // Default: Si no tiene expense_type, asumimos que es una COMPRA estándar (legacy support)
           filtered = filtered.filter(inv => 
-            inv.flow === 'COMPRA' && inv.expense_type === 'COMPRA'
+            inv.flow === 'COMPRA' && (inv.expense_type === 'COMPRA' || !inv.expense_type)
           );
           break;
         case 'gastos':
+          // Solo mostrar explícitamente marcados como GASTO
           filtered = filtered.filter(inv => 
-            inv.flow === 'COMPRA' && (inv.expense_type === 'GASTO' || !inv.expense_type)
+            inv.flow === 'COMPRA' && inv.expense_type === 'GASTO'
           );
           break;
         // caso trash ya está cubierto por sourceList, pero si quisiéramos filtrar trash por tipo...
@@ -1029,6 +1063,25 @@ export default {
         'ANULADA': 'grey-darken-3'
       };
       return colors[status] || 'grey';
+    },
+
+    getFormattedDisplayAmount(invoice) {
+        // 1. Si el usuario activó la vista global en USD (toggle activado)
+        if (this.currencyDisplay === 'USD') {
+            // Si la factura YA es en USD, mostrarla directa
+            if (invoice.financial?.currency === 'USD') {
+                return this.formatCurrency(invoice.financial.totalSales || 0, 'USD');
+            }
+            // Si es VES, usar el monto convertido
+            const converted = this.convertedAmounts[invoice.id] !== undefined ? this.convertedAmounts[invoice.id] : 0;
+            return this.formatCurrency(converted, 'USD');
+        }
+
+        // 2. Si estamos en vista por defecto (VES), respetar la moneda original de cada factura
+        const originalCurrency = invoice.financial?.currency || 'VES';
+        const amount = invoice.financial?.totalSales || 0;
+        
+        return this.formatCurrency(amount, originalCurrency);
     },
     
     getDisplayAmount(invoice) {

@@ -15,7 +15,10 @@ const ENHANCED_EXTRACTION_PROMPT = `Analiza este documento comercial (imagen OCR
 
 OBJETIVO PRINCIPAL:
 1. IDENTIFICAR TIPO: Determina si es FACTURA (Fiscal, con Nro Control), NOTA DE ENTREGA/RECIBO (No Fiscal), o NOTA CRÉDITO/DÉBITO.
-2. DETECTAR FLUJO: Determina si es una COMPRA (Usuario es CLIENTE/RECEPTOR) o VENTA (Usuario es EMISOR/PROVEEDOR) basándote en el Contexto del Usuario provisto.
+2. DETECTAR FLUJO: 
+   - VENTA: El Usuario (Contexto) es el EMISOR/PROVEEDOR.
+   - COMPRA: El Usuario es el CLIENTE y está adquiriendo insumos o productos puntuales.
+   - GASTO: El Usuario es el CLIENTE y es un SERVICIO RECURRENTE (Luz, Agua, Internet, Condominio, Teléfono).
 3. EXTRAER DATOS: Extrae cada campo posible, incluyendo montos desglosados, impuestos, y validando formatos numéricos.
 
 Contexto del Usuario (quien sube el documento):
@@ -26,8 +29,8 @@ Estructura JSON Requerida (Retorna SOLO esto):
 {
   "documentType": "FACTURA|NOTA DE CRÉDITO|NOTA DE DÉBITO|RECIBO|COMPROBANTE",
   "documentCategory": "FACTURA" (si es fiscal/legal) o "RECIBO" (si es nota entrega/interno),
-  "detectedFlow": "VENTA|COMPRA",
-  "reasoning": "Breve explicación de por qué clasificaste así el documento",
+  "detectedFlow": "VENTA|COMPRA|GASTO",
+  "reasoning": "Breve explicación de por qué clasificaste así el documento (ej: 'Es recibo de luz CORPOELEC -> GASTO')",
 
   "invoiceNumber": "Número de documento completo (ej: A-000123)",
   "controlNumber": "Número de control (formato fiscal serie-número) o null",
