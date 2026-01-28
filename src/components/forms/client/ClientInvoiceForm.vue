@@ -833,7 +833,7 @@
           variant="elevated"
           class="px-6"
         >
-          {{ isEditing ? 'Actualizar Factura' : 'Crear Factura' }}
+          {{ isEditing ? 'Actualizar Registro' : 'Crear Registro' }}
         </v-btn>
         
         <v-btn
