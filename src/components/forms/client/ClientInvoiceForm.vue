@@ -319,30 +319,21 @@
                   </v-select>
                 </v-col>
                 <v-col cols="12" md="4">
-                  <v-text-field
+                  <CustomDatePicker
                     v-model="formData.issueDate"
                     label="Fecha de Emisión"
-                    type="date"
-                    :rules="[v => !!v || 'La fecha de emisión es requerida']"
-                    required
-                    variant="outlined"
-                    class="animated-field"
-                    prepend-inner-icon="mdi-calendar"
+                    placeholder="Seleccionar fecha"
+                    :required="true"
                     hint="Fecha del documento"
-                    persistent-hint
-                  ></v-text-field>
+                  />
                 </v-col>
                 <v-col cols="12" md="4">
-                  <v-text-field
+                  <CustomDatePicker
                     v-model="formData.dueDate"
                     label="Fecha de Vencimiento"
-                    type="date"
-                    variant="outlined"
-                    class="animated-field"
-                    prepend-inner-icon="mdi-calendar-clock"
+                    placeholder="Seleccionar fecha"
                     hint="Opcional - Fecha límite de pago"
-                    persistent-hint
-                  ></v-text-field>
+                  />
                 </v-col>
                 <v-col cols="12" md="4">
                   <v-select
@@ -888,6 +879,7 @@ import clientOcrService from '@/services/clientOcrService.js';
 import bcvService from '@/services/bcvService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
+import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
 
 import { supabase } from '@/lib/supabaseClient';
 
@@ -895,7 +887,8 @@ export default {
   name: 'ClientInvoiceForm',
   components: {
     AppSnackbar,
-    FileUploadZone
+    FileUploadZone,
+    CustomDatePicker
   },
   props: {
     invoice: {
@@ -914,6 +907,13 @@ export default {
       loading: false,
       currentStep: 1,
       showItems: false,
+      
+      // Validación de duplicados
+      isDuplicate: false,
+      duplicateError: '',
+      checkingDuplicate: false,
+      invoiceCheckTimer: null,
+      originalInvoiceNumber: null, // Para tracking de cambios OCR
       
       // Eliminar archivo
       showDeleteAttachmentDialog: false,
@@ -1193,16 +1193,8 @@ export default {
     }
   },
   async mounted() {
-    // Si es una nueva factura, generar número automáticamente
+    // Número de factura vacío - debe ser ingresado por el usuario o mapeado por OCR
     if (!this.isEditing) {
-      try {
-        const nextNumber = await invoiceService.getNextInvoiceNumber();
-        this.formData.invoiceNumber = nextNumber;
-      } catch (error) {
-        console.error('❌ Error al generar número de factura:', error);
-        this.formData.invoiceNumber = 'F-2024-001';
-      }
-      
       // Establecer flujo inicial desde prop
       this.formData.flow = this.flow;
     }
@@ -1756,6 +1748,28 @@ export default {
     },
 
     async handleSubmit() {
+      // VALIDACIÓN DE DUPLICADOS - Bloqueo explícito
+      if (this.isDuplicate) {
+        this.showSnackbar(
+          '⚠️ El número de factura ya está registrado. Por favor, ingrese un número diferente.',
+          'error',
+          6000
+        );
+        // Registrar decisión del usuario (intento de guardar con duplicado)
+        console.warn('⚠️ Intento de guardar factura con número duplicado:', {
+          invoiceNumber: this.formData.invoiceNumber,
+          timestamp: new Date().toISOString(),
+          action: 'BLOCKED'
+        });
+        return;
+      }
+      
+      // Verificar si está en proceso de validación
+      if (this.checkingDuplicate) {
+        this.showSnackbar('Verificando número de factura... Por favor espere.', 'info');
+        return;
+      }
+      
       if (!this.$refs.form.validate()) {
         this.showSnackbar('Por favor complete todos los campos obligatorios', 'error');
         return;
