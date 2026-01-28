@@ -15,6 +15,7 @@
       :multi-calendars="multiCalendars"
       :enable-time-picker="enableTimePicker"
       :time-picker="timePicker"
+      :month-picker="monthPicker"
       :auto-apply="autoApply"
       :close-on-auto-apply="closeOnAutoApply"
       :preview-format="previewFormat"
@@ -103,6 +104,10 @@ export default {
       type: Boolean,
       default: true
     },
+    monthPicker: {
+      type: Boolean,
+      default: false
+    },
     errorMessage: {
       type: String,
       default: ''
@@ -190,7 +195,7 @@ export default {
 .custom-date-picker-input :deep(.dp__input) {
   border: 2px solid #EDEDED;
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 12px 16px 12px 40px; /* Extra left padding for icon */
   font-size: 0.875rem;
   font-family: 'Poppins', sans-serif;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

@@ -557,6 +557,197 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Diálogo de filtros de fecha para exportación (UX Mejorado) -->
+    <v-dialog v-model="exportDateDialog" max-width="520px" persistent>
+      <v-card class="export-date-dialog">
+        <!-- Header con contexto claro -->
+        <v-card-title class="d-flex align-center pa-4 bg-primary">
+          <v-icon color="white" class="mr-3">mdi-file-export-outline</v-icon>
+          <div>
+            <div class="text-h6 text-white">Exportar Registros</div>
+            <div class="text-caption text-white-50">
+              {{ pendingExportType === 'fiscal' ? 'Libro Fiscal SENIAT' : 'Reporte General' }}
+              - {{ pendingExportFlow === 'COMPRA' ? 'Compras/Gastos' : 'Ventas' }}
+            </div>
+          </div>
+        </v-card-title>
+
+        <v-card-text class="pa-5">
+          <!-- Error Alert -->
+          <v-alert
+            v-if="exportDateError"
+            type="error"
+            variant="tonal"
+            class="mb-4"
+            closable
+            @click:close="exportDateError = ''"
+          >
+            <v-icon start>mdi-alert-circle</v-icon>
+            {{ exportDateError }}
+          </v-alert>
+
+          <!-- Instrucciones claras -->
+          <p class="text-body-2 text-medium-emphasis mb-4">
+            <v-icon size="small" class="mr-1">mdi-information-outline</v-icon>
+            Selecciona el período que deseas incluir en la exportación:
+          </p>
+
+          <!-- Selector de modo con tarjetas visuales -->
+          <v-row class="mb-4">
+            <v-col cols="6">
+              <v-card
+                :variant="exportDateMode === 'month' ? 'elevated' : 'outlined'"
+                :color="exportDateMode === 'month' ? 'primary' : undefined"
+                :class="{ 'border-primary': exportDateMode === 'month' }"
+                class="pa-3 cursor-pointer text-center mode-card"
+                @click="exportDateMode = 'month'"
+                elevation="0"
+              >
+                <v-icon 
+                  :color="exportDateMode === 'month' ? 'white' : 'primary'" 
+                  size="32" 
+                  class="mb-2"
+                >
+                  mdi-calendar-month
+                </v-icon>
+                <div 
+                  class="text-subtitle-2 font-weight-medium"
+                  :class="exportDateMode === 'month' ? 'text-white' : ''"
+                >
+                  Mes Específico
+                </div>
+                <div 
+                  class="text-caption"
+                  :class="exportDateMode === 'month' ? 'text-white-50' : 'text-medium-emphasis'"
+                >
+                  Ej: Enero 2026
+                </div>
+              </v-card>
+            </v-col>
+            <v-col cols="6">
+              <v-card
+                :variant="exportDateMode === 'range' ? 'elevated' : 'outlined'"
+                :color="exportDateMode === 'range' ? 'primary' : undefined"
+                :class="{ 'border-primary': exportDateMode === 'range' }"
+                class="pa-3 cursor-pointer text-center mode-card"
+                @click="exportDateMode = 'range'"
+                elevation="0"
+              >
+                <v-icon 
+                  :color="exportDateMode === 'range' ? 'white' : 'primary'" 
+                  size="32" 
+                  class="mb-2"
+                >
+                  mdi-calendar-range
+                </v-icon>
+                <div 
+                  class="text-subtitle-2 font-weight-medium"
+                  :class="exportDateMode === 'range' ? 'text-white' : ''"
+                >
+                  Rango de Fechas
+                </div>
+                <div 
+                  class="text-caption"
+                  :class="exportDateMode === 'range' ? 'text-white-50' : 'text-medium-emphasis'"
+                >
+                  Desde - Hasta
+                </div>
+              </v-card>
+            </v-col>
+          </v-row>
+
+          <!-- Contenedor de inputs con transición suave -->
+          <v-expand-transition>
+            <div v-if="exportDateMode === 'month'" key="month-input" class="pa-2">
+              <CustomDatePicker
+                v-model="exportMonthDate"
+                label="¿Qué mes deseas exportar?"
+                placeholder="Seleccionar mes y año"
+                format="MMMM yyyy"
+                preview-format="MMMM yyyy"
+                hint="Haz clic para abrir el calendario"
+                :clearable="false"
+                month-picker
+              />
+            </div>
+          </v-expand-transition>
+
+          <v-expand-transition>
+            <div v-if="exportDateMode === 'range'" key="range-inputs" class="pa-2">
+              <!-- Selector de rango de fechas -->
+              <CustomDatePicker
+                v-model="exportDateRange"
+                label="Selecciona el rango de fechas"
+                placeholder="Desde - Hasta"
+                format="dd/MM/yyyy"
+                preview-format="dd/MM/yyyy"
+                hint="Haz clic para seleccionar el rango"
+                :range="true"
+                :multi-calendars="true"
+                :clearable="true"
+                :error-message="exportDateError"
+              />
+            </div>
+          </v-expand-transition>
+
+          <!-- Preview de resultados con mejor visual -->
+          <v-card 
+            variant="tonal" 
+            :color="filteredExportPreviewCount > 0 ? 'success' : 'warning'"
+            class="mt-4 pa-4"
+          >
+            <div class="d-flex align-center">
+              <v-avatar 
+                :color="filteredExportPreviewCount > 0 ? 'success' : 'warning'" 
+                size="48"
+                class="mr-4"
+              >
+                <v-icon color="white" size="24">
+                  {{ filteredExportPreviewCount > 0 ? 'mdi-file-document-multiple' : 'mdi-file-question' }}
+                </v-icon>
+              </v-avatar>
+              <div>
+                <div class="text-h5 font-weight-bold">
+                  {{ filteredExportPreviewCount }}
+                </div>
+                <div class="text-body-2">
+                  {{ filteredExportPreviewCount === 1 ? 'registro encontrado' : 'registros encontrados' }}
+                </div>
+              </div>
+            </div>
+            <div v-if="filteredExportPreviewCount === 0" class="text-caption mt-2 text-warning-darken-2">
+              <v-icon size="small" class="mr-1">mdi-lightbulb-outline</v-icon>
+              Prueba seleccionar otro período con datos disponibles
+            </div>
+          </v-card>
+        </v-card-text>
+
+        <!-- Acciones con botones claros -->
+        <v-divider></v-divider>
+        <v-card-actions class="pa-4">
+          <v-btn 
+            variant="text" 
+            color="grey-darken-1"
+            @click="cancelExportDateDialog"
+            prepend-icon="mdi-close"
+          >
+            Cancelar
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="success"
+            variant="elevated"
+            size="large"
+            :disabled="filteredExportPreviewCount === 0 || !!exportDateError"
+            @click="confirmExportWithDateFilter"
+            prepend-icon="mdi-download"
+          >
+            Exportar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -564,6 +755,7 @@
 import StatsCard from '@/components/common/StatsCard.vue'
 import CurrencyStatsCard from '@/components/common/CurrencyStatsCard.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import CustomDatePicker from '@/components/common/CustomDatePicker.vue'
 import invoiceService from '@/services/invoiceService.js';
 import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
@@ -577,7 +769,8 @@ export default {
     ClientInvoiceForm,
     AnimatedNumber,
     StatsCard,
-    CurrencyStatsCard
+    CurrencyStatsCard,
+    CustomDatePicker
   },
   data() {
     return {
@@ -629,6 +822,18 @@ export default {
         includeItems: true,
         includeMetadata: true
       },
+      
+      // Opciones de exportación con filtro de fecha
+      exportDateDialog: false,
+      exportDateMode: 'month', // 'month' o 'range'
+      exportMonthDate: null, // Date object para month picker { month: 0-11, year: YYYY }
+      exportDateRange: null, // Array [startDate, endDate] para range picker
+      exportMonth: '', // Mantener para compatibilidad
+      exportDateFrom: '',
+      exportDateTo: '',
+      exportDateError: '',
+      pendingExportType: null, // 'fiscal' o 'general'
+      pendingExportFlow: null, // 'COMPRA' o 'VENTA'
       
       // Configuración de la tabla
       currentUser: null,
@@ -697,6 +902,26 @@ export default {
     // Titulo dinámico para el botón de borrar
     deleteButtonText() {
        return this.currentTab === 'trash' ? 'Eliminar Definitivamente' : 'Mover a Papelera';
+    },
+    
+    // Preview de facturas para exportación con filtro de fecha
+    filteredExportPreviewCount() {
+      if (!this.pendingExportFlow) return 0;
+      
+      // Obtener facturas base según tipo y flow
+      let baseInvoices = this.invoices.filter(inv => {
+        const flowMatch = this.pendingExportFlow === 'COMPRA' 
+          ? inv.flow === 'COMPRA' 
+          : inv.flow === 'VENTA';
+        
+        if (this.pendingExportType === 'fiscal') {
+          return flowMatch && inv.documentType === 'FACTURA';
+        }
+        return flowMatch;
+      });
+      
+      // Aplicar filtro de fecha
+      return this.applyDateFilterToInvoices(baseInvoices).length;
     }
   },
   watch: {
@@ -1218,46 +1443,185 @@ export default {
     },
     
     // Exportar solo facturas fiscales (para libros SENIAT)
-    async exportFiscal(flowType) {
-      try {
-        // Filtrar solo facturas fiscales del tipo de flujo especificado
-        const fiscalInvoices = this.invoices.filter(inv => 
-          inv.documentType === 'FACTURA' && 
-          (flowType === 'COMPRA' ? inv.flow === 'COMPRA' : inv.flow === 'VENTA')
-        );
-        
-        if (fiscalInvoices.length === 0) {
-          alert(`No hay facturas fiscales de ${flowType === 'COMPRA' ? 'compras/gastos' : 'ventas'} para exportar.`);
-          return;
-        }
-        
-        await this.startExport(fiscalInvoices, flowType, 'SENIAT');
-      } catch (error) {
-        console.error('Error al exportar libro fiscal:', error);
+    exportFiscal(flowType) {
+      // Verificar si hay facturas antes de mostrar el diálogo
+      const fiscalInvoices = this.invoices.filter(inv => 
+        inv.documentType === 'FACTURA' && 
+        (flowType === 'COMPRA' ? inv.flow === 'COMPRA' : inv.flow === 'VENTA')
+      );
+      
+      if (fiscalInvoices.length === 0) {
+        alert(`No hay facturas fiscales de ${flowType === 'COMPRA' ? 'compras/gastos' : 'ventas'} para exportar.`);
+        return;
       }
+      
+      // Abrir diálogo de filtros de fecha
+      this.pendingExportType = 'fiscal';
+      this.pendingExportFlow = flowType;
+      this.resetExportDateFilters();
+      this.exportDateDialog = true;
     },
     
     // Exportar todo (facturas + recibos)
-    async exportGeneral(flowType) {
-      try {
-        // Filtrar todos los registros del tipo de flujo (facturas + recibos)
-        const allRecords = this.invoices.filter(inv => 
-          flowType === 'COMPRA' ? inv.flow === 'COMPRA' : inv.flow === 'VENTA'
-        );
+    exportGeneral(flowType) {
+      // Verificar si hay registros antes de mostrar el diálogo
+      const allRecords = this.invoices.filter(inv => 
+        flowType === 'COMPRA' ? inv.flow === 'COMPRA' : inv.flow === 'VENTA'
+      );
+      
+      if (allRecords.length === 0) {
+        alert(`No hay registros de ${flowType === 'COMPRA' ? 'compras/gastos' : 'ventas'} para exportar.`);
+        return;
+      }
+      
+      // Abrir diálogo de filtros de fecha
+      this.pendingExportType = 'general';
+      this.pendingExportFlow = flowType;
+      this.resetExportDateFilters();
+      this.exportDateDialog = true;
+    },
+    
+    // Resetear filtros de fecha para nueva exportación
+    resetExportDateFilters() {
+      this.exportDateMode = 'month';
+      // Por defecto, seleccionar el mes actual usando formato de CustomDatePicker
+      const now = new Date();
+      this.exportMonthDate = { month: now.getMonth(), year: now.getFullYear() };
+      this.exportDateRange = null;
+      // Mantener compatibilidad con formato string
+      this.exportMonth = dayjs().format('YYYY-MM');
+      this.exportDateFrom = '';
+      this.exportDateTo = '';
+      this.exportDateError = '';
+    },
+    
+    // Cancelar diálogo de exportación con fecha
+    cancelExportDateDialog() {
+      this.exportDateDialog = false;
+      this.pendingExportType = null;
+      this.pendingExportFlow = null;
+    },
+    
+    /**
+     * Aplicar filtro de fecha a un array de facturas
+     * Soporta tanto formato month picker {month, year} como range picker [Date, Date]
+     * @param {Array} invoices - Array de facturas a filtrar
+     * @returns {Array} - Facturas filtradas por fecha
+     */
+    applyDateFilterToInvoices(invoices) {
+      if (!invoices || invoices.length === 0) return [];
+      
+      this.exportDateError = '';
+      
+      if (this.exportDateMode === 'month') {
+        // Modo mes: usar exportMonthDate {month: 0-11, year: YYYY}
+        if (!this.exportMonthDate) return invoices;
         
-        if (allRecords.length === 0) {
-          alert(`No hay registros de ${flowType === 'COMPRA' ? 'compras/gastos' : 'ventas'} para exportar.`);
-          return;
+        const targetYear = this.exportMonthDate.year;
+        const targetMonth = this.exportMonthDate.month; // 0-indexed
+        
+        return invoices.filter(inv => {
+          if (!inv.issueDate) return false;
+          const invoiceDate = new Date(inv.issueDate);
+          return invoiceDate.getFullYear() === targetYear && 
+                 invoiceDate.getMonth() === targetMonth;
+        });
+      } else {
+        // Modo rango: usar exportDateRange [startDate, endDate]
+        if (!this.exportDateRange || this.exportDateRange.length < 2) {
+          // Sin rango seleccionado, devolver todas
+          return invoices;
         }
         
-        await this.startExport(allRecords, flowType, 'GENERAL');
+        const [startDate, endDate] = this.exportDateRange;
+        
+        if (!startDate || !endDate) return invoices;
+        
+        // Validar que el rango sea válido
+        if (startDate > endDate) {
+          this.exportDateError = 'La fecha de inicio no puede ser posterior a la fecha fin.';
+          return [];
+        }
+        
+        // Normalizar fechas para comparación (inicio del día)
+        const startNormalized = new Date(startDate);
+        startNormalized.setHours(0, 0, 0, 0);
+        
+        const endNormalized = new Date(endDate);
+        endNormalized.setHours(23, 59, 59, 999);
+        
+        return invoices.filter(inv => {
+          if (!inv.issueDate) return false;
+          const invoiceDate = new Date(inv.issueDate);
+          return invoiceDate >= startNormalized && invoiceDate <= endNormalized;
+        });
+      }
+    },
+    
+    // Confirmar exportación con filtro de fecha aplicado
+    async confirmExportWithDateFilter() {
+      if (!this.pendingExportFlow) return;
+      
+      // Obtener facturas base según tipo y flow
+      let baseInvoices = this.invoices.filter(inv => {
+        const flowMatch = this.pendingExportFlow === 'COMPRA' 
+          ? inv.flow === 'COMPRA' 
+          : inv.flow === 'VENTA';
+        
+        if (this.pendingExportType === 'fiscal') {
+          return flowMatch && inv.documentType === 'FACTURA';
+        }
+        return flowMatch;
+      });
+      
+      // Aplicar filtro de fecha
+      const filteredInvoices = this.applyDateFilterToInvoices(baseInvoices);
+      
+      // Log de depuración para verificar el filtrado
+      console.log('📊 Export Debug Info:');
+      console.log(`   - Mode: ${this.exportDateMode}`);
+      console.log(`   - Base invoices: ${baseInvoices.length}`);
+      console.log(`   - Filtered invoices: ${filteredInvoices.length}`);
+      if (this.exportDateMode === 'month' && this.exportMonthDate) {
+        console.log(`   - Month filter: ${this.exportMonthDate.month + 1}/${this.exportMonthDate.year}`);
+      } else if (this.exportDateRange) {
+        console.log(`   - Range filter: ${this.exportDateRange[0]} to ${this.exportDateRange[1]}`);
+      }
+      
+      if (filteredInvoices.length === 0) {
+        alert('No hay registros que coincidan con el filtro de fecha seleccionado.');
+        return;
+      }
+      
+      // Determinar modo de exportación
+      const mode = this.pendingExportType === 'fiscal' ? 'SENIAT' : 'GENERAL';
+      
+      // Generar período para el nombre del archivo
+      let periodSuffix = '';
+      if (this.exportDateMode === 'month' && this.exportMonthDate) {
+        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        periodSuffix = `${monthNames[this.exportMonthDate.month]}_${this.exportMonthDate.year}`;
+      } else if (this.exportDateRange && this.exportDateRange.length >= 2) {
+        const from = dayjs(this.exportDateRange[0]).format('DDMMYY');
+        const to = dayjs(this.exportDateRange[1]).format('DDMMYY');
+        periodSuffix = `${from}-${to}`;
+      }
+      
+      console.log(`   - Period suffix: ${periodSuffix}`);
+      console.log(`   - Invoices to export:`, filteredInvoices.map(i => ({ num: i.invoiceNumber, date: i.issueDate })));
+      
+      try {
+        await this.startExport(filteredInvoices, this.pendingExportFlow, mode, periodSuffix);
+        this.exportDateDialog = false;
+        this.pendingExportType = null;
+        this.pendingExportFlow = null;
       } catch (error) {
-        console.error('Error al exportar reporte general:', error);
+        console.error('Error al exportar con filtro de fecha:', error);
       }
     },
     
     // Iniciar exportación con los datos preparados
-    async startExport(invoicesToExport, flowType, mode) {
+    async startExport(invoicesToExport, flowType, mode, periodSuffix = '') {
       try {
         // Preparar información de la empresa
         const clientProfile = this.currentUser?.client || {};
@@ -1265,15 +1629,18 @@ export default {
           ? this.currentUser.organization[0] 
           : (this.currentUser?.organization || {});
         
+        // Usar el período proporcionado o el mes actual como fallback
+        const periodDisplay = periodSuffix || dayjs().format('YYYY-MM');
+        
         const companyInfo = {
           name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
           rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
-          period: dayjs().format('MMM YY').toLowerCase()
+          period: periodSuffix || dayjs().format('MMM YY').toLowerCase()
         };
         
         const filename = mode === 'SENIAT' 
-          ? `Libro_${flowType === 'VENTA' ? 'Ventas' : 'Compras'}_${dayjs().format('YYYY-MM')}.xlsx`
-          : `Reporte_${flowType}_General_${dayjs().format('YYYY-MM')}.xlsx`;
+          ? `Libro_${flowType === 'VENTA' ? 'Ventas' : 'Compras'}_${periodDisplay}.xlsx`
+          : `Reporte_${flowType}_General_${periodDisplay}.xlsx`;
         
         // Aplicar ordenamiento seleccionado antes de enviar al servicio de exportación
         const sortedInvoices = this.getSortedInvoices(invoicesToExport);
@@ -1307,5 +1674,62 @@ export default {
 .amount-changing {
   opacity: 0.5;
   transform: scale(0.95);
+}
+
+/* Export Date Dialog Styles */
+.export-date-dialog {
+  overflow: hidden;
+}
+
+.mode-card {
+  transition: all 0.2s ease;
+  min-height: 100px;
+}
+
+.mode-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.text-white-50 {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.border-primary {
+  border: 2px solid rgb(var(--v-theme-primary)) !important;
+}
+
+/* Date input clickable styles */
+.date-input-clickable {
+  cursor: pointer;
+}
+
+.date-input-clickable :deep(.v-field) {
+  cursor: pointer;
+}
+
+.date-input-clickable :deep(.v-field__input) {
+  cursor: pointer;
+  min-height: 56px;
+}
+
+.date-input-clickable :deep(input[type="date"]),
+.date-input-clickable :deep(input[type="month"]) {
+  cursor: pointer;
+  font-size: 16px;
+}
+
+/* Hide the native date picker icon since we have our own button */
+.date-input-clickable :deep(input[type="date"]::-webkit-calendar-picker-indicator),
+.date-input-clickable :deep(input[type="month"])::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  cursor: pointer;
 }
 </style>
