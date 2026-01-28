@@ -66,366 +66,426 @@ class ExportService {
     };
   }
 
-  // Construir Libro de Compras (Exact Layout)
+  // Construir Libro de Compras (Formato SENIAT Oficial)
   buildLibroCompras(worksheet, invoices, companyInfo) {
-    const fiscalInvoices = invoices.filter(inv => inv.documentType === 'FACTURA');
-
-    // 1. Configurar Columnas (Anchos aproximados según imagen)
-    // A: Fecha, B: Tipo Doc, C: Num Doc, D: Nombre, E: RIF, F: Total+Imp, G: Exento, H: Base Imp (Imp), I: %, J: Credito (Imp), K: Base Imp (Int), L: %, M: Credito (Int)
-    // Ajuste según imagen:
-    // Col A: Fecha (10)
-    // Col B: Tipo Doc (5)
-    // Col C: Número (12)
-    // Col D: Nombre (35)
-    // Col E: RIF (12)
-    // Col F: Total Compras (15)
-    // Col G: Exento (12)
-    // Col H: Base Imp (Importacion) (12)
-    // Col I: % (5)
-    // Col J: Credito Fiscal (Importacion) (12)
-    // Col K: Base Imp (Interna) (12)
-    // Col L: % (5)
-    // Col M: Credito Fiscal (Interna) (12)
-
-    worksheet.columns = [
-      { key: 'fecha', width: 12 },
-      { key: 'tipo', width: 6 },
-      { key: 'numero', width: 15 },
-      { key: 'nombre', width: 40 },
-      { key: 'rif', width: 15 },
-      { key: 'total', width: 18 },
-      { key: 'exento', width: 15 },
-      { key: 'base_imp', width: 15 },
-      { key: 'alicuota_imp', width: 6 },
-      { key: 'credito_imp', width: 15 },
-      { key: 'base_int', width: 15 },
-      { key: 'alicuota_int', width: 6 },
-      { key: 'credito_int', width: 15 },
-    ];
-
-    // 2. Encabezado Superior (Filas 1-5)
-    worksheet.mergeCells('A1:F1');
-    worksheet.getCell('A1').value = 'Libro de Compras';
-    worksheet.getCell('A1').font = { bold: true, size: 14 };
-
-    worksheet.mergeCells('A2:F2');
-    worksheet.getCell('A2').value = 'Según Artículo 75 del Reglamento de la Ley del IVA GO 5.363 del 12 de Julio de 1999';
-    worksheet.getCell('A2').font = { size: 8 };
-
-    worksheet.getCell('M2').value = 'Página No';
-    worksheet.getCell('M2').alignment = { horizontal: 'right' };
-    worksheet.getCell('N2').value = 1; // Pagina 1 estática por ahora
-
-    worksheet.getCell('A3').value = 'Empresa';
-    worksheet.mergeCells('B3:F3');
-    worksheet.getCell('B3').value = companyInfo.name;
-    worksheet.getCell('B3').font = { bold: true };
-
-    worksheet.getCell('K3').value = 'R.I.F.';
-    worksheet.getCell('K3').alignment = { horizontal: 'right' };
-    worksheet.mergeCells('L3:M3');
-    worksheet.getCell('L3').value = companyInfo.rif;
-    worksheet.getCell('L3').border = { bottom: { style: 'thin' } };
-
-    worksheet.getCell('A4').value = 'Periodo';
-    worksheet.getCell('B4').value = companyInfo.period;
-
-    worksheet.getCell('A5').value = 'PERIODO ACTUAL';
-    worksheet.getCell('A5').font = { bold: true };
-
-    // 3. Encabezados de Tabla (Filas 6-8)
-    // Fila 6: Super headers
-    worksheet.mergeCells('H6:J6');
-    worksheet.getCell('H6').value = 'COMPRAS DE IMPORTACION';
-    worksheet.getCell('H6').alignment = { horizontal: 'center' };
-    worksheet.getCell('H6').font = { size: 8 };
-
-    worksheet.mergeCells('K6:M6');
-    worksheet.getCell('K6').value = 'COMPRAS INTERNAS';
-    worksheet.getCell('K6').alignment = { horizontal: 'center' };
-    worksheet.getCell('K6').font = { size: 8 };
-
-    // Fila 7-8: Headers principales
-    const headers = [
-      { cell: 'A7', val: 'Fecha' }, { cell: 'A8', val: 'Documento' },
-      { cell: 'B7', val: 'Tipo' }, { cell: 'B8', val: 'Doc.' },
-      { cell: 'C7', val: 'Número' }, { cell: 'C8', val: 'Documento' },
-      { cell: 'D7', val: 'Nombre y Apellido' }, { cell: 'D8', val: 'y/o Razón Social' },
-      { cell: 'E7', val: '' }, { cell: 'E8', val: 'RIF' }, // RIF aligned bottom
-      { cell: 'F7', val: 'Total Compras' }, { cell: 'F8', val: 'mas Impuesto' },
-      { cell: 'G7', val: 'Monto Exento' }, { cell: 'G8', val: 'ó Exonerado' },
-      // Importacion
-      { cell: 'H8', val: 'Base Imponible' }, { cell: 'I8', val: '(%)' }, { cell: 'J8', val: 'Crédito Fiscal' },
-      // Internas
-      { cell: 'K8', val: 'Base Imponible' }, { cell: 'L8', val: '(%)' }, { cell: 'M8', val: 'Crédito Fiscal' },
-    ];
-
-    headers.forEach(h => {
-      const cell = worksheet.getCell(h.cell);
-      cell.value = h.val;
-      cell.font = { bold: false, size: 9 };
-      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-      cell.alignment = { vertical: 'bottom', wrapText: true };
+    // Filtrar solo facturas fiscales y eliminar duplicados
+    const seen = new Set();
+    const fiscalInvoices = invoices.filter(inv => {
+      if (inv.documentType !== 'FACTURA') return false;
+      const key = inv.invoiceNumber || inv.id;
+      if (seen.has(key)) {
+        console.warn(`⚠️ Libro Compras: Factura duplicada detectada y omitida: ${key}`);
+        return false;
+      }
+      seen.add(key);
+      return true;
     });
 
-    // 4. Datos (Fila 9+)
-    let currentRow = 9;
-    fiscalInvoices.forEach(inv => {
-      const row = worksheet.getRow(currentRow);
-      row.values = {
-        fecha: this.formatDate(inv.issueDate),
-        tipo: 'FAC', // Hardcoded for now based on filter
-        numero: inv.invoiceNumber,
-        nombre: inv.issuer?.companyName || 'Proveedor',
-        rif: inv.issuer?.rif || 'N/A',
-        total: this.formatCurrency(inv.financial?.totalSales),
-        exento: this.formatCurrency(inv.financial?.exemptSales),
-        base_imp: 0, // Logic needed for import
-        alicuota_imp: '',
-        credito_imp: 0,
-        base_int: this.formatCurrency(inv.financial?.taxableSales),
-        alicuota_int: '16%',
-        credito_int: this.formatCurrency(inv.financial?.taxDebit)
-      };
+    console.log(`📊 Libro de Compras - Total facturas a exportar: ${fiscalInvoices.length}`);
 
-      // Apply borders to row
-      ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'].forEach(col => {
+    // Configurar columnas según plantilla SENIAT
+    // N° | Fecha | Tipo Doc | N° Documento | N° Control | Razón Social | RIF | 
+    // Total Compra | Compras No Gravadas | Compras Gravadas | Crédito Fiscal |
+    // Retención IVA | Retención ISLR | Retención Municipal | IGTF
+    worksheet.columns = [
+      { key: 'num', width: 5 },
+      { key: 'fecha', width: 12 },
+      { key: 'tipoDoc', width: 10 },
+      { key: 'numDoc', width: 15 },
+      { key: 'numControl', width: 15 },
+      { key: 'razonSocial', width: 35 },
+      { key: 'rif', width: 15 },
+      { key: 'totalCompra', width: 14 },
+      { key: 'comprasNoGravadas', width: 14 },
+      { key: 'comprasGravadas', width: 14 },
+      { key: 'creditoFiscal', width: 14 },
+      { key: 'retencionIva', width: 12 },
+      { key: 'retencionIslr', width: 12 },
+      { key: 'retencionMunicipal', width: 12 },
+      { key: 'igtf', width: 10 },
+    ];
+
+    // ==========================================
+    // HEADER EMPRESA (Filas 1-4)
+    // ==========================================
+    const headerStyle = { font: { bold: true } };
+    const yellowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+
+    // Fila 1: Contribuyente
+    worksheet.getCell('A1').value = 'Contribuyente:';
+    worksheet.mergeCells('B1:E1');
+    worksheet.getCell('B1').value = companyInfo.name || 'EMPRESA';
+    worksheet.getCell('B1').font = { bold: true };
+
+    // Fila 2: RIF
+    worksheet.getCell('A2').value = 'RIF';
+    worksheet.mergeCells('B2:E2');
+    worksheet.getCell('B2').value = companyInfo.rif || 'J-00000000-0';
+    worksheet.getCell('B2').font = { bold: true };
+
+    // Fila 3: Tipo de contribuyente (configurable)
+    worksheet.getCell('A3').value = 'Tipo de contribuyente';
+    worksheet.mergeCells('B3:E3');
+    worksheet.getCell('B3').value = companyInfo.taxpayerType || 'Ordinario';
+
+    // Fila 4: Libro de Compras/Mes/Año
+    worksheet.getCell('A4').value = 'Libro de Compras/Mes/Año';
+    worksheet.mergeCells('B4:E4');
+    worksheet.getCell('B4').value = companyInfo.period || dayjs().format('MMMM/YYYY');
+
+    // ==========================================
+    // ENCABEZADOS DE TABLA (Fila 6)
+    // ==========================================
+    const headerRow = 6;
+    const headers = [
+      'N°', 'Fecha', 'Tipo\nDocumento', 'N° Documento', 'N° Control',
+      'Razón Social,\nProveedor y/o Cliente', 'Rif',
+      'Total\nCompra', 'Compras No\nGravadas', 'Compras\nGravadas', 'Crédito Fiscal',
+      'Retención IVA', 'Retención de\nISLR', 'Retención\nMunicipal', 'IGTF'
+    ];
+
+    const hRow = worksheet.getRow(headerRow);
+    headers.forEach((header, idx) => {
+      const cell = hRow.getCell(idx + 1);
+      cell.value = header;
+      cell.font = { bold: true, size: 9 };
+      cell.fill = yellowFill;
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      this.addBorders(cell);
+    });
+    hRow.height = 30;
+
+    // ==========================================
+    // DATOS (Fila 7+)
+    // ==========================================
+    let currentRow = headerRow + 1;
+    fiscalInvoices.forEach((inv, index) => {
+      const row = worksheet.getRow(currentRow);
+
+      // Validar número de factura
+      if (!inv.invoiceNumber) {
+        console.warn(`⚠️ Factura sin número en posición ${index + 1}, usando ID: ${inv.id}`);
+      }
+
+      row.values = [
+        index + 1, // N° secuencial
+        this.formatDate(inv.issueDate),
+        'FACTURA',
+        inv.invoiceNumber || '-',
+        inv.controlNumber || '-',
+        inv.issuer?.companyName || 'Proveedor',
+        inv.issuer?.rif || '-',
+        this.formatCurrency(inv.financial?.totalSales),
+        this.formatCurrency(inv.financial?.exemptSales),
+        this.formatCurrency(inv.financial?.taxableSales),
+        this.formatCurrency(inv.financial?.taxDebit), // Crédito fiscal
+        this.formatCurrency(inv.financial?.ivaRetention),
+        this.formatCurrency(inv.financial?.islrRetention),
+        this.formatCurrency(inv.financial?.municipalRetention),
+        this.formatCurrency(inv.financial?.igtf)
+      ];
+
+      // Aplicar bordes a todas las celdas
+      for (let col = 1; col <= 15; col++) {
         this.addBorders(row.getCell(col));
-      });
+      }
 
       currentRow++;
     });
 
-    // 5. Totales de Tabla
+    // ==========================================
+    // FILA DE TOTALES
+    // ==========================================
     const totalRow = worksheet.getRow(currentRow);
-    totalRow.getCell('A').value = 'Total';
-    totalRow.getCell('A').font = { bold: true };
+    const dataStartRow = headerRow + 1;
+    const dataEndRow = currentRow - 1;
 
-    ['F', 'G', 'H', 'J', 'K', 'M'].forEach(col => {
-      totalRow.getCell(col).value = { formula: `SUM(${col}9:${col}${currentRow - 1})` };
-      totalRow.getCell(col).font = { bold: true };
-      this.addBorders(totalRow.getCell(col));
-    });
+    // Solo calcular totales si hay datos
+    if (fiscalInvoices.length > 0) {
+      totalRow.getCell(1).value = ''; // N°
+      totalRow.getCell(8).value = { formula: `SUM(H${dataStartRow}:H${dataEndRow})` };
+      totalRow.getCell(9).value = { formula: `SUM(I${dataStartRow}:I${dataEndRow})` };
+      totalRow.getCell(10).value = { formula: `SUM(J${dataStartRow}:J${dataEndRow})` };
+      totalRow.getCell(11).value = { formula: `SUM(K${dataStartRow}:K${dataEndRow})` };
+      totalRow.getCell(12).value = { formula: `SUM(L${dataStartRow}:L${dataEndRow})` };
+      totalRow.getCell(13).value = { formula: `SUM(M${dataStartRow}:M${dataEndRow})` };
+      totalRow.getCell(14).value = { formula: `SUM(N${dataStartRow}:N${dataEndRow})` };
+      totalRow.getCell(15).value = { formula: `SUM(O${dataStartRow}:O${dataEndRow})` };
 
-    currentRow += 2; // Espacio
+      for (let col = 8; col <= 15; col++) {
+        totalRow.getCell(col).font = { bold: true };
+        this.addBorders(totalRow.getCell(col));
+      }
+    }
 
-    // 6. Tabla Resumen (Footer)
-    // Estructura:
-    // Col A-D: Descripciones
-    // Col E: Base Imponible
-    // Col F: Crédito Fiscal
-    // Col G-H: Retención IVA (merged)
+    currentRow += 2;
 
+    // ==========================================
+    // TABLA RESUMEN (Categorías SENIAT)
+    // ==========================================
     const summaryStartRow = currentRow;
-    const summaryHeaders = ['Totales', '', '', '', 'Base', 'Crédito', 'Retención de IVA'];
-    const summaryRow = worksheet.getRow(summaryStartRow);
 
-    // Merge A-D for "Totales" label
+    // Encabezado resumen
     worksheet.mergeCells(`A${summaryStartRow}:D${summaryStartRow}`);
-    summaryRow.getCell('A').value = 'Totales';
-    summaryRow.getCell('E').value = 'Base\nImponible';
-    summaryRow.getCell('F').value = 'Crédito\nFiscal';
-    worksheet.mergeCells(`G${summaryStartRow}:H${summaryStartRow}`);
-    summaryRow.getCell('G').value = 'Retención de IVA';
-
-    // Style Summary Header
-    ['A', 'E', 'F', 'G'].forEach(col => {
-      const cell = summaryRow.getCell(col);
-      cell.font = { bold: true };
-      cell.alignment = { wrapText: true, vertical: 'top' };
-      this.addBorders(cell);
-    });
-    // Fix borders for merged cells
-    this.addBorders(summaryRow.getCell('H'));
+    worksheet.getCell(`A${summaryStartRow}`).value = '';
+    worksheet.getCell(`E${summaryStartRow}`).value = 'Base Imponible';
+    worksheet.getCell(`F${summaryStartRow}`).value = 'Crédito Fiscal';
+    worksheet.getCell(`E${summaryStartRow}`).font = { bold: true };
+    worksheet.getCell(`F${summaryStartRow}`).font = { bold: true };
+    this.addBorders(worksheet.getCell(`E${summaryStartRow}`));
+    this.addBorders(worksheet.getCell(`F${summaryStartRow}`));
 
     const summaryItems = [
-      'Compras no gravadas y/o sin derecho a crédito fiscal',
-      'Importación gravada por alícuota general',
-      'Importaciones gravadas por alícuota general más alícuota adicional',
-      'Importaciones gravadas por alícuota reducida',
-      'Compras internas gravadas por alícuota general',
-      'Compras internas gravadas por alícuota general más alícuota adicional',
-      'Compras internas gravadas por alícuota reducida',
-      'Total compras y créditos fiscales del periodo'
+      { label: 'Total: Compras Excentas y/o sin Derecho a Crédito Fiscal', row: 30, baseFormula: null, creditFormula: null },
+      { label: 'Σ de las Compras Importación Afectas solo Alícuota General', row: 31, baseFormula: null, creditFormula: null },
+      { label: 'Σ de las Compras Importación Afectas en Alícuota General + Adicional', row: 312, baseFormula: null, creditFormula: null },
+      { label: 'Σ de las Compras Importación Afectas en Alícuota Reducida', row: 313, baseFormula: null, creditFormula: null },
+      { label: 'Σ de las Compras Internas Afectas solo en Alícuota General', row: 33, baseFormula: `J${dataEndRow + 1}`, creditFormula: `K${dataEndRow + 1}` },
+      { label: 'Σ de las Compras Internas Afectas en Alícuota General + Adicional', row: 332, baseFormula: null, creditFormula: null },
+      { label: 'Σ de las Compras Internas Afectas en Alícuota Reducida', row: 333, baseFormula: null, creditFormula: null },
     ];
 
     summaryItems.forEach((item, idx) => {
       const r = summaryStartRow + 1 + idx;
       const row = worksheet.getRow(r);
       worksheet.mergeCells(`A${r}:D${r}`);
-      row.getCell('A').value = item;
-      this.addBorders(row.getCell('A'));
+      row.getCell(1).value = item.label;
+      row.getCell(5).value = item.baseFormula ? { formula: item.baseFormula } : 0;
+      row.getCell(6).value = item.creditFormula ? { formula: item.creditFormula } : 0;
 
-      // Placeholders for formulas
-      // Example logic:
-      if (item.includes('Compras internas gravadas por alícuota general')) {
-        row.getCell('E').value = { formula: `K${currentRow - 2}` }; // Total Base Int
-        row.getCell('F').value = { formula: `M${currentRow - 2}` }; // Total Credito Int
-      } else if (item.includes('Total compras')) {
-        // Sum of above
-        row.getCell('E').value = { formula: `SUM(E${summaryStartRow + 1}:E${r - 1})` };
-        row.getCell('F').value = { formula: `SUM(F${summaryStartRow + 1}:F${r - 1})` };
-      } else {
-        row.getCell('E').value = 0;
-        row.getCell('F').value = 0;
-      }
-
-      this.addBorders(row.getCell('E'));
-      this.addBorders(row.getCell('F'));
-
-      // Retencion merged G-H
-      worksheet.mergeCells(`G${r}:H${r}`);
-      this.addBorders(row.getCell('G'));
-      this.addBorders(row.getCell('H'));
+      this.addBorders(row.getCell(1));
+      this.addBorders(row.getCell(5));
+      this.addBorders(row.getCell(6));
     });
+
+    // Fila de total resumen
+    const totalSummaryRow = summaryStartRow + summaryItems.length + 1;
+    worksheet.mergeCells(`A${totalSummaryRow}:D${totalSummaryRow}`);
+    worksheet.getCell(`A${totalSummaryRow}`).value = '';
+    worksheet.getCell(`E${totalSummaryRow}`).value = { formula: `SUM(E${summaryStartRow + 1}:E${totalSummaryRow - 1})` };
+    worksheet.getCell(`F${totalSummaryRow}`).value = { formula: `SUM(F${summaryStartRow + 1}:F${totalSummaryRow - 1})` };
+    worksheet.getCell(`E${totalSummaryRow}`).font = { bold: true };
+    worksheet.getCell(`F${totalSummaryRow}`).font = { bold: true };
+    this.addBorders(worksheet.getCell(`E${totalSummaryRow}`));
+    this.addBorders(worksheet.getCell(`F${totalSummaryRow}`));
+
+    console.log(`✅ Libro de Compras generado con ${fiscalInvoices.length} registros`);
   }
 
-  // Construir Libro de Ventas (Adaptado del de Compras)
+  // Construir Libro de Ventas (Formato SENIAT Oficial)
   buildLibroVentas(worksheet, invoices, companyInfo) {
-    const fiscalInvoices = invoices.filter(inv => inv.documentType === 'FACTURA');
-
-    worksheet.columns = [
-      { key: 'fecha', width: 12 },
-      { key: 'tipo', width: 6 },
-      { key: 'numero', width: 15 },
-      { key: 'nombre', width: 40 },
-      { key: 'rif', width: 15 },
-      { key: 'total', width: 18 },
-      { key: 'exento', width: 15 },
-      { key: 'base_imp', width: 15 }, // Exportaciones?
-      { key: 'alicuota_imp', width: 6 },
-      { key: 'debito_imp', width: 15 },
-      { key: 'base_int', width: 15 },
-      { key: 'alicuota_int', width: 6 },
-      { key: 'debito_int', width: 15 },
-    ];
-
-    // Header (Similar to Compras)
-    worksheet.mergeCells('A1:F1');
-    worksheet.getCell('A1').value = 'Libro de Ventas';
-    worksheet.getCell('A1').font = { bold: true, size: 14 };
-
-    // ... (Company info same as Compras) ...
-    worksheet.mergeCells('A2:F2');
-    worksheet.getCell('A2').value = 'Según Artículo 75 del Reglamento de la Ley del IVA';
-    worksheet.getCell('A3').value = 'Empresa';
-    worksheet.mergeCells('B3:F3');
-    worksheet.getCell('B3').value = companyInfo.name;
-    worksheet.getCell('B3').font = { bold: true };
-    worksheet.getCell('K3').value = 'R.I.F.';
-    worksheet.mergeCells('L3:M3');
-    worksheet.getCell('L3').value = companyInfo.rif;
-    worksheet.getCell('A4').value = 'Periodo';
-    worksheet.getCell('B4').value = companyInfo.period;
-
-    // Headers
-    worksheet.mergeCells('H6:J6');
-    worksheet.getCell('H6').value = 'VENTAS DE EXPORTACION'; // O similar
-    worksheet.getCell('H6').alignment = { horizontal: 'center' };
-
-    worksheet.mergeCells('K6:M6');
-    worksheet.getCell('K6').value = 'VENTAS INTERNAS';
-    worksheet.getCell('K6').alignment = { horizontal: 'center' };
-
-    const headers = [
-      { cell: 'A7', val: 'Fecha' }, { cell: 'A8', val: 'Documento' },
-      { cell: 'B7', val: 'Tipo' }, { cell: 'B8', val: 'Doc.' },
-      { cell: 'C7', val: 'Número' }, { cell: 'C8', val: 'Documento' },
-      { cell: 'D7', val: 'Nombre y Apellido' }, { cell: 'D8', val: 'y/o Razón Social' },
-      { cell: 'E7', val: '' }, { cell: 'E8', val: 'RIF' },
-      { cell: 'F7', val: 'Total Ventas' }, { cell: 'F8', val: 'mas Impuesto' },
-      { cell: 'G7', val: 'Monto Exento' }, { cell: 'G8', val: 'ó Exonerado' },
-      // Exportacion
-      { cell: 'H8', val: 'Base Imponible' }, { cell: 'I8', val: '(%)' }, { cell: 'J8', val: 'Débito Fiscal' },
-      // Internas
-      { cell: 'K8', val: 'Base Imponible' }, { cell: 'L8', val: '(%)' }, { cell: 'M8', val: 'Débito Fiscal' },
-    ];
-
-    headers.forEach(h => {
-      const cell = worksheet.getCell(h.cell);
-      cell.value = h.val;
-      cell.font = { bold: false, size: 9 };
-      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-      cell.alignment = { vertical: 'bottom', wrapText: true };
+    // Filtrar solo facturas fiscales y eliminar duplicados
+    const seen = new Set();
+    const fiscalInvoices = invoices.filter(inv => {
+      if (inv.documentType !== 'FACTURA') return false;
+      const key = inv.invoiceNumber || inv.id;
+      if (seen.has(key)) {
+        console.warn(`⚠️ Libro Ventas: Factura duplicada detectada y omitida: ${key}`);
+        return false;
+      }
+      seen.add(key);
+      return true;
     });
 
-    // Data
-    let currentRow = 9;
-    fiscalInvoices.forEach(inv => {
+    console.log(`📊 Libro de Ventas - Total facturas a exportar: ${fiscalInvoices.length}`);
+
+    // Configurar columnas según plantilla SENIAT
+    // N° | Fecha | Tipo Doc | N° Documento | N° Control | Razón Social | RIF | 
+    // Total Ventas | Venta No Gravadas | Venta Gravadas | Débito Fiscal |
+    // Retenciones IVA de Clientes | Retención ISLR | Retención Municipal | IGTF
+    worksheet.columns = [
+      { key: 'num', width: 5 },
+      { key: 'fecha', width: 12 },
+      { key: 'tipoDoc', width: 10 },
+      { key: 'numDoc', width: 15 },
+      { key: 'numControl', width: 15 },
+      { key: 'razonSocial', width: 35 },
+      { key: 'rif', width: 15 },
+      { key: 'totalVentas', width: 14 },
+      { key: 'ventaNoGravadas', width: 14 },
+      { key: 'ventaGravadas', width: 14 },
+      { key: 'debitoFiscal', width: 14 },
+      { key: 'retencionIvaClientes', width: 14 },
+      { key: 'retencionIslr', width: 12 },
+      { key: 'retencionMunicipal', width: 12 },
+      { key: 'igtf', width: 10 },
+    ];
+
+    // ==========================================
+    // HEADER EMPRESA (Filas 1-5)
+    // ==========================================
+    const yellowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+
+    // Fila 1: Contribuyente
+    worksheet.getCell('A1').value = 'Contribuyente:';
+    worksheet.mergeCells('B1:E1');
+    worksheet.getCell('B1').value = companyInfo.name || 'EMPRESA';
+    worksheet.getCell('B1').font = { bold: true };
+
+    // Fila 2: RIF
+    worksheet.getCell('A2').value = 'RIF';
+    worksheet.mergeCells('B2:E2');
+    worksheet.getCell('B2').value = companyInfo.rif || 'J-00000000-0';
+    worksheet.getCell('B2').font = { bold: true };
+
+    // Fila 3: Tipo de contribuyente (configurable)
+    worksheet.getCell('A3').value = 'Tipo de contribuyente';
+    worksheet.mergeCells('B3:E3');
+    worksheet.getCell('B3').value = companyInfo.taxpayerType || 'Ordinario';
+
+    // Fila 4: Libro de Ventas/Mes/Año
+    worksheet.getCell('A4').value = 'Libro de Ventas/Mes/Año';
+    worksheet.mergeCells('B4:E4');
+    worksheet.getCell('B4').value = companyInfo.period || dayjs().format('MMMM/YYYY');
+
+    // Fila 5: Máquina Fiscal Nro (configurable, vacío por defecto)
+    worksheet.getCell('A5').value = 'Máquina Fiscal Nro.';
+    worksheet.mergeCells('B5:E5');
+    worksheet.getCell('B5').value = companyInfo.fiscalMachineNumber || '';
+
+    // ==========================================
+    // ENCABEZADOS DE TABLA (Fila 7)
+    // ==========================================
+    const headerRow = 7;
+    const headers = [
+      'N°', 'Fecha', 'Tipo\nDocumento', 'N° Documento', 'N° Control',
+      'Razón Social, Proveedor\ny/o cliente', 'Rif',
+      'Total\nVentas', 'Venta No\nGravadas', 'Venta\nGravadas', 'Débito Fiscal',
+      'Retenciones IVA\nde Clientes', 'Retención\nISRL', 'Retención\nMunicipal', 'IGTF'
+    ];
+
+    const hRow = worksheet.getRow(headerRow);
+    headers.forEach((header, idx) => {
+      const cell = hRow.getCell(idx + 1);
+      cell.value = header;
+      cell.font = { bold: true, size: 9 };
+      cell.fill = yellowFill;
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      this.addBorders(cell);
+    });
+    hRow.height = 35;
+
+    // ==========================================
+    // DATOS (Fila 8+)
+    // ==========================================
+    let currentRow = headerRow + 1;
+    fiscalInvoices.forEach((inv, index) => {
       const row = worksheet.getRow(currentRow);
-      row.values = {
-        fecha: this.formatDate(inv.issueDate),
-        tipo: 'FAC',
-        numero: inv.invoiceNumber,
-        nombre: inv.client?.companyName || 'Cliente General',
-        rif: inv.client?.rif || 'N/A',
-        total: this.formatCurrency(inv.financial?.totalSales),
-        exento: this.formatCurrency(inv.financial?.exemptSales),
-        base_imp: 0,
-        alicuota_imp: '',
-        debito_imp: 0,
-        base_int: this.formatCurrency(inv.financial?.taxableSales),
-        alicuota_int: '16%',
-        debito_int: this.formatCurrency(inv.financial?.taxDebit)
-      };
-      ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'].forEach(col => {
+
+      // Validar número de factura
+      if (!inv.invoiceNumber) {
+        console.warn(`⚠️ Factura sin número en posición ${index + 1}, usando ID: ${inv.id}`);
+      }
+
+      row.values = [
+        index + 1, // N° secuencial
+        this.formatDate(inv.issueDate),
+        'FACTURA',
+        inv.invoiceNumber || '-',
+        inv.controlNumber || '-',
+        inv.client?.companyName || 'Cliente General',
+        inv.client?.rif || '-',
+        this.formatCurrency(inv.financial?.totalSales),
+        this.formatCurrency(inv.financial?.exemptSales),
+        this.formatCurrency(inv.financial?.taxableSales),
+        this.formatCurrency(inv.financial?.taxDebit), // Débito fiscal
+        this.formatCurrency(inv.financial?.ivaRetention),
+        this.formatCurrency(inv.financial?.islrRetention),
+        this.formatCurrency(inv.financial?.municipalRetention),
+        this.formatCurrency(inv.financial?.igtf)
+      ];
+
+      // Aplicar bordes a todas las celdas
+      for (let col = 1; col <= 15; col++) {
         this.addBorders(row.getCell(col));
-      });
+      }
+
       currentRow++;
     });
 
-    // Totales
+    // ==========================================
+    // FILA DE TOTALES
+    // ==========================================
     const totalRow = worksheet.getRow(currentRow);
-    totalRow.getCell('A').value = 'Total';
-    totalRow.getCell('A').font = { bold: true };
+    const dataStartRow = headerRow + 1;
+    const dataEndRow = currentRow - 1;
 
-    ['F', 'G', 'H', 'J', 'K', 'M'].forEach(col => {
-      totalRow.getCell(col).value = { formula: `SUM(${col}9:${col}${currentRow - 1})` };
-      totalRow.getCell(col).font = { bold: true };
-      this.addBorders(totalRow.getCell(col));
-    });
+    // Solo calcular totales si hay datos
+    if (fiscalInvoices.length > 0) {
+      totalRow.getCell(1).value = ''; // N°
+      totalRow.getCell(8).value = { formula: `SUM(H${dataStartRow}:H${dataEndRow})` };
+      totalRow.getCell(9).value = { formula: `SUM(I${dataStartRow}:I${dataEndRow})` };
+      totalRow.getCell(10).value = { formula: `SUM(J${dataStartRow}:J${dataEndRow})` };
+      totalRow.getCell(11).value = { formula: `SUM(K${dataStartRow}:K${dataEndRow})` };
+      totalRow.getCell(12).value = { formula: `SUM(L${dataStartRow}:L${dataEndRow})` };
+      totalRow.getCell(13).value = { formula: `SUM(M${dataStartRow}:M${dataEndRow})` };
+      totalRow.getCell(14).value = { formula: `SUM(N${dataStartRow}:N${dataEndRow})` };
+      totalRow.getCell(15).value = { formula: `SUM(O${dataStartRow}:O${dataEndRow})` };
 
-    // Summary (Simplified for Ventas)
+      for (let col = 8; col <= 15; col++) {
+        totalRow.getCell(col).font = { bold: true };
+        this.addBorders(totalRow.getCell(col));
+      }
+    }
+
     currentRow += 2;
-    const summaryStartRow = currentRow;
-    worksheet.mergeCells(`A${summaryStartRow}:D${summaryStartRow}`);
-    const summaryRow = worksheet.getRow(summaryStartRow);
-    summaryRow.getCell('A').value = 'Totales Ventas';
-    summaryRow.getCell('E').value = 'Base Imponible';
-    summaryRow.getCell('F').value = 'Débito Fiscal';
 
-    ['A', 'E', 'F'].forEach(col => {
-      const cell = summaryRow.getCell(col);
-      cell.font = { bold: true };
-      this.addBorders(cell);
-    });
+    // ==========================================
+    // TABLA RESUMEN (Categorías SENIAT)
+    // ==========================================
+    const summaryStartRow = currentRow;
+
+    // Encabezado resumen
+    worksheet.mergeCells(`A${summaryStartRow}:D${summaryStartRow}`);
+    worksheet.getCell(`A${summaryStartRow}`).value = '';
+    worksheet.getCell(`E${summaryStartRow}`).value = 'Base Imponible';
+    worksheet.getCell(`F${summaryStartRow}`).value = 'Débito Fiscal';
+    worksheet.getCell(`G${summaryStartRow}`).value = 'Retención IVA';
+    worksheet.getCell(`E${summaryStartRow}`).font = { bold: true };
+    worksheet.getCell(`F${summaryStartRow}`).font = { bold: true };
+    worksheet.getCell(`G${summaryStartRow}`).font = { bold: true };
+    this.addBorders(worksheet.getCell(`E${summaryStartRow}`));
+    this.addBorders(worksheet.getCell(`F${summaryStartRow}`));
+    this.addBorders(worksheet.getCell(`G${summaryStartRow}`));
 
     const summaryItems = [
-      'Ventas Internas Gravadas 16%',
-      'Ventas Internas Exentas',
-      'Total Ventas'
+      { label: 'Total: Ventas Internas No Gravadas', baseFormula: `I${currentRow - 2}`, debitFormula: null, retFormula: null },
+      { label: 'Sumatoria de las: Ventas de Exportación', baseFormula: null, debitFormula: null, retFormula: null },
+      { label: 'Sumatoria de las: Ventas Internas Afectadas solo alícuota General', baseFormula: `J${currentRow - 2}`, debitFormula: `K${currentRow - 2}`, retFormula: `L${currentRow - 2}` },
+      { label: 'Sumatoria de las: Ventas Internas Afectadas solo alícuota General+Adicional', baseFormula: null, debitFormula: null, retFormula: null },
+      { label: 'Sumatoria de las: Ventas Internas Afectadas en Alícuotas Reducida', baseFormula: null, debitFormula: null, retFormula: null },
     ];
 
     summaryItems.forEach((item, idx) => {
       const r = summaryStartRow + 1 + idx;
       const row = worksheet.getRow(r);
       worksheet.mergeCells(`A${r}:D${r}`);
-      row.getCell('A').value = item;
-      this.addBorders(row.getCell('A'));
+      row.getCell(1).value = item.label;
+      row.getCell(5).value = item.baseFormula ? { formula: item.baseFormula } : 0;
+      row.getCell(6).value = item.debitFormula ? { formula: item.debitFormula } : 0;
+      row.getCell(7).value = item.retFormula ? { formula: item.retFormula } : 0;
 
-      if (item.includes('16%')) {
-        row.getCell('E').value = { formula: `K${currentRow - 2}` };
-        row.getCell('F').value = { formula: `M${currentRow - 2}` };
-      } else if (item.includes('Total')) {
-        row.getCell('E').value = { formula: `SUM(E${summaryStartRow + 1}:E${r - 1})` };
-        row.getCell('F').value = { formula: `SUM(F${summaryStartRow + 1}:F${r - 1})` };
-      } else {
-        row.getCell('E').value = 0;
-        row.getCell('F').value = 0;
-      }
-      this.addBorders(row.getCell('E'));
-      this.addBorders(row.getCell('F'));
+      this.addBorders(row.getCell(1));
+      this.addBorders(row.getCell(5));
+      this.addBorders(row.getCell(6));
+      this.addBorders(row.getCell(7));
     });
+
+    // Fila de total resumen
+    const totalSummaryRow = summaryStartRow + summaryItems.length + 1;
+    worksheet.mergeCells(`A${totalSummaryRow}:D${totalSummaryRow}`);
+    worksheet.getCell(`A${totalSummaryRow}`).value = '';
+    worksheet.getCell(`E${totalSummaryRow}`).value = { formula: `SUM(E${summaryStartRow + 1}:E${totalSummaryRow - 1})` };
+    worksheet.getCell(`F${totalSummaryRow}`).value = { formula: `SUM(F${summaryStartRow + 1}:F${totalSummaryRow - 1})` };
+    worksheet.getCell(`G${totalSummaryRow}`).value = { formula: `SUM(G${summaryStartRow + 1}:G${totalSummaryRow - 1})` };
+    worksheet.getCell(`E${totalSummaryRow}`).font = { bold: true };
+    worksheet.getCell(`F${totalSummaryRow}`).font = { bold: true };
+    worksheet.getCell(`G${totalSummaryRow}`).font = { bold: true };
+    this.addBorders(worksheet.getCell(`E${totalSummaryRow}`));
+    this.addBorders(worksheet.getCell(`F${totalSummaryRow}`));
+    this.addBorders(worksheet.getCell(`G${totalSummaryRow}`));
+
+    console.log(`✅ Libro de Ventas generado con ${fiscalInvoices.length} registros`);
   }
 
   // Construir Reporte General (Sin cambios mayores)
