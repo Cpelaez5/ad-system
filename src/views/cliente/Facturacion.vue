@@ -114,7 +114,7 @@
 
       <v-col cols="12" sm="6" md="3">
         <CurrencyStatsCard
-          title="Monto Total"
+          :title="currentTab === 'all' ? 'Rentabilidad' : 'Monto Total'"
           :value="convertedStatsTotal"
           bg-color="#f0d29b"
           text-color="#010101"
