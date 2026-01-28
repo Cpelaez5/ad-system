@@ -208,44 +208,54 @@
               ></v-text-field>
             </v-col>
 
-            <!-- Estado -->
-            <v-col cols="12" md="3">
+            <!-- Estado (con opción 'Todos' por defecto) -->
+            <v-col cols="12" md="2">
               <v-select
                 v-model="statusFilter"
-                :items="invoiceStatuses"
+                :items="statusFilterOptions"
+                item-title="text"
+                item-value="value"
                 prepend-inner-icon="mdi-tag-outline"
                 label="Estado"
-                clearable
                 variant="outlined"
                 hide-details
                 @update:model-value="applyFilters"
               ></v-select>
             </v-col>
 
-            <!-- Fecha Inicio -->
+            <!-- Moneda -->
             <v-col cols="12" md="2">
-              <v-text-field
-                v-model="dateFromFilter"
-                prepend-inner-icon="mdi-calendar-start"
-                label="Fecha Inicio"
-                type="date"
+              <v-select
+                v-model="currencyFilter"
+                :items="currencyFilterOptions"
+                item-title="text"
+                item-value="value"
+                prepend-inner-icon="mdi-currency-usd"
+                label="Moneda"
                 variant="outlined"
                 hide-details
                 @update:model-value="applyFilters"
-              ></v-text-field>
+              ></v-select>
             </v-col>
 
-            <!-- Fecha Fin -->
+            <!-- Fecha Inicio (CustomDatePicker) -->
             <v-col cols="12" md="2">
-              <v-text-field
-                v-model="dateToFilter"
-                prepend-inner-icon="mdi-calendar-end"
-                label="Fecha Fin"
-                type="date"
-                variant="outlined"
-                hide-details
+              <CustomDatePicker
+                v-model="dateFromFilter"
+                label="Fecha Inicio"
+                placeholder="Seleccionar"
                 @update:model-value="applyFilters"
-              ></v-text-field>
+              />
+            </v-col>
+
+            <!-- Fecha Fin (CustomDatePicker) -->
+            <v-col cols="12" md="2">
+              <CustomDatePicker
+                v-model="dateToFilter"
+                label="Fecha Fin"
+                placeholder="Seleccionar"
+                @update:model-value="applyFilters"
+              />
             </v-col>
 
             <!-- Botón Limpiar -->
@@ -798,9 +808,10 @@ export default {
             
       // Filtros
       searchQuery: '',
-      statusFilter: null,
-      dateFromFilter: '',
-      dateToFilter: '',
+      statusFilter: 'all', // 'all' = Todos (predeterminado)
+      currencyFilter: 'all', // 'all' = Todas las monedas (predeterminado)
+      dateFromFilter: null, // Ahora es Date object o null
+      dateToFilter: null, // Ahora es Date object o null
       
       // Estados de diálogos
       invoiceDialog: false,
@@ -854,6 +865,25 @@ export default {
         'PAGADA',
         'VENCIDA',
         'ANULADA'
+      ],
+      
+      /** Opciones para filtro de estado con 'Todos' como predeterminado */
+      statusFilterOptions: [
+        { text: 'Todos', value: 'all' },
+        { text: 'Borrador', value: 'BORRADOR' },
+        { text: 'Emitida', value: 'EMITIDA' },
+        { text: 'Enviada', value: 'ENVIADA' },
+        { text: 'Pagada', value: 'PAGADA' },
+        { text: 'Vencida', value: 'VENCIDA' },
+        { text: 'Anulada', value: 'ANULADA' }
+      ],
+      
+      /** Opciones para filtro de moneda */
+      currencyFilterOptions: [
+        { text: 'Todas', value: 'all' },
+        { text: 'Bolívares (VES)', value: 'VES' },
+        { text: 'Dólares (USD)', value: 'USD' },
+        { text: 'Euros (EUR)', value: 'EUR' }
       ]
     };
   },
@@ -886,7 +916,8 @@ export default {
     activeFiltersCount() {
       let count = 0;
       if (this.searchQuery) count++;
-      if (this.statusFilter) count++;
+      if (this.statusFilter && this.statusFilter !== 'all') count++;
+      if (this.currencyFilter && this.currencyFilter !== 'all') count++;
       if (this.dateFromFilter) count++;
       if (this.dateToFilter) count++;
       return count;
@@ -1177,19 +1208,33 @@ export default {
         );
       }
       
-      // Filtro por estado
-      if (this.statusFilter) {
+      // Filtro por estado (solo aplicar si no es 'all')
+      if (this.statusFilter && this.statusFilter !== 'all') {
         filtered = filtered.filter(invoice => invoice.status === this.statusFilter);
       }
       
-      // Filtro por fecha desde
+      // Filtro por moneda (solo aplicar si no es 'all')
+      if (this.currencyFilter && this.currencyFilter !== 'all') {
+        filtered = filtered.filter(invoice => {
+          const invoiceCurrency = invoice.financial?.currency || 'VES';
+          return invoiceCurrency === this.currencyFilter;
+        });
+      }
+      
+      // Filtro por fecha desde (CustomDatePicker devuelve Date object o string YYYY-MM-DD)
       if (this.dateFromFilter) {
-        filtered = filtered.filter(invoice => invoice.issueDate >= this.dateFromFilter);
+        const fromDate = this.dateFromFilter instanceof Date 
+          ? this.dateFromFilter.toISOString().slice(0, 10) 
+          : this.dateFromFilter;
+        filtered = filtered.filter(invoice => invoice.issueDate >= fromDate);
       }
 
-      // Filtro por fecha hasta (falta en el código original, lo agrego si estaba cortado o incompleto)
+      // Filtro por fecha hasta
       if (this.dateToFilter) {
-        filtered = filtered.filter(invoice => invoice.issueDate <= this.dateToFilter);
+        const toDate = this.dateToFilter instanceof Date 
+          ? this.dateToFilter.toISOString().slice(0, 10) 
+          : this.dateToFilter;
+        filtered = filtered.filter(invoice => invoice.issueDate <= toDate);
       }
 
       this.filteredInvoices = filtered;
@@ -1211,9 +1256,10 @@ export default {
     
     clearFilters() {
       this.searchQuery = '';
-      this.statusFilter = null;
-      this.dateFromFilter = '';
-      this.dateToFilter = '';
+      this.statusFilter = 'all'; // Reset to default
+      this.currencyFilter = 'all'; // Reset to default
+      this.dateFromFilter = null;
+      this.dateToFilter = null;
       this.applyFilters();
     },
     
