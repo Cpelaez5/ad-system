@@ -64,6 +64,8 @@
               <v-select
                 v-model="formData.category"
                 :items="categories"
+                item-title="title"
+                item-value="value"
                 label="Categoría *"
                 variant="outlined"
                 density="comfortable"
@@ -266,7 +268,13 @@ const defaultForm = {
 const formData = reactive({ ...defaultForm })
 
 // Opciones
-const categories = ['LEGAL', 'MUNICIPAL', 'SENIAT', 'NOMINA', 'OTROS']
+const categories = [
+  { title: 'Legal', value: 'LEGAL' },
+  { title: 'Municipal', value: 'MUNICIPAL' },
+  { title: 'Seniat', value: 'SENIAT' },
+  { title: 'Parafiscales y nómina', value: 'NOMINA' },
+  { title: 'Otros', value: 'OTROS' }
+]
 
 const statusOptions = [
   { title: 'Vigente', value: 'VIGENTE', color: 'success' },

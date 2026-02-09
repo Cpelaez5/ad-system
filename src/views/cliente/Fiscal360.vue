@@ -111,19 +111,22 @@
                   <span class="text-white text-caption font-weight-bold">{{ Math.ceil(value) }}%</span>
                 </template>
               </v-progress-linear>
+              <v-tooltip activator="parent" location="top">
+                Completados: {{ complianceDetail.total.covered }} / {{ complianceDetail.total.required }}
+              </v-tooltip>
               <div class="d-flex mt-2 gap-2 overflow-x-auto py-2">
                  <v-chip 
                     v-for="cat in categories" 
-                    :key="cat"
+                    :key="cat.value"
                     size="small" 
-                    :variant="getCategoryVariant(cat)"
-                    :color="getCategoryColor(cat)"
+                    :variant="getCategoryVariant(cat.value)"
+                    :color="getCategoryColor(cat.value)"
                     class="mr-2"
                  >
-                    <v-icon start :icon="getCategoryIconStatus(cat)"></v-icon>
-                    {{ cat }} 
-                    <span v-if="complianceDetail.byCategory[cat]" class="ml-1 font-weight-bold">
-                        ({{ complianceDetail.byCategory[cat].percent }}%)
+                    <v-icon start :icon="getCategoryIconStatus(cat.value)"></v-icon>
+                    {{ cat.title }} 
+                    <span v-if="complianceDetail[cat.value]" class="ml-1 font-weight-bold">
+                        ({{ complianceDetail[cat.value].rate }}%)
                     </span>
                  </v-chip>
               </div>
@@ -206,15 +209,15 @@
                 </v-chip>
                 <v-chip
                   v-for="cat in categories"
-                  :key="cat"
-                  :variant="categoryFilter === cat ? 'elevated' : 'outlined'"
-                  :color="categoryFilter === cat ? getCategoryChipColor(cat) : 'grey'"
+                  :key="cat.value"
+                  :variant="categoryFilter === cat.value ? 'elevated' : 'outlined'"
+                  :color="categoryFilter === cat.value ? getCategoryChipColor(cat.value) : 'grey'"
                   size="small"
                   class="font-weight-medium px-3 mr-2 mb-1"
-                  @click="categoryFilter = cat"
+                  @click="categoryFilter = cat.value"
                 >
-                  <v-icon start size="small" :icon="getCategoryIcon(cat)"></v-icon>
-                  {{ cat }}
+                  <v-icon start size="small" :icon="getCategoryIcon(cat.value)"></v-icon>
+                  {{ cat.title }}
                 </v-chip>
               </div>
             </div>
@@ -237,7 +240,7 @@
                    >
                     <v-expansion-panel-title>
                         <div class="d-flex align-center w-100">
-                            <v-icon color="secondary" class="mr-3">{{ getCategoryIcon(cat.name) }}</v-icon>
+                            <v-icon color="secondary" class="mr-3">{{ getCategoryIcon(cat.id) }}</v-icon>
                             <span class="text-subtitle-1 font-weight-bold">{{ cat.name }}</span>
                             <v-spacer />
                             <v-chip size="small" variant="tonal" class="mr-4">
@@ -430,7 +433,7 @@
                     </v-avatar>
                     <div class="flex-grow-1">
                         <div class="text-h5 font-weight-bold text-white">{{ previewItem.name }}</div>
-                        <div class="text-caption text-white" style="opacity: 0.8">{{ previewItem.category }}</div>
+                        <div class="text-caption text-white" style="opacity: 0.8">{{ getCategoryTitle(previewItem.category) }}</div>
                     </div>
                     <v-chip 
                         :color="getStatusColor(getEffectiveStatus(previewItem))" 
@@ -608,7 +611,18 @@ const filters = [
     { label: 'Vencidos', value: 'VENCIDO', count: 0 },
 ]
 
-const categories = ['LEGAL', 'MUNICIPAL', 'SENIAT', 'NOMINA', 'OTROS']
+const categories = [
+    { title: 'Legal', value: 'LEGAL' },
+    { title: 'Municipal', value: 'MUNICIPAL' },
+    { title: 'Seniat', value: 'SENIAT' },
+    { title: 'Parafiscales y nómina', value: 'NOMINA' },
+    { title: 'Otros', value: 'OTROS' }
+]
+
+const getCategoryTitle = (catValue) => {
+    const cat = categories.find(c => c.value === catValue)
+    return cat ? cat.title : catValue
+}
 
 // Computed
 const filteredDocs = computed(() => {
@@ -633,14 +647,26 @@ const filteredDocs = computed(() => {
 
 const groupedCategories = computed(() => {
     const groups = {}
-    filteredDocs.value.forEach(doc => {
-        if (!groups[doc.category]) groups[doc.category] = []
-        groups[doc.category].push(doc)
+    
+    // Inicializar grupos con el orden definido y títulos correctos
+    categories.forEach(cat => {
+        groups[cat.value] = {
+            title: cat.title,
+            docs: []
+        }
     })
-    return Object.keys(groups).map(cat => ({
-        name: cat,
-        docs: groups[cat]
-    }))
+
+    filteredDocs.value.forEach(doc => {
+        if (groups[doc.category]) {
+            groups[doc.category].docs.push(doc)
+        }
+    })
+
+    return Object.keys(groups).map(key => ({
+        name: groups[key].title, // Usar título amigable
+        id: key,
+        docs: groups[key].docs
+    })).filter(g => g.docs.length > 0)
 })
 
 const complianceRate = computed(() => {
@@ -662,7 +688,8 @@ const complianceDetail = computed(() => {
     let totalCovered = 0
 
     // Iterate known categories
-    categories.forEach(cat => {
+    categories.forEach(catObj => {
+        const cat = catObj.value
         if (cat === 'OTROS') return // Skip OTROS for strict compliance
         
         const types = FISCAL_TYPES[cat] || []
@@ -676,53 +703,57 @@ const complianceDetail = computed(() => {
                 if (d.category !== cat) return false
                 const isTypeMatch = d.doc_type === type.id
                 // Fallback fuzzy match only if doc_type is missing
-                const isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
+                let isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
+                
+                // Evitar falso positivo: "RIF de Socios" contiene "RIF"
+                if (isNameMatch && type.id === 'RIF' && d.name.toLowerCase().includes('socios')) {
+                    isNameMatch = false
+                }
+
                 return isTypeMatch || isNameMatch
             })
-            
-            if (matchingDocs.length > 0) {
-                // Get the best doc using effective status (considers expiration)
-                // VIGENTE = 1.0, TRAMITE = 0.7, VENCIDO = 0.5
-                const hasVigente = matchingDocs.some(d => getEffectiveStatus(d) === 'VIGENTE')
-                const hasTramite = matchingDocs.some(d => getEffectiveStatus(d) === 'TRAMITE')
-                const hasVencido = matchingDocs.some(d => getEffectiveStatus(d) === 'VENCIDO')
-                
-                if (hasVigente) {
-                    catCovered += 1 // Full value
-                } else if (hasTramite) {
-                    catCovered += 0.7 // In progress
-                } else if (hasVencido) {
-                    catCovered += 0.5 // Half value for expired
-                }
+
+            // Check if any matching doc is valid
+            const hasValidDoc = matchingDocs.some(d => {
+                const status = getEffectiveStatus(d)
+                return status === 'VIGENTE' || status === 'TRAMITE'
+            })
+
+            if (hasValidDoc) {
+                catCovered++
+                totalCovered++
             }
         })
 
         result[cat] = {
             total: catTotal,
             covered: catCovered,
-            percent: catTotal === 0 ? 100 : Math.round((catCovered / catTotal) * 100)
+            rate: catTotal === 0 ? 100 : Math.round((catCovered / catTotal) * 100)
         }
         
         totalRequired += catTotal
-        totalCovered += catCovered
     })
 
-    return {
-        byCategory: result,
-        totalProgress: totalRequired === 0 ? 0 : Math.round((totalCovered / totalRequired) * 100)
+    // Agregamos el total global al objeto resultado
+    result.total = {
+        required: totalRequired,
+        covered: totalCovered,
+        rate: totalRequired === 0 ? 0 : Math.round((totalCovered / totalRequired) * 100)
     }
+
+    return result
 })
 
-const progressRate = computed(() => complianceDetail.value.totalProgress)
+const progressRate = computed(() => {
+    return complianceDetail.value.total ? complianceDetail.value.total.rate : 0
+})
 
 const chartCenterValue = computed(() => {
-    return Object.values(complianceDetail.value.byCategory)
-        .reduce((sum, cat) => sum + cat.covered, 0)
+    return complianceDetail.value.total ? complianceDetail.value.total.covered : 0
 })
 
 const chartCenterTotal = computed(() => {
-    return Object.values(complianceDetail.value.byCategory)
-        .reduce((sum, cat) => sum + cat.total, 0)
+    return complianceDetail.value.total ? complianceDetail.value.total.required : 0
 })
 
 // Methods
@@ -748,11 +779,17 @@ const loadData = async () => {
     }
 }
 
-// Watch tab change - solo cambiar filtro, no recargar datos
-watch(currentTab, () => {
+// Watch tab change - recargar datos si cambia hacia/desde papelera
+watch(currentTab, (newTab, oldTab) => {
     categoryFilter.value = 'ALL' // Reset filter on tab change
-    // Los datos ya están en docs.value, solo se filtra diferente
-    // No es necesario recargar de la BD ni actualizar el chart
+    
+    // Si cambiamos hacia o desde la pestaña de papelera, recargar datos
+    // porque requiere filtrado diferente en el servidor (deleted_at)
+    if (newTab === 'trash' || oldTab === 'trash') {
+        loadData()
+        return
+    }
+    // Para otros tabs, no es necesario recargar de la BD
 })
 
 const updateChart = () => {
@@ -760,10 +797,9 @@ const updateChart = () => {
     if (chartInstance) chartInstance.destroy()
     
     // Calcular documentos requeridos cubiertos vs pendientes
-    const totalRequired = Object.values(complianceDetail.value.byCategory)
-        .reduce((sum, cat) => sum + cat.total, 0)
-    const totalCovered = Object.values(complianceDetail.value.byCategory)
-        .reduce((sum, cat) => sum + cat.covered, 0)
+    // Usamos el total ya calculado en complianceDetail
+    const totalRequired = complianceDetail.value.total ? complianceDetail.value.total.required : 0
+    const totalCovered = complianceDetail.value.total ? complianceDetail.value.total.covered : 0
     const pending = totalRequired - totalCovered
     
     chartInstance = new Chart(chartCanvas.value, {
@@ -952,23 +988,23 @@ const getExpirationClass = (dateStr) => {
 }
 
 const getCategoryVariant = (cat) => {
-    if (!complianceDetail.value.byCategory[cat]) return 'outlined'
-    return complianceDetail.value.byCategory[cat].percent === 100 ? 'tonal' : 'outlined'
+    if (!complianceDetail.value[cat]) return 'outlined'
+    return complianceDetail.value[cat].rate === 100 ? 'tonal' : 'outlined'
 }
 
 const getCategoryColor = (cat) => {
-    if (!complianceDetail.value.byCategory[cat]) return 'grey'
-    const percent = complianceDetail.value.byCategory[cat].percent
-    if (percent === 100) return 'success'
-    if (percent > 0) return 'warning'
+    if (!complianceDetail.value[cat]) return 'grey'
+    const rate = complianceDetail.value[cat].rate
+    if (rate === 100) return 'success'
+    if (rate > 0) return 'warning'
     return 'grey'
 }
 
 const getCategoryIconStatus = (cat) => {
-    if (!complianceDetail.value.byCategory[cat]) return 'mdi-circle-outline'
-    const percent = complianceDetail.value.byCategory[cat].percent
-    if (percent === 100) return 'mdi-check-all'
-    if (percent > 0) return 'mdi-chart-arc'
+    if (!complianceDetail.value[cat]) return 'mdi-circle-outline'
+    const rate = complianceDetail.value[cat].rate
+    if (rate === 100) return 'mdi-check-all'
+    if (rate > 0) return 'mdi-chart-arc'
     return 'mdi-circle-outline'
 }
 
