@@ -4,24 +4,34 @@
     <!-- HEADER -->
     <v-row no-gutters class="pa-6 pb-2">
       <v-col cols="12" md="8">
-        <h1 class="text-h4 font-weight-bold text-secondary mb-1">
+        <h1 class="text-h4 text-md-h4 text-h5 font-weight-bold text-secondary mb-1">
           Expediente Fiscal 360
         </h1>
-        <p class="text-body-1 text-grey-darken-1">
+        <p class="text-body-2 text-md-body-1 text-grey-darken-1">
           Gestiona tus permisos y mantén tu empresa al día.
         </p>
       </v-col>
-      <v-col cols="12" md="4" class="d-flex align-center justify-end mt-4 mt-md-0">
+      <v-col cols="12" md="4" class="d-flex align-center justify-start justify-md-end flex-wrap mt-4 mt-md-0">
+        <v-btn
+          color="secondary"
+          prepend-icon="mdi-file-pdf-box"
+          variant="outlined"
+          class="text-none px-4 mr-3"
+          rounded="lg"
+          @click="exportToPDF"
+          :loading="exporting"
+        >
+          <span class="d-none d-sm-inline mr-1">Exportar</span> Expediente
+        </v-btn>
         <v-btn
           color="primary"
           prepend-icon="mdi-plus"
-          height="48"
           elevation="2"
-          class="text-none px-6"
+          class="text-none px-4"
           rounded="lg"
           @click="openDialog()"
         >
-          Nuevo Documento
+          <span class="d-none d-sm-inline mr-1">Nuevo</span> Documento
         </v-btn>
       </v-col>
     </v-row>
@@ -51,19 +61,21 @@
       <!-- Stats Cards -->
       <v-col cols="12" md="8" lg="9">
         <v-row class="fill-height">
-          <v-col cols="12" sm="4">
+          <v-col cols="6" sm="4">
             <StatsCard
                title="Vigentes"
                :value="stats.vigente"
-               color="success"
+               bg-color="#02254d"
+               text-color="white"
                icon="mdi-check-circle"
             />
           </v-col>
-          <v-col cols="12" sm="4">
+          <v-col cols="6" sm="4">
             <StatsCard
                title="En Trámite"
                :value="stats.tramite"
-               color="warning"
+               bg-color="#f2b648"
+               text-color="#010101"
                icon="mdi-clock-outline"
             />
           </v-col>
@@ -71,7 +83,8 @@
             <StatsCard
                title="Vencidos / Por Vencer"
                :value="stats.vencido + stats.porVencer"
-               color="error"
+               bg-color="#961112"
+               text-color="white"
                icon="mdi-alert-circle"
             />
           </v-col>
@@ -124,40 +137,88 @@
     <v-row class="px-6 pb-10">
       <v-col cols="12">
         
-        <!-- Tabs & Filters -->
-        <v-card elevation="0" class="mb-6 bg-transparent">
-            <v-tabs v-model="currentTab" color="primary" bg-color="transparent" class="mb-4">
-                <v-tab value="active" class="text-none">
-                    <v-icon start>mdi-file-document-outline</v-icon>
-                    Activos
-                </v-tab>
-                <v-tab value="trash" class="text-none">
-                    <v-icon start>mdi-delete-outline</v-icon>
-                    Papelera
-                    <v-chip size="x-small" class="ml-2" color="grey" variant="tonal">{{ stats.trash }}</v-chip>
-                </v-tab>
-            </v-tabs>
+        <!-- Tabs de navegación por estado -->
+        <v-card class="mb-4" elevation="2">
+          <v-tabs
+            v-model="currentTab"
+            bg-color="white"
+            color="primary"
+            show-arrows
+            height="64"
+          >
+            <v-tab value="all" class="text-none font-weight-medium">
+              <v-icon start size="24">mdi-view-list</v-icon>
+              <span class="d-none d-sm-inline">Todos</span>
+              <v-chip size="small" class="ml-2" color="primary" variant="tonal">
+                {{ stats.total }}
+              </v-chip>
+            </v-tab>
+            
+            <v-tab value="VIGENTE" class="text-none font-weight-medium">
+              <v-icon start size="24" color="success">mdi-check-circle</v-icon>
+              <span class="d-none d-sm-inline">Vigentes</span>
+              <v-chip size="small" class="ml-2" color="success" variant="tonal">
+                {{ stats.vigente }}
+              </v-chip>
+            </v-tab>
+            
+            <v-tab value="TRAMITE" class="text-none font-weight-medium">
+              <v-icon start size="24" color="warning">mdi-clock-outline</v-icon>
+              <span class="d-none d-sm-inline">En Trámite</span>
+              <v-chip size="small" class="ml-2" color="warning" variant="tonal">
+                {{ stats.tramite }}
+              </v-chip>
+            </v-tab>
+            
+            <v-tab value="VENCIDO" class="text-none font-weight-medium">
+              <v-icon start size="24" color="error">mdi-alert-circle</v-icon>
+              <span class="d-none d-sm-inline">Vencidos</span>
+              <v-chip size="small" class="ml-2" color="error" variant="tonal">
+                {{ stats.vencido }}
+              </v-chip>
+            </v-tab>
 
-            <!-- Status Filters (Only for Active Tab) -->
-            <div v-if="currentTab === 'active'" class="d-flex gap-4 overflow-x-auto pb-2">
-            <v-btn
-                v-for="filter in filters"
-                :key="filter.value"
-                :variant="activeFilter === filter.value ? 'flat' : 'text'"
-                :color="activeFilter === filter.value ? 'primary' : 'grey-darken-1'"
-                class="text-none rounded-pill"
-                @click="activeFilter = filter.value"
-            >
-                {{ filter.label }}
-                <v-badge
-                v-if="filter.count > 0"
-                :content="filter.count"
-                inline
-                color="secondary"
-                class="ml-2"
-                />
-            </v-btn>
+            <v-tab value="trash" class="text-none font-weight-medium">
+              <v-icon start size="24" color="grey">mdi-delete-outline</v-icon>
+              <span class="d-none d-sm-inline">Papelera</span>
+              <v-chip size="small" class="ml-2" color="grey" variant="tonal">
+                {{ stats.trash }}
+              </v-chip>
+            </v-tab>
+          </v-tabs>
+
+          <!-- Filtros por categoría - Solo para tabs que no son papelera -->
+          <v-slide-y-transition>
+            <div v-if="currentTab !== 'trash'" class="pa-4 bg-grey-lighten-5">
+              <div class="d-flex align-center flex-wrap">
+                <span class="text-caption text-grey-darken-1 font-weight-medium mr-4">
+                  <v-icon size="small" class="mr-1">mdi-filter-variant</v-icon>
+                  Filtrar por categoría:
+                </span>
+                <v-chip
+                  :variant="categoryFilter === 'ALL' ? 'elevated' : 'outlined'"
+                  :color="categoryFilter === 'ALL' ? 'primary' : 'grey'"
+                  size="small"
+                  class="font-weight-medium px-3 mr-2 mb-1"
+                  @click="categoryFilter = 'ALL'"
+                >
+                  Todas
+                </v-chip>
+                <v-chip
+                  v-for="cat in categories"
+                  :key="cat"
+                  :variant="categoryFilter === cat ? 'elevated' : 'outlined'"
+                  :color="categoryFilter === cat ? getCategoryChipColor(cat) : 'grey'"
+                  size="small"
+                  class="font-weight-medium px-3 mr-2 mb-1"
+                  @click="categoryFilter = cat"
+                >
+                  <v-icon start size="small" :icon="getCategoryIcon(cat)"></v-icon>
+                  {{ cat }}
+                </v-chip>
+              </div>
             </div>
+          </v-slide-y-transition>
         </v-card>
 
         <!-- Document List -->
@@ -189,8 +250,9 @@
                             <v-list-item
                                v-for="doc in cat.docs"
                                :key="doc.id"
-                               class="py-3 rounded-lg mb-1 hover-bg"
+                               class="py-3 rounded-lg mb-1 hover-bg cursor-pointer"
                                border
+                               @click="openPreview(doc)"
                             >
                                 <template v-slot:prepend>
                                     <div class="mr-4 text-center d-flex align-center justify-center" style="width: 50px; height: 50px">
@@ -229,9 +291,18 @@
                                 </v-list-item-subtitle>
 
                                 <template v-slot:append>
-                                    <div class="d-flex align-center gap-2">
+                                    <div class="d-flex align-center">
                                         <!-- Actions for Active Items -->
-                                        <template v-if="currentTab === 'active'">
+                                        <template v-if="currentTab !== 'trash'">
+                                            <v-btn
+                                                icon="mdi-eye"
+                                                variant="text"
+                                                size="small"
+                                                color="info"
+                                                @click.stop="openPreview(doc)"
+                                                v-tooltip="'Ver detalle'"
+                                                class="mr-1"
+                                            />
                                             <v-btn
                                                 v-if="doc.documents?.file_url"
                                                 icon="mdi-download"
@@ -240,7 +311,9 @@
                                                 color="primary"
                                                 :href="doc.documents.file_url"
                                                 target="_blank"
+                                                @click.stop
                                                 v-tooltip="'Descargar'"
+                                                class="mr-1"
                                             />
                                             <v-btn
                                                 icon="mdi-pencil"
@@ -249,6 +322,7 @@
                                                 color="grey"
                                                 @click.stop="openDialog(doc)"
                                                 v-tooltip="'Editar'"
+                                                class="mr-1"
                                             />
                                             <v-btn
                                                 icon="mdi-delete"
@@ -345,12 +419,163 @@
         </v-card>
     </v-dialog>
 
+    <!-- Preview Dialog -->
+    <v-dialog v-model="previewDialog" max-width="900" scrollable>
+        <v-card v-if="previewItem" class="rounded-xl elevation-0" style="border-radius: 20px !important;">
+            <!-- Header con gradiente sutil -->
+            <div class="preview-header pa-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
+                <div class="d-flex align-center">
+                    <v-avatar color="white" size="48" class="mr-4">
+                        <v-icon :icon="getCategoryIcon(previewItem.category)" color="secondary" size="24"></v-icon>
+                    </v-avatar>
+                    <div class="flex-grow-1">
+                        <div class="text-h5 font-weight-bold text-white">{{ previewItem.name }}</div>
+                        <div class="text-caption text-white" style="opacity: 0.8">{{ previewItem.category }}</div>
+                    </div>
+                    <v-chip 
+                        :color="getStatusColor(getEffectiveStatus(previewItem))" 
+                        size="small" 
+                        class="font-weight-bold px-3"
+                        variant="elevated"
+                    >
+                        {{ getEffectiveStatus(previewItem) }}
+                    </v-chip>
+                </div>
+            </div>
+            
+            <v-card-text class="pa-0">
+                <v-row no-gutters>
+                    <!-- Document Info -->
+                    <v-col cols="12" :md="previewItem.documents?.file_url ? 4 : 12" class="pa-6 bg-grey-lighten-5">
+                        <div class="text-overline text-grey-darken-1 mb-4">
+                            <v-icon size="small" class="mr-1">mdi-information</v-icon>
+                            Detalles
+                        </div>
+                        
+                        <div class="d-flex flex-column" style="gap: 16px;">
+                            <div v-if="previewItem.doc_type" class="info-item">
+                                <div class="text-caption text-grey-darken-1 mb-1">Tipo de Documento</div>
+                                <div class="text-body-1 font-weight-medium">{{ previewItem.doc_type }}</div>
+                            </div>
+                            
+                            <div v-if="previewItem.emission_date" class="info-item">
+                                <div class="text-caption text-grey-darken-1 mb-1">
+                                    <v-icon size="x-small" class="mr-1">mdi-calendar-check</v-icon>
+                                    Fecha de Emisión
+                                </div>
+                                <div class="text-body-1 font-weight-medium">{{ formatDate(previewItem.emission_date) }}</div>
+                            </div>
+                            
+                            <div v-if="previewItem.expiration_date" class="info-item">
+                                <div class="text-caption text-grey-darken-1 mb-1">
+                                    <v-icon size="x-small" class="mr-1" :color="getExpirationIconColor(previewItem.expiration_date)">mdi-calendar-clock</v-icon>
+                                    Fecha de Vencimiento
+                                </div>
+                                <div class="text-body-1 font-weight-medium" :class="getExpirationClass(previewItem.expiration_date)">
+                                    {{ formatDate(previewItem.expiration_date) }}
+                                </div>
+                            </div>
+                            
+                            <div v-if="previewItem.notes" class="info-item">
+                                <div class="text-caption text-grey-darken-1 mb-1">
+                                    <v-icon size="x-small" class="mr-1">mdi-note-text</v-icon>
+                                    Notas
+                                </div>
+                                <div class="text-body-2 font-weight-medium text-wrap" style="white-space: pre-wrap;">{{ previewItem.notes }}</div>
+                            </div>
+                        </div>
+                    </v-col>
+                    
+                    <!-- File Preview -->
+                    <v-col v-if="previewItem.documents?.file_url" cols="12" md="8" class="pa-6">
+                        <div class="text-overline text-grey-darken-1 mb-4">
+                            <v-icon size="small" class="mr-1">mdi-file-document</v-icon>
+                            Vista Previa
+                        </div>
+                        
+                        <div class="preview-container rounded-xl overflow-hidden bg-grey-lighten-3" style="height: 420px;">
+                            <!-- PDF Preview -->
+                            <iframe 
+                                v-if="isFilePDF(previewItem.documents.file_url)"
+                                :src="previewItem.documents.file_url"
+                                width="100%"
+                                height="100%"
+                                style="border: none"
+                            ></iframe>
+                            
+                            <!-- Image Preview -->
+                            <v-img
+                                v-else
+                                :src="previewItem.documents.file_url"
+                                height="420"
+                                cover
+                            >
+                                <template v-slot:placeholder>
+                                    <div class="d-flex align-center justify-center fill-height">
+                                        <v-progress-circular indeterminate color="primary"></v-progress-circular>
+                                    </div>
+                                </template>
+                            </v-img>
+                        </div>
+                    </v-col>
+                    
+                    <!-- No file message -->
+                    <v-col v-else-if="!previewItem.documents?.file_url" cols="12" md="8" class="d-flex align-center justify-center pa-6">
+                        <div class="text-center py-12">
+                            <v-icon size="80" color="grey-lighten-2">mdi-file-hidden</v-icon>
+                            <div class="text-body-1 text-grey mt-4">Sin archivo adjunto</div>
+                            <div class="text-caption text-grey-lighten-1">Puedes agregar un archivo editando el documento</div>
+                        </div>
+                    </v-col>
+                </v-row>
+            </v-card-text>
+            
+            <v-divider />
+            
+            <v-card-actions class="px-6 py-4">
+                <v-btn
+                    v-if="previewItem.documents?.file_url"
+                    prepend-icon="mdi-download"
+                    color="primary"
+                    variant="tonal"
+                    rounded="lg"
+                    :href="previewItem.documents.file_url"
+                    target="_blank"
+                    class="text-none"
+                >
+                    Descargar Archivo
+                </v-btn>
+                <v-spacer />
+                <v-btn
+                    prepend-icon="mdi-pencil"
+                    color="secondary"
+                    variant="text"
+                    rounded="lg"
+                    @click="previewDialog = false; openDialog(previewItem)"
+                    class="text-none mr-2"
+                >
+                    Editar
+                </v-btn>
+                <v-btn 
+                    @click="previewDialog = false" 
+                    variant="elevated" 
+                    color="grey-darken-3"
+                    rounded="lg"
+                    class="text-none"
+                >
+                    Cerrar
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
   </v-container>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import Chart from 'chart.js/auto'
+import { jsPDF } from 'jspdf'
 import StatsCard from '@/components/common/StatsCard.vue'
 import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
 import fiscalService from '@/services/fiscalService'
@@ -361,14 +586,18 @@ const loading = ref(true)
 const saving = ref(false)
 const deleting = ref(false)
 const restoring = ref(false)
+const exporting = ref(false)
 const docs = ref([])
 const stats = reactive({ total: 0, vigente: 0, tramite: 0, vencido: 0, porVencer: 0, trash: 0 })
 const activeFilter = ref('ALL')
-const currentTab = ref('active') // 'active' | 'trash'
+const categoryFilter = ref('ALL')
+const currentTab = ref('all') // 'all' | 'VIGENTE' | 'TRAMITE' | 'VENCIDO' | 'trash'
 const dialogOpen = ref(false)
 const deleteDialog = ref(false)
+const previewDialog = ref(false)
 const editingItem = ref(null)
 const itemToDelete = ref(null)
+const previewItem = ref(null)
 const chartCanvas = ref(null)
 let chartInstance = null
 
@@ -383,8 +612,23 @@ const categories = ['LEGAL', 'MUNICIPAL', 'SENIAT', 'NOMINA', 'OTROS']
 
 // Computed
 const filteredDocs = computed(() => {
-    if (activeFilter.value === 'ALL') return docs.value
-    return docs.value.filter(d => d.status === activeFilter.value)
+    let filtered = docs.value
+    
+    // Filtrar por pestaña (estado)
+    if (currentTab.value === 'trash') {
+        // Papelera se maneja en loadData, pero por seguridad
+        return filtered
+    } else if (currentTab.value !== 'all') {
+        // Filtrar por estado efectivo
+        filtered = filtered.filter(d => getEffectiveStatus(d) === currentTab.value)
+    }
+    
+    // Filtrar por categoría
+    if (categoryFilter.value !== 'ALL') {
+        filtered = filtered.filter(d => d.category === categoryFilter.value)
+    }
+    
+    return filtered
 })
 
 const groupedCategories = computed(() => {
@@ -497,10 +741,6 @@ const loadData = async () => {
         filters[1].count = stats.vigente
         filters[2].count = stats.tramite
         filters[3].count = stats.vencido
-        
-        if (currentTab.value === 'active') {
-             updateChart()
-        }
     } catch (e) {
         console.error(e)
     } finally {
@@ -508,10 +748,11 @@ const loadData = async () => {
     }
 }
 
-// Watch tab change to reload data
+// Watch tab change - solo cambiar filtro, no recargar datos
 watch(currentTab, () => {
-    activeFilter.value = 'ALL' // Reset filter on tab change
-    loadData()
+    categoryFilter.value = 'ALL' // Reset filter on tab change
+    // Los datos ya están en docs.value, solo se filtra diferente
+    // No es necesario recargar de la BD ni actualizar el chart
 })
 
 const updateChart = () => {
@@ -551,6 +792,24 @@ const updateChart = () => {
 const openDialog = (item = null) => {
     editingItem.value = item
     dialogOpen.value = true
+}
+
+const openPreview = (doc) => {
+    previewItem.value = doc
+    previewDialog.value = true
+}
+
+const isFilePDF = (url) => {
+    if (!url) return false
+    return url.toLowerCase().includes('.pdf')
+}
+
+const getExpirationIconColor = (dateStr) => {
+    if (!dateStr) return 'grey'
+    const days = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24))
+    if (days < 0) return 'error'
+    if (days <= 30) return 'warning'
+    return 'success'
 }
 
 const handleSave = async (formData) => {
@@ -654,6 +913,17 @@ const getCategoryIcon = (cat) => {
     return map[cat] || 'mdi-file'
 }
 
+const getCategoryChipColor = (cat) => {
+    const map = {
+        'LEGAL': 'deep-purple',
+        'MUNICIPAL': 'blue',
+        'SENIAT': 'teal',
+        'NOMINA': 'orange',
+        'OTROS': 'grey'
+    }
+    return map[cat] || 'grey'
+}
+
 const hasCategory = (cat) => {
     return docs.value.some(d => d.category === cat)
 }
@@ -702,8 +972,161 @@ const getCategoryIconStatus = (cat) => {
     return 'mdi-circle-outline'
 }
 
-onMounted(() => {
-    loadData()
+// PDF Export
+const exportToPDF = async () => {
+    exporting.value = true
+    
+    try {
+        const doc = new jsPDF()
+        const pageWidth = doc.internal.pageSize.getWidth()
+        const margin = 15
+        let y = 20
+        
+        // Header
+        doc.setFontSize(20)
+        doc.setTextColor(31, 53, 92) // #1F355C - secondary color
+        doc.text('Expediente Fiscal 360', pageWidth / 2, y, { align: 'center' })
+        
+        y += 10
+        doc.setFontSize(10)
+        doc.setTextColor(100)
+        doc.text(`Generado: ${new Date().toLocaleDateString('es-ES', { 
+            day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+        })}`, pageWidth / 2, y, { align: 'center' })
+        
+        // Progress Summary
+        y += 15
+        doc.setFontSize(12)
+        doc.setTextColor(0)
+        doc.text(`Progreso General: ${progressRate.value}%`, margin, y)
+        
+        // Draw progress bar
+        y += 5
+        const barWidth = 60
+        const barHeight = 5
+        doc.setFillColor(230, 230, 230)
+        doc.rect(margin, y, barWidth, barHeight, 'F')
+        doc.setFillColor(76, 175, 80) // Green
+        doc.rect(margin, y, barWidth * (progressRate.value / 100), barHeight, 'F')
+        
+        y += 15
+        
+        // Category headers
+        const categories = ['LEGAL', 'MUNICIPAL', 'SENIAT', 'NOMINA', 'OTROS']
+        const categoryNames = {
+            'LEGAL': 'Legal',
+            'MUNICIPAL': 'Municipal', 
+            'SENIAT': 'SENIAT',
+            'NOMINA': 'Nómina',
+            'OTROS': 'Otros'
+        }
+        
+        for (const cat of categories) {
+            const catDocs = docs.value.filter(d => d.category === cat)
+            if (catDocs.length === 0) continue
+            
+            // Check if we need a new page
+            if (y > 260) {
+                doc.addPage()
+                y = 20
+            }
+            
+            // Category Header
+            doc.setFontSize(14)
+            doc.setTextColor(168, 28, 34) // #A81C22 - primary color
+            doc.text(categoryNames[cat], margin, y)
+            
+            // Category progress
+            const catProgress = complianceDetail.value.byCategory[cat]
+            if (catProgress) {
+                doc.setFontSize(10)
+                doc.setTextColor(100)
+                doc.text(`(${catProgress.covered}/${catProgress.total} - ${catProgress.percent}%)`, margin + 30, y)
+            }
+            
+            y += 8
+            
+            // Table header
+            doc.setFontSize(9)
+            doc.setTextColor(80)
+            doc.text('Documento', margin, y)
+            doc.text('Estado', margin + 80, y)
+            doc.text('Vencimiento', margin + 110, y)
+            
+            y += 2
+            doc.setDrawColor(200)
+            doc.line(margin, y, pageWidth - margin, y)
+            y += 5
+            
+            // Documents
+            for (const docItem of catDocs) {
+                if (y > 270) {
+                    doc.addPage()
+                    y = 20
+                }
+                
+                doc.setFontSize(10)
+                doc.setTextColor(0)
+                
+                // Name (truncate if too long)
+                const docName = docItem.name || 'Sin nombre'
+                const truncatedName = docName.length > 40 ? docName.substring(0, 37) + '...' : docName
+                doc.text(truncatedName, margin, y)
+                
+                // Status with color
+                const effectiveStatus = getEffectiveStatus(docItem)
+                if (effectiveStatus === 'VIGENTE') {
+                    doc.setTextColor(76, 175, 80) // Green
+                } else if (effectiveStatus === 'TRAMITE') {
+                    doc.setTextColor(255, 193, 7) // Yellow/Orange
+                } else {
+                    doc.setTextColor(244, 67, 54) // Red
+                }
+                doc.text(effectiveStatus, margin + 80, y)
+                
+                // Expiration date
+                doc.setTextColor(100)
+                if (docItem.expiration_date) {
+                    const expDate = new Date(docItem.expiration_date)
+                    doc.text(expDate.toLocaleDateString('es-ES'), margin + 110, y)
+                } else {
+                    doc.text('N/A', margin + 110, y)
+                }
+                
+                y += 6
+            }
+            
+            y += 8
+        }
+        
+        // Footer
+        const pageCount = doc.internal.getNumberOfPages()
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i)
+            doc.setFontSize(8)
+            doc.setTextColor(150)
+            doc.text(
+                `Página ${i} de ${pageCount}`, 
+                pageWidth / 2, 
+                doc.internal.pageSize.getHeight() - 10, 
+                { align: 'center' }
+            )
+        }
+        
+        // Save
+        const fileName = `Expediente_Fiscal_${new Date().toISOString().split('T')[0]}.pdf`
+        doc.save(fileName)
+        
+    } catch (error) {
+        console.error('Error al exportar PDF:', error)
+    } finally {
+        exporting.value = false
+    }
+}
+
+onMounted(async () => {
+    await loadData()
+    updateChart()
 })
 
 </script>
