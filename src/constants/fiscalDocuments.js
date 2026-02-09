@@ -4,6 +4,8 @@ export const FISCAL_TYPES = {
         { id: 'RIF', label: 'RIF', frequency: 'VIGENTE', required: true },
         { id: 'PUBLICACION_MERCANTIL', label: 'Publicación Mercantil', frequency: 'PERMANENT', required: true },
         { id: 'ACTA_ASAMBLEA', label: 'Acta de Asamblea', frequency: 'PERMANENT', required: false },
+        { id: 'CEDULA_SOCIOS', label: 'Cédula de Socios', frequency: 'VIGENTE', required: true },
+        { id: 'RIF_SOCIOS', label: 'RIF de Socios', frequency: 'VIGENTE', required: true },
     ],
     'MUNICIPAL': [
         { id: 'CONFORMIDAD_USO', label: 'Conformidad de Uso', frequency: 'PERMANENT', required: true },
@@ -28,10 +30,10 @@ export const FISCAL_TYPES = {
         { id: 'IGP', label: 'Impuesto Grandes Patrimonios (Oct-Nov)', frequency: 'ANNUAL', required: false },
     ],
     'NOMINA': [
-        { id: 'IVSS', label: 'Solvencia IVSS', frequency: 'MONTHLY', required: true }, // Solvencia o Pago?
-        { id: 'INCES', label: 'Solvencia INCES', frequency: 'QUARTERLY', required: true },
-        { id: 'BANAVIH', label: 'Solvencia BANAVIH', frequency: 'MONTHLY', required: true },
-        { id: 'MINTRAPP', label: 'Solvencia MINTRAPP (Nil)', frequency: 'QUARTERLY', required: true },
+        { id: 'IVSS', label: 'IVSS', frequency: 'MONTHLY', required: true }, // Solvencia o Pago?
+        { id: 'INCES', label: 'INCES', frequency: 'QUARTERLY', required: true },
+        { id: 'BANAVIH', label: 'BANAVIH', frequency: 'MONTHLY', required: true },
+        { id: 'MINTRAPP', label: 'MINTRAPP (Nil)', frequency: 'QUARTERLY', required: true },
         { id: 'RUPDAE', label: 'RUPDAE', frequency: 'PERMANENT', required: true },
         { id: 'FONACIT', label: 'FONACIT', frequency: 'ANNUAL', required: false },
         { id: 'OTROS', label: 'Otros Parafiscales', frequency: 'AdHoc', required: false },
