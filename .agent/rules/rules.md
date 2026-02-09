@@ -15,6 +15,18 @@ trigger: always_on
 - **Comentarios en español**: Explicar lógica compleja
 - **Nombres descriptivos**: Variables y funciones autoexplicativas
 
+### Principios S.O.L.I.D.
+> Aplicar para código escalable y testeable
+
+- **S (Single Responsibility)**: Una clase/función/archivo = UNA responsabilidad.
+  *Ej: `InvoiceService` solo maneja facturas, no clientes.*
+- **O (Open/Closed)**: Abierto a extensión, cerrado a modificación.
+  *Ej: Agregar nuevos reportes sin tocar el código de los existentes.*
+- **L (Liskov Substitution)**: Las subclases deben comportarse como sus padres.
+- **I (Interface Segregation)**: Interfaces pequeñas y específicas > Interfaces gigantes.
+- **D (Dependency Inversion)**: Depender de abstracciones, no de implementaciones concretas.
+  *Ej: Componentes dependen de servicios, no de la BD directamente.*
+
 ### Nomenclatura
 ```javascript
 // Variables y funciones: camelCase
