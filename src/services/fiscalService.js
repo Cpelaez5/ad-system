@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabaseClient'
 import imageCompression from 'browser-image-compression'
 import documentService from './documentService'
 import { getCurrentOrganizationId } from '@/utils/tenantHelpers'
+import userService from '@/services/userService'
 
 const fiscalService = {
     // Opciones de compresión por defecto
@@ -17,6 +18,9 @@ const fiscalService = {
             const organizationId = getCurrentOrganizationId()
             if (!organizationId) throw new Error('No organization ID found')
 
+            const currentUser = await userService.getCurrentUser()
+            if (!currentUser) throw new Error('No user found')
+
             let query = supabase
                 .from('fiscal_docs')
                 .select(`
@@ -31,6 +35,15 @@ const fiscalService = {
         `)
                 .eq('organization_id', organizationId)
                 .order('created_at', { ascending: false })
+
+            // FIltrado por rol: Clientes SOLO ven sus propios documentos
+            if (currentUser.role === 'cliente') {
+                if (!currentUser.client_id) {
+                    console.warn('⚠️ Cliente sin client_id, no se mostrarán documentos')
+                    return []
+                }
+                query = query.eq('client_id', currentUser.client_id)
+            }
 
             // Filtrar por estado de papelera
             if (options.trashed) {
@@ -71,16 +84,21 @@ const fiscalService = {
             const organizationId = getCurrentOrganizationId()
             let documentId = docData.document_id
 
+            // Obtener usuario actual para asignar client_id si es cliente
+            const currentUser = await userService.getCurrentUser()
+
+            // Determinar client_id
+            let clientId = docData.client_id
+            if (currentUser?.role === 'cliente') {
+                clientId = currentUser.client_id
+            }
+
             // 1. Si hay archivo, subirlo primero
             if (file) {
                 // Comprimir si es imagen
                 const fileToUpload = await this.compressImage(file)
 
                 // Subir a Storage usando documentService
-                // Nota: Asumimos que documentService.uploadFile devuelve { success: true, data: { ... } }
-                // y documentService.createDocument registra en tabla documents
-
-                // A) Subir físico
                 const uploadRes = await documentService.uploadFile(fileToUpload, 'FISCAL')
                 if (!uploadRes.success) throw new Error(uploadRes.message)
 
@@ -91,7 +109,7 @@ const fiscalService = {
                     fileType: fileToUpload.type,
                     fileSize: fileToUpload.size,
                     category: 'FISCAL',
-                    uploadedBy: (await supabase.auth.getUser()).data.user?.id
+                    uploadedBy: currentUser?.id
                 }
 
                 const createDocRes = await documentService.createDocument(docEntry)
@@ -103,6 +121,7 @@ const fiscalService = {
             // 2. Guardar metadatos en fiscal_docs
             const payload = {
                 organization_id: organizationId,
+                client_id: clientId, // Asignar client_id
                 name: docData.name,
                 category: docData.category,
                 doc_type: docData.doc_type || null,
@@ -124,7 +143,6 @@ const fiscalService = {
                     .single()
             } else {
                 // Insertar
-                // client_id se puede inferir si es necesario, por ahora lo dejamos opcional o null
                 result = await supabase
                     .from('fiscal_docs')
                     .insert(payload)
@@ -145,12 +163,8 @@ const fiscalService = {
         const docs = await this.getFiscalDocs({ trashed: false })
 
         // Contar eliminados
-        const organizationId = getCurrentOrganizationId()
-        const { count } = await supabase
-            .from('fiscal_docs')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', organizationId)
-            .not('deleted_at', 'is', null)
+        // Reusamos getFiscalDocs con trashed: true para respetar filtros de seguridad
+        const trashDocs = await this.getFiscalDocs({ trashed: true })
 
         const now = new Date()
         const stats = {
@@ -159,7 +173,7 @@ const fiscalService = {
             tramite: 0,
             vencido: 0,
             porVencer: 0,
-            trash: count || 0
+            trash: trashDocs.length
         }
 
         docs.forEach(doc => {
