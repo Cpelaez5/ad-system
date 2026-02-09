@@ -159,6 +159,29 @@ CREATE TABLE documents (
 
 ---
 
+### fiscal_docs
+Expediente Fiscal 360: Metadatos de permisos y documentos legales.
+
+```sql
+CREATE TABLE fiscal_docs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  client_id UUID REFERENCES clients(id),
+  
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('VIGENTE', 'TRAMITE', 'VENCIDO')),
+  expiration_date DATE,
+  
+  document_id UUID REFERENCES documents(id),
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
 ### invitations
 Sistema de invitaciones por email.
 

@@ -143,6 +143,12 @@ const routes = [
     meta: { requiresAuth: true, title: 'Mis Documentos', roles: ['cliente'] }
   },
   {
+    path: '/cliente/fiscal-360',
+    name: 'ClienteFiscal360',
+    component: () => import('@/views/cliente/Fiscal360.vue'),
+    meta: { requiresAuth: true, title: 'Expediente Fiscal 360', roles: ['cliente'] }
+  },
+  {
     path: '/clientes',
     name: 'Clientes',
     component: Clientes,

@@ -65,6 +65,13 @@
           title="Mis Documentos"
           value="cliente-archivo"
         ></v-list-item>
+
+        <v-list-item
+          :to="{ name: 'ClienteFiscal360' }"
+          prepend-icon="mdi-file-certificate"
+          title="Expediente Fiscal"
+          value="cliente-fiscal-360"
+        ></v-list-item>
       </template>
 
 
