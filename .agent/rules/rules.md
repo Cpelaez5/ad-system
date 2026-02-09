@@ -344,7 +344,8 @@ const { data } = await supabase
 │   ├── error-handling.md ← Manejo de errores
 │   ├── router.md         ← Rutas y guards
 │   ├── env-variables.md  ← Variables de entorno
-│   └── utils.md          ← Helpers y utilidades
+│   ├── utils.md          ← Helpers y utilidades
+│   └── visual-identity.md← Guía de estilos y diseño
 ├── components/           ← Documentación de componentes
 │   ├── index.md          ← Índice de todos los componentes
 │   └── README_*.md       ← READMEs de componentes específicos

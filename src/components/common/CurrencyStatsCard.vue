@@ -22,7 +22,10 @@
       </div>
       
       <!-- Valor con AnimatedNumber -->
-      <div class="text-h4" :style="{ color: textColor, fontSize: '2.6rem !important' }">
+      <div 
+        class="text-h4 value-text" 
+        :style="{ color: textColor, fontSize: fontSize }"
+      >
         {{ currencySymbol }}<AnimatedNumber
           :value="value"
           :start="0"
@@ -70,6 +73,23 @@ export default {
       required: true
     }
   },
+  computed: {
+    formattedValue() {
+      // Formatear el valor para estimar su longitud (incluyendo decimales y separadores)
+      return this.value.toLocaleString('es-VE', { 
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2 
+      })
+    },
+    fontSize() {
+      const length = this.formattedValue.length + this.currencySymbol.length
+      
+      if (length < 10) return '2.8rem !important'
+      if (length < 13) return '2.4rem !important'
+      if (length < 16) return '2.0rem !important'
+      return '1.8rem !important'
+    }
+  },
   emits: ['toggle-currency']
 }
 </script>
@@ -100,7 +120,8 @@ export default {
 
 .stats-card .text-h4 {
   font-size: 2rem;
-  font-weight: 300;
+  font-weight: 600;
   line-height: 1.2;
+  transition: font-size 0.3s ease-in-out; 
 }
 </style>

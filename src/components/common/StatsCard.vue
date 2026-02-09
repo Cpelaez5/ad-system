@@ -110,7 +110,7 @@ export default {
 
 .stats-card .text-h4 {
   font-size: 2rem;
-  font-weight: 300;
+  font-weight: 600;
   line-height: 1.2;
 }
 </style>

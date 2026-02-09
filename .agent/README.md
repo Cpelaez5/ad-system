@@ -41,6 +41,7 @@ Workflows automatizados            → workflows/
 │   ├── router.md          ← Rutas y guards
 │   ├── env-variables.md   ← Variables de entorno
 │   ├── utils.md           ← Helpers (tenantHelpers)
+│   ├── visual-identity.md ← Guía de estilos y diseño
 │   └── plantillas.md      ← Templates Excel
 ├── components/
 │   ├── index.md           ← Índice de componentes
