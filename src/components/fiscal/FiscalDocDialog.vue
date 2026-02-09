@@ -164,6 +164,8 @@
                 persistent-hint
                 hint="Dejar vacío si no aplica"
                 :rules="expirationDateRules"
+                clearable
+                @click:clear="formData.expiration_date = null"
               />
             </v-col>
 
