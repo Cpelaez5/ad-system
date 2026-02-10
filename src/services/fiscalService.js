@@ -55,6 +55,14 @@ const fiscalService = {
             const { data, error } = await query
 
             if (error) throw error
+
+            console.log(`📊 getFiscalDocs: ${data?.length || 0} documentos cargados`, {
+                trashed: options.trashed,
+                org: organizationId,
+                role: currentUser.role,
+                client_id: currentUser.client_id
+            })
+
             return data
         } catch (error) {
             console.error('❌ Error getting fiscal docs:', error)
@@ -91,7 +99,23 @@ const fiscalService = {
             let clientId = docData.client_id
             if (currentUser?.role === 'cliente') {
                 clientId = currentUser.client_id
+
+                // GUARDRAIL: Si el cliente no tiene client_id, advertir
+                if (!clientId) {
+                    console.error('🚨 CRÍTICO: Usuario cliente sin client_id asignado. El documento será invisible por RLS.')
+                    console.error('   Usuario:', currentUser.email, '| ID:', currentUser.id)
+                    // Intentar usar el id del usuario como fallback
+                }
             }
+
+            console.log('📋 Guardando documento fiscal:', {
+                name: docData.name,
+                category: docData.category,
+                doc_type: docData.doc_type,
+                client_id: clientId,
+                organization_id: organizationId,
+                role: currentUser?.role
+            })
 
             // 1. Si hay archivo, subirlo primero
             if (file) {
@@ -121,7 +145,7 @@ const fiscalService = {
             // 2. Guardar metadatos en fiscal_docs
             const payload = {
                 organization_id: organizationId,
-                client_id: clientId, // Asignar client_id
+                client_id: clientId,
                 name: docData.name,
                 category: docData.category,
                 doc_type: docData.doc_type || null,

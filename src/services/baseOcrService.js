@@ -5,13 +5,19 @@
  * - Extracción directa de texto de PDF (Parsing)
  * - Conversión de PDF a imagen
  * - Compresión de imágenes
- * - OCR con Tesseract
+ * - OCR con Tesseract (Worker Singleton para rendimiento)
  * - Conversión a base64
  */
 
+// Singleton para el worker de Tesseract - se reutiliza entre llamadas
+let tesseractWorker = null
+let workerInitializing = false
+let workerInitPromise = null
+
 class BaseOCRService {
     constructor() {
-        this.maxImageSize = 1024 // Max width/height en pixels
+        this.maxImageSize = 800 // Reducido de 1024 para mejor rendimiento
+        this.pdfScale = 1.2 // Reducido de 2.0 para mejor rendimiento
     }
 
     /**
@@ -93,7 +99,7 @@ class BaseOCRService {
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
             const page = await pdf.getPage(1)
 
-            const viewport = page.getViewport({ scale: 2.0 })
+            const viewport = page.getViewport({ scale: this.pdfScale })
             const canvas = document.createElement('canvas')
             const context = canvas.getContext('2d')
             canvas.width = viewport.width
@@ -207,15 +213,41 @@ class BaseOCRService {
     }
 
     /**
-     * Realiza OCR local usando Tesseract.js
+     * Obtiene o crea el worker de Tesseract (Singleton)
+     * Reutiliza el worker entre llamadas para mejorar rendimiento
+     */
+    async getTesseractWorker() {
+        // Si ya tenemos worker listo, retornarlo
+        if (tesseractWorker) {
+            return tesseractWorker
+        }
+
+        // Si ya está inicializando, esperar la promesa existente
+        if (workerInitializing && workerInitPromise) {
+            return workerInitPromise
+        }
+
+        // Inicializar nuevo worker
+        workerInitializing = true
+        workerInitPromise = (async () => {
+            console.log('🔧 Inicializando Tesseract worker (una sola vez)...')
+            const Tesseract = await import('tesseract.js')
+            tesseractWorker = await Tesseract.createWorker('spa')
+            console.log('✅ Tesseract worker listo para reutilizar')
+            workerInitializing = false
+            return tesseractWorker
+        })()
+
+        return workerInitPromise
+    }
+
+    /**
+     * Realiza OCR local usando Tesseract.js (Worker Singleton)
      */
     async performLocalOCR(imageFile) {
-        const Tesseract = await import('tesseract.js')
-        const worker = await Tesseract.createWorker('spa')
-
+        const worker = await this.getTesseractWorker()
         const { data: { text } } = await worker.recognize(imageFile)
-        await worker.terminate()
-
+        // NO terminamos el worker - lo reutilizamos
         return this.postProcessText(text)
     }
 

@@ -572,6 +572,19 @@
         </v-card>
     </v-dialog>
 
+    <!-- Snackbar para notificaciones -->
+    <v-snackbar 
+        v-model="snackbar.show" 
+        :color="snackbar.color" 
+        :timeout="4000"
+        location="bottom"
+    >
+        {{ snackbar.message }}
+        <template v-slot:actions>
+            <v-btn variant="text" @click="snackbar.show = false">Cerrar</v-btn>
+        </template>
+    </v-snackbar>
+
   </v-container>
 </template>
 
@@ -603,6 +616,7 @@ const itemToDelete = ref(null)
 const previewItem = ref(null)
 const chartCanvas = ref(null)
 let chartInstance = null
+const snackbar = ref({ show: false, message: '', color: 'error' })
 
 const filters = [
     { label: 'Todos', value: 'ALL', count: 0 },
@@ -808,7 +822,8 @@ const updateChart = () => {
              labels: ['Completados', 'Pendientes'],
              datasets: [{
                  data: [totalCovered, pending],
-                 backgroundColor: ['#4CAF50', '#E0E0E0'],
+                 backgroundColor: ['#4CAF50', '#e0e0e0'],
+                 hoverBackgroundColor: ['#66BB6A', '#d5d5d5'],
                  borderWidth: 0,
                  hoverOffset: 4
              }]
@@ -860,9 +875,22 @@ const handleSave = async (formData) => {
         if (res.success) {
             dialogOpen.value = false
             await loadData()
+        } else {
+            // Mostrar error al usuario
+            console.error('❌ Error al guardar documento fiscal:', res.message)
+            snackbar.value = {
+                show: true,
+                message: `Error al guardar: ${res.message}`,
+                color: 'error'
+            }
         }
     } catch (e) {
-        console.error(e)
+        console.error('❌ Error inesperado al guardar:', e)
+        snackbar.value = {
+            show: true,
+            message: 'Error inesperado al guardar el documento',
+            color: 'error'
+        }
     } finally {
         saving.value = false
     }
