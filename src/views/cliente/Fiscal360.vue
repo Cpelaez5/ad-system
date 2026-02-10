@@ -140,7 +140,7 @@
     <v-row class="px-6 pb-10">
       <v-col cols="12">
         
-        <!-- Tabs de navegación por estado -->
+        <!-- Tabs de navegación por categoría -->
         <v-card class="mb-4" elevation="2">
           <v-tabs
             v-model="currentTab"
@@ -156,28 +156,12 @@
                 {{ stats.total }}
               </v-chip>
             </v-tab>
-            
-            <v-tab value="VIGENTE" class="text-none font-weight-medium">
-              <v-icon start size="24" color="success">mdi-check-circle</v-icon>
-              <span class="d-none d-sm-inline">Vigentes</span>
-              <v-chip size="small" class="ml-2" color="success" variant="tonal">
-                {{ stats.vigente }}
-              </v-chip>
-            </v-tab>
-            
-            <v-tab value="TRAMITE" class="text-none font-weight-medium">
-              <v-icon start size="24" color="warning">mdi-clock-outline</v-icon>
-              <span class="d-none d-sm-inline">En Trámite</span>
-              <v-chip size="small" class="ml-2" color="warning" variant="tonal">
-                {{ stats.tramite }}
-              </v-chip>
-            </v-tab>
-            
-            <v-tab value="VENCIDO" class="text-none font-weight-medium">
-              <v-icon start size="24" color="error">mdi-alert-circle</v-icon>
-              <span class="d-none d-sm-inline">Vencidos</span>
-              <v-chip size="small" class="ml-2" color="error" variant="tonal">
-                {{ stats.vencido }}
+
+            <v-tab v-for="cat in categories" :key="cat.value" :value="cat.value" class="text-none font-weight-medium">
+              <v-icon start size="24" :color="getCategoryChipColor(cat.value)">{{ getCategoryIcon(cat.value) }}</v-icon>
+              <span class="d-none d-sm-inline">{{ cat.title }}</span>
+              <v-chip size="small" class="ml-2" :color="getCategoryChipColor(cat.value)" variant="tonal">
+                {{ getCategoryCount(cat.value) }}
               </v-chip>
             </v-tab>
 
@@ -190,35 +174,44 @@
             </v-tab>
           </v-tabs>
 
-          <!-- Filtros por categoría - Solo para tabs que no son papelera -->
+          <!-- Barra de período y filtro de estado - Solo para tabs con docs recurrentes -->
           <v-slide-y-transition>
-            <div v-if="currentTab !== 'trash'" class="pa-4 bg-grey-lighten-5">
-              <div class="d-flex align-center flex-wrap">
-                <span class="text-caption text-grey-darken-1 font-weight-medium mr-4">
-                  <v-icon size="small" class="mr-1">mdi-filter-variant</v-icon>
-                  Filtrar por categoría:
-                </span>
-                <v-chip
-                  :variant="categoryFilter === 'ALL' ? 'elevated' : 'outlined'"
-                  :color="categoryFilter === 'ALL' ? 'primary' : 'grey'"
-                  size="small"
-                  class="font-weight-medium px-3 mr-2 mb-1"
-                  @click="categoryFilter = 'ALL'"
-                >
-                  Todas
-                </v-chip>
-                <v-chip
-                  v-for="cat in categories"
-                  :key="cat.value"
-                  :variant="categoryFilter === cat.value ? 'elevated' : 'outlined'"
-                  :color="categoryFilter === cat.value ? getCategoryChipColor(cat.value) : 'grey'"
-                  size="small"
-                  class="font-weight-medium px-3 mr-2 mb-1"
-                  @click="categoryFilter = cat.value"
-                >
-                  <v-icon start size="small" :icon="getCategoryIcon(cat.value)"></v-icon>
-                  {{ cat.title }}
-                </v-chip>
+            <div v-if="showPeriodSelector" class="pa-3 px-4 bg-grey-lighten-5">
+              <div class="d-flex align-center flex-wrap" style="gap: 12px">
+                <!-- Selector de año -->
+                <v-select
+                  v-model="selectedYear"
+                  :items="availableYears"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  style="max-width: 110px"
+                  prepend-inner-icon="mdi-calendar"
+                />
+
+                <!-- Navegación de mes -->
+                <div class="d-flex align-center">
+                  <v-btn icon="mdi-chevron-left" size="small" variant="text" @click="prevMonth" />
+                  <span class="text-subtitle-2 font-weight-bold text-secondary mx-2" style="min-width: 90px; text-align: center">
+                    {{ MONTHS[selectedMonth] }}
+                  </span>
+                  <v-btn icon="mdi-chevron-right" size="small" variant="text" @click="nextMonth" />
+                </div>
+
+                <v-spacer />
+
+                <!-- Filtro de estado -->
+                <v-select
+                  v-model="statusFilter"
+                  :items="statusOptions"
+                  item-title="label"
+                  item-value="value"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  style="max-width: 170px"
+                  prepend-inner-icon="mdi-filter-variant"
+                />
               </div>
             </div>
           </v-slide-y-transition>
@@ -226,149 +219,179 @@
 
         <!-- Document List -->
         <v-card class="rounded-xl border-none" elevation="0" :loading="loading">
-          <v-data-iterator
-             :items="filteredDocs"
-             :items-per-page="-1"
-          >
-             <template v-slot:default="{ items }">
+
+          <!-- ===== MODO EXPANSION PANELS: Tab "Todos" ===== -->
+          <template v-if="currentTab === 'all' || currentTab === 'trash'">
+            <v-data-iterator :items="filteredDocs" :items-per-page="-1">
+              <template v-slot:default="{ items }">
                 <v-expansion-panels variant="accordion" class="rounded-xl">
-                   <v-expansion-panel
-                      v-for="cat in groupedCategories"
-                      :key="cat.name"
-                      elevation="0"
-                      class="mb-2 border rounded-lg"
-                   >
+                  <v-expansion-panel
+                    v-for="cat in groupedCategories"
+                    :key="cat.name"
+                    elevation="0"
+                    class="mb-2 border rounded-lg"
+                  >
                     <v-expansion-panel-title>
-                        <div class="d-flex align-center w-100">
-                            <v-icon color="secondary" class="mr-3">{{ getCategoryIcon(cat.id) }}</v-icon>
-                            <span class="text-subtitle-1 font-weight-bold">{{ cat.name }}</span>
-                            <v-spacer />
-                            <v-chip size="small" variant="tonal" class="mr-4">
-                                {{ cat.docs.length }} docs
-                            </v-chip>
-                        </div>
+                      <div class="d-flex align-center w-100">
+                        <v-icon color="secondary" class="mr-3">{{ getCategoryIcon(cat.id) }}</v-icon>
+                        <span class="text-subtitle-1 font-weight-bold">{{ cat.name }}</span>
+                        <v-spacer />
+                        <v-chip size="small" variant="tonal" class="mr-4">
+                          {{ cat.docs.length }} docs
+                        </v-chip>
+                      </div>
                     </v-expansion-panel-title>
                     <v-expansion-panel-text>
-                        <v-list lines="two">
-                            <v-list-item
-                               v-for="doc in cat.docs"
-                               :key="doc.id"
-                               class="py-3 rounded-lg mb-1 hover-bg cursor-pointer"
-                               border
-                               @click="openPreview(doc)"
-                            >
-                                <template v-slot:prepend>
-                                    <div class="mr-4 text-center d-flex align-center justify-center" style="width: 50px; height: 50px">
-                                        <!-- Si tiene fecha de vencimiento, mostrar día/mes -->
-                                        <template v-if="doc.expiration_date">
-                                            <div>
-                                                <div class="text-h6 font-weight-bold mb-n1" :class="getExpirationClass(doc.expiration_date)">
-                                                    {{ getDay(doc.expiration_date) }}
-                                                </div>
-                                                <div class="text-caption text-uppercase" :class="getExpirationClass(doc.expiration_date)">
-                                                    {{ getMonth(doc.expiration_date) }}
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <!-- Sin vencimiento: mostrar ícono -->
-                                        <v-icon
-                                            v-else
-                                            :icon="getCategoryIcon(doc.category)"
-                                            size="32"
-                                            color="primary"
-                                        />
-                                    </div>
-                                </template>
+                      <v-list lines="two">
+                        <v-list-item
+                          v-for="doc in cat.docs"
+                          :key="doc.id"
+                          class="py-3 rounded-lg mb-1 hover-bg cursor-pointer"
+                          border
+                          @click="openPreview(doc)"
+                        >
+                          <template v-slot:prepend>
+                            <div class="mr-4 text-center d-flex align-center justify-center" style="width: 50px; height: 50px">
+                              <template v-if="doc.expiration_date">
+                                <div>
+                                  <div class="text-h6 font-weight-bold mb-n1" :class="getExpirationClass(doc.expiration_date)">
+                                    {{ getDay(doc.expiration_date) }}
+                                  </div>
+                                  <div class="text-caption text-uppercase" :class="getExpirationClass(doc.expiration_date)">
+                                    {{ getMonth(doc.expiration_date) }}
+                                  </div>
+                                </div>
+                              </template>
+                              <v-icon v-else :icon="getCategoryIcon(doc.category)" size="32" color="primary" />
+                            </div>
+                          </template>
 
-                                <v-list-item-title class="font-weight-bold mb-1">
-                                    {{ doc.name }}
-                                </v-list-item-title>
-                                
-                                <v-list-item-subtitle>
-                                    <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2">
-                                        {{ getEffectiveStatus(doc) }}
-                                    </v-chip>
-                                    <span v-if="doc.expiration_date" :class="getExpirationClass(doc.expiration_date)">
-                                        Vence: {{ formatDate(doc.expiration_date) }}
-                                    </span>
-                                </v-list-item-subtitle>
+                          <v-list-item-title class="font-weight-bold mb-1">{{ doc.name }}</v-list-item-title>
+                          <v-list-item-subtitle>
+                            <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2">
+                              {{ getEffectiveStatus(doc) }}
+                            </v-chip>
+                            <span v-if="doc.expiration_date" :class="getExpirationClass(doc.expiration_date)">
+                              Vence: {{ formatDate(doc.expiration_date) }}
+                            </span>
+                          </v-list-item-subtitle>
 
-                                <template v-slot:append>
-                                    <div class="d-flex align-center">
-                                        <!-- Actions for Active Items -->
-                                        <template v-if="currentTab !== 'trash'">
-                                            <v-btn
-                                                icon="mdi-eye"
-                                                variant="text"
-                                                size="small"
-                                                color="info"
-                                                @click.stop="openPreview(doc)"
-                                                v-tooltip="'Ver detalle'"
-                                                class="mr-1"
-                                            />
-                                            <v-btn
-                                                v-if="doc.documents?.file_url"
-                                                icon="mdi-download"
-                                                variant="text"
-                                                size="small"
-                                                color="primary"
-                                                :href="doc.documents.file_url"
-                                                target="_blank"
-                                                @click.stop
-                                                v-tooltip="'Descargar'"
-                                                class="mr-1"
-                                            />
-                                            <v-btn
-                                                icon="mdi-pencil"
-                                                variant="text"
-                                                size="small"
-                                                color="grey"
-                                                @click.stop="openDialog(doc)"
-                                                v-tooltip="'Editar'"
-                                                class="mr-1"
-                                            />
-                                            <v-btn
-                                                icon="mdi-delete"
-                                                variant="text"
-                                                size="small"
-                                                color="error"
-                                                @click.stop="confirmDelete(doc)"
-                                                v-tooltip="'Mover a Papelera'"
-                                            />
-                                        </template>
-
-                                        <!-- Actions for Trashed Items -->
-                                        <template v-else>
-                                            <v-btn
-                                                prepend-icon="mdi-refresh"
-                                                variant="text"
-                                                size="small"
-                                                color="success"
-                                                @click.stop="restoreDoc(doc)"
-                                                :loading="restoring"
-                                            >
-                                                Restaurar
-                                            </v-btn>
-                                            <v-btn
-                                                icon="mdi-delete-forever"
-                                                variant="text"
-                                                size="small"
-                                                color="error"
-                                                @click.stop="confirmDelete(doc)"
-                                                v-tooltip="'Eliminar Definitivamente'"
-                                            />
-                                        </template>
-                                    </div>
-                                </template>
-                            </v-list-item>
-                        </v-list>
+                          <template v-slot:append>
+                            <div class="d-flex align-center">
+                              <template v-if="currentTab !== 'trash'">
+                                <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(doc)" v-tooltip="'Ver detalle'" class="mr-1" />
+                                <v-btn v-if="doc.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="doc.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" class="mr-1" />
+                                <v-btn icon="mdi-pencil" variant="text" size="small" color="grey" @click.stop="openDialog(doc)" v-tooltip="'Editar'" class="mr-1" />
+                                <v-btn icon="mdi-delete" variant="text" size="small" color="error" @click.stop="confirmDelete(doc)" v-tooltip="'Mover a Papelera'" />
+                              </template>
+                              <template v-else>
+                                <v-btn prepend-icon="mdi-refresh" variant="text" size="small" color="success" @click.stop="restoreDoc(doc)" :loading="restoring">Restaurar</v-btn>
+                                <v-btn icon="mdi-delete-forever" variant="text" size="small" color="error" @click.stop="confirmDelete(doc)" v-tooltip="'Eliminar Definitivamente'" />
+                              </template>
+                            </div>
+                          </template>
+                        </v-list-item>
+                      </v-list>
                     </v-expansion-panel-text>
-                   </v-expansion-panel>
+                  </v-expansion-panel>
                 </v-expansion-panels>
-             </template>
-          </v-data-iterator>
+              </template>
+            </v-data-iterator>
+          </template>
+
+          <!-- ===== MODO LISTA PLANA: Tabs de categoría individual ===== -->
+          <template v-else>
+            <v-list lines="two" class="pa-2">
+              <!-- Documentos existentes -->
+              <v-list-item
+                v-for="doc in filteredDocs"
+                :key="doc.id"
+                class="py-3 rounded-lg mb-1 hover-bg cursor-pointer"
+                border
+                @click="openPreview(doc)"
+              >
+                <template v-slot:prepend>
+                  <div class="mr-4 text-center d-flex align-center justify-center" style="width: 50px; height: 50px">
+                    <template v-if="doc.expiration_date">
+                      <div>
+                        <div class="text-h6 font-weight-bold mb-n1" :class="getExpirationClass(doc.expiration_date)">
+                          {{ getDay(doc.expiration_date) }}
+                        </div>
+                        <div class="text-caption text-uppercase" :class="getExpirationClass(doc.expiration_date)">
+                          {{ getMonth(doc.expiration_date) }}
+                        </div>
+                      </div>
+                    </template>
+                    <v-icon v-else :icon="getCategoryIcon(doc.category)" size="32" color="primary" />
+                  </div>
+                </template>
+
+                <v-list-item-title class="font-weight-bold mb-1">{{ doc.name }}</v-list-item-title>
+                <v-list-item-subtitle>
+                  <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2">
+                    {{ getEffectiveStatus(doc) }}
+                  </v-chip>
+                  <span v-if="doc.expiration_date" :class="getExpirationClass(doc.expiration_date)">
+                    Vence: {{ formatDate(doc.expiration_date) }}
+                  </span>
+                </v-list-item-subtitle>
+
+                <template v-slot:append>
+                  <div class="d-flex align-center">
+                    <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(doc)" v-tooltip="'Ver detalle'" class="mr-1" />
+                    <v-btn v-if="doc.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="doc.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" class="mr-1" />
+                    <v-btn icon="mdi-pencil" variant="text" size="small" color="grey" @click.stop="openDialog(doc)" v-tooltip="'Editar'" class="mr-1" />
+                    <v-btn icon="mdi-delete" variant="text" size="small" color="error" @click.stop="confirmDelete(doc)" v-tooltip="'Mover a Papelera'" />
+                  </div>
+                </template>
+              </v-list-item>
+
+              <!-- Documentos pendientes (requeridos pero no subidos) -->
+              <template v-if="pendingDocs.length > 0">
+                <v-divider class="my-3" />
+                <div class="text-caption text-grey-darken-1 font-weight-medium px-4 mb-2">
+                  <v-icon size="small" class="mr-1">mdi-alert-circle-outline</v-icon>
+                  Pendientes por subir
+                </div>
+                <v-list-item
+                  v-for="pending in pendingDocs"
+                  :key="pending.id"
+                  class="py-3 rounded-lg mb-1"
+                  border
+                  style="opacity: 0.6"
+                >
+                  <template v-slot:prepend>
+                    <div class="mr-4 d-flex align-center justify-center" style="width: 50px; height: 50px">
+                      <v-icon icon="mdi-file-question-outline" size="32" color="grey-lighten-1" />
+                    </div>
+                  </template>
+
+                  <v-list-item-title class="font-weight-medium text-grey-darken-1 mb-1">
+                    {{ pending.label }}
+                  </v-list-item-title>
+                  <v-list-item-subtitle class="text-grey">
+                    Documento requerido — No encontrado para este período
+                  </v-list-item-subtitle>
+
+                  <template v-slot:append>
+                    <v-btn
+                      prepend-icon="mdi-plus"
+                      variant="tonal"
+                      size="small"
+                      color="primary"
+                      class="text-none"
+                      @click.stop="openDialogForPending(pending)"
+                    >
+                      Subir
+                    </v-btn>
+                  </template>
+                </v-list-item>
+              </template>
+            </v-list>
+          </template>
           
-          <div v-if="filteredDocs.length === 0" class="text-center py-10">
+          <!-- Estado vacío -->
+          <div v-if="filteredDocs.length === 0 && pendingDocs.length === 0" class="text-center py-10">
             <v-icon size="64" color="grey-lighten-2" class="mb-4">
                 {{ currentTab === 'trash' ? 'mdi-delete-empty' : 'mdi-file-document-outline' }}
             </v-icon>
@@ -595,7 +618,7 @@ import { jsPDF } from 'jspdf'
 import StatsCard from '@/components/common/StatsCard.vue'
 import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
 import fiscalService from '@/services/fiscalService'
-import { FISCAL_TYPES } from '@/constants/fiscalDocuments'
+import { FISCAL_TYPES, MONTHS, isRecurringFrequency } from '@/constants/fiscalDocuments'
 
 // Data
 const loading = ref(true)
@@ -605,9 +628,7 @@ const restoring = ref(false)
 const exporting = ref(false)
 const docs = ref([])
 const stats = reactive({ total: 0, vigente: 0, tramite: 0, vencido: 0, porVencer: 0, trash: 0 })
-const activeFilter = ref('ALL')
-const categoryFilter = ref('ALL')
-const currentTab = ref('all') // 'all' | 'VIGENTE' | 'TRAMITE' | 'VENCIDO' | 'trash'
+const currentTab = ref('all') // 'all' | 'LEGAL' | 'MUNICIPAL' | 'SENIAT' | 'NOMINA' | 'OTROS' | 'trash'
 const dialogOpen = ref(false)
 const deleteDialog = ref(false)
 const previewDialog = ref(false)
@@ -618,12 +639,45 @@ const chartCanvas = ref(null)
 let chartInstance = null
 const snackbar = ref({ show: false, message: '', color: 'error' })
 
-const filters = [
-    { label: 'Todos', value: 'ALL', count: 0 },
-    { label: 'Vigentes', value: 'VIGENTE', count: 0 },
-    { label: 'En Trámite', value: 'TRAMITE', count: 0 },
-    { label: 'Vencidos', value: 'VENCIDO', count: 0 },
+// Selector de período
+const now = new Date()
+const selectedYear = ref(now.getFullYear())
+const selectedMonth = ref(now.getMonth()) // 0-based
+const statusFilter = ref('ALL')
+
+const statusOptions = [
+    { label: 'Todos los estados', value: 'ALL' },
+    { label: 'Vigentes', value: 'VIGENTE' },
+    { label: 'En Trámite', value: 'TRAMITE' },
+    { label: 'Vencidos', value: 'VENCIDO' }
 ]
+
+// Años disponibles para el selector
+const availableYears = computed(() => {
+    const current = new Date().getFullYear()
+    const years = []
+    for (let y = current - 2; y <= current + 1; y++) years.push(y)
+    return years
+})
+
+// Navegación de mes
+const prevMonth = () => {
+    if (selectedMonth.value === 0) {
+        selectedMonth.value = 11
+        selectedYear.value--
+    } else {
+        selectedMonth.value--
+    }
+}
+
+const nextMonth = () => {
+    if (selectedMonth.value === 11) {
+        selectedMonth.value = 0
+        selectedYear.value++
+    } else {
+        selectedMonth.value++
+    }
+}
 
 const categories = [
     { title: 'Legal', value: 'LEGAL' },
@@ -633,31 +687,107 @@ const categories = [
     { title: 'Otros', value: 'OTROS' }
 ]
 
+// Determinar si el tab actual tiene documentos recurrentes (necesita selector de período)
+const showPeriodSelector = computed(() => {
+    if (currentTab.value === 'trash' || currentTab.value === 'all') return false
+    const catTypes = FISCAL_TYPES[currentTab.value] || []
+    return catTypes.some(t => isRecurringFrequency(t.frequency))
+})
+
 const getCategoryTitle = (catValue) => {
     const cat = categories.find(c => c.value === catValue)
     return cat ? cat.title : catValue
 }
 
 // Computed
+// Verifica si un documento pertenece al período seleccionado
+const isInSelectedPeriod = (doc) => {
+    if (!doc.emission_date) return true // Sin fecha de emisión: siempre visible
+    
+    const emissionDate = new Date(doc.emission_date)
+    const emYear = emissionDate.getFullYear()
+    const emMonth = emissionDate.getMonth()
+    
+    // Buscar la frecuencia del tipo de documento
+    const catTypes = FISCAL_TYPES[doc.category] || []
+    const typeInfo = catTypes.find(t => t.id === doc.doc_type)
+    const frequency = typeInfo?.frequency || 'PERMANENT'
+    
+    // Documentos permanentes/vigentes: siempre visibles
+    if (!isRecurringFrequency(frequency) && frequency !== 'ANNUAL') return true
+    
+    // Documentos anuales: filtrar solo por año
+    if (frequency === 'ANNUAL') return emYear === selectedYear.value
+    
+    // Documentos trimestrales: verificar si el mes de emisión está en el mismo trimestre
+    if (frequency === 'QUARTERLY') {
+        const selectedQ = Math.floor(selectedMonth.value / 3)
+        const docQ = Math.floor(emMonth / 3)
+        return emYear === selectedYear.value && docQ === selectedQ
+    }
+    
+    // Documentos mensuales/quincenales/semestrales: filtrar por mes exacto
+    return emYear === selectedYear.value && emMonth === selectedMonth.value
+}
+
 const filteredDocs = computed(() => {
     let filtered = docs.value
     
-    // Filtrar por pestaña (estado)
-    if (currentTab.value === 'trash') {
-        // Papelera se maneja en loadData, pero por seguridad
-        return filtered
-    } else if (currentTab.value !== 'all') {
-        // Filtrar por estado efectivo
-        filtered = filtered.filter(d => getEffectiveStatus(d) === currentTab.value)
+    // Papelera: retornar tal cual
+    if (currentTab.value === 'trash') return filtered
+    
+    // Filtrar por categoría (tab)
+    if (currentTab.value !== 'all') {
+        filtered = filtered.filter(d => d.category === currentTab.value)
     }
     
-    // Filtrar por categoría
-    if (categoryFilter.value !== 'ALL') {
-        filtered = filtered.filter(d => d.category === categoryFilter.value)
+    // Filtrar por período (solo si el selector está visible)
+    if (showPeriodSelector.value) {
+        filtered = filtered.filter(d => isInSelectedPeriod(d))
+    }
+    
+    // Filtrar por estado
+    if (statusFilter.value !== 'ALL') {
+        filtered = filtered.filter(d => getEffectiveStatus(d) === statusFilter.value)
     }
     
     return filtered
 })
+
+// Documentos pendientes (requeridos pero no subidos) para el período actual
+const pendingDocs = computed(() => {
+    if (currentTab.value === 'all' || currentTab.value === 'trash') return []
+    if (statusFilter.value !== 'ALL') return [] // No mostrar pendientes si hay filtro de estado
+    
+    const catTypes = FISCAL_TYPES[currentTab.value] || []
+    const pending = []
+    
+    catTypes.forEach(type => {
+        if (!type.required) return
+        
+        // Para docs permanentes, verificar si existe alguno sin importar período
+        if (!isRecurringFrequency(type.frequency) && type.frequency !== 'ANNUAL') {
+            const exists = docs.value.some(d => d.category === currentTab.value && d.doc_type === type.id)
+            if (!exists) {
+                pending.push({ ...type, category: currentTab.value, isPending: true })
+            }
+            return
+        }
+        
+        // Para docs recurrentes, verificar si existe para el período seleccionado
+        const existsInPeriod = filteredDocs.value.some(d => d.doc_type === type.id)
+        if (!existsInPeriod) {
+            pending.push({ ...type, category: currentTab.value, isPending: true })
+        }
+    })
+    
+    return pending
+})
+
+// Conteo de documentos por categoría
+const getCategoryCount = (catValue) => {
+    return docs.value.filter(d => d.category === catValue).length
+}
 
 const groupedCategories = computed(() => {
     const groups = {}
@@ -677,7 +807,7 @@ const groupedCategories = computed(() => {
     })
 
     return Object.keys(groups).map(key => ({
-        name: groups[key].title, // Usar título amigable
+        name: groups[key].title,
         id: key,
         docs: groups[key].docs
     })).filter(g => g.docs.length > 0)
@@ -780,12 +910,6 @@ const loadData = async () => {
         // Stats siempre globales
         const newStats = await fiscalService.getStats()
         Object.assign(stats, newStats)
-        
-        // Update filter counts
-        filters[0].count = stats.total
-        filters[1].count = stats.vigente
-        filters[2].count = stats.tramite
-        filters[3].count = stats.vencido
     } catch (e) {
         console.error(e)
     } finally {
@@ -795,7 +919,7 @@ const loadData = async () => {
 
 // Watch tab change - recargar datos si cambia hacia/desde papelera
 watch(currentTab, (newTab, oldTab) => {
-    categoryFilter.value = 'ALL' // Reset filter on tab change
+    statusFilter.value = 'ALL' // Reset filtro de estado al cambiar tab
     
     // Si cambiamos hacia o desde la pestaña de papelera, recargar datos
     // porque requiere filtrado diferente en el servidor (deleted_at)
@@ -842,6 +966,17 @@ const updateChart = () => {
 
 const openDialog = (item = null) => {
     editingItem.value = item
+    dialogOpen.value = true
+}
+
+// Abrir diálogo pre-rellenado para un documento pendiente
+const openDialogForPending = (pending) => {
+    editingItem.value = {
+        category: pending.category,
+        doc_type: pending.id,
+        name: pending.label,
+        status: 'VIGENTE'
+    }
     dialogOpen.value = true
 }
 

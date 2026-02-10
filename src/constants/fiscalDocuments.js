@@ -53,3 +53,14 @@ export const FREQUENCIES = {
     QUINCENAL: 'Quincenal',
     AdHoc: 'Eventual'
 }
+
+// Helper: determina si una frecuencia es recurrente (necesita filtro por período)
+export const isRecurringFrequency = (frequency) => {
+    return ['MONTHLY', 'QUARTERLY', 'QUINCENAL', 'SEMESTRAL'].includes(frequency)
+}
+
+// Meses del año para el selector de período
+export const MONTHS = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+]
