@@ -43,16 +43,12 @@
       <v-col cols="12" md="4" lg="3">
         <v-card class="rounded-xl h-100 pa-4" variant="outlined" style="border-color: rgba(0,0,0,0.05)">
           <div class="d-flex align-center justify-space-between mb-4">
-            <h3 class="text-subtitle-1 font-weight-bold text-secondary">Estado General</h3>
-            <v-chip size="small" :color="complianceColor" variant="flat" class="font-weight-bold">
-              {{ progressRate }}% Cumplimiento
-            </v-chip>
+            <h3 class="text-subtitle-1 font-weight-bold text-secondary">Progreso General</h3>
           </div>
           <div style="height: 180px; position: relative">
-            <canvas ref="chartCanvas"></canvas>
+            <canvas ref="chartCanvas" style="position: relative; z-index: 2"></canvas>
             <div class="chart-center-text">
-                <div class="text-h4 font-weight-bold text-secondary">{{ chartCenterValue }}</div>
-                <div class="text-caption text-grey">de {{ chartCenterTotal }}</div>
+                <div class="text-h4 font-weight-bold text-secondary">{{ progressRate }}%</div>
             </div>
           </div>
         </v-card>
@@ -95,9 +91,6 @@
               <div class="d-flex justify-space-between mb-2">
                 <span class="text-subtitle-2 font-weight-bold text-secondary">
                   Progreso del Expediente
-                </span>
-                <span class="text-caption font-weight-bold text-primary">
-                  {{ progressRate }}% Completado
                 </span>
               </div>
               <v-progress-linear
@@ -185,18 +178,24 @@
                   density="compact"
                   variant="outlined"
                   hide-details
-                  style="max-width: 110px"
+                  style="width: 110px"
+                  bg-color="white"
+                  label="Año"
                   prepend-inner-icon="mdi-calendar"
                 />
 
-                <!-- Navegación de mes -->
-                <div class="d-flex align-center">
-                  <v-btn icon="mdi-chevron-left" size="small" variant="text" @click="prevMonth" />
-                  <span class="text-subtitle-2 font-weight-bold text-secondary mx-2" style="min-width: 90px; text-align: center">
-                    {{ MONTHS[selectedMonth] }}
-                  </span>
-                  <v-btn icon="mdi-chevron-right" size="small" variant="text" @click="nextMonth" />
-                </div>
+                <!-- Selector de mes -->
+                <v-select
+                  v-model="selectedMonth"
+                  :items="monthOptions"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  style="width: 160px"
+                  bg-color="white"
+                  label="Mes"
+                  prepend-inner-icon="mdi-calendar-month"
+                />
 
                 <v-spacer />
 
@@ -209,8 +208,10 @@
                   density="compact"
                   variant="outlined"
                   hide-details
-                  style="max-width: 170px"
+                  style="max-width: 180px"
+                  bg-color="white"
                   prepend-inner-icon="mdi-filter-variant"
+                  label="Estado"
                 />
               </div>
             </div>
@@ -666,6 +667,8 @@ import { jsPDF } from 'jspdf'
 import StatsCard from '@/components/common/StatsCard.vue'
 import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
 import fiscalService from '@/services/fiscalService'
+import userService from '@/services/userService'
+import systemLogo from '@/assets/icon.png'
 import { FISCAL_TYPES, MONTHS, isRecurringFrequency, getExpirationInfo } from '@/constants/fiscalDocuments'
 
 // Data
@@ -700,32 +703,18 @@ const statusOptions = [
     { label: 'Vencidos', value: 'VENCIDO' }
 ]
 
-// Años disponibles para el selector
+// Años disponibles para el selector (desde 2020 hasta el próximo año)
 const availableYears = computed(() => {
     const current = new Date().getFullYear()
     const years = []
-    for (let y = current - 2; y <= current + 1; y++) years.push(y)
-    return years
+    for (let y = 2020; y <= current + 1; y++) years.push(y)
+    return years.sort((a, b) => b - a) // Orden descendente para acceso rápido a recientes
 })
 
-// Navegación de mes
-const prevMonth = () => {
-    if (selectedMonth.value === 0) {
-        selectedMonth.value = 11
-        selectedYear.value--
-    } else {
-        selectedMonth.value--
-    }
-}
-
-const nextMonth = () => {
-    if (selectedMonth.value === 11) {
-        selectedMonth.value = 0
-        selectedYear.value++
-    } else {
-        selectedMonth.value++
-    }
-}
+// Opciones de meses para el selector
+const monthOptions = computed(() => {
+    return MONTHS.map((label, index) => ({ title: label, value: index }))
+})
 
 const categories = [
     { title: 'Legal', value: 'LEGAL' },
@@ -982,20 +971,58 @@ const updateChart = () => {
     if (!chartCanvas.value) return
     if (chartInstance) chartInstance.destroy()
     
-    // Calcular documentos requeridos cubiertos vs pendientes
-    // Usamos el total ya calculado en complianceDetail
-    const totalRequired = complianceDetail.value.total ? complianceDetail.value.total.required : 0
-    const totalCovered = complianceDetail.value.total ? complianceDetail.value.total.covered : 0
-    const pending = totalRequired - totalCovered
-    
+    // Calcular desglose de estatus para la gráfica
+    let cVigente = 0
+    let cTramite = 0
+    let cVencido = 0
+    let cPendiente = 0
+
+    // Iterar todas las categorías para contar documentos requeridos
+    const cats = ['LEGAL', 'MUNICIPAL', 'SENIAT', 'NOMINA']
+    cats.forEach(cat => {
+        const types = FISCAL_TYPES[cat] || []
+        const requiredTypes = types.filter(t => t.required)
+        
+        requiredTypes.forEach(type => {
+            // Buscar documentos coincidentes
+            const matchingDocs = docs.value.filter(d => {
+                if (d.category !== cat) return false
+                const isTypeMatch = d.doc_type === type.id
+                let isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
+                if (isNameMatch && type.id === 'RIF' && d.name.toLowerCase().includes('socios')) isNameMatch = false
+                return isTypeMatch || isNameMatch
+            })
+
+            // Prioridad: 1. Vigente, 2. Trámite, 3. Vencido, 4. Pendiente
+            const validDoc = matchingDocs.find(d => {
+                const s = getEffectiveStatus(d)
+                return s === 'VIGENTE' || s === 'TRAMITE'
+            })
+            
+            if (validDoc) {
+                const s = getEffectiveStatus(validDoc)
+                if (s === 'VIGENTE') cVigente++
+                else if (s === 'TRAMITE') cTramite++
+            } else {
+                const expiredDoc = matchingDocs.find(d => getEffectiveStatus(d) === 'VENCIDO')
+                if (expiredDoc) {
+                    cVencido++
+                } else {
+                    cPendiente++
+                }
+            }
+        })
+    })
+
+    // Configurar gráfica
     chartInstance = new Chart(chartCanvas.value, {
         type: 'doughnut',
         data: {
-             labels: ['Completados', 'Pendientes'],
+             labels: ['Vigentes', 'En Trámite', 'Vencidos', 'Pendientes'],
              datasets: [{
-                 data: [totalCovered, pending],
-                 backgroundColor: ['#4CAF50', '#e0e0e0'],
-                 hoverBackgroundColor: ['#66BB6A', '#d5d5d5'],
+                 data: [cVigente, cTramite, cVencido, cPendiente],
+                 backgroundColor: ['#4CAF50', '#FFC107', '#F44336', '#E0E0E0'],
+                 hoverBackgroundColor: ['#66BB6A', '#FFD54F', '#EF5350', '#BDBDBD'],
                  borderWidth: 0,
                  hoverOffset: 4
              }]
@@ -1005,8 +1032,17 @@ const updateChart = () => {
             maintainAspectRatio: false,
             cutout: '75%',
             plugins: {
-                legend: { display: false },
-                tooltip: { enabled: true }
+                legend: { 
+                    display: false
+                },
+                tooltip: { 
+                    enabled: true,
+                    callbacks: {
+                        label: function(context) {
+                            return ` ${context.label}: ${context.raw}`;
+                        }
+                    }
+                }
             }
         }
     })
@@ -1230,9 +1266,54 @@ const exportToPDF = async () => {
         let y = 20
         
         // Header
+        const currentUser = await userService.getCurrentUser()
+        const clientName = currentUser.client?.company_name || currentUser.organization?.name || currentUser.firstName + ' ' + currentUser.lastName
+        const clientRif = currentUser.client?.rif || currentUser.organization?.rif || ''
+
+        // Convert identifier to base64
+        const getBase64ImageFromURL = (url) => {
+            return new Promise((resolve, reject) => {
+                const img = new Image()
+                img.setAttribute('crossOrigin', 'anonymous')
+                img.onload = () => {
+                    const canvas = document.createElement('canvas')
+                    canvas.width = img.width
+                    canvas.height = img.height
+                    const ctx = canvas.getContext('2d')
+                    ctx.drawImage(img, 0, 0)
+                    const dataURL = canvas.toDataURL('image/png')
+                    resolve({ dataURL, width: img.width, height: img.height })
+                }
+                img.onerror = error => reject(error)
+                img.src = url
+            })
+        }
+
+        try {
+            const logoInfo = await getBase64ImageFromURL(systemLogo)
+            const pdfHeight = 12 // Reduced from 18
+            const ratio = logoInfo.width / logoInfo.height
+            const pdfWidth = pdfHeight * ratio
+            
+            doc.addImage(logoInfo.dataURL, 'PNG', margin, 10, pdfWidth, pdfHeight)
+        } catch (e) {
+            console.warn('Could not load logo for PDF', e)
+        }
+
         doc.setFontSize(20)
         doc.setTextColor(31, 53, 92) // #1F355C - secondary color
         doc.text('Expediente Fiscal 360', pageWidth / 2, y, { align: 'center' })
+        
+        y += 8
+        doc.setFontSize(12)
+        doc.setTextColor(80)
+        doc.text(clientName, pageWidth / 2, y, { align: 'center' })
+
+        if (clientRif) {
+            y += 6
+            doc.setFontSize(10)
+            doc.text(`RIF/CI: ${clientRif}`, pageWidth / 2, y, { align: 'center' })
+        }
         
         y += 10
         doc.setFontSize(10)
@@ -1264,7 +1345,7 @@ const exportToPDF = async () => {
             'LEGAL': 'Legal',
             'MUNICIPAL': 'Municipal', 
             'SENIAT': 'SENIAT',
-            'NOMINA': 'Nómina',
+            'NOMINA': 'Nómina y Parafiscales',
             'OTROS': 'Otros'
         }
         
@@ -1324,7 +1405,7 @@ const exportToPDF = async () => {
             if (catProgress) {
                 doc.setFontSize(10)
                 doc.setTextColor(100)
-                doc.text(`(${catProgress.covered}/${catProgress.total} - ${catProgress.percent}%)`, margin + 30, y)
+                doc.text(`(${catProgress.covered}/${catProgress.total} - ${catProgress.rate}%)`, margin + 55, y)
             }
             
             y += 8
@@ -1435,6 +1516,7 @@ onMounted(async () => {
     transform: translate(-50%, -50%);
     text-align: center;
     pointer-events: none;
+    z-index: 0;
 }
 
 .hover-bg:hover {
