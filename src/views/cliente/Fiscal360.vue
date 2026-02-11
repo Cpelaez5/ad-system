@@ -267,13 +267,37 @@
                           </template>
 
                           <v-list-item-title class="font-weight-bold mb-1">{{ doc.name }}</v-list-item-title>
-                          <v-list-item-subtitle>
-                            <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2">
+                          <v-list-item-subtitle class="d-flex align-center flex-wrap">
+                            <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2 mb-1">
                               {{ getEffectiveStatus(doc) }}
                             </v-chip>
-                            <span v-if="doc.expiration_date" :class="getExpirationClass(doc.expiration_date)">
-                              Vence: {{ formatDate(doc.expiration_date) }}
-                            </span>
+                            
+                            <!-- Expiration Warning -->
+                            <template v-if="doc.expiration_date">
+                                <v-chip
+                                    size="x-small"
+                                    variant="flat"
+                                    :color="getExpirationInfo(doc.expiration_date).color"
+                                    class="mr-2 mb-1"
+                                >
+                                    <v-icon start size="x-small">{{ getExpirationInfo(doc.expiration_date).icon }}</v-icon>
+                                    {{ getExpirationInfo(doc.expiration_date).label }}
+                                </v-chip>
+                            </template>
+
+                            <!-- Missing Dates Warning -->
+                            <template v-else-if="!doc.expiration_date || !doc.emission_date">
+                                  <v-chip
+                                    size="x-small"
+                                    variant="tonal"
+                                    color="warning"
+                                    class="mb-1 cursor-pointer"
+                                    @click.stop="openDialog(doc)"
+                                >
+                                    <v-icon start size="x-small">mdi-calendar-alert</v-icon>
+                                    Completar fechas
+                                </v-chip>
+                            </template>
                           </v-list-item-subtitle>
 
                           <template v-slot:append>
@@ -327,13 +351,37 @@
                 </template>
 
                 <v-list-item-title class="font-weight-bold mb-1">{{ doc.name }}</v-list-item-title>
-                <v-list-item-subtitle>
-                  <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2">
+                <v-list-item-subtitle class="d-flex align-center flex-wrap">
+                  <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2 mb-1">
                     {{ getEffectiveStatus(doc) }}
                   </v-chip>
-                  <span v-if="doc.expiration_date" :class="getExpirationClass(doc.expiration_date)">
-                    Vence: {{ formatDate(doc.expiration_date) }}
-                  </span>
+                  
+                  <!-- Expiration Warning -->
+                  <template v-if="doc.expiration_date">
+                      <v-chip
+                          size="x-small"
+                          variant="flat"
+                          :color="getExpirationInfo(doc.expiration_date).color"
+                          class="mr-2 mb-1"
+                      >
+                          <v-icon start size="x-small">{{ getExpirationInfo(doc.expiration_date).icon }}</v-icon>
+                          {{ getExpirationInfo(doc.expiration_date).label }}
+                      </v-chip>
+                  </template>
+
+                  <!-- Missing Dates Warning -->
+                  <template v-else-if="!doc.expiration_date || !doc.emission_date">
+                        <v-chip
+                          size="x-small"
+                          variant="tonal"
+                          color="warning"
+                          class="mb-1 cursor-pointer"
+                          @click.stop="openDialog(doc)"
+                      >
+                          <v-icon start size="x-small">mdi-calendar-alert</v-icon>
+                          Completar fechas
+                      </v-chip>
+                  </template>
                 </v-list-item-subtitle>
 
                 <template v-slot:append>
@@ -618,7 +666,7 @@ import { jsPDF } from 'jspdf'
 import StatsCard from '@/components/common/StatsCard.vue'
 import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
 import fiscalService from '@/services/fiscalService'
-import { FISCAL_TYPES, MONTHS, isRecurringFrequency } from '@/constants/fiscalDocuments'
+import { FISCAL_TYPES, MONTHS, isRecurringFrequency, getExpirationInfo } from '@/constants/fiscalDocuments'
 
 // Data
 const loading = ref(true)
@@ -1222,7 +1270,43 @@ const exportToPDF = async () => {
         
         for (const cat of categories) {
             const catDocs = docs.value.filter(d => d.category === cat)
-            if (catDocs.length === 0) continue
+            
+            // 1. Existing docs
+            const allItems = [...catDocs]
+            
+            // 2. Identify missing required docs
+            const types = FISCAL_TYPES[cat] || []
+            const requiredTypes = types.filter(t => t.required)
+            
+            for (const type of requiredTypes) {
+                // Check if any valid doc matches this type
+                const hasValid = catDocs.some(d => {
+                     // Match logic mirrors complianceDetail
+                     const isTypeMatch = d.doc_type === type.id
+                     // Fuzzy match
+                     let isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
+                     if (isNameMatch && type.id === 'RIF' && d.name.toLowerCase().includes('socios')) isNameMatch = false
+                     
+                     if (!(isTypeMatch || isNameMatch)) return false
+                     
+                     // Must be non-expired
+                     const status = getEffectiveStatus(d)
+                     return status === 'VIGENTE' || status === 'TRAMITE'
+                })
+                
+                if (!hasValid) {
+                     // Add placeholder for missing doc
+                     allItems.push({
+                         name: type.label,
+                         status: 'NO PRESENTADO',
+                         expiration_date: null,
+                         isMissing: true
+                     })
+                }
+            }
+
+            // Skip category only if absolutely nothing to show
+            if (allItems.length === 0) continue
             
             // Check if we need a new page
             if (y > 260) {
@@ -1236,7 +1320,7 @@ const exportToPDF = async () => {
             doc.text(categoryNames[cat], margin, y)
             
             // Category progress
-            const catProgress = complianceDetail.value.byCategory[cat]
+            const catProgress = complianceDetail.value[cat]
             if (catProgress) {
                 doc.setFontSize(10)
                 doc.setTextColor(100)
@@ -1257,8 +1341,12 @@ const exportToPDF = async () => {
             doc.line(margin, y, pageWidth - margin, y)
             y += 5
             
-            // Documents
-            for (const docItem of catDocs) {
+            // Sort: Existing first, then Missing. Or Alphabetical?
+            // Let's sort by name for a clean report.
+            allItems.sort((a, b) => a.name.localeCompare(b.name))
+
+            // Documents Loop
+            for (const docItem of allItems) {
                 if (y > 270) {
                     doc.addPage()
                     y = 20
@@ -1272,24 +1360,33 @@ const exportToPDF = async () => {
                 const truncatedName = docName.length > 40 ? docName.substring(0, 37) + '...' : docName
                 doc.text(truncatedName, margin, y)
                 
-                // Status with color
-                const effectiveStatus = getEffectiveStatus(docItem)
-                if (effectiveStatus === 'VIGENTE') {
-                    doc.setTextColor(76, 175, 80) // Green
-                } else if (effectiveStatus === 'TRAMITE') {
-                    doc.setTextColor(255, 193, 7) // Yellow/Orange
-                } else {
+                if (docItem.isMissing) {
+                    // Missing Item styling
                     doc.setTextColor(244, 67, 54) // Red
-                }
-                doc.text(effectiveStatus, margin + 80, y)
-                
-                // Expiration date
-                doc.setTextColor(100)
-                if (docItem.expiration_date) {
-                    const expDate = new Date(docItem.expiration_date)
-                    doc.text(expDate.toLocaleDateString('es-ES'), margin + 110, y)
+                    doc.text('NO PRESENTADO', margin + 80, y)
+                    doc.setTextColor(150)
+                    doc.text('--', margin + 110, y)
                 } else {
-                    doc.text('N/A', margin + 110, y)
+                    // Existing Item styling
+                    // Status with color
+                    const effectiveStatus = getEffectiveStatus(docItem)
+                    if (effectiveStatus === 'VIGENTE') {
+                        doc.setTextColor(76, 175, 80) // Green
+                    } else if (effectiveStatus === 'TRAMITE') {
+                        doc.setTextColor(255, 193, 7) // Yellow/Orange
+                    } else {
+                        doc.setTextColor(244, 67, 54) // Red
+                    }
+                    doc.text(effectiveStatus, margin + 80, y)
+                    
+                    // Expiration date
+                    doc.setTextColor(100)
+                    if (docItem.expiration_date) {
+                        const expDate = new Date(docItem.expiration_date)
+                        doc.text(expDate.toLocaleDateString('es-ES'), margin + 110, y)
+                    } else {
+                        doc.text('N/A', margin + 110, y)
+                    }
                 }
                 
                 y += 6

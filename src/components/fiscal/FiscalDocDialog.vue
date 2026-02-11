@@ -146,12 +146,14 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="formData.emission_date"
-                label="Fecha de Emisión"
+                label="Fecha de Emisión *"
                 type="date"
                 variant="outlined"
                 density="comfortable"
                 persistent-hint
                 hint="Fecha en que se emitió el documento"
+                :rules="[v => !!v || 'La fecha de emisión es requerida']"
+                required
               />
             </v-col>
 
@@ -159,15 +161,14 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="formData.expiration_date"
-                label="Fecha de Vencimiento"
+                label="Fecha de Vencimiento *"
                 type="date"
                 variant="outlined"
                 density="comfortable"
                 persistent-hint
-                hint="Dejar vacío si no aplica"
+                hint="Indique cuándo vence este documento"
                 :rules="expirationDateRules"
-                clearable
-                @click:clear="formData.expiration_date = null"
+                required
               />
             </v-col>
 
@@ -300,10 +301,11 @@ const existingFile = computed(() => {
   return null
 })
 
-// Validation: Expiration date must be after emission date
+// Validación: fecha de vencimiento es requerida y debe ser posterior a la emisión
 const expirationDateRules = computed(() => [
+    v => !!v || 'La fecha de vencimiento es requerida',
     v => {
-        if (!v || !formData.emission_date) return true // Optional field
+        if (!v || !formData.emission_date) return true
         const emission = new Date(formData.emission_date)
         const expiration = new Date(v)
         if (expiration <= emission) {
