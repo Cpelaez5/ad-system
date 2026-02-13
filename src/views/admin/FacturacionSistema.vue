@@ -168,7 +168,10 @@
                 <span class="font-weight-bold text-body-2">{{ item.reference }}</span>
               </template>
               <template v-slot:item.amount="{ item }">
-                <span class="font-weight-bold">${{ formatMoney(item.amount) }}</span>
+                <div>
+                  <div class="font-weight-bold text-success" title="Monto Reportado">${{ formatMoney(item.amount) }}</div>
+                  <div class="text-caption text-grey" title="Monto Factura">${{ formatMoney(item.invoice?.amount || 0) }}</div>
+                </div>
               </template>
               <template v-slot:item.status="{ item }">
                 <v-chip :color="reportStatusColor(item.status)" size="small" variant="tonal" class="font-weight-bold">
@@ -494,7 +497,8 @@
           <v-row dense>
             <v-col cols="6"><div class="text-caption text-medium-emphasis">Factura</div><div class="font-weight-bold">{{ selectedReport.invoice?.invoice_number }}</div></v-col>
             <v-col cols="6"><div class="text-caption text-medium-emphasis">Cliente</div><div class="font-weight-bold">{{ selectedReport.invoice?.client?.company_name }}</div></v-col>
-            <v-col cols="6"><div class="text-caption text-medium-emphasis">Monto</div><div class="font-weight-bold">${{ formatMoney(selectedReport.amount) }}</div></v-col>
+            <v-col cols="6"><div class="text-caption text-medium-emphasis">Monto Reportado</div><div class="font-weight-bold text-success">${{ formatMoney(selectedReport.amount) }}</div></v-col>
+            <v-col cols="6"><div class="text-caption text-medium-emphasis">Monto Factura</div><div class="font-weight-bold">${{ formatMoney(selectedReport.invoice?.amount || 0) }}</div></v-col>
             <v-col cols="6"><div class="text-caption text-medium-emphasis">Método</div><div class="font-weight-bold">{{ selectedReport.payment_method?.name }}</div></v-col>
             <v-col cols="6"><div class="text-caption text-medium-emphasis">Referencia</div><div class="font-weight-bold">{{ selectedReport.reference }}</div></v-col>
             <v-col cols="6"><div class="text-caption text-medium-emphasis">Fecha</div><div class="font-weight-bold">{{ formatDateTime(selectedReport.created_at) }}</div></v-col>
@@ -637,7 +641,7 @@ export default {
         { title: 'Cliente', key: 'client', sortable: false },
         { title: 'Método', key: 'method', sortable: false },
         { title: 'Referencia', key: 'reference', sortable: true },
-        { title: 'Monto', key: 'amount', sortable: true },
+        { title: 'Montos (Rep/Fac)', key: 'amount', sortable: true },
         { title: 'Estado', key: 'status', sortable: true },
         { title: 'Acciones', key: 'actions', sortable: false, width: 130 }
       ],

@@ -194,12 +194,20 @@ export default {
             const { data, error } = await query;
             if (error) throw error;
 
+            // Obtener balance de crédito del cliente si aplica
+            let clientBalance = 0;
+            if (clientId) {
+                const { data: clientData } = await supabase.from('clients').select('balance').eq('id', clientId).single();
+                clientBalance = clientData?.balance || 0;
+            }
+
             const now = new Date();
             const balance = {
                 totalFacturado: 0,
                 totalPagado: 0,
                 totalPendiente: 0,
                 totalVencido: 0,
+                saldoAFavor: clientBalance,
                 proximoVencimiento: null,
                 cantidadFacturas: data?.length || 0
             };
@@ -509,23 +517,39 @@ export default {
      * Aprueba un reporte de pago (super_admin).
      * Marca la factura como pagada.
      */
+    /**
+     * Aprueba un reporte de pago (super_admin).
+     * Marca la factura como pagada y abona excedentes al balance del cliente si existen.
+     */
     async approvePayment(reportId, reviewerId) {
         try {
-            // 1. Actualizar reporte
-            const { data: report, error: reportError } = await supabase
+            // 1. Obtener reporte y factura
+            const { data: report, error: fetchError } = await supabase
+                .from('payment_reports')
+                .select('*, invoice:system_invoices(amount, client_id)')
+                .eq('id', reportId)
+                .single();
+
+            if (fetchError) throw fetchError;
+
+            // 2. Calcular diferencia (excedente)
+            const reportedAmount = parseFloat(report.amount);
+            const invoiceAmount = parseFloat(report.invoice.amount);
+            const excess = reportedAmount - invoiceAmount;
+
+            // 3. Actualizar estado del reporte
+            const { error: updateError } = await supabase
                 .from('payment_reports')
                 .update({
                     status: 'approved',
                     reviewed_by: reviewerId,
                     reviewed_at: new Date().toISOString()
                 })
-                .eq('id', reportId)
-                .select('*, invoice_id')
-                .single();
+                .eq('id', reportId);
 
-            if (reportError) throw reportError;
+            if (updateError) throw updateError;
 
-            // 2. Marcar la factura como pagada
+            // 4. Marcar factura como pagada
             const { error: invoiceError } = await supabase
                 .from('system_invoices')
                 .update({
@@ -537,7 +561,26 @@ export default {
 
             if (invoiceError) throw invoiceError;
 
-            return { success: true, data: report };
+            // 5. Abonar a saldo si hay excedente (Credit System)
+            if (excess > 0) {
+                // Obtener saldo actual
+                const { data: client, error: clientError } = await supabase
+                    .from('clients')
+                    .select('balance')
+                    .eq('id', report.client_id)
+                    .single();
+
+                if (!clientError) {
+                    const newBalance = (parseFloat(client.balance) || 0) + excess;
+                    await supabase
+                        .from('clients')
+                        .update({ balance: newBalance })
+                        .eq('id', report.client_id);
+                    console.log(`💰 Saldo abonado al cliente ${report.client_id}: +$${excess}`);
+                }
+            }
+
+            return { success: true };
         } catch (error) {
             console.error('❌ Error aprobando pago:', error);
             return { success: false, error };

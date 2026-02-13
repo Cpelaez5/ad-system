@@ -16,47 +16,134 @@
 import BaseOCRService from './baseOcrService';
 
 // Prompt especializado para comprobantes de pago
-const PAYMENT_PROOF_PROMPT = `Analiza este comprobante de pago (captura de pantalla o PDF) y extrae TODOS los datos disponibles con máxima precisión.
+// Prompts especializados por tipo de pago
+const PAYMENT_PROMPTS = {
+    // 1. PAGO MÓVIL
+    mobile_payment: `Analiza este COMPROBANTE DE PAGO MÓVIL (Venezuela) y extrae los datos.
+    
+    CONTEXTO: Buscamos validar un pago móvil interbancario.
+    
+    Estructura JSON Requerida (Si no encuentras un dato, usa null):
+    {
+      "type": "PAGO_MOVIL",
+      "reference": "Número de referencia completo (ej: 12345678, 001234). Prioridad ALTA.",
+      "amount": 0.00,
+      "currency": "VES",
+      "date": "YYYY-MM-DD",
+      "sender": {
+        "phone": "Teléfono del emisor (ej: 0412-1234567). Busca 'Teléfono', 'Celular', 'Móvil'.",
+        "document": "Cédula o RIF del emisor (ej: V12345678). Busca 'Cédula', 'ID', 'Documento'.",
+        "bank": "Banco emisor (ej: Banesco, Venezuela, Mercantil). A veces está en el logo o encabezado.",
+        "name": "Nombre del emisor."
+      },
+      "receiver": {
+        "phone": "Teléfono receptor",
+        "document": "Documento receptor",
+        "bank": "Banco receptor"
+      },
+      "status": "EXITOSO|PENDIENTE|FALLIDO"
+    }
 
-CONTEXTO: Este documento es un COMPROBANTE DE PAGO (transferencia bancaria, pago móvil, Zelle o Binance). Necesitamos extraer los datos para reportar el pago.
+    REGLAS:
+    - Referencia: A veces llamada 'Ref', 'Secuencia', 'Nro Operación'.
+    - Monto: Formato numérico (ej: 1250.50). Ignora 'Bs'.
+    - Si no encuentras un campo, devuélvelo como null. NO INVENTES DATOS.`,
 
-Estructura JSON Requerida (Retorna SOLO el JSON):
-{
-  "type": "PAGO_MOVIL|TRANSFERENCIA|ZELLE|BINANCE|DESCONOCIDO",
-  "reference": "Número de referencia, confirmación o transacción",
-  "amount": 0.00,
-  "currency": "VES|USD",
-  "date": "YYYY-MM-DD",
-  
-  "sender": {
-    "phone": "Teléfono del emisor (ej: 0412-1234567) o null",
-    "document": "Cédula o RIF del emisor (ej: V-12345678) o null",
-    "bank": "Banco del emisor o null",
-    "name": "Nombre del emisor o null",
-    "email": "Email del emisor o null"
-  },
-  
-  "receiver": {
-    "phone": "Teléfono del receptor o null",
-    "document": "Cédula o RIF del receptor o null",
-    "bank": "Banco del receptor o null",
-    "name": "Nombre del receptor o null",
-    "email": "Email del receptor o null"
-  },
-  
-  "status": "EXITOSO|PENDIENTE|FALLIDO|DESCONOCIDO",
-  "notes": "Cualquier nota adicional encontrada o null"
-}
+    // 2. TRANSFERENCIA BANCARIA
+    bank_transfer: `Analiza este COMPROBANTE DE TRANSFERENCIA BANCARIA y extrae los datos.
+    
+    CONTEXTO: Transferencia entre bancos nacionales.
+    
+    Estructura JSON Requerida (Si no encuentras un dato, usa null):
+    {
+      "type": "TRANSFERENCIA",
+      "reference": "Número de referencia/operación.",
+      "amount": 0.00,
+      "currency": "VES",
+      "date": "YYYY-MM-DD",
+      "sender": {
+        "bank": "Banco emisor (ej: Provincial, BNC).",
+        "name": "Nombre del titular.",
+        "account_last_digits": "Últimos dígitos de cuenta origen (si visibles)."
+      },
+      "receiver": {
+        "bank": "Banco receptor.",
+        "name": "Nombre receptor.",
+        "document": "Documento receptor."
+      },
+      "status": "EXITOSO|PENDIENTE"
+    }
+    
+    REGLAS:
+    - Referencia es crítica.
+    - Si no encuentras un dato, usa null.`,
 
-REGLAS:
-- Si ves "Pago Móvil", "P2P", "C2P" → type: "PAGO_MOVIL"
-- Si ves "Transferencia", "Bancaria" → type: "TRANSFERENCIA"
-- Si ves "Zelle" → type: "ZELLE"
-- Si ves "Binance", "Pay" → type: "BINANCE"
-- IMPORTANTE NÚMEROS: Usa formato estándar JSON (punto para decimales). Ej: 1250.50
-- MONEDA: Si es "Bs" o "Bolívares" → "VES". Si es "$" o "USD" → "USD"
-- Referencia: Busca "Ref", "Nro", "Confirmación", "Transaction", "ID"
-- Retorna SOLO el JSON válido, sin texto adicional.`;
+    // 3. ZELLE
+    zelle: `Analiza este COMPROBANTE DE ZELLE y extrae los datos.
+    
+    CONTEXTO: Pago en dólares vía Zelle.
+    
+    Estructura JSON Requerida (Si no encuentras un dato, usa null):
+    {
+      "type": "ZELLE",
+      "reference": "Número de confirmación o ID de referencia (ej: 'ppw...', numérico o alfanumérico).",
+      "amount": 0.00,
+      "currency": "USD",
+      "date": "YYYY-MM-DD",
+      "sender": {
+        "name": "Nombre del emisor (quien envía el dinero).",
+        "email": "Correo electrónico del emisor (si aparece)."
+      },
+      "receiver": {
+        "name": "Nombre del receptor (a quien se envió).",
+        "email": "Correo o teléfono del receptor."
+      },
+      "status": "EXITOSO|PENDIENTE|PROCESANDO"
+    }
+    
+    REGLAS:
+    - Monto: Números con punto decimal.
+    - Si no encuentras un dato, usa null.`,
+
+    // 4. BINANCE
+    binance: `Analiza este COMPROBANTE DE BINANCE PAY / TRANSFERENCIA CRYPTO y extrae los datos.
+    
+    CONTEXTO: Pago en USDT/Cripto.
+    
+    Estructura JSON Requerida (Si no encuentras un dato, usa null):
+    {
+      "type": "BINANCE",
+      "reference": "TXID, Internal Transfer ID, Order ID o Pay ID.",
+      "amount": 0.00,
+      "currency": "USDT",
+      "date": "YYYY-MM-DD",
+      "sender": {
+        "binance_id": "Pay ID o User ID del emisor (si visible).",
+        "email": "Correo o apodo del emisor."
+      },
+      "status": "EXITOSO|COMPLETADO"
+    }
+    
+    REGLAS:
+    - Busca identificadores únicos largos (TXID) o numéricos (Order ID).
+    - Si no encuentras un dato, usa null.`,
+
+    // DEFAULT
+    default: `Analiza este comprobante de pago genérico y extrae datos.
+    
+    Estructura JSON Requerida:
+    {
+      "type": "DESCONOCIDO",
+      "reference": "Referencia del pago",
+      "amount": 0.00,
+      "currency": "VES|USD",
+      "date": "YYYY-MM-DD",
+      "sender": {},
+      "status": "EXITOSO"
+    }
+    
+    REGLAS: Si no encuentras dato, usa null.`
+};
 
 class PaymentOCRService extends BaseOCRService {
     constructor() {
@@ -68,17 +155,21 @@ class PaymentOCRService extends BaseOCRService {
     /**
      * Extrae datos de un comprobante de pago.
      * @param {File} file - Archivo imagen o PDF del comprobante
+     * @param {string} paymentType - Tipo de pago ('mobile_payment', 'bank_transfer', 'zelle', 'binance')
      * @returns {Promise<Object>} Datos extraídos del comprobante
      */
-    async extractPaymentData(file) {
+    async extractPaymentData(file, paymentType = 'default') {
         try {
-            console.log('💳 [Payment OCR] Procesando comprobante de pago...');
+            console.log(`💳 [Payment OCR] Procesando comprobante (${paymentType})...`);
+
+            // Seleccionar prompt según tipo
+            const prompt = PAYMENT_PROMPTS[paymentType] || PAYMENT_PROMPTS.default;
 
             // Procesar archivo (hereda PDF parse / compresión de imagen)
             const text = await this.processFile(file);
 
             console.log('📝 Analizando comprobante con DeepSeek (temperatura 0.0)...');
-            const response = await this.analyzeWithDeepSeek(text, PAYMENT_PROOF_PROMPT);
+            const response = await this.analyzeWithDeepSeek(text, prompt);
 
             const data = this.parseJSONResponse(response);
             console.log('🤖 Datos extraídos del comprobante:', data);

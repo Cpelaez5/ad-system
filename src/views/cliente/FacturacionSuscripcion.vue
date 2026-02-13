@@ -41,6 +41,13 @@
           </div>
         </v-card>
       </v-col>
+      <!-- Saldo a favor (Nuevo) -->
+      <v-col cols="12" sm="6" md="3" v-if="balance.saldoAFavor > 0">
+        <v-card rounded="xl" class="pa-4 stat-card" style="background: #4CAF50; color: white;">
+          <div class="text-caption text-uppercase opacity-80 mb-1">Saldo a favor</div>
+          <div class="text-h6 font-weight-bold">+${{ formatMoney(balance.saldoAFavor) }}</div>
+        </v-card>
+      </v-col>
     </v-row>
 
     <!-- Tabs: Facturas / Mis Reportes -->
@@ -151,8 +158,11 @@
             <template v-slot:item.reference="{ item }">
               <span class="text-body-2 font-weight-medium">{{ item.reference }}</span>
             </template>
-            <template v-slot:item.amount="{ item }">
-              <span class="font-weight-bold text-body-2">${{ formatMoney(item.amount) }}</span>
+            <template v-slot:item.amounts="{ item }">
+              <div>
+                <div class="font-weight-bold text-success" title="Monto Reportado">${{ formatMoney(item.amount) }}</div>
+                <div class="text-caption text-grey" title="Monto Factura">${{ formatMoney(item.invoice?.amount || 0) }}</div>
+              </div>
             </template>
             <template v-slot:item.created_at="{ item }">
               <span class="text-body-2">{{ formatDate(item.created_at) }}</span>
@@ -214,6 +224,10 @@
               <br><strong>+ IGTF (3%):</strong> ${{ formatMoney(igtfAmount) }}
               <br><strong>Total a pagar:</strong> ${{ formatMoney(totalWithIgtf) }}
             </template>
+            <template v-if="bcvRate">
+               / <strong>Bs. {{ formatMoney(totalWithIgtf * bcvRate.dollar) }}</strong>
+               <div class="text-caption mt-1 opacity-80">Tasa BCV: {{ bcvRate.dollar.toFixed(4) }} Bs/$ ({{ formatDate(bcvRate.date) }})</div>
+            </template>
           </v-alert>
 
           <v-form ref="paymentForm" @submit.prevent="submitPayment">
@@ -258,6 +272,14 @@
                 <span class="text-caption text-medium-emphasis mr-2" style="min-width: 120px;">{{ detailLabel(key) }}:</span>
                 <span class="text-body-2 font-weight-medium">{{ val }}</span>
               </div>
+              <!-- Mostrar equivalente en Bs para transferencias/pago móvil -->
+              <template v-if="(selectedMethodType === 'bank_transfer' || selectedMethodType === 'mobile_payment') && bcvRate">
+                <v-divider class="my-2"></v-divider>
+                <div class="d-flex align-center justify-space-between text-caption font-weight-bold text-primary">
+                  <span>Monto en Bolívares:</span>
+                  <span>Bs. {{ formatMoney(totalWithIgtf * bcvRate.dollar) }}</span>
+                </div>
+              </template>
             </v-card>
 
             <!-- ============ Paso 2: Comprobante de pago (PRIORIZADO) ============ -->
@@ -383,6 +405,26 @@
               variant="outlined" density="comfortable" prepend-inner-icon="mdi-pound"
               placeholder="Ej: 00012345678" :rules="[v => !!v || 'Ingresa la referencia']" class="mb-3"></v-text-field>
 
+            <!-- Monto Reportado Universal (Editable) -->
+            <v-text-field 
+              v-model.number="paymentFormData.amount" 
+              label="Monto Reportado (USD)" 
+              variant="outlined" 
+              density="comfortable" 
+              type="number" 
+              step="0.01" 
+              prepend-inner-icon="mdi-currency-usd"
+              :rules="[v => v > 0 || 'El monto debe ser mayor a 0']" 
+              class="mb-3"
+              hint="Si el pago fue en Bolívares, el sistema calcula el equivalente. Ajusta si es necesario."
+              persistent-hint
+            ></v-text-field>
+
+            <!-- Validaciones de pago -->
+            <v-alert v-if="paymentStatusMessage" :type="paymentStatusMessage.type" variant="tonal" density="compact" class="mb-4 text-caption">
+              {{ paymentStatusMessage.text }}
+            </v-alert>
+
             <!-- Campos dinámicos: Pago Móvil -->
             <template v-if="selectedMethodType === 'mobile_payment'">
               <v-text-field v-model="paymentFormData.sender_details.sender_phone" label="Tu teléfono (desde donde pagaste)"
@@ -404,9 +446,7 @@
               <v-text-field v-model="paymentFormData.sender_details.sender_name" label="Nombre del titular de la cuenta Zelle"
                 variant="outlined" density="comfortable" prepend-inner-icon="mdi-account"
                 placeholder="Ej: John Doe" :rules="[v => !!v || 'Requerido']" class="mb-3"></v-text-field>
-              <v-text-field v-model.number="paymentFormData.sender_details.sender_amount" label="Monto total enviado (USD)"
-                variant="outlined" density="comfortable" prepend-inner-icon="mdi-currency-usd"
-                type="number" step="0.01" placeholder="0.00" :rules="[v => v > 0 || 'Requerido']" class="mb-3"></v-text-field>
+
             </template>
 
             <!-- Campos dinámicos: Binance -->
@@ -417,9 +457,7 @@
               <v-text-field v-model="paymentFormData.sender_details.sender_binance_id" label="Tu Binance ID / Pay ID"
                 variant="outlined" density="comfortable" prepend-inner-icon="mdi-identifier"
                 placeholder="Ej: 123456789" :rules="[v => !!v || 'Requerido']" class="mb-3"></v-text-field>
-              <v-text-field v-model.number="paymentFormData.sender_details.sender_amount" label="Monto total enviado (USDT)"
-                variant="outlined" density="comfortable" prepend-inner-icon="mdi-currency-usd"
-                type="number" step="0.01" placeholder="0.00" :rules="[v => v > 0 || 'Requerido']" class="mb-3"></v-text-field>
+
             </template>
 
             <!-- Soporte -->
@@ -428,6 +466,13 @@
               <strong>¿Problemas con el pago?</strong> Llama al {{ selectedMethodSupport }}
             </v-alert>
           </v-form>
+          
+           <!-- Botón de Ayuda Flotante (en el dialog) -->
+           <div class="d-flex justify-center mt-2">
+             <v-btn variant="text" size="small" color="primary" class="text-caption text-none" prepend-icon="mdi-whatsapp" href="https://wa.me/584241234567" target="_blank">
+               ¿Necesitas ayuda con este pago?
+             </v-btn>
+           </div>
         </v-card-text>
 
         <v-card-actions class="px-5 pb-5">
@@ -475,6 +520,11 @@
               <template v-slot:prepend><v-icon size="18" color="primary">mdi-currency-usd</v-icon></template>
               <v-list-item-title class="text-caption text-medium-emphasis">Monto Reportado</v-list-item-title>
               <v-list-item-subtitle class="font-weight-bold">${{ formatMoney(detailReport.amount) }}</v-list-item-subtitle>
+            </v-list-item>
+            <v-list-item>
+              <template v-slot:prepend><v-icon size="18" color="grey">mdi-file-document-outline</v-icon></template>
+              <v-list-item-title class="text-caption text-medium-emphasis">Monto Factura</v-list-item-title>
+              <v-list-item-subtitle class="font-weight-bold">${{ formatMoney(detailReport.invoice?.amount || 0) }}</v-list-item-subtitle>
             </v-list-item>
             <v-list-item>
               <template v-slot:prepend><v-icon size="18" color="primary">mdi-calendar</v-icon></template>
@@ -562,6 +612,7 @@
 import billingService from '@/services/billingService';
 import paymentOcrService from '@/services/paymentOcrService';
 import userService from '@/services/userService';
+import bcvService from '@/services/bcvService';
 
 export default {
   name: 'FacturacionSuscripcion',
@@ -571,9 +622,10 @@ export default {
       activeTab: 'invoices',
       invoices: [],
       clientReports: [],
-      balance: { totalFacturado: 0, totalPagado: 0, totalPendiente: 0, proximoVencimiento: null },
+      balance: { totalFacturado: 0, totalPagado: 0, totalPendiente: 0, saldoAFavor: 0, proximoVencimiento: null },
       currentUser: null,
       availableMethods: [],
+      bcvRate: null,
 
       // Dialog de pago (crear o editar)
       showPaymentDialog: false,
@@ -592,6 +644,7 @@ export default {
       paymentFormData: {
         payment_method_id: null,
         reference: '',
+        amount: 0,
         sender_details: {}
       },
 
@@ -622,7 +675,7 @@ export default {
         { title: 'Factura', key: 'invoice', sortable: false },
         { title: 'Método', key: 'method', sortable: false },
         { title: 'Referencia', key: 'reference', sortable: true },
-        { title: 'Monto', key: 'amount', sortable: true },
+        { title: 'Montos (Rep/Fac)', key: 'amounts', sortable: false },
         { title: 'Fecha', key: 'created_at', sortable: true },
         { title: 'Estado', key: 'status', sortable: true },
         { title: 'Acciones', key: 'actions', sortable: false, width: '120px' }
@@ -635,6 +688,10 @@ export default {
     paymentFormValid() {
       const hasMethod = !!this.paymentFormData.payment_method_id;
       const hasRef = !!this.paymentFormData.reference?.trim();
+      const hasAmount = this.paymentFormData.amount > 0;
+
+      // Global check basics
+      if (!hasMethod || !hasRef || !hasAmount) return false;
 
       // Validar comprobante si es obligatorio
       if (this.selectedMethodRequireProof) {
@@ -645,17 +702,17 @@ export default {
       // Validar campos específicos por tipo de método
       if (this.selectedMethodType === 'mobile_payment') {
         const sd = this.paymentFormData.sender_details;
-        return hasMethod && hasRef && sd.sender_phone && sd.sender_document && sd.sender_bank;
+        return sd.sender_phone && sd.sender_document && sd.sender_bank;
       }
       if (this.selectedMethodType === 'zelle') {
         const sd = this.paymentFormData.sender_details;
-        return hasMethod && hasRef && sd.sender_email && sd.sender_name && sd.sender_amount > 0;
+        return sd.sender_email && sd.sender_name;
       }
       if (this.selectedMethodType === 'binance') {
         const sd = this.paymentFormData.sender_details;
-        return hasMethod && hasRef && sd.sender_email && sd.sender_binance_id && sd.sender_amount > 0;
+        return sd.sender_email && sd.sender_binance_id;
       }
-      return hasMethod && hasRef;
+      return true;
     },
     selectedMethod() {
       return this.availableMethods.find(m => m.id === this.paymentFormData.payment_method_id);
@@ -676,6 +733,44 @@ export default {
     },
     totalWithIgtf() {
       return parseFloat(this.selectedInvoice?.amount || 0) + this.igtfAmount;
+    },
+    amountInBs() {
+      if (!this.bcvRate?.dollar || !this.totalWithIgtf) return 0;
+      return this.totalWithIgtf * this.bcvRate.dollar;
+    },
+    paymentDiff() {
+      // Diferencia entre lo que reporta y lo que debe pagar
+      if (!this.totalWithIgtf) return 0;
+      return parseFloat(this.paymentFormData.amount || 0) - this.totalWithIgtf;
+    },
+    paymentStatusMessage() {
+      const diff = this.paymentDiff;
+      // Tolerancia de 0.01
+      if (Math.abs(diff) < 0.01) return { type: 'success', text: 'Monto exacto. ¡Gracias!' };
+      if (diff > 0) return { type: 'info', text: `ℹ️ Pago Excedente: Estás pagando $${diff.toFixed(2)} de más. Se abonará a tu saldo a favor una vez aprobado.` };
+      return { type: 'warning', text: `⚠️ Pago Parcial: Quedarán pendientes $${Math.abs(diff).toFixed(2)}.` };
+    }
+  },
+  watch: {
+    // Sincronizar monto reportado con monto de factura al abrir
+    selectedInvoice: {
+      handler(val) {
+        if (val && !this.isEditingReport) {
+           // Calcular IGTF si aplica el método seleccionado (pero selectedMethod puede cambiar después)
+           // Mejor lo hacemos reactivo al método
+           this.updateDefaultAmount();
+        }
+      },
+      immediate: true
+    },
+    'paymentFormData.payment_method_id'() {
+       if (!this.isEditingReport) this.updateDefaultAmount();
+    },
+    // Sincronizar input de Zelle/Binance con el monto principal
+    'paymentFormData.sender_details.sender_amount'(val) {
+      if ((this.selectedMethodType === 'zelle' || this.selectedMethodType === 'binance') && val) {
+        this.paymentFormData.amount = val;
+      }
     }
   },
   async mounted() {
@@ -699,6 +794,11 @@ export default {
         if (balanceResult.success) this.balance = balanceResult.data;
         if (methodsResult.success) this.availableMethods = methodsResult.data || [];
         if (reportsResult.success) this.clientReports = reportsResult.data || [];
+
+        // Cargar tasa BCV
+        const rateRes = await bcvService.getCurrentRate();
+        if (rateRes.success) this.bcvRate = rateRes.data;
+
       } catch (error) {
         console.error('Error cargando facturación:', error);
         this.showSnackbar('Error cargando datos', 'error');
@@ -734,6 +834,14 @@ export default {
       return new Date(dateStr).toLocaleString('es-VE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     },
 
+
+    
+    updateDefaultAmount() {
+      if (this.selectedInvoice) {
+        this.paymentFormData.amount = this.totalWithIgtf;
+      }
+    },
+
     detailLabel(key) {
       const labels = { phone: 'Teléfono', document: 'Documento', bank: 'Banco', account_number: 'Nº Cuenta', beneficiary_name: 'Beneficiario', beneficiary_document: 'Documento', email: 'Email', full_name: 'Nombre' };
       return labels[key] || key;
@@ -754,7 +862,7 @@ export default {
       this.editingReportProofUrl = null;
       this.replaceProof = false;
       this.removeProofFlag = false;
-      this.paymentFormData = { payment_method_id: null, reference: '', sender_details: {} };
+      this.paymentFormData = { payment_method_id: null, reference: '', amount: this.totalWithIgtf, sender_details: {} };
       this.proofFile = null;
       this.proofPreviewUrl = null;
       this.ocrCompleted = false;
@@ -783,6 +891,7 @@ export default {
       this.paymentFormData = {
         payment_method_id: report.payment_method_id,
         reference: report.reference,
+        amount: report.amount, // Al editar, mantener el monto reportado
         sender_details: { ...(report.sender_details || {}) }
       };
       this.proofFile = null;
@@ -838,11 +947,16 @@ export default {
       this.ocrProcessing = true;
       this.ocrCompleted = false;
       try {
-        const ocrData = await paymentOcrService.extractPaymentData(file);
+        // Pasar el tipo de método para usar el prompt correcto
+        const ocrData = await paymentOcrService.extractPaymentData(file, this.selectedMethodType);
+        
         if (ocrData && ocrData.confidence >= 0.3) {
+          // Referencia universal
           if (ocrData.reference && !this.paymentFormData.reference) {
             this.paymentFormData.reference = ocrData.reference;
           }
+
+          // Mapeo específico según método
           if (this.selectedMethodType === 'mobile_payment' && ocrData.sender) {
             if (ocrData.sender.phone && !this.paymentFormData.sender_details.sender_phone) {
               this.paymentFormData.sender_details.sender_phone = ocrData.sender.phone;
@@ -853,7 +967,32 @@ export default {
             if (ocrData.sender.bank && !this.paymentFormData.sender_details.sender_bank) {
               this.paymentFormData.sender_details.sender_bank = ocrData.sender.bank;
             }
+          } else if (this.selectedMethodType === 'zelle' && ocrData.sender) {
+             if (ocrData.sender.email && !this.paymentFormData.sender_details.sender_email) {
+               this.paymentFormData.sender_details.sender_email = ocrData.sender.email;
+             }
+             if (ocrData.sender.name && !this.paymentFormData.sender_details.sender_name) {
+               this.paymentFormData.sender_details.sender_name = ocrData.sender.name;
+             }
+             // Monto en USD (ya no sender_amount, sino main amount)
+             if (ocrData.amount && (ocrData.currency === 'USD' || ocrData.currency === 'USDT')) {
+               // Solo actualizar si no ha sido modificado manual (podría chequear dirty flag, pero simple: si es igual al default)
+               // Mejor: Update paymentFormData.amount directamente si es un monto válido extraído
+               this.paymentFormData.amount = ocrData.amount;
+             }
+          } else if (this.selectedMethodType === 'binance' && ocrData.sender) {
+             if (ocrData.sender.email && !this.paymentFormData.sender_details.sender_email) {
+               this.paymentFormData.sender_details.sender_email = ocrData.sender.email;
+             }
+             if (ocrData.sender.binance_id && !this.paymentFormData.sender_details.sender_binance_id) {
+               this.paymentFormData.sender_details.sender_binance_id = ocrData.sender.binance_id;
+             }
+             // Monto en USDT -> Main amount
+             if (ocrData.amount && (ocrData.currency === 'USD' || ocrData.currency === 'USDT')) {
+               this.paymentFormData.amount = ocrData.amount;
+             }
           }
+
           this.ocrCompleted = true;
         }
       } catch (error) {
@@ -876,7 +1015,7 @@ export default {
           result = await billingService.updatePaymentReport(this.editingReportId, {
             payment_method_id: this.paymentFormData.payment_method_id,
             reference: this.paymentFormData.reference.trim(),
-            amount: this.totalWithIgtf,
+            amount: parseFloat(this.paymentFormData.amount),
             sender_details: this.paymentFormData.sender_details,
             removeProof: this.removeProofFlag
           }, this.proofFile);
@@ -892,7 +1031,7 @@ export default {
             payment_method_id: this.paymentFormData.payment_method_id,
             payment_method_type: this.selectedMethodType,
             reference: this.paymentFormData.reference.trim(),
-            amount: this.totalWithIgtf,
+            amount: parseFloat(this.paymentFormData.amount),
             sender_details: this.paymentFormData.sender_details
           }, this.proofFile);
 
