@@ -102,6 +102,16 @@
                 <div>
                   <div class="font-weight-medium">{{ item.client?.company_name || '—' }}</div>
                   <div class="text-caption text-medium-emphasis">{{ item.client?.rif || '' }}</div>
+                  <v-chip
+                    v-if="item.client?.balance > 0"
+                    color="success"
+                    size="x-small"
+                    variant="flat"
+                    class="mt-1 font-weight-bold"
+                  >
+                    <v-icon start size="12">mdi-wallet-plus</v-icon>
+                    Saldo: ${{ formatMoney(item.client.balance) }}
+                  </v-chip>
                 </div>
               </template>
               <template v-slot:item.amount="{ item }">
@@ -517,6 +527,17 @@
               <v-col v-if="selectedReport.sender_details.sender_binance_id" cols="6"><div class="text-caption text-medium-emphasis">Binance ID</div><div>{{ selectedReport.sender_details.sender_binance_id }}</div></v-col>
               <v-col v-if="selectedReport.sender_details.sender_amount" cols="6"><div class="text-caption text-medium-emphasis">Monto enviado</div><div>${{ formatMoney(selectedReport.sender_details.sender_amount) }}</div></v-col>
             </v-row>
+          </template>
+
+          <!-- Info Pago Mixto -->
+          <template v-if="selectedReport.sender_details?.related_balance_payment">
+             <v-divider class="my-4"></v-divider>
+             <v-alert variant="tonal" color="info" density="compact" border="start" class="mb-0">
+                <div class="text-caption font-weight-bold">Pago Mixto</div>
+                <div class="text-caption">
+                   Este pago fue complementado con <strong>${{ formatMoney(selectedReport.sender_details.related_balance_payment) }}</strong> del saldo a favor del cliente.
+                </div>
+             </v-alert>
           </template>
 
           <!-- Comprobante -->

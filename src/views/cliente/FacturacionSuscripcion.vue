@@ -401,6 +401,40 @@
               </v-chip>
             </p>
 
+            <!-- Switch Saldo a Favor (Pago Mixto) -->
+            <div v-if="!isEditingReport && balance.saldoAFavor > 0 && paymentFormData.payment_method_id !== 'balance_method'" class="mb-4 pa-3 bg-grey-lighten-4 rounded-lg border">
+               <v-switch
+                  v-model="useBalance"
+                  color="success"
+                  density="compact"
+                  hide-details
+                  class="mt-0"
+               >
+                  <template v-slot:label>
+                     <span class="text-body-2 font-weight-bold ml-2">
+                        Usar mi saldo disponible (${{ formatMoney(balance.saldoAFavor) }})
+                     </span>
+                  </template>
+               </v-switch>
+               
+               <!-- Desglose de pago mixto -->
+               <div v-if="useBalance" class="mt-2 text-caption text-medium-emphasis ml-2 pl-2 border-s-lg border-success">
+                  <div class="d-flex justify-space-between">
+                     <span>Deuda pendiente:</span>
+                     <strong>${{ formatMoney(invoiceRemaining || totalWithIgtf) }}</strong>
+                  </div>
+                  <div class="d-flex justify-space-between text-success">
+                     <span>- Saldo a usar:</span>
+                     <strong>${{ formatMoney(Math.min(balance.saldoAFavor, invoiceRemaining || totalWithIgtf)) }}</strong>
+                  </div>
+                  <v-divider class="my-1"></v-divider>
+                  <div class="d-flex justify-space-between font-weight-bold">
+                     <span>Restante a pagar:</span>
+                     <span>${{ formatMoney(paymentFormData.amount) }}</span>
+                  </div>
+               </div>
+            </div>
+
             <v-text-field v-model="paymentFormData.reference" label="Número de referencia / comprobante"
               variant="outlined" density="comfortable" prepend-inner-icon="mdi-pound"
               placeholder="Ej: 00012345678" :rules="[v => !!v || 'Ingresa la referencia']" class="mb-3"></v-text-field>
@@ -543,6 +577,17 @@
               </v-list-item>
             </template>
 
+            <!-- Info Pago Mixto -->
+            <template v-if="detailReport.sender_details?.related_balance_payment">
+               <v-divider class="my-3"></v-divider>
+               <v-alert variant="tonal" color="info" density="compact" border="start" class="mb-0">
+                  <div class="text-caption font-weight-bold">Pago Mixto</div>
+                  <div class="text-caption">
+                     Además de este pago, se usaron <strong>${{ formatMoney(detailReport.sender_details.related_balance_payment) }}</strong> de su saldo a favor.
+                  </div>
+               </v-alert>
+            </template>
+
             <!-- Motivo de rechazo -->
             <template v-if="detailReport.status === 'rejected' && detailReport.rejection_reason">
               <v-divider class="my-3"></v-divider>
@@ -624,7 +669,8 @@ export default {
       clientReports: [],
       balance: { totalFacturado: 0, totalPagado: 0, totalPendiente: 0, saldoAFavor: 0, proximoVencimiento: null },
       currentUser: null,
-      availableMethods: [],
+      apiMethods: [],
+      invoiceRemaining: 0,
       bcvRate: null,
 
       // Dialog de pago (crear o editar)
@@ -647,6 +693,7 @@ export default {
         amount: 0,
         sender_details: {}
       },
+      useBalance: false,
 
       // Dialog de detalle
       showDetailDialog: false,
@@ -686,8 +733,10 @@ export default {
   },
   computed: {
     paymentFormValid() {
+      // Validaciones básicas
+      const isBalance = this.paymentFormData.payment_method_id === 'balance_method';
       const hasMethod = !!this.paymentFormData.payment_method_id;
-      const hasRef = !!this.paymentFormData.reference?.trim();
+      const hasRef = isBalance ? true : !!this.paymentFormData.reference?.trim(); // Balance no requiere referencia manual
       const hasAmount = this.paymentFormData.amount > 0;
 
       // Global check basics
@@ -713,6 +762,28 @@ export default {
         return sd.sender_email && sd.sender_binance_id;
       }
       return true;
+    },
+    // Métodos combinados: API + Saldo a Favor
+    availableMethods() {
+      const methods = [...this.apiMethods];
+      // Agregar método de saldo si tiene saldo positivo
+      // Usamos un ID especial 'balance_method'
+      if (this.balance?.saldoAFavor > 0) {
+        // Verificar si ya existe (por si acaso)
+        if (!methods.find(m => m.id === 'balance_method')) {
+          methods.unshift({
+            id: 'balance_method',
+            name: 'Saldo a Favor',
+            type: 'balance',
+            description: `Utiliza tu saldo disponible ($${this.formatMoney(this.balance.saldoAFavor)})`,
+            is_enabled: true,
+            charge_igtf: false,
+            require_proof: false,
+            details: {}
+          });
+        }
+      }
+      return methods;
     },
     selectedMethod() {
       return this.availableMethods.find(m => m.id === this.paymentFormData.payment_method_id);
@@ -740,8 +811,19 @@ export default {
     },
     paymentDiff() {
       // Diferencia entre lo que reporta y lo que debe pagar
-      if (!this.totalWithIgtf) return 0;
-      return parseFloat(this.paymentFormData.amount || 0) - this.totalWithIgtf;
+      const currentDebt = this.invoiceRemaining > 0 ? this.invoiceRemaining : this.totalWithIgtf;
+      if (!currentDebt) return 0;
+      
+      let totalPaying = parseFloat(this.paymentFormData.amount || 0);
+
+      // Si usa saldo mixto, sumarlo al "total que está pagando" para el cálculo
+      if (this.useBalance && !this.isEditingReport && this.paymentFormData.payment_method_id !== 'balance_method') {
+          const maxBalance = this.balance?.saldoAFavor || 0;
+          const balanceUsed = Math.min(maxBalance, currentDebt);
+          totalPaying += balanceUsed;
+      }
+
+      return totalPaying - currentDebt;
     },
     paymentStatusMessage() {
       const diff = this.paymentDiff;
@@ -763,8 +845,33 @@ export default {
       },
       immediate: true
     },
-    'paymentFormData.payment_method_id'() {
-       if (!this.isEditingReport) this.updateDefaultAmount();
+    'paymentFormData.payment_method_id'(val) {
+       if (!this.isEditingReport && val) {
+          if (val === 'balance_method') {
+             // Si selecciona explícitamente el método de saldo (sin switch)
+             this.useBalance = false; // Desactivar switch mixto para evitar conflictos
+             const maxBalance = this.balance?.saldoAFavor || 0;
+             const maxDebt = this.invoiceRemaining > 0 ? this.invoiceRemaining : this.totalWithIgtf;
+             const toPay = Math.min(maxBalance, maxDebt);
+             this.paymentFormData.amount = parseFloat(toPay.toFixed(2));
+          } else if (this.useBalance) {
+             // Si cambia de método externo pero mantiene switch activado
+             this.calculateMixedAmount();
+          } else {
+             this.updateDefaultAmount();
+          }
+       }
+    },
+    useBalance(val) {
+       if (val) {
+          // Si activa uso de saldo, calcular remanente
+          this.calculateMixedAmount();
+       } else {
+          // Si desactiva, volver al monto full (o restante de factura)
+          if (this.paymentFormData.payment_method_id !== 'balance_method') {
+             this.paymentFormData.amount = this.invoiceRemaining > 0 ? this.invoiceRemaining : this.totalWithIgtf;
+          }
+       }
     },
     // Sincronizar input de Zelle/Binance con el monto principal
     'paymentFormData.sender_details.sender_amount'(val) {
@@ -792,7 +899,10 @@ export default {
 
         if (invoicesResult.success) this.invoices = invoicesResult.data || [];
         if (balanceResult.success) this.balance = balanceResult.data;
-        if (methodsResult.success) this.availableMethods = methodsResult.data || [];
+        if (invoicesResult.success) this.invoices = invoicesResult.data || [];
+        if (balanceResult.success) this.balance = balanceResult.data;
+        if (methodsResult.success) this.apiMethods = methodsResult.data || [];
+        if (reportsResult.success) this.clientReports = reportsResult.data || [];
         if (reportsResult.success) this.clientReports = reportsResult.data || [];
 
         // Cargar tasa BCV
@@ -836,6 +946,17 @@ export default {
 
 
     
+    calculateMixedAmount() {
+       const maxBalance = this.balance?.saldoAFavor || 0;
+       const debt = this.invoiceRemaining > 0 ? this.invoiceRemaining : this.totalWithIgtf;
+       const balanceUsed = Math.min(maxBalance, debt);
+       
+       // Si el saldo cubre todo, podríamos sugerir cambiar a método "Saldo" o dejar monto en 0?
+       // Dejaremos monto 0, pero validaremos que si monto es 0 y useBalance es true, se procese todo como saldo.
+       const remaining = Math.max(0, debt - balanceUsed);
+       this.paymentFormData.amount = parseFloat(remaining.toFixed(2));
+    },
+
     updateDefaultAmount() {
       if (this.selectedInvoice) {
         this.paymentFormData.amount = this.totalWithIgtf;
@@ -855,14 +976,33 @@ export default {
     },
 
     // --- Dialog de pago (CREAR) ---
-    openPaymentDialog(invoice) {
+    async openPaymentDialog(invoice) {
       this.selectedInvoice = invoice;
       this.isEditingReport = false;
       this.editingReportId = null;
       this.editingReportProofUrl = null;
       this.replaceProof = false;
       this.removeProofFlag = false;
-      this.paymentFormData = { payment_method_id: null, reference: '', amount: this.totalWithIgtf, sender_details: {} };
+      
+      // Consultar estado actual de la factura (pagos previos)
+      // para saber cuánto falta por pagar realmente.
+      this.invoiceRemaining = invoice.amount; // Default start
+      try {
+         const { exists, message, remaining } = await billingService.checkExistingReport(invoice.id);
+         if (exists && remaining <= 0.01) {
+            this.showSnackbar(message || 'Factura ya pagada', 'warning');
+            return; // No abrir dialog si ya está pagada full
+         }
+         if (typeof remaining === 'number') {
+            this.invoiceRemaining = remaining;
+         }
+      } catch (e) {
+         console.error('Error checking report:', e);
+      }
+
+      // Pre-fill amount con lo que falta
+      this.paymentFormData = { payment_method_id: null, reference: '', amount: this.invoiceRemaining, sender_details: {} };
+      this.useBalance = false;
       this.proofFile = null;
       this.proofPreviewUrl = null;
       this.ocrCompleted = false;
@@ -894,6 +1034,7 @@ export default {
         amount: report.amount, // Al editar, mantener el monto reportado
         sender_details: { ...(report.sender_details || {}) }
       };
+      this.useBalance = false;
       this.proofFile = null;
       this.proofPreviewUrl = null;
       this.ocrCompleted = false;
@@ -1010,7 +1151,55 @@ export default {
       try {
         let result;
 
-        if (this.isEditingReport) {
+        // Detectar si es pago mixto que CUBRE TODO con saldo
+        // O si es pago mixto parcial
+        let processingMixedBalance = false;
+        let balanceUsedAmount = 0;
+
+        if (this.useBalance && !this.isEditingReport && this.paymentFormData.payment_method_id !== 'balance_method') {
+            // Calcular cuánto saldo se usa
+            const maxBalance = this.balance?.saldoAFavor || 0;
+            const debt = this.invoiceRemaining > 0 ? this.invoiceRemaining : this.totalWithIgtf;
+            balanceUsedAmount = Math.min(maxBalance, debt);
+
+            if (balanceUsedAmount > 0) {
+               processingMixedBalance = true;
+               // 1. Procesar pago con saldo
+               const itemsResult = await billingService.payWithBalance({
+                  invoice_id: this.selectedInvoice.id,
+                  client_id: this.currentUser.client_id,
+                  amount: balanceUsedAmount
+               });
+               
+               if (!itemsResult.success) throw itemsResult.error;
+               
+               // Si el saldo cubrió TODO (monto restante 0 o muy bajo), terminamos aquí
+               if (this.paymentFormData.amount <= 0.01) {
+                  this.showSnackbar('Pago completo con saldo procesado exitosamente', 'success');
+                  this.closePaymentDialog();
+                  await this.loadData();
+                  return; 
+               }
+            }
+        }
+
+        if (this.paymentFormData.payment_method_id === 'balance_method') {
+           // ... (Lógica existente de pago full saldo) ...
+           if (this.isEditingReport) {
+              this.showSnackbar('No se puede editar un pago con saldo (ya fue procesado)', 'error');
+              return;
+           }
+           result = await billingService.payWithBalance({
+              invoice_id: this.selectedInvoice.id,
+              client_id: this.currentUser.client_id,
+              amount: parseFloat(this.paymentFormData.amount)
+           });
+           
+           if (result.success) {
+             this.showSnackbar('Pago con saldo procesado correctamente', 'success');
+           }
+        } else if (this.isEditingReport) {
+          // ... (Lógica existente edición) ...
           // Modo edición
           result = await billingService.updatePaymentReport(this.editingReportId, {
             payment_method_id: this.paymentFormData.payment_method_id,
@@ -1024,7 +1213,14 @@ export default {
             this.showSnackbar('Reporte actualizado exitosamente.', 'success');
           }
         } else {
-          // Modo creación
+          // --- CASO 3: NUEVO REPORTE EXTERNO (puede ser parte de mixto) ---
+          
+          // Agregar metadata de saldo si fue mixto
+          const finalSenderDetails = { ...this.paymentFormData.sender_details };
+          if (processingMixedBalance) {
+             finalSenderDetails.related_balance_payment = balanceUsedAmount;
+          }
+
           result = await billingService.submitPaymentReport({
             invoice_id: this.selectedInvoice.id,
             client_id: this.currentUser.client_id,
@@ -1032,11 +1228,11 @@ export default {
             payment_method_type: this.selectedMethodType,
             reference: this.paymentFormData.reference.trim(),
             amount: parseFloat(this.paymentFormData.amount),
-            sender_details: this.paymentFormData.sender_details
+            sender_details: finalSenderDetails
           }, this.proofFile);
 
           if (result.success) {
-            this.showSnackbar('¡Pago reportado exitosamente! Será validado por el administrador.', 'success');
+            this.showSnackbar(processingMixedBalance ? 'Pago mixto procesado correctamente' : '¡Pago reportado exitosamente!', 'success');
           }
         }
 

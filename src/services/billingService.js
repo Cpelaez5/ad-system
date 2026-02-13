@@ -46,7 +46,7 @@ export default {
         try {
             const { data, error } = await supabase
                 .from('system_invoices')
-                .select('*, client:clients(company_name, rif, email)')
+                .select('*, client:clients(company_name, rif, email, balance)')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -385,15 +385,42 @@ export default {
      */
     async checkExistingReport(invoiceId) {
         try {
-            const { data, error } = await supabase
+            // Obtener reportes activos (pending o approved)
+            const { data: reports, error } = await supabase
                 .from('payment_reports')
-                .select('id, status')
+                .select('amount, status')
                 .eq('invoice_id', invoiceId)
-                .in('status', ['pending_review', 'approved'])
-                .limit(1);
+                .in('status', ['pending_review', 'approved']);
 
             if (error) throw error;
-            return { success: true, exists: (data && data.length > 0), report: data?.[0] || null };
+
+            // Calcular total reportado/pagado
+            const totalReported = reports?.reduce((sum, r) => sum + parseFloat(r.amount), 0) || 0;
+
+            // Obtener monto de la factura
+            const { data: invoice, error: invError } = await supabase
+                .from('system_invoices')
+                .select('amount')
+                .eq('id', invoiceId)
+                .single();
+
+            if (invError) throw invError;
+
+            const remaining = Math.max(0, invoice.amount - totalReported);
+
+            // Si lo reportado ya cubre la factura, bloquear
+            // Usamos una pequeña tolerancia para errores de flotante
+            if (totalReported >= (invoice.amount - 0.01)) {
+                return {
+                    success: true,
+                    exists: true,
+                    message: 'Esta factura ya está totalmente cubierta por reportes previos (pendientes o aprobados).',
+                    totalReported,
+                    remaining
+                };
+            }
+
+            return { success: true, exists: false, totalReported, remaining };
         } catch (error) {
             console.error('❌ Error verificando reporte existente:', error);
             return { success: false, exists: false, error };
@@ -532,57 +559,169 @@ export default {
 
             if (fetchError) throw fetchError;
 
-            // 2. Calcular diferencia (excedente)
-            const reportedAmount = parseFloat(report.amount);
-            const invoiceAmount = parseFloat(report.invoice.amount);
-            const excess = reportedAmount - invoiceAmount;
-
-            // 3. Actualizar estado del reporte
-            const { error: updateError } = await supabase
+            // 2. Calcular totales
+            // Obtener TODOS los pagos aprobados para esta factura (incluyendo este que acabamos de aprobar)
+            const { data: allReports, error: reportsError } = await supabase
                 .from('payment_reports')
-                .update({
-                    status: 'approved',
-                    reviewed_by: reviewerId,
-                    reviewed_at: new Date().toISOString()
-                })
-                .eq('id', reportId);
+                .select('amount')
+                .eq('invoice_id', report.invoice_id)
+                .eq('status', 'approved');
 
-            if (updateError) throw updateError;
+            if (reportsError) throw reportsError;
 
-            // 4. Marcar factura como pagada
-            const { error: invoiceError } = await supabase
-                .from('system_invoices')
-                .update({
-                    status: 'paid',
-                    paid_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', report.invoice_id);
+            const totalPaid = allReports.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+            const invoiceAmount = parseFloat(report.invoice.amount);
 
-            if (invoiceError) throw invoiceError;
+            // Excedente GLOBAL (considerando todos los pagos)
+            const excess = totalPaid - invoiceAmount;
+
+            // 4. Actualizar estado de factura si se cubrió el monto
+            if (totalPaid >= (invoiceAmount - 0.01)) {
+                const { error: invoiceError } = await supabase
+                    .from('system_invoices')
+                    .update({
+                        status: 'paid', // Marcar pagada
+                        paid_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', report.invoice_id);
+
+                if (invoiceError) throw invoiceError;
+            }
 
             // 5. Abonar a saldo si hay excedente (Credit System)
             if (excess > 0) {
-                // Obtener saldo actual
-                const { data: client, error: clientError } = await supabase
-                    .from('clients')
-                    .select('balance')
-                    .eq('id', report.client_id)
-                    .single();
+                // Solo abonamos lo que EXCEDE el monto total.
+                // PERO, debemos tener cuidado de no abonar dos veces si ya se abonó en un pago anterior.
+                // Lógica simplificada: 
+                // Si este reporte causó que TotalPaid > InvoiceAmount, el "nuevo" excedente generado por ESTE reporte es:
+                // Excess Contribution = Min(ReportAmount, TotalPaid - InvoiceAmount)
+                // NO, porque si ya estaba pagada, todo el reporte es excedente.
 
-                if (!clientError) {
-                    const newBalance = (parseFloat(client.balance) || 0) + excess;
-                    await supabase
+                // Calculamos cuánto faltaba por pagar ANTES de este reporte
+                const paidBefore = totalPaid - parseFloat(report.amount);
+                const remainingBefore = Math.max(0, invoiceAmount - paidBefore);
+
+                // El excedente generado por ESTE reporte es: MontoReporte - DeudaRestante
+                const newExcess = Math.max(0, parseFloat(report.amount) - remainingBefore);
+
+                if (newExcess > 0) {
+                    const { data: client, error: clientError } = await supabase
                         .from('clients')
-                        .update({ balance: newBalance })
-                        .eq('id', report.client_id);
-                    console.log(`💰 Saldo abonado al cliente ${report.client_id}: +$${excess}`);
+                        .select('balance')
+                        .eq('id', report.client_id)
+                        .single();
+
+                    if (!clientError) {
+                        const newBalance = (parseFloat(client.balance) || 0) + newExcess;
+                        await supabase
+                            .from('clients')
+                            .update({ balance: newBalance })
+                            .eq('id', report.client_id);
+                        console.log(`💰 Saldo abonado al cliente ${report.client_id}: +$${newExcess}`);
+                    }
                 }
             }
 
             return { success: true };
         } catch (error) {
             console.error('❌ Error aprobando pago:', error);
+            return { success: false, error };
+        }
+    },
+
+    /**
+     * Realiza un pago utilizando el saldo a favor del cliente.
+     */
+    async payWithBalance(paymentData) {
+        try {
+            const { invoice_id, client_id, amount } = paymentData;
+            const payAmount = parseFloat(amount);
+
+            if (payAmount <= 0) throw new Error('Monto inválido');
+
+            // 1. Verificar saldo actual
+            const { data: client, error: clientError } = await supabase
+                .from('clients')
+                .select('balance')
+                .eq('id', client_id)
+                .single();
+
+            if (clientError || !client) throw new Error('Error consultando saldo del cliente');
+
+            const currentBalance = parseFloat(client.balance || 0);
+            if (currentBalance < payAmount) {
+                throw new Error('Saldo insuficiente para realizar este pago.');
+            }
+
+            // 2. Crear reporte de pago APROBADO automáticamente
+            const { data: report, error: reportError } = await supabase
+                .from('payment_reports')
+                .insert([{
+                    invoice_id,
+                    client_id,
+                    payment_method_id: null, // Sin método externo
+                    payment_method_type: 'balance', // Identificador especial
+                    reference: `BAL-${Date.now()}`, // Referencia interna
+                    amount: payAmount,
+                    status: 'approved', // Auto-aprobado
+                    reviewed_at: new Date().toISOString(),
+                    sender_details: { type: 'balance_payment' }
+                }])
+                .select()
+                .single();
+
+            if (reportError) throw reportError;
+
+            // 3. Descontar del saldo del cliente
+            const newBalance = currentBalance - payAmount;
+            const { error: balanceError } = await supabase
+                .from('clients')
+                .update({ balance: newBalance })
+                .eq('id', client_id);
+
+            if (balanceError) throw balanceError;
+
+            // 4. Actualizar estado de la factura (verificar si se pagó completa)
+            // Reutilizamos la lógica de ver si la factura está pagada.
+            // Ojo: approvePayment hacía esto, pero aquí ya creamos el reporte aprobado.
+            // Podemos llamar a una lógica similar manualmente.
+
+            const { data: allReports } = await supabase.from('payment_reports')
+                .select('amount')
+                .eq('invoice_id', invoice_id)
+                .eq('status', 'approved');
+
+            const totalPaid = allReports.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+
+            // Obtener monto factura
+            const { data: invoice } = await supabase.from('system_invoices').select('amount').eq('id', invoice_id).single();
+
+            if (totalPaid >= (invoice.amount - 0.01)) {
+                await supabase.from('system_invoices')
+                    .update({
+                        status: 'paid',
+                        paid_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', invoice_id);
+            } else {
+                // Si es parcial, asegurar que esté en 'pending' (o partial si existiera)
+                // Como ya estaba 'pending', no hace falta cambiar a menos que estuviera 'overdue'?
+                // Si estaba overdue y paga parcial, ¿sigue overdue o pending?
+                // Pending está bien.
+                await supabase.from('system_invoices')
+                    .update({
+                        status: 'pending',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', invoice_id);
+            }
+
+            return { success: true, data: report };
+
+        } catch (error) {
+            console.error('❌ Error pagando con saldo:', error);
             return { success: false, error };
         }
     },
