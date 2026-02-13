@@ -199,6 +199,24 @@ this.$refs.notifications.show({
 
 ---
 
+## Componentes de Planes
+
+### PlanCard.vue ✅
+**Uso**: Tarjeta individual de plan de suscripción (S.O.L.I.D.)
+```vue
+<PlanCard
+  :plan="planObject"
+  billing-period="monthly"
+  :is-current="false"
+  :loading="false"
+  @select="handleSelect"
+/>
+```
+**Props**: `plan` (Object), `billingPeriod` (String), `isCurrent` (Boolean), `loading` (Boolean)
+**Eventos**: `select` (emite el plan seleccionado)
+
+---
+
 ## Cómo Agregar Nuevo Componente
 
 1. Crear archivo en `src/components/common/`
