@@ -8,6 +8,7 @@ import {
   deleteWithTenant,
   handleTenantError
 } from '@/utils/tenantHelpers'
+import inventoryService from './inventoryService'
 
 class InvoiceService {
   constructor() {
@@ -254,6 +255,18 @@ class InvoiceService {
         return { success: false, message: 'No hay organización disponible' }
       }
 
+      // 1. Obtener factura anterior para revertir inventario
+      const { data: oldInvoice, error: fetchError } = await supabase
+        .from('invoices')
+        .select('items, flow, expense_type, invoice_number')
+        .eq('id', id)
+        .eq('organization_id', organizationId)
+        .single()
+
+      if (fetchError) {
+        console.warn('⚠️ No se pudo obtener factura anterior para ajustar inventario:', fetchError)
+      }
+
       // Determinar cliente según el rol; si es cliente, forzar su client_id
       // Si clientId es explícitamente null (organización), mantenerlo null
       const userProfile = await this.getCurrentUserProfile()
@@ -382,6 +395,9 @@ class InvoiceService {
       console.log('✅ Factura creada exitosamente en Supabase:', newInvoice.id)
       console.log('📄 Factura creada:', newInvoice)
 
+      // 2. Procesar Movimientos de Inventario (Salida/Entrada)
+      await this.processInventoryMovements(newInvoice, false);
+
       // Transformar respuesta para el frontend
       const transformedInvoice = {
         id: newInvoice.id,
@@ -404,8 +420,6 @@ class InvoiceService {
         updatedAt: newInvoice.updated_at,
         clientId: newInvoice.client_id
       }
-
-      console.log('🔄 Factura transformada:', transformedInvoice)
 
       return {
         success: true,
@@ -475,6 +489,12 @@ class InvoiceService {
 
       console.log('✅ Factura actualizada en Supabase:', updatedInvoice.id)
 
+      // 2. Actualizar Inventario (Revertir Old -> Aplicar New)
+      if (oldInvoice) {
+        await this.processInventoryMovements(oldInvoice, true) // Revertir lo que había
+      }
+      await this.processInventoryMovements(updatedInvoice, false) // Aplicar lo nuevo
+
       // Transformar respuesta para el frontend
       const transformedInvoice = {
         id: updatedInvoice.id,
@@ -511,6 +531,7 @@ class InvoiceService {
   }
 
   // Eliminar factura (enviar a papelera)
+  // Eliminar factura (enviar a papelera)
   async deleteInvoice(id) {
     try {
       console.log('🔄 Enviando factura a papelera (soft delete)...')
@@ -535,11 +556,15 @@ class InvoiceService {
         return { success: false, message: `Error al enviar a papelera: ${error.message}` }
       }
 
+      // Revertir inventario
+      if (deletedInvoice) {
+        await this.processInventoryMovements(deletedInvoice, true)
+      }
+
       console.log('✅ Factura enviada a papelera:', deletedInvoice.id)
 
       return {
         success: true,
-        data: deletedInvoice,
         message: 'Factura enviada a la papelera exitosamente'
       }
 
@@ -583,7 +608,7 @@ class InvoiceService {
       // 1. Obtener la factura para ver si tiene adjuntos
       const { data: invoiceToDelete, error: fetchError } = await supabase
         .from('invoices')
-        .select('attachments')
+        .select('attachments, deleted_at, items, flow, expense_type, invoice_number')
         .eq('id', id)
         .eq('organization_id', organizationId)
         .single();
@@ -620,6 +645,14 @@ class InvoiceService {
         .single()
 
       if (error) throw error;
+
+      // Revertir movimientos de inventario si no estaba ya anulada (o si es hard delete directo)
+      // Aunque si viene de papelera ya se revirtió.
+      // HARD DELETE suele ser desde papelera (ya anulada).
+      // Si el status NO es 'ANULADA' o deleted_at era null, revertimos.
+      if (invoiceToDelete && !invoiceToDelete.deleted_at) {
+        await this.processInventoryMovements(invoiceToDelete, true)
+      }
 
       console.log('✅mm Factura eliminada permanentemente:', id)
       return { success: true, message: 'Factura eliminada definitivamente' }
@@ -1003,9 +1036,60 @@ class InvoiceService {
       return { success: false, message: `Error al eliminar archivo: ${error.message}` }
     }
   }
+
+  // Procesar movimientos de inventario basados en la factura
+  // isReversal: si es true, invertimos el movimiento (ej: anular factura)
+  async processInventoryMovements(invoice, isReversal = false) {
+    try {
+      if (!invoice.items || !Array.isArray(invoice.items)) return
+
+      const isPurchase = invoice.flow === 'COMPRA'
+      const isSale = invoice.flow === 'VENTA'
+
+      // Si es COMPRA, debe ser de tipo COMPRA (Mercancía) para afectar inventario
+      if (isPurchase && invoice.expense_type !== 'COMPRA') return
+
+      // Si es reversing, invertimos la lógica
+      let movementType = ''
+
+      if (isReversal) {
+        if (isPurchase) movementType = 'OUT_RETURN' // Devolver compra (sacar)
+        if (isSale) movementType = 'IN_RETURN' // Devolver venta (meter)
+      } else {
+        if (isPurchase) movementType = 'IN_PURCHASE'
+        if (isSale) movementType = 'OUT_SALE'
+      }
+
+      if (!movementType) return
+
+      for (const item of invoice.items) {
+        // Solo procesar si tiene product_id (es un producto de inventario)
+        if (item.product_id) {
+          // Calcular cantidad (siempre positiva para el servicio, él se encarga del signo según tipo)
+          const qty = parseFloat(item.quantity) || 0
+          if (qty <= 0) continue
+
+          // Costo (Si es compra, usamos el precio unitario como costo. Si es venta, no actualizamos costo pero registramos salida)
+          // Si es Reversal, no tocamos el costo del producto usualmente, o sí?
+          // Para simplificar, en reversal no actualizamos costo promedio, solo stock.
+          const cost = (!isReversal && isPurchase) ? (parseFloat(item.unitPrice) || 0) : null
+
+          await inventoryService.registerMovement({
+            product_id: item.product_id,
+            movement_type: movementType,
+            quantity: qty,
+            cost_price: cost,
+            reference_id: invoice.id,
+            description: `${isReversal ? 'Anulación/Borrado' : ''} ${isPurchase ? 'Compra' : 'Venta'} Ref: ${invoice.invoice_number}`
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Error processing inventory movements', e)
+      // No lanzamos error para no romper el flujo de factura, pero logueamos
+    }
+  }
+
 }
 
-// Crear instancia única del servicio
-const invoiceService = new InvoiceService()
-
-export default invoiceService
+export default new InvoiceService()

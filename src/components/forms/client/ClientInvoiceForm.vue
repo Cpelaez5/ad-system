@@ -687,14 +687,42 @@
                         <div v-for="(item, index) in formData.items" :key="`item-${index}`" class="mb-3 item-row">
                           <v-row no-gutters>
                             <v-col cols="12" md="5" class="pr-md-1">
-                              <v-text-field
-                                v-model="item.description"
-                                label="Descripción"
-                                variant="outlined"
-                                density="compact"
-                                hide-details
-                                class="animated-field"
-                              ></v-text-field>
+                              <div class="d-flex align-center">
+                                <v-tooltip v-if="isInventoryEnabled" location="top" text="Alternar Inventario/Manual">
+                                  <template v-slot:activator="{ props }">
+                                    <v-btn
+                                      v-bind="props"
+                                      icon
+                                      variant="text"
+                                      size="x-small"
+                                      :color="item.isInventory ? 'primary' : 'grey'"
+                                      class="mr-1"
+                                      @click="toggleInventoryMode(index)"
+                                    >
+                                      <v-icon>{{ item.isInventory ? 'mdi-package-variant' : 'mdi-pencil' }}</v-icon>
+                                    </v-btn>
+                                  </template>
+                                </v-tooltip>
+                                
+                                <ProductAutocomplete
+                                  v-if="item.isInventory && isInventoryEnabled"
+                                  v-model="item.product"
+                                  :flow="formData.flow"
+                                  :client-id="currentUser?.client?.id"
+                                  label="Buscar Producto"
+                                  class="flex-grow-1"
+                                  @product-selected="(prod) => onProductSelected(index, prod)"
+                                />
+                                <v-text-field
+                                  v-else
+                                  v-model="item.description"
+                                  label="Descripción"
+                                  variant="outlined"
+                                  density="compact"
+                                  hide-details
+                                  class="animated-field flex-grow-1"
+                                ></v-text-field>
+                              </div>
                             </v-col>
                             <v-col cols="4" md="2" class="px-1">
                               <v-text-field
@@ -704,9 +732,18 @@
                                 step="0.01"
                                 variant="outlined"
                                 density="compact"
-                                hide-details
+                                hide-details="auto"
+                                :bg-color="isInventoryEnabled && item.isInventory && item.product && item.quantity > item.product.stock ? 'error' : undefined"
+                                @update:modelValue="calculateTotals"
+                                :rules="[
+                                  v => v > 0 || 'Min 1',
+                                  v => !isInventoryEnabled || !item.isInventory || !item.product || v <= item.product.stock || `Max ${item.product.stock}`
+                                ]"
                                 class="animated-field"
                               ></v-text-field>
+                              <div v-if="isInventoryEnabled && item.isInventory && item.product" class="text-caption mt-1" :class="item.quantity > item.product.stock ? 'text-error font-weight-bold' : 'text-grey'">
+                                  Disp: {{ item.product.stock }} {{ item.product.unit || 'und' }}
+                              </div>
                             </v-col>
                             <v-col cols="4" md="2" class="px-1">
                               <v-text-field
@@ -880,6 +917,7 @@ import bcvService from '@/services/bcvService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
+import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue';
 
 import { supabase } from '@/lib/supabaseClient';
 
@@ -888,7 +926,8 @@ export default {
   components: {
     AppSnackbar,
     FileUploadZone,
-    CustomDatePicker
+    CustomDatePicker,
+    ProductAutocomplete
   },
   props: {
     invoice: {
@@ -998,7 +1037,9 @@ export default {
             description: '',
             quantity: 1,
             unitPrice: 0,
-            total: 0
+            total: 0,
+            isInventory: false,
+            product: null
           }
         ],
         
@@ -1097,6 +1138,10 @@ export default {
         'EUR': '€'
       };
       return symbols[this.formData.financial.currency] || 'Bs';
+    },
+
+    isInventoryEnabled() {
+      return this.currentUser?.client?.activity_type !== 'services';
     }
   },
 
@@ -1398,10 +1443,22 @@ export default {
         // Solo calcular si NO vino de la IA, O si vino de IA pero estamos editando la base manualmente (baseFromAI lo resetearemos al editar)
         // Simplificación: Si el usuario edita Base, recalculamos IVA aunque viniera de IA originalmente?
         // Regla de usuario: "si la IA consigue esos datos... no debe haber conflicto... si la IA solo consigue uno... procurar sacar el calculo"
-        // Si el usuario toca el campo, asumimos que quiere recalcular.
-        
+        // Si el usuario    
         const iva = base * 0.16;
         this.formData.financial.taxDebit = parseFloat(iva.toFixed(2));
+        
+        this.calculateTotals();
+    },
+
+    onProductSelected(index, product) {
+        if (!product) return;
+        
+        const item = this.formData.items[index];
+        item.product = product;
+        item.product_id = product.id; // Critical for backend inventory logic
+        item.description = product.name;
+        item.unitPrice = product.price || 0;
+        item.total = parseFloat((item.quantity * item.unitPrice).toFixed(2));
         
         this.calculateTotals();
     },
@@ -1441,7 +1498,16 @@ export default {
         case 3:
           return this.formData.financial.totalSales > 0;
         case 4:
-          return true;
+           // Validar stock si hay items de inventario
+           if (this.isInventoryEnabled && this.formData.items.length > 0) {
+               const invalidItem = this.formData.items.find(item => 
+                   item.isInventory && 
+                   item.product && 
+                   item.quantity > item.product.stock
+               );
+               if (invalidItem) return false;
+           }
+           return true;
         default:
           return true;
       }
@@ -1690,7 +1756,9 @@ export default {
         description: '',
         quantity: 1,
         unitPrice: 0,
-        total: 0
+        total: 0,
+        isInventory: false,
+        product: null
       });
     },
     

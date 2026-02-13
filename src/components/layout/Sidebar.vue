@@ -42,12 +42,7 @@
 
       <!-- Cliente: Mi Área, Compras, Gastos, Archivo -->
       <template v-if="isCliente">
-        <v-list-item
-          :to="{ name: 'ClienteMiArea' }"
-          prepend-icon="mdi-account"
-          title="Mi Área"
-          value="cliente-mi-area"
-        ></v-list-item>
+
 
       
         <v-list-item
@@ -71,6 +66,14 @@
           prepend-icon="mdi-file-certificate"
           title="Expediente Fiscal"
           value="cliente-fiscal-360"
+        ></v-list-item>
+
+        <v-list-item
+          v-if="!isServicesCompany"
+          :to="{ name: 'ClienteInventario' }"
+          prepend-icon="mdi-package-variant-closed"
+          title="Inventario"
+          value="cliente-inventario"
         ></v-list-item>
       </template>
 
@@ -219,6 +222,9 @@ export default {
     },
     isSuperAdmin() {
       return this.userRole === 'super_admin';
+    },
+    isServicesCompany() {
+      return this.currentUser?.client?.activity_type === 'services';
     }
   },
   mounted() {

@@ -143,10 +143,22 @@ const routes = [
     meta: { requiresAuth: true, title: 'Mis Documentos', roles: ['cliente'] }
   },
   {
+    path: '/cliente/planes',
+    name: 'ClientePlanes',
+    component: () => import('../views/cliente/Planes.vue'),
+    meta: { requiresAuth: true, title: 'Planes y Suscripción', roles: ['cliente'] }
+  },
+  {
     path: '/cliente/fiscal-360',
     name: 'ClienteFiscal360',
     component: () => import('@/views/cliente/Fiscal360.vue'),
     meta: { requiresAuth: true, title: 'Expediente Fiscal 360', roles: ['cliente'] }
+  },
+  {
+    path: '/cliente/inventario',
+    name: 'ClienteInventario',
+    component: () => import('@/views/cliente/Inventario.vue'),
+    meta: { requiresAuth: true, title: 'Inventario de Mercancía', roles: ['cliente'] }
   },
   {
     path: '/clientes',

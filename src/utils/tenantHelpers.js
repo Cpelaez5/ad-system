@@ -22,11 +22,11 @@ export function getCurrentOrganizationId() {
   try {
     // Intentar obtener de ambas claves (compatibilidad)
     let orgId = localStorage.getItem('organization_id') || localStorage.getItem('current_organization_id')
-    
+
     // Si no hay organization_id o es el mock, intentar obtener del usuario actual
     if (!orgId || orgId === 'mock-org-1' || orgId === 'mock-org-2') {
       console.warn('⚠️ Organization ID inválido o mock detectado')
-      
+
       // Intentar obtener del usuario actual
       try {
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
@@ -40,17 +40,17 @@ export function getCurrentOrganizationId() {
       } catch (e) {
         console.warn('⚠️ No se pudo obtener organization_id del usuario actual')
       }
-      
+
       // Si aún no hay organization_id, NO usar fallback inseguro
       // En su lugar, retornar null y dejar que el servicio maneje el error
       console.error('❌ No se pudo obtener organization_id válido')
       return null
     }
-    
+
     // Guardar en ambas claves para compatibilidad
     localStorage.setItem('organization_id', orgId)
     localStorage.setItem('current_organization_id', orgId)
-    
+
     console.log('✅ Organization ID válido encontrado:', orgId)
     return orgId
   } catch (error) {
@@ -71,7 +71,7 @@ export function setCurrentOrganizationId(organizationId) {
       console.warn('⚠️ Intentando guardar organization_id vacío')
       return false
     }
-    
+
     // Guardar en ambas claves para compatibilidad
     localStorage.setItem('organization_id', organizationId)
     localStorage.setItem('current_organization_id', organizationId)
@@ -112,24 +112,24 @@ export function clearCurrentOrganizationId() {
 export async function queryWithTenant(table, selectQuery = '*', additionalFilters = {}) {
   try {
     const orgId = getCurrentOrganizationId()
-    
+
     if (!orgId) {
       throw new Error('No se puede hacer query sin organization_id')
     }
-    
+
     // Crear la query base con filtro de organización
     let query = supabase
       .from(table)
       .select(selectQuery)
       .eq('organization_id', orgId)
-    
+
     // Aplicar filtros adicionales si se proporcionan
     Object.entries(additionalFilters).forEach(([key, value]) => {
       if (value !== null && value !== undefined) {
         query = query.eq(key, value)
       }
     })
-    
+
     return query
   } catch (error) {
     console.error(`❌ Error en queryWithTenant para tabla ${table}:`, error)
@@ -149,46 +149,46 @@ export async function queryWithTenant(table, selectQuery = '*', additionalFilter
 export async function insertWithTenant(table, data, options = {}) {
   try {
     const orgId = getCurrentOrganizationId()
-    
+
     if (!orgId) {
       throw new Error('No se puede insertar sin organization_id')
     }
-    
+
     // Agregar organization_id automáticamente si no está presente
     const dataWithTenant = {
       ...data,
       organization_id: data.organization_id || orgId
     }
-    
+
     console.log(`🔄 Insertando en ${table} con organization_id:`, dataWithTenant.organization_id)
-    
+
     let query = supabase.from(table).insert(dataWithTenant)
-    
+
     // Aplicar opciones de retorno si se especifican
     if (options.returning) {
       query = query.select(options.returning === 'representation' ? '*' : options.returning)
     }
-    
+
     const { data: result, error } = await query
-    
+
     if (error) {
       // Si es error de RLS, devolver indicador específico
       if (error.code === '42501' || (error.details && String(error.details).includes('row-level security'))) {
         console.warn(`⚠️ Inserción bloqueada por RLS en tabla ${table}:`, error.message)
         return { data: null, error, rlsBlocked: true }
       }
-      
+
       console.error(`❌ Error en insertWithTenant para tabla ${table}:`, error)
       return { data: null, error, rlsBlocked: false }
     }
-    
+
     return { data: result, error: null, rlsBlocked: false }
-    
+
   } catch (error) {
     console.error(`❌ Error inesperado en insertWithTenant para tabla ${table}:`, error)
-    return { 
-      data: null, 
-      error, 
+    return {
+      data: null,
+      error,
       rlsBlocked: error.code === '42501' || (error.details && String(error.details).includes('row-level security'))
     }
   }
@@ -205,13 +205,13 @@ export async function insertWithTenant(table, data, options = {}) {
 export async function updateWithTenant(table, id, data) {
   try {
     const orgId = getCurrentOrganizationId()
-    
+
     if (!orgId) {
       throw new Error('No se puede actualizar sin organization_id')
     }
-    
+
     console.log(`🔄 Actualizando ${table} ID ${id} con organization_id:`, orgId)
-    
+
     return await supabase
       .from(table)
       .update(data)
@@ -233,13 +233,13 @@ export async function updateWithTenant(table, id, data) {
 export async function deleteWithTenant(table, id) {
   try {
     const orgId = getCurrentOrganizationId()
-    
+
     if (!orgId) {
       throw new Error('No se puede eliminar sin organization_id')
     }
-    
+
     console.log(`🔄 Eliminando ${table} ID ${id} con organization_id:`, orgId)
-    
+
     return await supabase
       .from(table)
       .delete()
@@ -261,23 +261,23 @@ export async function deleteWithTenant(table, id) {
 export async function belongsToCurrentTenant(table, id) {
   try {
     const orgId = getCurrentOrganizationId()
-    
+
     if (!orgId) {
       return false
     }
-    
+
     const { data, error } = await supabase
       .from(table)
       .select('organization_id')
       .eq('id', id)
       .eq('organization_id', orgId)
       .single()
-    
+
     if (error) {
       console.warn(`⚠️ Error al verificar tenant para ${table} ID ${id}:`, error)
       return false
     }
-    
+
     return !!data
   } catch (error) {
     console.error(`❌ Error inesperado al verificar tenant para ${table}:`, error)
@@ -293,22 +293,22 @@ export async function belongsToCurrentTenant(table, id) {
 export async function getCurrentOrganizationName() {
   try {
     const orgId = getCurrentOrganizationId()
-    
+
     if (!orgId) {
       return null
     }
-    
+
     const { data, error } = await supabase
       .from('organizations')
       .select('name')
       .eq('id', orgId)
       .single()
-    
+
     if (error) {
       console.error('❌ Error al obtener nombre de organización:', error)
       return null
     }
-    
+
     return data?.name || null
   } catch (error) {
     console.error('❌ Error inesperado al obtener nombre de organización:', error)
@@ -325,14 +325,30 @@ export async function getCurrentOrganizationName() {
  */
 export function handleTenantError(error, operation) {
   console.error(`❌ Error en operación multi-tenant (${operation}):`, error)
-  
+
   // Agregar contexto al error
   const tenantError = new Error(`Error en ${operation}: ${error.message}`)
   tenantError.originalError = error
   tenantError.operation = operation
   tenantError.organizationId = getCurrentOrganizationId()
-  
+
   return tenantError
+}
+
+/**
+ * Obtiene el ID del cliente actual del usuario autenticado (si es rol cliente)
+ * 
+ * @returns {string|null} El client_id o null si no está disponible
+ */
+export function getCurrentClientId() {
+  try {
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+    // Normalizar nombres de propiedad posibles
+    return currentUser.client_id || currentUser.clientId || null
+  } catch (error) {
+    console.error('❌ Error al obtener client_id:', error)
+    return null
+  }
 }
 
 // Exportar funciones por defecto para facilitar el uso
@@ -346,5 +362,6 @@ export default {
   deleteWithTenant,
   belongsToCurrentTenant,
   getCurrentOrganizationName,
-  handleTenantError
+  handleTenantError,
+  getCurrentClientId
 }

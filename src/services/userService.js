@@ -578,7 +578,90 @@ const userService = {
       console.error('❌ Error al cerrar sesión:', error);
       return { success: false, message: 'Error al cerrar sesión' };
     }
+  },
+
+  async updateUserProfile(userId, profileData) {
+    try {
+      const userUpdates = {
+        updated_at: new Date().toISOString(),
+        first_name: profileData.firstName,
+        last_name: profileData.lastName,
+        username: profileData.username
+      };
+
+      // Filter undefined
+      Object.keys(userUpdates).forEach(key => userUpdates[key] === undefined && delete userUpdates[key]);
+
+      const { error: errorUser } = await supabase.from('users').update(userUpdates).eq('id', userId);
+      if (errorUser) throw errorUser;
+
+      if (profileData.client?.id) {
+        const clientUpdates = {
+          company_name: profileData.client.companyName,
+          rif: profileData.client.rif,
+          phone: profileData.client.phone,
+          address: profileData.client.address,
+          activity_type: profileData.client.activity_type,
+          // Billing data
+          billing_name: profileData.client.billing_name,
+          billing_tax_id: profileData.client.billing_tax_id,
+          billing_address: profileData.client.billing_address,
+          is_special_taxpayer: profileData.client.is_special_taxpayer,
+          retains_islr: profileData.client.retains_islr
+        };
+
+        Object.keys(clientUpdates).forEach(key => clientUpdates[key] === undefined && delete clientUpdates[key]);
+
+        if (Object.keys(clientUpdates).length > 0) {
+          const { error: errorClient } = await supabase.from('clients').update(clientUpdates).eq('id', profileData.client.id);
+          if (errorClient) throw errorClient;
+        }
+      }
+      return { success: true };
+    } catch (e) {
+      console.error(e);
+      return { success: false, error: e };
+    }
+  },
+
+  async changePassword(email, currentPassword, newPassword) {
+    try {
+      // 1. Re-autenticar al usuario para verificar la contraseña actual
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword
+      });
+
+      if (signInError) {
+        console.warn('⚠️ Error de re-autenticación al cambiar contraseña:', signInError);
+        return {
+          success: false,
+          message: 'La contraseña actual es incorrecta.'
+        };
+      }
+
+      // 2. Si la contraseña actual es correcta, actualizar a la nueva
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (updateError) {
+        console.error('❌ Error al actualizar contraseña:', updateError);
+        return {
+          success: false,
+          message: 'Error al actualizar la contraseña. Asegúrate de que cumpla con los requisitos de seguridad.'
+        };
+      }
+
+      return { success: true };
+
+    } catch (error) {
+      console.error('❌ Error inesperado al cambiar contraseña:', error);
+      return {
+        success: false,
+        message: 'Ocurrió un error inesperado.'
+      };
+    }
   }
 };
+
 
 export default userService;

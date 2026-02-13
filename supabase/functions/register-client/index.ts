@@ -17,7 +17,7 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        const { email, password, first_name, last_name, company_name, rif, phone, address, organization_id } = await req.json()
+        const { email, password, first_name, last_name, company_name, rif, phone, address, organization_id, activity_type } = await req.json()
 
         // 1. Create Client Record FIRST
         // This generates the client_id needed for the user record
@@ -30,6 +30,7 @@ serve(async (req) => {
                 address,
                 phone,
                 email,
+                activity_type: activity_type || 'goods', // Default to goods if not provided
                 taxpayer_type: 'JURIDICA', // Valid value
                 status: 'ACTIVO' // Valid value (uppercase Spanish)
             })

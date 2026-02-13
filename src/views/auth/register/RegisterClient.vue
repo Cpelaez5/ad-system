@@ -67,6 +67,18 @@
           </div>
         </div>
 
+
+
+        <div class="form-group">
+          <label class="form-label">Tipo de Actividad Económica</label>
+          <select v-model="form.activity_type" class="form-input" required>
+            <option value="" disabled selected>Selecciona una actividad</option>
+            <option value="goods">Comercio / Venta de Productos</option>
+            <option value="manufacturing">Fabricación / Manufactura</option>
+            <option value="services">Prestación de Servicios</option>
+          </select>
+        </div>
+
         <div class="form-group">
           <label class="form-label">Dirección Fiscal</label>
           <textarea v-model="form.address" class="form-input" rows="3" placeholder="Dirección completa" required></textarea>
@@ -111,7 +123,9 @@ export default {
         company_name: '',
         rif: '',
         phone: '',
-        address: ''
+        activity_type: '',
+        address: '',
+
       }
     }
   },
@@ -145,12 +159,14 @@ export default {
           this.form.company_name = data.company_name || '';
           this.form.rif = data.rif || '';
           this.form.phone = data.phone || '';
+          this.form.activity_type = data.activity_type || '';
           this.form.address = data.address || '';
+
         }
       } catch (e) { console.log('Info: No se cargaron datos previos.'); }
     },
     async handleSubmit() {
-      if (!this.form.company_name || !this.form.rif || !this.form.address) {
+      if (!this.form.company_name || !this.form.rif || !this.form.address || !this.form.activity_type) {
         alert('Por favor completa los datos del negocio');
         return;
       }
@@ -169,7 +185,9 @@ export default {
             company_name: this.form.company_name,
             rif: this.form.rif,
             phone: this.form.phone,
+            activity_type: this.form.activity_type,
             address: this.form.address,
+
             organization_id: this.invitation.organization_id
           }
         });

@@ -88,6 +88,9 @@
           </v-list-item-subtitle>
         </v-list-item>
         <v-divider />
+        <v-list-item @click="goToPlans">
+          <v-list-item-title>Planes</v-list-item-title>
+        </v-list-item>
         <v-list-item @click="goToProfile">
           <v-list-item-title>Mi Perfil</v-list-item-title>
         </v-list-item>
@@ -272,8 +275,12 @@ export default {
 		},
     
 		goToProfile() {
-			this.$router.push('/profile')
+			this.$router.push('/cliente/mi-area')
 		},
+    
+    goToPlans() {
+      this.$router.push('/cliente/planes')
+    },
     
 		goToSettings() {
 			this.$router.push('/settings')
