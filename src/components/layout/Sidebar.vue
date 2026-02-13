@@ -75,6 +75,13 @@
           title="Inventario"
           value="cliente-inventario"
         ></v-list-item>
+
+        <v-list-item
+          :to="{ name: 'ClienteFacturacionSuscripcion' }"
+          prepend-icon="mdi-credit-card-outline"
+          title="Mi Facturación"
+          value="cliente-facturacion-suscripcion"
+        ></v-list-item>
       </template>
 
 
@@ -159,6 +166,15 @@
         prepend-icon="mdi-account-group"
         title="Usuarios"
         value="usuarios"
+      ></v-list-item>
+
+      <!-- Super Admin: Facturación del Sistema -->
+      <v-list-item
+        v-if="isSuperAdmin"
+        :to="{ name: 'FacturacionSistema' }"
+        prepend-icon="mdi-receipt-text-outline"
+        title="Facturación"
+        value="facturacion-sistema"
       ></v-list-item>
 
       <!-- Super Admin: Gestión de Empresas (futuro) -->

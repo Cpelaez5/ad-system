@@ -159,6 +159,53 @@ CREATE TABLE documents (
 
 ---
 
+### system_invoices
+Facturas del sistema hacia los clientes por su suscripción.
+
+```sql
+CREATE TABLE system_invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  subscription_id UUID REFERENCES client_subscriptions(id),
+  invoice_number TEXT NOT NULL UNIQUE,
+  amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'paid', 'overdue', 'canceled')),
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+  due_date DATE NOT NULL,
+  paid_at TIMESTAMPTZ,
+  payment_reference TEXT,
+  payment_method TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Estados**: `pending`, `paid`, `overdue`, `canceled`
+
+---
+
+### payment_methods
+Métodos de pago guardados por el cliente (placeholder).
+
+```sql
+CREATE TABLE payment_methods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  type TEXT NOT NULL DEFAULT 'bank_transfer'
+    CHECK (type IN ('bank_transfer', 'mobile_payment', 'zelle', 'cash')),
+  label TEXT NOT NULL,
+  details JSONB DEFAULT '{}',
+  is_default BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
 ### fiscal_docs
 Expediente Fiscal 360: Metadatos de permisos y documentos legales.
 
@@ -233,6 +280,56 @@ $$ LANGUAGE sql SECURITY DEFINER;
 - Límite: 50MB por archivo
 - Tipos: PDF, Excel, Word, Imágenes
 - Acceso: Por organization_id
+
+### payment-proofs
+- Límite: 10MB por archivo
+- Tipos: Imágenes, PDF
+- Acceso: Clientes suben, super_admin y cliente leen
+
+---
+
+## Tablas de Facturación del Sistema
+
+### payment_methods
+Métodos de pago configurados por super_admin (global del sistema).
+
+```sql
+CREATE TABLE payment_methods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('mobile_payment', 'bank_transfer', 'zelle', 'binance')),
+  description TEXT,
+  is_enabled BOOLEAN DEFAULT true,
+  charge_igtf BOOLEAN DEFAULT false,
+  details JSONB NOT NULL DEFAULT '{}',
+  support_phone_prefix TEXT,
+  support_phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### payment_reports
+Reportes de pago enviados por clientes para validación.
+
+```sql
+CREATE TABLE payment_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id UUID NOT NULL REFERENCES system_invoices(id),
+  client_id UUID NOT NULL REFERENCES clients(id),
+  payment_method_id UUID NOT NULL REFERENCES payment_methods(id),
+  reference TEXT NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  proof_url TEXT,
+  sender_details JSONB DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'pending_review'
+    CHECK (status IN ('pending_review', 'approved', 'rejected')),
+  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_at TIMESTAMPTZ,
+  rejection_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
 ---
 

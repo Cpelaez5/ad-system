@@ -29,6 +29,7 @@ const Archivo = () => import('../views/contador/Archivo.vue')
 
 // Vistas para admin y super_admin
 const Usuarios = () => import('../views/admin/Usuarios.vue')
+const FacturacionSistema = () => import('../views/admin/FacturacionSistema.vue')
 
 // Componentes de prueba
 import TestForm from '@/components/common/TestForm.vue'
@@ -149,6 +150,12 @@ const routes = [
     meta: { requiresAuth: true, title: 'Planes y Suscripción', roles: ['cliente'] }
   },
   {
+    path: '/cliente/facturacion-suscripcion',
+    name: 'ClienteFacturacionSuscripcion',
+    component: () => import('../views/cliente/FacturacionSuscripcion.vue'),
+    meta: { requiresAuth: true, title: 'Facturación de Suscripción', roles: ['cliente'] }
+  },
+  {
     path: '/cliente/fiscal-360',
     name: 'ClienteFiscal360',
     component: () => import('@/views/cliente/Fiscal360.vue'),
@@ -201,6 +208,12 @@ const routes = [
     name: 'Usuarios',
     component: Usuarios,
     meta: { requiresAuth: true, title: 'Gestión de Usuarios', roles: ['super_admin', 'admin'] }
+  },
+  {
+    path: '/admin/facturacion-sistema',
+    name: 'FacturacionSistema',
+    component: FacturacionSistema,
+    meta: { requiresAuth: true, title: 'Facturación del Sistema', roles: ['super_admin'] }
   },
   {
     path: '/profile',

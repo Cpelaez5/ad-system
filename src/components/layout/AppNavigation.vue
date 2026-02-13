@@ -91,6 +91,9 @@
         <v-list-item @click="goToPlans">
           <v-list-item-title>Planes</v-list-item-title>
         </v-list-item>
+        <v-list-item @click="goToBilling">
+          <v-list-item-title>Facturación</v-list-item-title>
+        </v-list-item>
         <v-list-item @click="goToProfile">
           <v-list-item-title>Mi Perfil</v-list-item-title>
         </v-list-item>
@@ -280,6 +283,10 @@ export default {
     
     goToPlans() {
       this.$router.push('/cliente/planes')
+    },
+
+    goToBilling() {
+      this.$router.push('/cliente/facturacion-suscripcion')
     },
     
 		goToSettings() {
