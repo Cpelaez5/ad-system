@@ -51,6 +51,40 @@
       </div>
     </div>
 
+    <!-- Estadísticas rápidas -->
+    <v-row class="mb-6">
+      <v-col cols="12" sm="6" md="4">
+        <StatsCard
+          title="Total Productos"
+          :value="stats.totalProducts"
+          bg-color="#02254d"
+          text-color="white"
+        />
+      </v-col>
+      
+      <v-col cols="12" sm="6" md="4">
+        <CurrencyStatsCard
+          title="Valor en Inventario (Costo)"
+          :value="stats.totalValueCost"
+          bg-color="#f0d29b"
+          text-color="#010101"
+          currency-symbol="Bs. "
+          @toggle-currency="() => {}"
+        />
+      </v-col>
+
+      <v-col cols="12" sm="6" md="4">
+        <CurrencyStatsCard
+          title="Valor Estimado (Venta)"
+          :value="stats.totalValueSale"
+          bg-color="#f2b648"
+          text-color="#010101"
+          currency-symbol="Bs. "
+          @toggle-currency="() => {}"
+        />
+      </v-col>
+    </v-row>
+
     <!-- Tabs de Navegación -->
     <v-tabs v-model="activeTab" color="primary" class="mb-6 bg-white rounded-lg elevation-1">
       <v-tab value="dashboard" prepend-icon="mdi-view-dashboard">Tablero</v-tab>
@@ -61,54 +95,6 @@
     <v-window v-model="activeTab">
       <!-- DASHBOARD TAB -->
       <v-window-item value="dashboard">
-        <v-row>
-          <!-- Total Productos -->
-          <v-col cols="12" sm="6" md="4">
-            <v-card class="pa-4 stats-card bg-surface-light" border>
-              <div class="d-flex align-center justify-space-between">
-                <div>
-                  <div class="text-overline text-grey-darken-1 font-weight-bold">Total Productos</div>
-                  <div class="text-h3 font-weight-bold text-secondary mt-2">
-                    <AnimatedNumber :value="stats.totalProducts" :duration="800" />
-                  </div>
-                </div>
-                <v-icon size="48" color="primary" class="opacity-20">mdi-package-variant-closed</v-icon>
-              </div>
-            </v-card>
-          </v-col>
-          
-          <!-- Valor Inventario (Costo) -->
-          <v-col cols="12" sm="6" md="4">
-            <v-card class="pa-4 stats-card bg-surface-light" border>
-              <div class="d-flex align-center justify-space-between">
-                <div>
-                  <div class="text-overline text-grey-darken-1 font-weight-bold">Valor en Inventario (Costo)</div>
-                  <div class="text-h4 font-weight-bold text-success mt-2">
-                    {{ formatCurrency(stats.totalValueCost) }}
-                  </div>
-                  <div class="text-caption text-grey">Base para ISLR</div>
-                </div>
-                <v-icon size="48" color="success" class="opacity-20">mdi-cash-multiple</v-icon>
-              </div>
-            </v-card>
-          </v-col>
-
-          <!-- Valor Inventario (Venta) -->
-          <v-col cols="12" sm="6" md="4">
-            <v-card class="pa-4 stats-card bg-surface-light" border>
-              <div class="d-flex align-center justify-space-between">
-                <div>
-                  <div class="text-overline text-grey-darken-1 font-weight-bold">Valor Estimado (Venta)</div>
-                  <div class="text-h4 font-weight-bold text-info mt-2">
-                     {{ formatCurrency(stats.totalValueSale) }}
-                  </div>
-                  <div class="text-caption text-grey">Proyección Ganancia</div>
-                </div>
-                <v-icon size="48" color="info" class="opacity-20">mdi-tag-text-outline</v-icon>
-              </div>
-            </v-card>
-          </v-col>
-        </v-row>
 
         <v-row class="mt-4">
           <!-- Top Productos -->
@@ -432,10 +418,12 @@ import inventoryService from '@/services/inventoryService'
 import inventoryExportService from '@/services/inventoryExportService'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import InventoryAdjustmentDialog from '@/components/inventory/InventoryAdjustmentDialog.vue'
+import StatsCard from '@/components/common/StatsCard.vue'
+import CurrencyStatsCard from '@/components/common/CurrencyStatsCard.vue'
 
 export default {
   name: 'ClienteInventario',
-  components: { AnimatedNumber, InventoryAdjustmentDialog },
+  components: { AnimatedNumber, InventoryAdjustmentDialog, StatsCard, CurrencyStatsCard },
   data() {
     return {
       activeTab: 'dashboard',
@@ -461,6 +449,9 @@ export default {
       loadingProductMovements: false,
 
       // UI Config
+      currencyDisplay: 'VES',
+      exchangeRate: 1,
+
       productSearch: '',
       productDialog: false,
       editingProduct: null,
@@ -498,17 +489,51 @@ export default {
       ]
     }
   },
+  computed: {
+    convertedTotalValueCost() {
+      if (this.currencyDisplay === 'VES') return this.stats.totalValueCost;
+      return this.stats.totalValueCost / this.exchangeRate;
+    },
+    convertedTotalValueSale() {
+      if (this.currencyDisplay === 'VES') return this.stats.totalValueSale;
+      return this.stats.totalValueSale / this.exchangeRate;
+    }
+  },
   async mounted() {
     await this.loadDashboard()
+    await this.fetchExchangeRate()
   },
   watch: {
     activeTab(val) {
       if (val === 'products') this.loadProducts()
       if (val === 'dashboard') this.loadDashboard()
-      // Movements tab could load recent movements
+      if (val === 'movements') this.loadMovements()
     }
   },
   methods: {
+    async fetchExchangeRate() {
+        try {
+            // Importación dinámica para prevenir dependencias rotas si no existe globalmente
+            const bcvServiceModule = await import('@/services/bcvService');
+            const rate = await bcvServiceModule.default.getLatestExchangeRate();
+            if (rate) this.exchangeRate = rate.rate;
+        } catch(e) {
+            console.warn('Could not fetch BCV exchange rate', e);
+        }
+    },
+    toggleCurrency() {
+        this.currencyDisplay = this.currencyDisplay === 'VES' ? 'USD' : 'VES';
+    },
+    async loadMovements() {
+      this.loadingMovements = true
+      try {
+        this.movements = await inventoryService.getAllMovements({ limit: 500 })
+      } catch (e) {
+        console.error('Error loading movements', e)
+      } finally {
+        this.loadingMovements = false
+      }
+    },
     async loadDashboard() {
       // Cargar stats
       try {
