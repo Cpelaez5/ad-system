@@ -437,50 +437,134 @@
     </v-dialog>
 
     <!-- Diálogo de vista de factura -->
-    <v-dialog v-model="viewDialog" max-width="800px">
-      <v-card v-if="viewingInvoice">
-        <v-card-title>
-          <v-icon left>mdi-receipt-long</v-icon>
-          Factura {{ viewingInvoice.invoiceNumber }}
-        </v-card-title>
-        <v-card-text>
-          <v-row>
-            <v-col cols="12" md="6">
-              <h4>Emisor</h4>
-              <p><strong>{{ viewingInvoice.issuer.companyName }}</strong></p>
-              <p>RIF: {{ viewingInvoice.issuer.rif }}</p>
-              <p>{{ viewingInvoice.issuer.address }}</p>
+    <v-dialog v-model="viewDialog" max-width="900px" scrollable>
+      <v-card v-if="viewingInvoice" class="rounded-xl elevation-0" style="border-radius: 20px !important;">
+        <!-- Header con gradiente sutil -->
+        <div class="pa-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
+            <div class="d-flex align-center">
+                <v-avatar color="white" size="48" class="mr-4">
+                    <v-icon icon="mdi-receipt-long" color="secondary" size="24"></v-icon>
+                </v-avatar>
+                <div class="flex-grow-1">
+                    <div class="text-h5 font-weight-bold text-white">{{ viewingInvoice.invoiceNumber }}</div>
+                    <div class="text-caption text-white" style="opacity: 0.8">{{ viewingInvoice.flow }}</div>
+                </div>
+                <v-chip 
+                    :color="getStatusColor(viewingInvoice.status)" 
+                    size="small" 
+                    class="font-weight-bold px-3"
+                    variant="elevated"
+                >
+                    {{ viewingInvoice.status }}
+                </v-chip>
+            </div>
+        </div>
+        
+        <v-card-text class="pa-0">
+          <v-row no-gutters>
+            <!-- Document Info -->
+            <v-col cols="12" :md="hasAttachment(viewingInvoice) ? 4 : 12" class="pa-6 bg-grey-lighten-5">
+              <div class="text-overline text-grey-darken-1 mb-4">
+                  <v-icon size="small" class="mr-1">mdi-information</v-icon>
+                  Detalles
+              </div>
+              
+              <div class="d-flex flex-column" style="gap: 16px;">
+                  <div class="info-item">
+                      <div class="text-caption text-grey-darken-1 mb-1">Emisor</div>
+                      <div class="text-body-1 font-weight-medium">{{ viewingInvoice.issuer.companyName }}</div>
+                      <div class="text-body-2 text-grey-darken-1">RIF: {{ viewingInvoice.issuer.rif }}</div>
+                  </div>
+                  
+                  <div class="info-item">
+                      <div class="text-caption text-grey-darken-1 mb-1">Cliente</div>
+                      <div class="text-body-1 font-weight-medium">{{ viewingInvoice.client.companyName }}</div>
+                      <div class="text-body-2 text-grey-darken-1">RIF: {{ viewingInvoice.client.rif }}</div>
+                  </div>
+                  
+                  <div class="info-item d-flex justify-space-between border-b pb-2">
+                    <div>
+                      <div class="text-caption text-grey-darken-1 mb-1">Fecha Emisión</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatDate(viewingInvoice.issueDate) }}</div>
+                    </div>
+                    <div class="text-right">
+                      <div class="text-caption text-grey-darken-1 mb-1">Vencimiento</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatDate(viewingInvoice.dueDate) }}</div>
+                    </div>
+                  </div>
+
+                  <div class="info-item d-flex justify-space-between align-end">
+                    <div>
+                      <div class="text-caption text-grey-darken-1 mb-1">Total IVA</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatCurrency(viewingInvoice.financial.taxDebit) }}</div>
+                    </div>
+                    <div class="text-right">
+                      <div class="text-caption text-primary font-weight-bold mb-1">Monto Total</div>
+                      <div class="text-h6 font-weight-bold text-success">{{ formatCurrency(viewingInvoice.financial.totalSales) }}</div>
+                    </div>
+                  </div>
+                  
+                  <div v-if="viewingInvoice.notes" class="info-item mt-2">
+                      <div class="text-caption text-grey-darken-1 mb-1">
+                          <v-icon size="x-small" class="mr-1">mdi-note-text</v-icon>
+                          Notas
+                      </div>
+                      <div class="text-body-2 font-weight-medium text-wrap" style="white-space: pre-wrap;">{{ viewingInvoice.notes }}</div>
+                  </div>
+
+                  <div v-if="hasAttachment(viewingInvoice)" class="mt-4">
+                      <v-btn
+                          color="primary"
+                          variant="tonal"
+                          block
+                          prepend-icon="mdi-download"
+                          @click="downloadAttachment(viewingInvoice)"
+                      >
+                          Descargar Archivo
+                      </v-btn>
+                  </div>
+              </div>
             </v-col>
-            <v-col cols="12" md="6">
-              <h4>Cliente</h4>
-              <p><strong>{{ viewingInvoice.client.companyName }}</strong></p>
-              <p>RIF: {{ viewingInvoice.client.rif }}</p>
-              <p>{{ viewingInvoice.client.address }}</p>
+            
+            <!-- File Preview -->
+            <v-col v-if="hasAttachment(viewingInvoice)" cols="12" md="8" class="pa-6">
+                <div class="text-overline text-grey-darken-1 mb-4">
+                    <v-icon size="small" class="mr-1">mdi-file-document</v-icon>
+                    Vista Previa
+                </div>
+                
+                <div class="preview-container rounded-xl overflow-hidden bg-grey-lighten-3" style="height: 480px;">
+                    <!-- PDF Preview -->
+                    <iframe 
+                        v-if="isFilePDF(getFirstAttachment(viewingInvoice).url)"
+                        :src="getFirstAttachment(viewingInvoice).url"
+                        width="100%"
+                        height="100%"
+                        style="border: none"
+                    ></iframe>
+                    
+                    <!-- Image Preview -->
+                    <v-img
+                        v-else
+                        :src="getFirstAttachment(viewingInvoice).url"
+                        height="480"
+                        cover
+                    >
+                        <template v-slot:placeholder>
+                            <div class="d-flex align-center justify-center fill-height">
+                                <v-progress-circular indeterminate color="primary"></v-progress-circular>
+                            </div>
+                        </template>
+                    </v-img>
+                </div>
             </v-col>
+            
           </v-row>
-          
-          <v-divider class="my-4"></v-divider>
-          
-          <v-row>
-            <v-col cols="12" md="6">
-              <p><strong>Fecha:</strong> {{ formatDate(viewingInvoice.issueDate) }}</p>
-              <p><strong>Vencimiento:</strong> {{ formatDate(viewingInvoice.dueDate) }}</p>
-            </v-col>
-            <v-col cols="12" md="6">
-              <p><strong>Total:</strong> {{ formatCurrency(viewingInvoice.financial.totalSales) }}</p>
-              <p><strong>IVA:</strong> {{ formatCurrency(viewingInvoice.financial.taxDebit) }}</p>
-            </v-col>
-          </v-row>
-          
-          <div v-if="viewingInvoice.notes">
-            <v-divider class="my-4"></v-divider>
-            <h4>Notas</h4>
-            <p>{{ viewingInvoice.notes }}</p>
-          </div>
         </v-card-text>
-        <v-card-actions>
+        <v-divider></v-divider>
+        <v-card-actions class="pa-4 bg-grey-lighten-5">
           <v-spacer></v-spacer>
-          <v-btn color="primary" @click="viewDialog = false">
+          <v-btn color="primary" variant="elevated" @click="viewDialog = false" class="px-6">
             Cerrar
           </v-btn>
         </v-card-actions>
@@ -1411,6 +1495,25 @@ export default {
         this.currencyDisplay = this.currencyDisplay === 'VES' ? 'USD' : 'VES';
         this.isChangingCurrency = false;
       }, 300);
+    },
+
+    // Utilities for Invoice Preview
+    hasAttachment(invoice) {
+        return invoice && invoice.attachments && invoice.attachments.length > 0 && invoice.attachments[0].url;
+    },
+    getFirstAttachment(invoice) {
+        if (this.hasAttachment(invoice)) return invoice.attachments[0];
+        return null;
+    },
+    isFilePDF(url) {
+        if (!url) return false;
+        return url.toLowerCase().includes('.pdf');
+    },
+    downloadAttachment(invoice) {
+        const attach = this.getFirstAttachment(invoice);
+        if (attach && attach.url) {
+            window.open(attach.url, '_blank');
+        }
     },
     
     // Helper para ordenar facturas según la UI

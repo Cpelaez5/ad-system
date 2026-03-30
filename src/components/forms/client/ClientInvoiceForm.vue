@@ -114,6 +114,11 @@
                       </template>
                     </v-tooltip>
                   </v-card-text>
+                  <v-divider></v-divider>
+                  <div v-if="uploadedFilePreview" class="pa-2 bg-grey-lighten-4" style="overflow: hidden; display: flex; justify-content: center; align-items: center;">
+                       <iframe v-if="uploadedFile.type === 'application/pdf'" :src="uploadedFilePreview" width="100%" height="450px" style="border: none; border-radius: 8px;"></iframe>
+                       <v-img v-else :src="uploadedFilePreview" max-height="450" class="rounded-lg" contain></v-img>
+                  </div>
                 </v-card>
               </v-fade-transition>
 
@@ -734,7 +739,7 @@
                                 density="compact"
                                 hide-details="auto"
                                 :bg-color="isInventoryEnabled && item.isInventory && item.product && item.quantity > item.product.stock ? 'error' : undefined"
-                                @update:modelValue="calculateTotals"
+                                @update:modelValue="updateItemTotal(index)"
                                 :rules="[
                                   v => v > 0 || 'Min 1',
                                   v => !isInventoryEnabled || !item.isInventory || !item.product || v <= item.product.stock || `Max ${item.product.stock}`
@@ -745,7 +750,7 @@
                                   Disp: {{ item.product.stock }} {{ item.product.unit || 'und' }}
                               </div>
                             </v-col>
-                            <v-col cols="4" md="2" class="px-1">
+                            <v-col cols="4" md="2" class="px-1">                              
                               <v-text-field
                                 v-model.number="item.unitPrice"
                                 label="Precio"
@@ -754,8 +759,13 @@
                                 variant="outlined"
                                 density="compact"
                                 hide-details
+                                @update:modelValue="updateItemTotal(index)"
                                 class="animated-field"
-                              ></v-text-field>
+                              >
+                                <template v-slot:prepend-inner>
+                                  <span class="text-caption text-grey mt-1">Bs</span>
+                                </template>
+                              </v-text-field>
                             </v-col>
                             <v-col cols="4" md="2" class="pl-1">
                               <v-text-field
@@ -961,6 +971,7 @@ export default {
       
       // Archivo subido
       uploadedFile: null,
+      uploadedFilePreview: null,
       extracting: false,
       extractionResult: null,
       
@@ -1186,6 +1197,17 @@ export default {
         }
       },
       immediate: true
+    },
+    uploadedFile: {
+      handler(newFile) {
+        if (this.uploadedFilePreview) {
+          URL.revokeObjectURL(this.uploadedFilePreview);
+          this.uploadedFilePreview = null;
+        }
+        if (newFile) {
+          this.uploadedFilePreview = URL.createObjectURL(newFile);
+        }
+      }
     },
     'formData.issueDate': {
       handler(newDate) {
@@ -1450,6 +1472,15 @@ export default {
         this.calculateTotals();
     },
 
+    toggleInventoryMode(index) {
+      const item = this.formData.items[index];
+      item.isInventory = !item.isInventory;
+      if (!item.isInventory) {
+        item.product = null;
+        item.product_id = null;
+      }
+    },
+
     onProductSelected(index, product) {
         if (!product) return;
         
@@ -1457,13 +1488,20 @@ export default {
         item.product = product;
         item.product_id = product.id; // Critical for backend inventory logic
         item.description = product.name;
-        item.unitPrice = product.price || 0;
+        item.unitPrice = product.sale_price || 0;
         item.total = parseFloat((item.quantity * item.unitPrice).toFixed(2));
         
         this.calculateTotals();
     },
     
     // Sumar todo para el Total Final
+    updateItemTotal(index) {
+      const item = this.formData.items[index];
+      const qty = parseFloat(item.quantity) || 0;
+      const price = parseFloat(item.unitPrice) || 0;
+      item.total = parseFloat((qty * price).toFixed(2));
+      this.calculateTotals();
+    },
     calculateTotals() {
         if (this.manualAdjustment) return;
         
@@ -1496,16 +1534,29 @@ export default {
                  !!this.formData.client.companyName && 
                  !!this.formData.client.rif;
         case 3:
-          return this.formData.financial.totalSales > 0;
+          return true; // Se movió la validación del total al paso final para no bloquear la UX
         case 4:
+           if (this.formData.financial.totalSales <= 0) {
+              this.showSnackbar('Debe haber un total válido en la factura (Agregue ítems o indíquelo manualmente en el paso anterior)', 'error');
+              return false;
+           }
+           
            // Validar stock si hay items de inventario
            if (this.isInventoryEnabled && this.formData.items.length > 0) {
-               const invalidItem = this.formData.items.find(item => 
-                   item.isInventory && 
-                   item.product && 
-                   item.quantity > item.product.stock
-               );
-               if (invalidItem) return false;
+            const missingProduct = this.formData.items.find(item => item.isInventory && !item.product);
+            if (missingProduct) {
+                this.showSnackbar('Debe seleccionar un producto del inventario para los ítems vinculados.', 'warning')
+                return false
+            }
+
+            const overflowItem = this.formData.items.find(item => 
+                item.isInventory && item.product && item.quantity > item.product.stock
+            );
+            
+            if (overflowItem && this.formData.flow === 'VENTA') {
+                this.showSnackbar(`Stock insuficiente para: ${overflowItem.product.name}`, 'error')
+                return false
+            }
            }
            return true;
         default:
@@ -1534,6 +1585,15 @@ export default {
       }
       
       this.currentStep++;
+    },
+    
+    handleSubmit() {
+      // Validar un ultima vez?
+      if (!this.validateStep(this.currentStep)) {
+          this.showSnackbar('Por favor complete todos los campos requeridos', 'error');
+          return;
+      }
+      this.$emit('submit', this.formData);
     },
     
     previousStep() {

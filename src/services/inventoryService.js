@@ -75,7 +75,7 @@ class InventoryService {
                 client_id: productData.client_id || getCurrentClientId()
             }
 
-            return await insertWithTenant(this.productsTable, payload)
+            return await insertWithTenant(this.productsTable, payload, { returning: 'representation' })
         } catch (error) {
             return handleTenantError(error, 'createProduct')
         }

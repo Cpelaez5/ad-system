@@ -255,17 +255,7 @@ class InvoiceService {
         return { success: false, message: 'No hay organización disponible' }
       }
 
-      // 1. Obtener factura anterior para revertir inventario
-      const { data: oldInvoice, error: fetchError } = await supabase
-        .from('invoices')
-        .select('items, flow, expense_type, invoice_number')
-        .eq('id', id)
-        .eq('organization_id', organizationId)
-        .single()
-
-      if (fetchError) {
-        console.warn('⚠️ No se pudo obtener factura anterior para ajustar inventario:', fetchError)
-      }
+      // Determinamos el cliente según el rol
 
       // Determinar cliente según el rol; si es cliente, forzar su client_id
       // Si clientId es explícitamente null (organización), mantenerlo null
@@ -442,6 +432,18 @@ class InvoiceService {
       if (!organizationId) {
         console.error('❌ No hay organization_id disponible')
         return { success: false, message: 'No hay organización disponible' }
+      }
+
+      // 1. Obtener factura anterior para revertir el inventario antes de guardar los nuevos cambios
+      const { data: oldInvoice, error: fetchError } = await supabase
+        .from('invoices')
+        .select('items, flow, expense_type, invoice_number, id, status')
+        .eq('id', id)
+        .eq('organization_id', organizationId)
+        .single()
+
+      if (fetchError) {
+        console.warn('⚠️ No se pudo obtener factura anterior para ajustar inventario:', fetchError)
       }
 
       // Preparar datos para actualización
