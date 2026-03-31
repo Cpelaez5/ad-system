@@ -66,16 +66,14 @@ class InventoryService {
 
     async createProduct(productData) {
         try {
-            // Validar código único? La base de datos no tiene unique constraint explicito en code+org pero debería
-            // Por ahora confiamos en la inserción
-
-            // Asignar client_id si no viene
+            // Asignar client_id si no viene (necesario para cumplir RLS de cliente)
             const payload = {
                 ...productData,
                 client_id: productData.client_id || getCurrentClientId()
             }
 
-            return await insertWithTenant(this.productsTable, payload, { returning: 'representation' })
+            // Siempre pedimos returning:'*' para obtener el ID del registro recién creado
+            return await insertWithTenant(this.productsTable, payload, { returning: '*' })
         } catch (error) {
             return handleTenantError(error, 'createProduct')
         }
@@ -169,29 +167,53 @@ class InventoryService {
         }
     }
 
-    // Obtener Kardex de un producto
+    // Obtener Kardex de un producto (con número de factura de referencia)
     async getProductMovements(productId) {
         try {
             const { data, error } = await supabase
                 .from(this.movementsTable)
-                .select('*')
+                .select(`
+                  *,
+                  products:inventory_products(name, code, unit),
+                  invoice:invoices!inventory_movements_reference_id_fkey(invoice_number)
+                `)
                 .eq('product_id', productId)
                 .eq('organization_id', getCurrentOrganizationId())
                 .order('created_at', { ascending: false })
 
-            if (error) throw error
-            return data
+            if (error) {
+                // Si falla el join (FK no existe aún), intentar sin join
+                console.warn('Join con invoices falló, cargando sin referencia de factura:', error.message)
+                const { data: fallback, error: fallbackErr } = await supabase
+                    .from(this.movementsTable)
+                    .select('*')
+                    .eq('product_id', productId)
+                    .eq('organization_id', getCurrentOrganizationId())
+                    .order('created_at', { ascending: false })
+                if (fallbackErr) throw fallbackErr
+                return fallback
+            }
+
+            // Mapear invoice_number al nivel raíz del movimiento
+            return (data || []).map(m => ({
+                ...m,
+                invoice_number: m.invoice?.invoice_number || null
+            }))
         } catch (error) {
             return handleTenantError(error, 'getProductMovements')
         }
     }
 
-    // Obtener todos los movimientos (para reporte global)
+    // Obtener todos los movimientos (para reporte global) con número de factura
     async getAllMovements({ limit = 100, clientId = null } = {}) {
         try {
             let query = supabase
                 .from(this.movementsTable)
-                .select('*, products:inventory_products(name, code, unit)')
+                .select(`
+                  *,
+                  products:inventory_products(name, code, unit),
+                  invoice:invoices!inventory_movements_reference_id_fkey(invoice_number)
+                `)
                 .eq('organization_id', getCurrentOrganizationId())
                 .order('created_at', { ascending: false })
 
@@ -204,8 +226,27 @@ class InventoryService {
             }
 
             const { data, error } = await query
-            if (error) throw error
-            return data
+
+            if (error) {
+                // Si el join falla (la FK a invoices puede no existir), cargar sin él
+                console.warn('Join con invoices falló en getAllMovements, cargando sin referencia:', error.message)
+                let fallbackQuery = supabase
+                    .from(this.movementsTable)
+                    .select('*, products:inventory_products(name, code, unit)')
+                    .eq('organization_id', getCurrentOrganizationId())
+                    .order('created_at', { ascending: false })
+                if (clientId) fallbackQuery = fallbackQuery.eq('client_id', clientId)
+                if (limit) fallbackQuery = fallbackQuery.limit(limit)
+                const { data: fallback, error: fallbackErr } = await fallbackQuery
+                if (fallbackErr) throw fallbackErr
+                return fallback
+            }
+
+            // Mapear invoice_number al nivel raíz del movimiento
+            return (data || []).map(m => ({
+                ...m,
+                invoice_number: m.invoice?.invoice_number || null
+            }))
         } catch (error) {
             return handleTenantError(error, 'getAllMovements')
         }

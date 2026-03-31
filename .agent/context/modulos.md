@@ -13,6 +13,7 @@ Gestionan las facturas de las **Empresas Cliente** asociadas a la organización:
 - **Gastos** (`/gastos`) - Facturas de venta emitidas a clientes
 - **Ventas** (`/ventas`) - Facturas de venta emitidas a clientes  
 - **Compras** (`/compras`) - Facturas de compra recibidas de clientes
+- **Inventario** (`/inventario`) - Control de stock impulsado por compras y ventas (ver [Lógica Inventario y Facturación](./logica-inventario.md))
 
 **Características**:
 - Tienen `client_id` asociado (pertenecen a una empresa cliente)

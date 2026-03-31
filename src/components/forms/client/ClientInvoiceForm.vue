@@ -230,6 +230,7 @@
                     :rules="[v => !!v || 'Debe seleccionar el tipo de egreso']"
                     required
                     hide-details="auto"
+                    @update:model-value="syncItemsInventoryMode"
                   >
                     <v-radio
                       value="COMPRA"
@@ -1049,6 +1050,7 @@ export default {
             quantity: 1,
             unitPrice: 0,
             total: 0,
+            // isInventory comienza en false; se ajusta al seleccionar flujo
             isInventory: false,
             product: null
           }
@@ -1415,6 +1417,34 @@ export default {
           this.clearIssuerData();
         }
       }
+
+      // IMPORTANTE: Sincronizar isInventory en todos los ítems existentes
+      // para que el ítem inicial (por defecto) también quede correcto.
+      this.syncItemsInventoryMode();
+    },
+
+    /**
+     * Sincroniza el flag isInventory en TODOS los ítems del formulario
+     * según el flujo y tipo de egreso actuales.
+     * Se llama cuando el usuario cambia VENTA ↔ COMPRA o COMPRA ↔ GASTO.
+     */
+    syncItemsInventoryMode() {
+      // Los ítems deben tener inventario en VENTA o en COMPRA de mercancía.
+      // En GASTO u otros tipos, isInventory = false.
+      const isInventoryFlow = (
+        this.formData.flow === 'VENTA' ||
+        (this.formData.flow === 'COMPRA' && this.formData.expense_type === 'COMPRA')
+      );
+
+      this.formData.items.forEach(item => {
+        // Solo actualizar si el ítem no tiene ya un producto vinculado
+        // (si ya tiene product_id, ya está en modo inventario y no tocar)
+        if (!item.product_id) {
+          item.isInventory = isInventoryFlow;
+        }
+      });
+
+      console.log(`🔄 [syncItemsInventoryMode] Modo inventario: ${isInventoryFlow} | Ítems actualizados: ${this.formData.items.length}`);
     },
     
     clearClientData() {
@@ -1485,11 +1515,26 @@ export default {
         if (!product) return;
         
         const item = this.formData.items[index];
-        item.product = product;
-        item.product_id = product.id; // Critical for backend inventory logic
-        item.description = product.name;
-        item.unitPrice = product.sale_price || 0;
-        item.total = parseFloat((item.quantity * item.unitPrice).toFixed(2));
+        
+        if (typeof product === 'string') {
+            // Texto libre: el usuario escribió algo sin seleccionar del dropdown.
+            item.description = product;
+            item.product = null;
+            item.product_id = null;
+            // En COMPRA de mercancía mantenemos isInventory:true para que el servicio
+            // auto-cree el producto. En VENTA se desactiva para no descontar stock de
+            // un producto que no fue identificado con certeza.
+            const isCompra = this.formData.flow === 'COMPRA' && this.formData.expense_type === 'COMPRA';
+            item.isInventory = isCompra;
+        } else {
+            item.product = product;
+            item.product_id = product.id; // Clave para la lógica de inventario en el backend
+            item.description = product.name;
+            // En COMPRA usamos el costo, en VENTA el precio de venta
+            item.unitPrice = this.formData.flow === 'COMPRA' ? (product.cost_price || product.sale_price || 0) : (product.sale_price || 0);
+            item.total = parseFloat((item.quantity * item.unitPrice).toFixed(2));
+            item.isInventory = true;
+        }
         
         this.calculateTotals();
     },
@@ -1745,13 +1790,18 @@ export default {
          if (sourceParty.taxpayerType) this.formData[targetParty].taxpayerType = sourceParty.taxpayerType;
       }
 
-      // 4. Items
+      // 4. Items del OCR
       if (data.items && data.items.length > 0) {
+        // En compras de mercancía, marcamos isInventory:true para auto-crear productos
+        const isCompraInventario = this.formData.flow === 'COMPRA' && this.formData.expense_type === 'COMPRA';
         this.formData.items = data.items.map(item => ({
           description: item.description || 'Item sin descripción',
           quantity: parseFloat(item.quantity) || 1,
           unitPrice: parseFloat(item.unitPrice) || 0,
-          total: parseFloat(item.amount) || ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0))
+          total: parseFloat(item.amount) || ((parseFloat(item.quantity) || 1) * (parseFloat(item.unitPrice) || 0)),
+          isInventory: isCompraInventario, // OCR en compras → auto-registrar en inventario
+          product: null,
+          product_id: null
         }));
         this.showItems = true;
       }
@@ -1812,12 +1862,19 @@ export default {
     },
     
     addItem() {
+      // Para COMPRA de mercancía y VENTA, isInventory:true por defecto
+      // para garantizar la trazabilidad automática con el inventario.
+      // El usuario puede desactivarlo manualmente si no aplica.
+      const isInventoryFlow = (
+        this.formData.flow === 'VENTA' ||
+        (this.formData.flow === 'COMPRA' && this.formData.expense_type === 'COMPRA')
+      );
       this.formData.items.push({
         description: '',
         quantity: 1,
         unitPrice: 0,
         total: 0,
-        isInventory: false,
+        isInventory: isInventoryFlow,
         product: null
       });
     },

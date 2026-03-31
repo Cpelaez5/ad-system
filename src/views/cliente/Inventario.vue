@@ -1,30 +1,28 @@
 <template>
   <v-container fluid class="pa-4">
-    <div class="d-flex align-center justify-space-between mb-6">
-      <div>
-        <h1 class="text-h4 font-weight-bold text-secondary">Inventario de Mercancía</h1>
-        <div class="text-subtitle-1 text-grey-darken-1">Gestión de productos, stock y movimientos</div>
-      </div>
-      <div class="d-flex gap-2">
+    <div class="d-flex align-center justify-end mb-6">
+      <div class="d-flex" style="gap: 12px;">
          <v-btn
-          color="info"
-          variant="tonal"
-          prepend-icon="mdi-robot"
+          color="secondary"
+          variant="elevated"
+          prepend-icon="mdi-file-document-outline"
           @click="adjustmentDialog = true"
         >
-          IA Consumo
+          Escanear Documento (IA)
         </v-btn>
         <v-btn
           color="primary"
+          variant="elevated"
           prepend-icon="mdi-plus"
           @click="openProductDialog()"
         >
           Nuevo Producto
         </v-btn>
         <v-btn
-          color="secondary"
-          variant="outlined"
-          prepend-icon="mdi-file-excel"
+          color="white"
+          variant="elevated"
+          class="text-secondary"
+          prepend-icon="mdi-export"
         >
           Exportar
           
@@ -65,25 +63,90 @@
       <v-col cols="12" sm="6" md="4">
         <CurrencyStatsCard
           title="Valor en Inventario (Costo)"
-          :value="stats.totalValueCost"
+          :value="convertedTotalValueCost"
           bg-color="#f0d29b"
           text-color="#010101"
-          currency-symbol="Bs. "
-          @toggle-currency="() => {}"
+          :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
+          @toggle-currency="toggleCurrency"
         />
       </v-col>
 
       <v-col cols="12" sm="6" md="4">
         <CurrencyStatsCard
           title="Valor Estimado (Venta)"
-          :value="stats.totalValueSale"
+          :value="convertedTotalValueSale"
           bg-color="#f2b648"
           text-color="#010101"
-          currency-symbol="Bs. "
-          @toggle-currency="() => {}"
+          :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
+          @toggle-currency="toggleCurrency"
         />
       </v-col>
     </v-row>
+
+    <!-- Filtros Colapsables de Fecha -->
+    <v-expansion-panels class="mb-6" variant="accordion">
+      <v-expansion-panel>
+        <v-expansion-panel-title>
+          <div class="d-flex align-center">
+            <v-icon start>mdi-filter-variant</v-icon>
+            <span class="font-weight-medium">Filtros de Fecha</span>
+            <v-chip 
+              v-if="dateFromFilter || dateToFilter" 
+              size="small" 
+              color="primary" 
+              variant="tonal"
+              class="ml-3"
+            >
+              Filtro Activo
+            </v-chip>
+          </div>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <v-row class="mt-2">
+            <!-- Selector Rápido -->
+            <v-col cols="12" md="4">
+              <v-select
+                v-model="quickDateFilter"
+                :items="quickDateOptions"
+                item-title="title"
+                item-value="value"
+                prepend-inner-icon="mdi-clock-fast"
+                label="Intervalos de tiempo"
+                variant="outlined"
+                hide-details
+                @update:model-value="applyQuickDate"
+              ></v-select>
+            </v-col>
+            
+            <!-- Fecha Desde -->
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model="dateFromFilter"
+                label="Desde"
+                type="date"
+                variant="outlined"
+                hide-details
+              ></v-text-field>
+            </v-col>
+
+            <!-- Fecha Hasta -->
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model="dateToFilter"
+                label="Hasta"
+                type="date"
+                variant="outlined"
+                hide-details
+              ></v-text-field>
+            </v-col>
+            
+            <v-col cols="12" class="d-flex justify-end mt-2 pt-0">
+               <v-btn variant="text" color="error" class="mr-2" @click="resetDateFilters">Limpiar</v-btn>
+            </v-col>
+          </v-row>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
 
     <!-- Tabs de Navegación -->
     <v-tabs v-model="activeTab" color="primary" class="mb-6 bg-white rounded-lg elevation-1">
@@ -95,10 +158,9 @@
     <v-window v-model="activeTab">
       <!-- DASHBOARD TAB -->
       <v-window-item value="dashboard">
-
-        <v-row class="mt-4">
+        <v-row class="ma-0">
           <!-- Top Productos -->
-          <v-col cols="12" md="6">
+          <v-col cols="12" md="6" class="pl-0 py-0 pr-md-2 mb-4 mb-md-0">
             <v-card class="h-100 rounded-xl" elevation="2">
               <v-card-title class="d-flex align-center">
                 <v-icon color="secondary" class="mr-2">mdi-chart-line</v-icon>
@@ -133,8 +195,8 @@
           </v-col>
         
           <!-- Listado de Stock Bajo -->
-           <v-col cols="12" md="6">
-             <v-card title="Resumen de Stock Bajo" prepend-icon="mdi-alert-circle-outline">
+           <v-col cols="12" md="6" class="pr-0 py-0 pl-md-2">
+             <v-card class="h-100 rounded-xl" elevation="2" title="Resumen de Stock Bajo" prepend-icon="mdi-alert-circle-outline">
                <v-data-table
                  :headers="productHeaders"
                  :items="lowStockProducts"
@@ -174,7 +236,7 @@
           
           <v-data-table
             :headers="productHeaders"
-            :items="products"
+            :items="filteredProducts"
             :loading="loadingProducts"
             :search="productSearch"
             hover
@@ -218,7 +280,7 @@
           <!-- Filtros de Movimientos podría ir aquí -->
           <v-data-table
              :headers="movementHeaders"
-             :items="movements"
+             :items="filteredMovements"
              :loading="loadingMovements"
           >
             <template v-slot:item.movement_type="{ item }">
@@ -233,6 +295,19 @@
               <span :class="item.quantity >= 0 ? 'text-success' : 'text-error'">
                 {{ item.quantity > 0 ? '+' : '' }}{{ item.quantity }}
               </span>
+            </template>
+            <!-- Numero de factura de referencia legible -->
+            <template v-slot:item.invoice_number="{ item }">
+              <v-chip
+                v-if="item.invoice_number"
+                size="x-small"
+                color="primary"
+                variant="tonal"
+                prepend-icon="mdi-file-document-outline"
+              >
+                {{ item.invoice_number }}
+              </v-chip>
+              <span v-else class="text-caption text-disabled">N/A</span>
             </template>
           </v-data-table>
         </v-card>
@@ -374,6 +449,19 @@
                   {{ item.quantity > 0 ? '+' : '' }}{{ item.quantity }}
                 </span>
               </template>
+              <!-- Factura de referencia en el diálogo de Kardex por producto -->
+              <template v-slot:item.invoice_number="{ item }">
+                <v-chip
+                  v-if="item.invoice_number"
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                  prepend-icon="mdi-file-document-outline"
+                >
+                  {{ item.invoice_number }}
+                </v-chip>
+                <span v-else class="text-caption text-disabled">N/A</span>
+              </template>
            </v-data-table>
         </v-card-text>
         <v-card-actions>
@@ -420,6 +508,7 @@ import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import InventoryAdjustmentDialog from '@/components/inventory/InventoryAdjustmentDialog.vue'
 import StatsCard from '@/components/common/StatsCard.vue'
 import CurrencyStatsCard from '@/components/common/CurrencyStatsCard.vue'
+import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, format, subMonths } from 'date-fns'
 
 export default {
   name: 'ClienteInventario',
@@ -428,6 +517,19 @@ export default {
     return {
       activeTab: 'dashboard',
       
+      // Date Filters
+      dateFromFilter: null,
+      dateToFilter: null,
+      quickDateFilter: 'all',
+      quickDateOptions: [
+        { value: 'all', title: 'Todos los tiempos' },
+        { value: 'thisMonth', title: 'Este Mes' },
+        { value: 'lastMonth', title: 'Mes Pasado' },
+        { value: 'thisQuarter', title: 'Este Trimestre' },
+        { value: 'thisSemester', title: 'Este Semestre' },
+        { value: 'thisYear', title: 'Este Año' }
+      ],
+
       // Data
       products: [],
       movements: [], // Ultimos movimientos generales
@@ -485,11 +587,36 @@ export default {
         { title: 'Tipo', key: 'movement_type' },
         { title: 'Cantidad', key: 'quantity' },
         { title: 'Costo Unit.', key: 'cost_price' },
+        { title: 'Factura Ref.', key: 'invoice_number' },
         { title: 'Descripción', key: 'description' },
       ]
     }
   },
   computed: {
+    filteredProducts() {
+      let result = this.products;
+      if (this.dateFromFilter) {
+        result = result.filter(p => new Date(p.created_at) >= new Date(this.dateFromFilter));
+      }
+      if (this.dateToFilter) {
+        const toDate = new Date(this.dateToFilter);
+        toDate.setHours(23, 59, 59, 999);
+        result = result.filter(p => new Date(p.created_at) <= toDate);
+      }
+      return result;
+    },
+    filteredMovements() {
+      let result = this.movements;
+      if (this.dateFromFilter) {
+        result = result.filter(m => new Date(m.created_at) >= new Date(this.dateFromFilter));
+      }
+      if (this.dateToFilter) {
+        const toDate = new Date(this.dateToFilter);
+        toDate.setHours(23, 59, 59, 999);
+        result = result.filter(m => new Date(m.created_at) <= toDate);
+      }
+      return result;
+    },
     convertedTotalValueCost() {
       if (this.currencyDisplay === 'VES') return this.stats.totalValueCost;
       return this.stats.totalValueCost / this.exchangeRate;
@@ -511,18 +638,69 @@ export default {
     }
   },
   methods: {
+    applyQuickDate() {
+      const today = new Date();
+      switch (this.quickDateFilter) {
+        case 'thisMonth':
+          this.dateFromFilter = format(startOfMonth(today), 'yyyy-MM-dd');
+          this.dateToFilter = format(endOfMonth(today), 'yyyy-MM-dd');
+          break;
+        case 'lastMonth':
+          const lastM = subMonths(today, 1);
+          this.dateFromFilter = format(startOfMonth(lastM), 'yyyy-MM-dd');
+          this.dateToFilter = format(endOfMonth(lastM), 'yyyy-MM-dd');
+          break;
+        case 'thisQuarter':
+          this.dateFromFilter = format(startOfQuarter(today), 'yyyy-MM-dd');
+          this.dateToFilter = format(endOfQuarter(today), 'yyyy-MM-dd');
+          break;
+        case 'thisSemester':
+          // Simplification for semester: approx by checking month
+          const month = today.getMonth();
+          if (month < 6) {
+              this.dateFromFilter = format(new Date(today.getFullYear(), 0, 1), 'yyyy-MM-dd');
+              this.dateToFilter = format(new Date(today.getFullYear(), 5, 30), 'yyyy-MM-dd');
+          } else {
+              this.dateFromFilter = format(new Date(today.getFullYear(), 6, 1), 'yyyy-MM-dd');
+              this.dateToFilter = format(new Date(today.getFullYear(), 11, 31), 'yyyy-MM-dd');
+          }
+          break;
+        case 'thisYear':
+          this.dateFromFilter = format(startOfYear(today), 'yyyy-MM-dd');
+          this.dateToFilter = format(endOfYear(today), 'yyyy-MM-dd');
+          break;
+        case 'all':
+        default:
+          this.dateFromFilter = null;
+          this.dateToFilter = null;
+          break;
+      }
+    },
+    resetDateFilters() {
+      this.quickDateFilter = 'all';
+      this.dateFromFilter = null;
+      this.dateToFilter = null;
+    },
     async fetchExchangeRate() {
         try {
-            // Importación dinámica para prevenir dependencias rotas si no existe globalmente
             const bcvServiceModule = await import('@/services/bcvService');
-            const rate = await bcvServiceModule.default.getLatestExchangeRate();
-            if (rate) this.exchangeRate = rate.rate;
+            const rate = await bcvServiceModule.default.getCurrentRate();
+            if (rate && rate.success && rate.data) {
+                this.exchangeRate = parseFloat(rate.data.dollar) || 1;
+            }
         } catch(e) {
             console.warn('Could not fetch BCV exchange rate', e);
         }
     },
-    toggleCurrency() {
-        this.currencyDisplay = this.currencyDisplay === 'VES' ? 'USD' : 'VES';
+    async toggleCurrency() {
+        if (this.currencyDisplay === 'VES') {
+            if (this.exchangeRate === 1) {
+                await this.fetchExchangeRate();
+            }
+            this.currencyDisplay = 'USD';
+        } else {
+            this.currencyDisplay = 'VES';
+        }
     },
     async loadMovements() {
       this.loadingMovements = true
@@ -719,7 +897,15 @@ export default {
     async downloadValuation() {
         // TODO: Mostrar loading global
         try {
-            const allProducts = await inventoryService.getProducts({ limit: 2000 })
+            let allProducts = await inventoryService.getProducts({ limit: 5000 })
+            if (this.dateFromFilter) {
+                allProducts = allProducts.filter(p => new Date(p.created_at) >= new Date(this.dateFromFilter));
+            }
+            if (this.dateToFilter) {
+                const toDate = new Date(this.dateToFilter);
+                toDate.setHours(23, 59, 59, 999);
+                allProducts = allProducts.filter(p => new Date(p.created_at) <= toDate);
+            }
             await inventoryExportService.exportValuation(allProducts)
         } catch (e) {
             console.error(e)
@@ -728,7 +914,15 @@ export default {
     },
     async downloadKardex() {
         try {
-            const allMovements = await inventoryService.getAllMovements({ limit: 2000 })
+            let allMovements = await inventoryService.getAllMovements({ limit: 5000 })
+            if (this.dateFromFilter) {
+                allMovements = allMovements.filter(m => new Date(m.created_at) >= new Date(this.dateFromFilter));
+            }
+            if (this.dateToFilter) {
+                const toDate = new Date(this.dateToFilter);
+                toDate.setHours(23, 59, 59, 999);
+                allMovements = allMovements.filter(m => new Date(m.created_at) <= toDate);
+            }
             await inventoryExportService.exportMovements(allMovements)
         } catch (e) {
              console.error(e)
@@ -738,11 +932,14 @@ export default {
     
     openExportDialog() {
         const today = new Date().toISOString().substr(0, 10);
-        // Default: Primer dia del mes hasta hoy
+        // Default: Primer dia del mes hasta hoy o los filtros globales activos
         const date = new Date();
         const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().substr(0, 10);
         
-        this.exportDates = { start: firstDay, end: today };
+        this.exportDates = { 
+            start: this.dateFromFilter || firstDay, 
+            end: this.dateToFilter || today 
+        };
         this.exportDialog = true;
     },
     

@@ -1421,16 +1421,23 @@ export default {
        const item = this.formData.items[index];
        if (!product) return;
        
-       item.description = product.name;
-       item.product_id = product.id;
-       item.product = product; // Para mantener el objeto en el autocomplete
-       
-       // Asignar precio según flujo
-       const isPurchase = this.formData.flow === 'COMPRA';
-       const price = isPurchase ? product.cost_price : product.sale_price;
-       
-       item.unitPrice = parseFloat(price) || 0;
-       item.total = item.quantity * item.unitPrice;
+       if (typeof product === 'string') {
+         item.description = product;
+         item.product = null;
+         item.product_id = null;
+         item.isInventory = false;
+       } else {
+         item.description = product.name;
+         item.product_id = product.id;
+         item.product = product; // Para mantener el objeto en el autocomplete
+         
+         // Asignar precio según flujo
+         const isPurchase = this.formData.flow === 'COMPRA';
+         const price = isPurchase ? product.cost_price : product.sale_price;
+         
+         item.unitPrice = parseFloat(price) || 0;
+         item.total = item.quantity * item.unitPrice;
+       }
     },
     
     async handleSubmit() {

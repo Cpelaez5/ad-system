@@ -1065,19 +1065,53 @@ class InvoiceService {
       if (!movementType) return
 
       for (const item of invoice.items) {
-        // Solo procesar si tiene product_id (es un producto de inventario)
-        if (item.product_id) {
+        let productId = item.product_id
+
+        // --- Auto-crear producto si viene de texto libre en una compra de mercancía ---
+        // Si el ítem de una compra tiene isInventory:true pero no tiene product_id,
+        // creamos el producto silenciosamente para que quede disponible en el catálogo.
+        if (!productId && item.isInventory && isPurchase && !isReversal) {
+          const itemName = item.description || 'Producto sin nombre'
+          try {
+            console.log(`🆕 Auto-creando producto para ítem de compra: "${itemName}"`)
+            const newProduct = await inventoryService.createProduct({
+              name: itemName,
+              code: null,
+              stock: 0, // El movimiento lo actualizará
+              cost_price: parseFloat(item.unitPrice) || 0,
+              sale_price: parseFloat(item.unitPrice) || 0, // Costo como precio base hasta que el usuario lo ajuste
+              unit: item.unit || 'UND',
+              min_stock: 0,
+              status: 'ACTIVE'
+            })
+
+            // La función createProduct devuelve { data: [...], error } via insertWithTenant
+            if (newProduct?.data && newProduct.data.length > 0) {
+              productId = newProduct.data[0].id
+              console.log(`✅ Producto auto-creado: ${itemName} → ID ${productId}`)
+            } else if (newProduct?.id) {
+              productId = newProduct.id
+            } else {
+              console.warn(`⚠️ No se pudo auto-crear el producto "${itemName}":`, newProduct)
+              continue // Saltar este ítem si falla la creación
+            }
+          } catch (createErr) {
+            console.error(`❌ Error auto-creando producto "${itemName}":`, createErr)
+            continue
+          }
+        }
+
+        // Solo procesar si tiene product_id (ya sea original o recién creado)
+        if (productId) {
           // Calcular cantidad (siempre positiva para el servicio, él se encarga del signo según tipo)
           const qty = parseFloat(item.quantity) || 0
           if (qty <= 0) continue
 
-          // Costo (Si es compra, usamos el precio unitario como costo. Si es venta, no actualizamos costo pero registramos salida)
-          // Si es Reversal, no tocamos el costo del producto usualmente, o sí?
-          // Para simplificar, en reversal no actualizamos costo promedio, solo stock.
+          // Costo: en compras usamos el precio unitario. En reversiones no actualizamos costo.
           const cost = (!isReversal && isPurchase) ? (parseFloat(item.unitPrice) || 0) : null
 
           await inventoryService.registerMovement({
-            product_id: item.product_id,
+            product_id: productId,
             movement_type: movementType,
             quantity: qty,
             cost_price: cost,
@@ -1086,6 +1120,7 @@ class InvoiceService {
           })
         }
       }
+
     } catch (e) {
       console.error('Error processing inventory movements', e)
       // No lanzamos error para no romper el flujo de factura, pero logueamos

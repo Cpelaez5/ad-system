@@ -1,5 +1,5 @@
 <template>
-  <v-autocomplete
+  <v-combobox
     v-model="internalValue"
     :items="items"
     :loading="loading"
@@ -19,11 +19,35 @@
     @update:search="querySelections"
   >
     <template v-slot:item="{ props, item }">
-      <v-list-item v-bind="props" :title="item.raw.name" :subtitle="item.raw.code">
+      <!-- Deshabilitar productos sin stock en modo VENTA -->
+      <v-list-item
+        v-bind="props"
+        :title="item.raw.name"
+        :subtitle="item.raw.code"
+        :disabled="flow === 'VENTA' && item.raw.stock <= 0"
+      >
         <template v-slot:append>
            <div class="d-flex flex-column align-end">
-             <v-chip size="x-small" :color="item.raw.stock > item.raw.min_stock ? 'success' : 'warning'" variant="flat" class="mb-1">
+             <!-- Chip de stock con semáforo visual -->
+             <v-chip
+               v-if="item.raw.stock > 0"
+               size="x-small"
+               :color="item.raw.stock <= item.raw.min_stock ? 'warning' : 'success'"
+               variant="flat"
+               class="mb-1"
+             >
                {{ item.raw.stock }} {{ item.raw.unit }}
+             </v-chip>
+             <!-- Alerta SIN STOCK para ventas -->
+             <v-chip
+               v-else
+               size="x-small"
+               color="error"
+               variant="flat"
+               class="mb-1"
+               prepend-icon="mdi-alert-circle"
+             >
+               SIN STOCK
              </v-chip>
              <span class="text-caption text-grey">Base: {{ formatCurrency(item.raw.sale_price) }}</span>
            </div>
@@ -33,11 +57,12 @@
     <template v-slot:no-data>
       <div class="pa-2 text-center text-caption">
         <div v-if="loading">Buscando...</div>
-        <div v-else-if="search && search.length > 2">No encontrado. <a href="#" @click.prevent="$emit('create-new', search)">¿Crear?</a></div>
-        <div v-else>Escribe para buscar productos</div>
+        <div v-else-if="search && search.length > 2">Presiona Enter para agregar usando este texto.</div>
+        <div v-else>Escribe para buscar o agregar un texto libre</div>
       </div>
     </template>
-  </v-autocomplete>
+  </v-combobox>
+
 </template>
 
 <script>
