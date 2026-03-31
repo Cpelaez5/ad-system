@@ -947,7 +947,22 @@ export default {
     async fetchExchangeRate(date) {
       if (!date) return;
       try {
-        const r = await bcvService.getRateForDate(date);
+        const today = new Date().toISOString().split('T')[0];
+        let r;
+        
+        // Si la factura es de hoy, usamos la tasa EN VIVO, de lo contrario la histórica
+        if (date === today) {
+          r = await bcvService.getCurrentRate();
+        } else {
+          r = await bcvService.getRateForDate(date);
+          
+          // Fallback robusto si la API para fecha específica falla
+          if (!r.success) {
+            console.warn(`⚠️ No se encontró la tasa para la fecha ${date}. Aplicando tasa actual.`);
+            r = await bcvService.getCurrentRate();
+          }
+        }
+
         if (r.success && r.data?.dollar) {
           this.formData.financial.exchangeRate = r.data.dollar;
         }
