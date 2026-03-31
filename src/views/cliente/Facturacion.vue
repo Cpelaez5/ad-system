@@ -404,8 +404,18 @@
     </v-card>
 
     <!-- Diálogo para nueva/editar factura -->
-    <v-dialog v-model="invoiceDialog" max-width="1200px" scrollable>
+    <!-- Para volver al formulario original: cambiar USE_SIMPLE_FORM a false en data() -->
+    <v-dialog v-model="invoiceDialog" max-width="1100px" scrollable>
+      <SimpleInvoiceForm
+        v-if="USE_SIMPLE_FORM"
+        ref="simpleForm"
+        :invoice="editingInvoice"
+        :flow="defaultFlow"
+        @submit="handleInvoiceSubmit"
+        @cancel="closeInvoiceDialog"
+      />
       <ClientInvoiceForm
+        v-else
         :invoice="editingInvoice"
         :flow="defaultFlow"
         @submit="handleInvoiceSubmit"
@@ -854,6 +864,7 @@ import invoiceService from '@/services/invoiceService.js';
 import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
 import ClientInvoiceForm from '@/components/forms/client/ClientInvoiceForm.vue';
+import SimpleInvoiceForm  from '@/components/forms/client/SimpleInvoiceForm.vue';
 import userService from '@/services/userService.js';
 import dayjs from 'dayjs';
 
@@ -861,6 +872,7 @@ export default {
   name: 'FacturacionCliente',
   components: {
     ClientInvoiceForm,
+    SimpleInvoiceForm,
     AnimatedNumber,
     StatsCard,
     CurrencyStatsCard,
@@ -897,6 +909,9 @@ export default {
       dateFromFilter: null, // Ahora es Date object o null
       dateToFilter: null, // Ahora es Date object o null
       
+      // ── Feature flag: cambiar a false para volver al formulario multi-paso ──
+      USE_SIMPLE_FORM: true,
+
       // Estados de diálogos
       invoiceDialog: false,
       deleteDialog: false,
@@ -1400,11 +1415,44 @@ export default {
     },
     
     async handleInvoiceSubmit(result) {
-      if (result.success) {
+      // ── Formato antiguo (ClientInvoiceForm emite { success: true }) ──────────
+      if (result && result.success === true) {
         this.closeInvoiceDialog();
         await this.loadInvoices();
+        return;
+      }
+
+      // ── Formato nuevo (SimpleInvoiceForm emite el formData directamente) ─────
+      // El padre es responsable de la llamada al servicio (S de SOLID)
+      try {
+        const formData = result; // result ES el formData aquí
+
+        let savedResult;
+        if (formData.id) {
+          savedResult = await invoiceService.updateInvoice(formData.id, formData);
+        } else {
+          savedResult = await invoiceService.createInvoice(formData);
+        }
+
+        // Notificar al SimpleInvoiceForm que terminó con éxito
+        if (this.$refs.simpleForm) {
+          this.$refs.simpleForm.onSaveSuccess();
+        }
+
+        this.closeInvoiceDialog();
+        await this.loadInvoices();
+
+      } catch (err) {
+        console.error('❌ [Facturacion] Error al guardar factura:', err);
+        // Notificar al SimpleInvoiceForm del error (no pierde los datos)
+        if (this.$refs.simpleForm) {
+          this.$refs.simpleForm.onSaveFailed(
+            err?.message || 'Ocurrió un error al guardar. Por favor intenta de nuevo.'
+          );
+        }
       }
     },
+
     
     // Helpers de formato
     formatDate(date) {
