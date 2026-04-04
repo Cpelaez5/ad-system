@@ -126,7 +126,6 @@ class InvoiceService {
         invoiceNumber: invoice.invoice_number,
         controlNumber: invoice.control_number,
         documentType: invoice.document_type,
-        documentType: invoice.document_type,
         flow: invoice.flow || 'VENTA',
         expense_type: invoice.expense_type,
         issueDate: invoice.issue_date,
@@ -288,9 +287,9 @@ class InvoiceService {
 
       console.log('📝 Datos a insertar:', invoiceRecord)
 
-      // Lógica de reintento para conflictos de numéro de factura (código 23505)
+      // Lógica de reintento para conflictos de número de factura (código 23505)
       let attempts = 0;
-      const maxAttempts = 5; // Aumentamos intentos
+      const maxAttempts = 5;
       let lastError = null;
       let newInvoice = null;
 
@@ -386,7 +385,36 @@ class InvoiceService {
       console.log('📄 Factura creada:', newInvoice)
 
       // 2. Procesar Movimientos de Inventario (Salida/Entrada)
-      await this.processInventoryMovements(newInvoice, false);
+      // Esto también actualiza los items con product_id si se crearon productos nuevos
+      const inventoryResult = await this.processInventoryMovements(newInvoice, false)
+
+      // 3. Si se crearon productos nuevos, actualizar los items de la factura con los product_id
+      if (inventoryResult?.createdProducts && inventoryResult.createdProducts.length > 0) {
+        console.log('📦 [INVENTARIO] Actualizando items con nuevos product_id...')
+        const updatedItems = newInvoice.items.map(item => {
+          // Buscar si este item tuvo un producto creado
+          const createdProduct = inventoryResult.createdProducts.find(
+            cp => cp.description === item.description || cp.tempId === item._key
+          )
+          if (createdProduct && !item.product_id) {
+            return { ...item, product_id: createdProduct.productId }
+          }
+          return item
+        })
+
+        // Actualizar en la base de datos
+        const { error: updateError } = await supabase
+          .from('invoices')
+          .update({ items: updatedItems })
+          .eq('id', newInvoice.id)
+
+        if (updateError) {
+          console.warn('⚠️ No se pudieron actualizar los items con product_id:', updateError.message)
+        } else {
+          console.log('✅ Items actualizados con product_id correctamente')
+          newInvoice.items = updatedItems // Actualizar para la respuesta
+        }
+      }
 
       // Transformar respuesta para el frontend
       const transformedInvoice = {
@@ -434,8 +462,10 @@ class InvoiceService {
         return { success: false, message: 'No hay organización disponible' }
       }
 
-      // 1. Obtener factura anterior para revertir el inventario antes de guardar los nuevos cambios
-      const { data: oldInvoice, error: fetchError } = await supabase
+      // 1. CRÍTICO: Obtener factura ANTES del update y hacer un deep copy inmutable de sus ítems.
+      //    Si capturamos DESPUÉS del update, los ítems ya serán los nuevos y el revert
+      //    duplicará el inventario en vez de revertirlo.
+      const { data: oldInvoiceRaw, error: fetchError } = await supabase
         .from('invoices')
         .select('items, flow, expense_type, invoice_number, id, status')
         .eq('id', id)
@@ -446,8 +476,24 @@ class InvoiceService {
         console.warn('⚠️ No se pudo obtener factura anterior para ajustar inventario:', fetchError)
       }
 
+      // Deep copy para garantizar inmutabilidad (el objeto queda congelado antes del update)
+      const oldInvoiceSnapshot = oldInvoiceRaw
+        ? { ...oldInvoiceRaw, items: JSON.parse(JSON.stringify(oldInvoiceRaw.items || [])) }
+        : null
+
+      // DEBUG: Log del snapshot antiguo para verificar items
+      console.log('📦 [INVENTARIO DEBUG] Snapshot antiguo:', {
+        flow: oldInvoiceSnapshot?.flow,
+        expense_type: oldInvoiceSnapshot?.expense_type,
+        items: oldInvoiceSnapshot?.items?.map(i => ({
+          description: i.description,
+          product_id: i.product_id,
+          quantity: i.quantity,
+          isInventory: i.isInventory
+        }))
+      })
+
       // Preparar datos para actualización
-      // Si el usuario es cliente, no permitir cambiar el client_id
       const userProfile = await this.getCurrentUserProfile()
       const updateData = {
         client_id: userProfile?.role === 'cliente' ? undefined : (invoiceData.clientId || null),
@@ -475,6 +521,12 @@ class InvoiceService {
       })
 
       console.log('📝 Datos a actualizar:', updateData)
+      console.log('📦 [INVENTARIO DEBUG] Datos nuevos items:', updateData.items?.map(i => ({
+        description: i.description,
+        product_id: i.product_id,
+        quantity: i.quantity,
+        isInventory: i.isInventory
+      })))
 
       const { data: updatedInvoice, error } = await supabase
         .from('invoices')
@@ -491,11 +543,15 @@ class InvoiceService {
 
       console.log('✅ Factura actualizada en Supabase:', updatedInvoice.id)
 
-      // 2. Actualizar Inventario (Revertir Old -> Aplicar New)
-      if (oldInvoice) {
-        await this.processInventoryMovements(oldInvoice, true) // Revertir lo que había
+      // 2. Actualizar Inventario: Calcular delta entre factura antigua y nueva
+      //    Esto es más preciso que revertir + aplicar, especialmente cuando cambian las cantidades
+      const inventoryResult = await this.updateInventoryForInvoiceEdit(oldInvoiceSnapshot, updatedInvoice)
+
+      if (inventoryResult.success) {
+        console.log('✅ Inventario actualizado correctamente:', inventoryResult.message)
+      } else {
+        console.warn('⚠️ No se pudo actualizar inventario:', inventoryResult.message)
       }
-      await this.processInventoryMovements(updatedInvoice, false) // Aplicar lo nuevo
 
       // Transformar respuesta para el frontend
       const transformedInvoice = {
@@ -532,7 +588,190 @@ class InvoiceService {
     }
   }
 
-  // Eliminar factura (enviar a papelera)
+  /**
+   * Actualiza el inventario calculando el delta entre factura antigua y nueva.
+   * Este método es más preciso que revertir + aplicar porque:
+   * 1. Maneja correctamente productos que cambiaron de cantidad
+   * 2. Maneja productos agregados/eliminados
+   * 3. Evita problemas de duplicación cuando los items no tienen product_id
+   */
+  async updateInventoryForInvoiceEdit(oldInvoice, newInvoice) {
+    console.log('🔄 [INVENTARIO] Calculando delta para edición...')
+
+    // Validaciones iniciales
+    if (!oldInvoice && !newInvoice) {
+      return { success: false, message: 'No hay facturas para comparar' }
+    }
+
+    // Si ambas facturas existen, calcular delta
+    const oldItems = oldInvoice?.items || []
+    const newItems = newInvoice?.items || []
+    const flow = newInvoice?.flow || oldInvoice?.flow
+    const expenseType = newInvoice?.expense_type ?? oldInvoice?.expense_type
+
+    console.log('📦 [INVENTARIO DEBUG] oldItems:', oldItems.length, 'newItems:', newItems.length)
+    console.log('📦 [INVENTARIO DEBUG] flow:', flow, 'expenseType:', expenseType)
+
+    // Solo procesar si es COMPRA de mercancía (afecta inventario)
+    const isPurchase = flow === 'COMPRA'
+    const isInventoryFlow = isPurchase && expenseType === 'COMPRA'
+
+    // Para VENTA también debemos procesar inventario (salida de stock)
+    const isSale = flow === 'VENTA'
+
+    if (!isInventoryFlow && !isSale) {
+      console.log('📦 [INVENTARIO] No es flujo de inventario (flow:', flow, 'expenseType:', expenseType, ')')
+      return { success: true, message: 'No requiere actualización de inventario' }
+    }
+
+    // Crear mapas de productos por product_id
+    const oldMap = new Map()
+    oldItems.forEach(item => {
+      if (item.product_id) {
+        const existing = oldMap.get(item.product_id) || { quantity: 0, item }
+        existing.quantity += parseFloat(item.quantity) || 0
+        oldMap.set(item.product_id, existing)
+      }
+    })
+
+    const newMap = new Map()
+    newItems.forEach(item => {
+      if (item.product_id) {
+        const existing = newMap.get(item.product_id) || { quantity: 0, item }
+        existing.quantity += parseFloat(item.quantity) || 0
+        newMap.set(item.product_id, existing)
+      }
+    })
+
+    console.log('📦 [INVENTARIO DEBUG] oldMap:', Array.from(oldMap.entries()).map(([k, v]) => ({ id: k, qty: v.quantity })))
+    console.log('📦 [INVENTARIO DEBUG] newMap:', Array.from(newMap.entries()).map(([k, v]) => ({ id: k, qty: v.quantity })))
+
+    // Calcular deltas
+    const deltas = []
+    const allProductIds = new Set([...oldMap.keys(), ...newMap.keys()])
+
+    allProductIds.forEach(productId => {
+      const oldQty = oldMap.get(productId)?.quantity || 0
+      const newQty = newMap.get(productId)?.quantity || 0
+      const delta = newQty - oldQty
+
+      if (delta !== 0) {
+        deltas.push({
+          product_id: productId,
+          oldQty,
+          newQty,
+          delta,
+          item: newMap.get(productId)?.item || oldMap.get(productId)?.item
+        })
+      }
+    })
+
+    console.log('📦 [INVENTARIO DEBUG] Deltas calculados:', deltas)
+
+    // Aplicar cada delta al inventario
+    const results = []
+    for (const delta of deltas) {
+      const movementType = flow === 'VENTA'
+        ? (delta.delta > 0 ? 'OUT_SALE' : 'IN_RETURN')  // Venta: +delta = salir más, -delta = devolver
+        : (delta.delta > 0 ? 'IN_PURCHASE' : 'OUT_RETURN')  // Compra: +delta = entrar más, -delta = devolver
+
+      const qty = Math.abs(delta.delta)
+
+      if (qty > 0) {
+        console.log(`📦 [INVENTARIO] Aplicando delta para producto ${delta.product_id}: ${delta.oldQty} -> ${delta.newQty} (delta: ${delta.delta}, movimiento: ${movementType})`)
+
+        try {
+          const result = await inventoryService.registerMovement({
+            product_id: delta.product_id,
+            movement_type: movementType,
+            quantity: qty,
+            cost_price: delta.item?.unitPrice || null,
+            reference_id: newInvoice?.id || oldInvoice?.id,
+            description: `Ajuste por edición de ${flow === 'VENTA' ? 'venta' : 'compra'} Ref: ${newInvoice?.invoice_number || oldInvoice?.invoice_number}`
+          })
+
+          results.push({ product_id: delta.product_id, success: true, delta: delta.delta, result })
+        } catch (err) {
+          console.error(`❌ [INVENTARIO] Error aplicando delta para producto ${delta.product_id}:`, err)
+          results.push({ product_id: delta.product_id, success: false, error: err.message })
+        }
+      }
+    }
+
+    // Verificar si hubo errores
+    const errors = results.filter(r => !r.success)
+    if (errors.length > 0) {
+      return {
+        success: false,
+        message: `Se procesaron ${results.length - errors.length} de ${results.length} productos correctamente`,
+        errors
+      }
+    }
+
+    return {
+      success: true,
+      message: `Se actualizaron ${results.length} productos en inventario`,
+      results
+    }
+  }
+
+  async calculateInventoryDelta(oldItems, newItems, invoiceFlow, isReversal = false) {
+  console.log('🔄 Calculando diferencias de inventario...');
+  
+  // Convertir a mapas por product_id para comparar fácil
+  const oldMap = {};
+  const newMap = {};
+  
+  // Llenar mapas ANTES
+  (oldItems || []).forEach(item => {
+    if (item.product_id) oldMap[item.product_id] = parseFloat(item.quantity) || 0;
+  });
+  
+  // Llenar mapas DESPUÉS  
+  (newItems || []).forEach(item => {
+    if (item.product_id) newMap[item.product_id] = parseFloat(item.quantity) || 0;
+  });
+  
+  const deltas = [];
+  
+  // 1. Productos que existían ANTES
+  Object.keys(oldMap).forEach(productId => {
+    const oldQty = oldMap[productId];
+    const newQty = newMap[productId] || 0;
+    const delta = newQty - oldQty;  // ← ¡LA MAGIA!
+    
+    if (delta !== 0) {
+      deltas.push({
+        product_id: productId,
+        delta_quantity: delta,
+        movement_type: this.getMovementType(invoiceFlow, isReversal)
+      });
+    }
+  });
+  
+  // 2. Productos NUEVOS (no existían antes)
+  Object.keys(newMap).forEach(productId => {
+    if (!oldMap[productId]) {
+      deltas.push({
+        product_id: productId,
+        delta_quantity: newMap[productId],
+        movement_type: this.getMovementType(invoiceFlow, isReversal)
+      });
+    }
+  });
+  
+  console.log('📊 Deltas calculados:', deltas);
+  return deltas;
+}
+
+// 🔄 Helper para tipo de movimiento
+  getMovementType(flow, isReversal) {
+    if (isReversal) {
+      return flow === 'VENTA' ? 'IN_RETURN' : 'OUT_RETURN';
+    }
+    return flow === 'VENTA' ? 'OUT_SALE' : 'IN_PURCHASE';
+  }
+
   // Eliminar factura (enviar a papelera)
   async deleteInvoice(id) {
     try {
@@ -1041,15 +1280,32 @@ class InvoiceService {
 
   // Procesar movimientos de inventario basados en la factura
   // isReversal: si es true, invertimos el movimiento (ej: anular factura)
-  async processInventoryMovements(invoice, isReversal = false) {
+  // options.skipAutoCreate: si es true, no crear productos nuevos (usar en updates, no en creates)
+  // Devuelve: { success: boolean, createdProducts: Array<{ productId, description, tempId }> }
+  async processInventoryMovements(invoice, isReversal = false, options = {}) {
+
+    console.log('🔍 [INVENTARIO] Procesando movimientos:')
+    console.log('- items:', invoice.items?.length || 0)
+    console.log('- flow:', invoice.flow)
+    console.log('- expense_type:', invoice.expense_type)
+    console.log('- isReversal:', isReversal)
+
+    const { skipAutoCreate = false } = options
+    const result = { success: true, createdProducts: [], movements: [] }
+
     try {
-      if (!invoice.items || !Array.isArray(invoice.items)) return
+      if (!invoice.items || !Array.isArray(invoice.items)) {
+        return result
+      }
 
       const isPurchase = invoice.flow === 'COMPRA'
       const isSale = invoice.flow === 'VENTA'
 
       // Si es COMPRA, debe ser de tipo COMPRA (Mercancía) para afectar inventario
-      if (isPurchase && invoice.expense_type !== 'COMPRA') return
+      if (isPurchase && invoice.expense_type !== 'COMPRA') {
+        console.log('📦 [INVENTARIO] No es compra de mercancía, saltando inventario')
+        return result
+      }
 
       // Si es reversing, invertimos la lógica
       let movementType = ''
@@ -1062,7 +1318,12 @@ class InvoiceService {
         if (isSale) movementType = 'OUT_SALE'
       }
 
-      if (!movementType) return
+      if (!movementType) {
+        console.log('📦 [INVENTARIO] No se determinó tipo de movimiento, saltando')
+        return result
+      }
+
+      console.log(`📦 [INVENTARIO] Tipo de movimiento: ${movementType}`)
 
       for (const item of invoice.items) {
         let productId = item.product_id
@@ -1070,33 +1331,69 @@ class InvoiceService {
         // --- Auto-crear producto si viene de texto libre en una compra de mercancía ---
         // Si el ítem de una compra tiene isInventory:true pero no tiene product_id,
         // creamos el producto silenciosamente para que quede disponible en el catálogo.
-        if (!productId && item.isInventory && isPurchase && !isReversal) {
-          const itemName = item.description || 'Producto sin nombre'
+        if (!productId && item.isInventory && isPurchase && !isReversal && !skipAutoCreate) {
+          const itemName = (item.description || 'Producto sin nombre').trim()
           try {
-            console.log(`🆕 Auto-creando producto para ítem de compra: "${itemName}"`)
-            const newProduct = await inventoryService.createProduct({
-              name: itemName,
-              code: null,
-              stock: 0, // El movimiento lo actualizará
-              cost_price: parseFloat(item.unitPrice) || 0,
-              sale_price: parseFloat(item.unitPrice) || 0, // Costo como precio base hasta que el usuario lo ajuste
-              unit: item.unit || 'UND',
-              min_stock: 0,
-              status: 'ACTIVE'
-            })
+            // ANTI-DUPLICADO: Buscar si ya existe un producto con ese nombre exacto
+            // antes de crear uno nuevo. Esto evita que se creen duplicados al guardar
+            // la misma factura varias veces o al editar.
+            const existingProducts = await inventoryService.getProducts({ search: itemName, limit: 5 })
+            const exactMatch = existingProducts?.find(p =>
+              p.name.toLowerCase().trim() === itemName.toLowerCase()
+            )
 
-            // La función createProduct devuelve { data: [...], error } via insertWithTenant
-            if (newProduct?.data && newProduct.data.length > 0) {
-              productId = newProduct.data[0].id
-              console.log(`✅ Producto auto-creado: ${itemName} → ID ${productId}`)
-            } else if (newProduct?.id) {
-              productId = newProduct.id
+            if (exactMatch) {
+              // Reutilizar el producto existente
+              productId = exactMatch.id
+              console.log(`♻️ [INVENTARIO] Producto ya existe, reutilizando: "${itemName}" → ID ${productId}`)
+              // Registrar el producto creado (aunque sea existente) para que se pueda asociar al item
+              result.createdProducts.push({
+                productId: productId,
+                description: itemName,
+                tempId: item._key || null,
+                reused: true
+              })
             } else {
-              console.warn(`⚠️ No se pudo auto-crear el producto "${itemName}":`, newProduct)
-              continue // Saltar este ítem si falla la creación
+              // Solo crear si NO existe
+              console.log(`🆕 [INVENTARIO] Auto-creando producto nuevo: "${itemName}"`)
+              const newProduct = await inventoryService.createProduct({
+                name: itemName,
+                code: null,
+                stock: 0, // El movimiento lo actualizará
+                cost_price: parseFloat(item.unitPrice) || 0,
+                sale_price: parseFloat(item.unitPrice) || 0,
+                unit: item.unit || 'UND',
+                min_stock: 0,
+                status: 'ACTIVE'
+              })
+
+              // La función createProduct devuelve { data: [...], error } via insertWithTenant
+              if (newProduct?.data && newProduct.data.length > 0) {
+                productId = newProduct.data[0].id
+                console.log(`✅ [INVENTARIO] Producto auto-creado: ${itemName} → ID ${productId}`)
+                // Registrar el producto creado para que se pueda actualizar el item
+                result.createdProducts.push({
+                  productId: productId,
+                  description: itemName,
+                  tempId: item._key || null,
+                  reused: false
+                })
+              } else if (newProduct?.id) {
+                productId = newProduct.id
+                console.log(`✅ [INVENTARIO] Producto auto-creado: ${itemName} → ID ${productId}`)
+                result.createdProducts.push({
+                  productId: productId,
+                  description: itemName,
+                  tempId: item._key || null,
+                  reused: false
+                })
+              } else {
+                console.warn(`⚠️ [INVENTARIO] No se pudo auto-crear el producto "${itemName}":`, newProduct)
+                continue // Saltar este ítem si falla la creación
+              }
             }
           } catch (createErr) {
-            console.error(`❌ Error auto-creando producto "${itemName}":`, createErr)
+            console.error(`❌ [INVENTARIO] Error auto-creando producto "${itemName}":`, createErr)
             continue
           }
         }
@@ -1110,6 +1407,8 @@ class InvoiceService {
           // Costo: en compras usamos el precio unitario. En reversiones no actualizamos costo.
           const cost = (!isReversal && isPurchase) ? (parseFloat(item.unitPrice) || 0) : null
 
+          console.log(`📦 [INVENTARIO] Registrando movimiento: producto=${productId}, qty=${qty}, tipo=${movementType}`)
+
           await inventoryService.registerMovement({
             product_id: productId,
             movement_type: movementType,
@@ -1118,13 +1417,25 @@ class InvoiceService {
             reference_id: invoice.id,
             description: `${isReversal ? 'Anulación/Borrado' : ''} ${isPurchase ? 'Compra' : 'Venta'} Ref: ${invoice.invoice_number}`
           })
+
+          result.movements.push({
+            productId,
+            quantity: qty,
+            movementType
+          })
         }
       }
 
+      console.log(`✅ [INVENTARIO] Procesamiento completado: ${result.movements.length} movimientos, ${result.createdProducts.length} productos creados/reutilizados`)
+
     } catch (e) {
-      console.error('Error processing inventory movements', e)
+      console.error('❌ [INVENTARIO] Error processing inventory movements:', e)
+      result.success = false
+      result.error = e.message
       // No lanzamos error para no romper el flujo de factura, pero logueamos
     }
+
+    return result
   }
 
 }

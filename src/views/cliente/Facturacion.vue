@@ -1151,13 +1151,20 @@ export default {
         
         // 1. Cargar Ventas (donde yo soy el emisor - aproximación por frontend filter)
         // Nota: getInvoices({ flow: 'VENTA' }) trae todas las ventas de la org.
-        // Debemos filtrar por mi RIF o ID si es posible.
+        // debemos filtrar por mi RIF o ID si es posible.
         const allSales = await invoiceService.getInvoices({ flow: 'VENTA' });
+        
+        // Obtener el RIF del cliente desde user.client.rif
+        const myRif = this.currentUser.client?.rif;
+        
         const mySales = allSales.filter(inv => {
           // Filtrar donde el emisor soy yo
           // Asumimos que currentUser tiene RIF o nombre de empresa
-          if (!this.currentUser.rif) return true; // Si no tengo RIF, mostrar todo (fallback)
-          return inv.issuer?.rif === this.currentUser.rif;
+          if (!myRif) {
+            console.warn('⚠️ Cliente sin RIF configurado, mostrando todas las ventas');
+            return true; // Si no tengo RIF, mostrar todo (fallback)
+          }
+          return inv.issuer?.rif === myRif;
         });
         
         // 2. Cargar Compras (donde yo soy el cliente)
