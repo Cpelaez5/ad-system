@@ -230,10 +230,18 @@
               class="flex-grow-1 mr-4"
               style="max-width: 400px;"
             ></v-text-field>
+            <v-checkbox
+              v-model="showDeletedProducts"
+              label="Incluir eliminados"
+              density="compact"
+              hide-details
+              class="mr-4"
+              @update:model-value="loadProducts"
+            ></v-checkbox>
             <v-spacer></v-spacer>
             <v-btn icon="mdi-refresh" variant="text" @click="loadProducts"></v-btn>
           </v-card-title>
-          
+
           <v-data-table
             :headers="productHeaders"
             :items="filteredProducts"
@@ -241,6 +249,24 @@
             :search="productSearch"
             hover
           >
+            <!-- Indicador de producto eliminado -->
+            <template v-slot:item.name="{ item }">
+              <div class="d-flex align-center">
+                <span :class="{ 'text-decoration-line-through text-grey': item.deleted_at }">
+                  {{ item.name }}
+                </span>
+                <v-chip
+                  v-if="item.deleted_at"
+                  size="x-small"
+                  color="error"
+                  variant="tonal"
+                  class="ml-2"
+                >
+                  Eliminado
+                </v-chip>
+              </div>
+            </template>
+
             <!-- Stock con Color -->
             <template v-slot:item.stock="{ item }">
               <v-chip
@@ -252,7 +278,7 @@
                 {{ item.stock }} {{ item.unit }}
               </v-chip>
             </template>
-            
+
             <!-- Precios -->
             <template v-slot:item.cost_price="{ item }">
               {{ formatCurrency(item.cost_price) }}
@@ -264,9 +290,22 @@
             <!-- Acciones -->
             <template v-slot:item.actions="{ item }">
               <div class="d-flex">
-                <v-btn icon="mdi-pencil" size="small" variant="text" color="primary" @click="openProductDialog(item)"></v-btn>
-                <v-btn icon="mdi-history" size="small" variant="text" color="info" @click="viewMovements(item)" title="Ver Kardex"></v-btn>
-                <v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="confirmDeleteProduct(item)"></v-btn>
+                <template v-if="!item.deleted_at">
+                  <v-btn icon="mdi-pencil" size="small" variant="text" color="primary" @click="openProductDialog(item)"></v-btn>
+                  <v-btn icon="mdi-history" size="small" variant="text" color="info" @click="viewMovements(item)" title="Ver Kardex"></v-btn>
+                  <v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="openDeleteDialog(item)"></v-btn>
+                </template>
+                <template v-else>
+                  <v-btn
+                    icon="mdi-restore"
+                    size="small"
+                    variant="text"
+                    color="success"
+                    @click="openRestoreDialog(item)"
+                    title="Restaurar producto"
+                  ></v-btn>
+                  <v-btn icon="mdi-history" size="small" variant="text" color="info" @click="viewMovements(item)" title="Ver Kardex"></v-btn>
+                </template>
               </div>
             </template>
           </v-data-table>
@@ -471,11 +510,68 @@
       </v-card>
     </v-dialog>
 
-    <InventoryAdjustmentDialog 
+    <InventoryAdjustmentDialog
         v-model="adjustmentDialog"
         @saved="() => { loadDashboard(); loadProducts(); }"
     />
-    
+
+    <!-- Diálogo Confirmar Eliminación (Soft Delete) -->
+    <v-dialog v-model="deleteConfirmDialog" max-width="500px">
+      <v-card>
+        <v-card-title class="text-h6 bg-error text-white">
+          <v-icon start color="white">mdi-delete-alert</v-icon>
+          Eliminar Producto
+        </v-card-title>
+        <v-card-text class="pt-4">
+          <p class="mb-3">
+            ¿Está seguro que desea eliminar el producto <strong>{{ productToDelete?.name }}</strong>?
+          </p>
+          <v-alert type="warning" variant="tonal" density="compact" class="mb-3">
+            <strong>Este producto se marcará como eliminado.</strong>
+          </v-alert>
+          <ul class="text-caption text-grey-darken-1 pl-4">
+            <li>No afectará el historial de stock ni movimientos anteriores.</li>
+            <li>No aparecerá en el buscador de ventas ni en listas de productos activos.</li>
+            <li>Podrá restaurarlo posteriormente si es necesario.</li>
+          </ul>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="deleteConfirmDialog = false">Cancelar</v-btn>
+          <v-btn color="error" variant="elevated" @click="confirmDeleteProduct">
+            <v-icon start>mdi-delete</v-icon>
+            Eliminar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Diálogo Confirmar Restauración -->
+    <v-dialog v-model="restoreConfirmDialog" max-width="450px">
+      <v-card>
+        <v-card-title class="text-h6 bg-success text-white">
+          <v-icon start color="white">mdi-restore</v-icon>
+          Restaurar Producto
+        </v-card-title>
+        <v-card-text class="pt-4">
+          <p>
+            ¿Desea restaurar el producto <strong>{{ productToRestore?.name }}</strong>?
+          </p>
+          <p class="text-caption text-grey mt-2">
+            El producto volverá a estar activo y aparecerá en el buscador de ventas.
+          </p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="restoreConfirmDialog = false">Cancelar</v-btn>
+          <v-btn color="success" variant="elevated" @click="confirmRestoreProduct">
+            <v-icon start>mdi-restore</v-icon>
+            Restaurar
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Dialogo Exportar Resumen -->
     <v-dialog v-model="exportDialog" max-width="400px">
       <v-card>
@@ -568,6 +664,14 @@ export default {
         min_stock: 5,
         initial_stock: 0
       },
+
+      // Soft delete UI
+      showDeletedProducts: false,
+      deleteConfirmDialog: false,
+      productToDelete: null,
+      deletedProducts: [],
+      restoreConfirmDialog: false,
+      productToRestore: null,
 
       movementsDialog: false,
       selectedProductForMovements: null,
@@ -757,7 +861,7 @@ export default {
     async loadProducts() {
       this.loadingProducts = true
       try {
-        this.products = await inventoryService.getProducts()
+        this.products = await inventoryService.getProducts({ includeDeleted: this.showDeletedProducts })
       } catch (e) {
         console.error(e)
       } finally {
@@ -832,12 +936,43 @@ export default {
         console.error('Error saving product', e)
       }
     },
-    
-    async confirmDeleteProduct(item) {
-        if(confirm('¿Eliminar producto? Si tiene movimientos, esto podría afectar reportes históricos.')) {
-            await inventoryService.deleteProduct(item.id)
-            this.loadProducts()
-        }
+
+    // Abrir diálogo de confirmación de eliminación
+    openDeleteDialog(item) {
+      this.productToDelete = item
+      this.deleteConfirmDialog = true
+    },
+
+    // Confirmar soft delete
+    async confirmDeleteProduct() {
+      try {
+        await inventoryService.deleteProduct(this.productToDelete.id)
+        this.deleteConfirmDialog = false
+        this.productToDelete = null
+        this.loadProducts()
+        this.loadDashboard()
+      } catch (e) {
+        console.error('Error deleting product', e)
+      }
+    },
+
+    // Abrir diálogo de restauración
+    openRestoreDialog(item) {
+      this.productToRestore = item
+      this.restoreConfirmDialog = true
+    },
+
+    // Confirmar restauración de producto
+    async confirmRestoreProduct() {
+      try {
+        await inventoryService.restoreProduct(this.productToRestore.id)
+        this.restoreConfirmDialog = false
+        this.productToRestore = null
+        this.loadProducts()
+        this.loadDashboard()
+      } catch (e) {
+        console.error('Error restoring product', e)
+      }
     },
 
     // Kardex
