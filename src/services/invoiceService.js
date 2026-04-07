@@ -715,63 +715,6 @@ class InvoiceService {
     }
   }
 
-  async calculateInventoryDelta(oldItems, newItems, invoiceFlow, isReversal = false) {
-  console.log('🔄 Calculando diferencias de inventario...');
-  
-  // Convertir a mapas por product_id para comparar fácil
-  const oldMap = {};
-  const newMap = {};
-  
-  // Llenar mapas ANTES
-  (oldItems || []).forEach(item => {
-    if (item.product_id) oldMap[item.product_id] = parseFloat(item.quantity) || 0;
-  });
-  
-  // Llenar mapas DESPUÉS  
-  (newItems || []).forEach(item => {
-    if (item.product_id) newMap[item.product_id] = parseFloat(item.quantity) || 0;
-  });
-  
-  const deltas = [];
-  
-  // 1. Productos que existían ANTES
-  Object.keys(oldMap).forEach(productId => {
-    const oldQty = oldMap[productId];
-    const newQty = newMap[productId] || 0;
-    const delta = newQty - oldQty;  // ← ¡LA MAGIA!
-    
-    if (delta !== 0) {
-      deltas.push({
-        product_id: productId,
-        delta_quantity: delta,
-        movement_type: this.getMovementType(invoiceFlow, isReversal)
-      });
-    }
-  });
-  
-  // 2. Productos NUEVOS (no existían antes)
-  Object.keys(newMap).forEach(productId => {
-    if (!oldMap[productId]) {
-      deltas.push({
-        product_id: productId,
-        delta_quantity: newMap[productId],
-        movement_type: this.getMovementType(invoiceFlow, isReversal)
-      });
-    }
-  });
-  
-  console.log('📊 Deltas calculados:', deltas);
-  return deltas;
-}
-
-// 🔄 Helper para tipo de movimiento
-  getMovementType(flow, isReversal) {
-    if (isReversal) {
-      return flow === 'VENTA' ? 'IN_RETURN' : 'OUT_RETURN';
-    }
-    return flow === 'VENTA' ? 'OUT_SALE' : 'IN_PURCHASE';
-  }
-
   // Eliminar factura (enviar a papelera)
   async deleteInvoice(id) {
     try {
@@ -1354,12 +1297,24 @@ class InvoiceService {
                 reused: true
               })
             } else {
-              // Solo crear si NO existe
+              // Solo crear si NO existe — generar SKU automático
               console.log(`🆕 [INVENTARIO] Auto-creando producto nuevo: "${itemName}"`)
+
+              // Generar SKU secuencial (PROD-001, PROD-002, etc.)
+              let autoCode = item.code || null
+              if (!autoCode) {
+                try {
+                  autoCode = await inventoryService.getNextProductSku()
+                  console.log(`🏷️ [INVENTARIO] SKU auto-generado: ${autoCode}`)
+                } catch {
+                  autoCode = `PROD-${Date.now().toString().slice(-5)}`
+                }
+              }
+
               const newProduct = await inventoryService.createProduct({
                 name: itemName,
-                code: null,
-                stock: 0, // El movimiento lo actualizará
+                code: autoCode,          // SKU auto-generado o del OCR
+                stock: 0,                // El movimiento lo actualizará
                 cost_price: parseFloat(item.unitPrice) || 0,
                 sale_price: parseFloat(item.unitPrice) || 0,
                 unit: item.unit || 'UND',

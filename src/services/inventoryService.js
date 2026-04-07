@@ -408,6 +408,114 @@ class InventoryService {
             return { totalProducts: 0, totalValueCost: 0, totalValueSale: 0 }
         }
     }
+
+    /**
+     * Obtiene el siguiente código SKU auto-generado para un producto nuevo.
+     * Usa la función RPC get_next_product_sku en Supabase para garantizar
+     * unicidad y evitar condiciones de carrera.
+     * @returns {Promise<string>} SKU tipo 'PROD-001'
+     */
+    async getNextProductSku() {
+        try {
+            const orgId = getCurrentOrganizationId()
+            const { data, error } = await supabase.rpc('get_next_product_sku', {
+                org_id: orgId
+            })
+            if (error) throw error
+            return data || 'PROD-001'
+        } catch (error) {
+            console.warn('Error obteniendo siguiente SKU, usando fallback:', error)
+            // Fallback: timestamp corto como SKU único
+            return `PROD-${Date.now().toString().slice(-5)}`
+        }
+    }
+
+    /**
+     * Top productos vendidos usando agregación server-side (RPC).
+     * Reemplaza la carga de 1000 movimientos + group-by en el cliente.
+     * @param {number} limit - Cuántos productos traer (default 5)
+     * @returns {Promise<Array>}
+     */
+    async getTopSellingProducts(limit = 5) {
+        try {
+            const orgId = getCurrentOrganizationId()
+            const clientId = getCurrentClientId()
+
+            const { data, error } = await supabase.rpc('get_top_selling_products', {
+                org_id: orgId,
+                client_id_filter: clientId || null,
+                result_limit: limit
+            })
+
+            if (error) throw error
+
+            // Normalizar al formato que usa el componente
+            return (data || []).map(row => ({
+                name:         row.product_name,
+                unit:         row.product_unit || 'UND',
+                totalSold:    parseFloat(row.total_sold) || 0,
+                totalRevenue: parseFloat(row.total_revenue) || 0
+            }))
+        } catch (error) {
+            console.error('Error getTopSellingProducts:', error)
+            return []
+        }
+    }
+
+    /**
+     * Productos con stock bajo usando filtro server-side (RPC).
+     * Reemplaza el patrón: getProducts() + filtrar en cliente.
+     * @returns {Promise<Array>}
+     */
+    async getLowStockProducts() {
+        try {
+            const orgId = getCurrentOrganizationId()
+            const clientId = getCurrentClientId()
+
+            const { data, error } = await supabase.rpc('get_low_stock_products', {
+                org_id: orgId,
+                client_id_filter: clientId || null
+            })
+
+            if (error) throw error
+            return data || []
+        } catch (error) {
+            console.error('Error getLowStockProducts:', error)
+            return []
+        }
+    }
+
+    /**
+     * Busca productos por nombre o código exacto para match de OCR.
+     * Retorna el primer match exacto o null.
+     * @param {string} nameOrCode - Nombre o código a buscar
+     * @returns {Promise<Object|null>}
+     */
+    async findProductByNameOrCode(nameOrCode) {
+        if (!nameOrCode) return null
+        try {
+            const term = nameOrCode.trim().toLowerCase()
+            const { data, error } = await supabase
+                .from(this.productsTable)
+                .select('*')
+                .eq('organization_id', getCurrentOrganizationId())
+                .is('deleted_at', null)
+                .or(`name.ilike.${term},code.ilike.${term}`)
+                .limit(10)
+
+            if (error) throw error
+
+            // Buscar match exacto primero, luego parcial
+            const exactMatch = (data || []).find(p =>
+                p.name.toLowerCase() === term ||
+                (p.code && p.code.toLowerCase() === term)
+            )
+            return exactMatch || data?.[0] || null
+        } catch (error) {
+            console.error('Error findProductByNameOrCode:', error)
+            return null
+        }
+    }
 }
 
 export default new InventoryService()

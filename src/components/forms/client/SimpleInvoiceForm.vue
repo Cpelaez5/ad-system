@@ -362,6 +362,14 @@
             <v-row dense align="center">
               <!-- Descripción / producto -->
               <v-col cols="12" sm="5">
+                <!-- Indicador de código/SKU si viene del OCR y no es producto de inventario -->
+                <div v-if="item.code && !item.product_id" class="d-flex align-center gap-1 mb-1">
+                  <v-chip size="x-small" color="info" variant="tonal">
+                    <v-icon start size="12">mdi-barcode</v-icon>
+                    {{ item.code }}
+                  </v-chip>
+                  <span class="text-caption text-grey">Detectado del documento</span>
+                </div>
                 <ProductAutocomplete
                   v-if="showProductSearch"
                   v-model="item.product"
@@ -418,7 +426,7 @@
                 />
               </v-col>
 
-              <!-- Total (readonly) -->
+              <!-- Total (calculado automáticamente) -->
               <v-col cols="4" sm="2">
                 <v-text-field
                   :model-value="formatNumber(item.total)"
@@ -621,6 +629,7 @@
 import invoiceService from '@/services/invoiceService.js';
 import userService from '@/services/userService.js';
 import clientOcrService from '@/services/clientOcrService.js';
+import inventoryService from '@/services/inventoryService.js';
 import bcvService from '@/services/bcvService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
@@ -863,7 +872,18 @@ export default {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     newItem() {
-      return { _key: ++_itemKey, description: '', quantity: 1, unitPrice: 0, total: 0, isInventory: false, product: null, product_id: null };
+      return {
+        _key: ++_itemKey,
+        code: null,           // SKU/Código del producto (si existe en inventario o viene del OCR)
+        description: '',
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        unit: null,           // Unidad de medida
+        isInventory: false,
+        product: null,
+        product_id: null
+      };
     },
 
     formatNumber(n) {
@@ -1034,15 +1054,21 @@ export default {
       if (!product) return;
       const item = this.formData.items[index];
       if (typeof product === 'string') {
+        // El usuario escribió texto libre
         item.description = product;
+        item.code = null;
         item.product = null;
         item.product_id = null;
+        item.unit = null;
         const isCompra = this.formData.flow === 'COMPRA' && this.formData.expense_type === 'COMPRA';
         item.isInventory = isCompra;
       } else {
+        // El usuario seleccionó un producto del inventario
         item.product     = product;
         item.product_id  = product.id;
+        item.code         = product.code || null;  // Código/SKU del inventario
         item.description = product.name;
+        item.unit         = product.unit || null;
         item.unitPrice   = this.formData.flow === 'COMPRA' ? (product.cost_price || 0) : (product.sale_price || 0);
         item.total       = parseFloat((item.quantity * item.unitPrice).toFixed(2));
         item.isInventory = true;
@@ -1063,78 +1089,232 @@ export default {
 
       try {
         const userContext = {
-          companyName: this.currentUser?.companyName || this.currentUser?.name,
-          rif:         this.currentUser?.rif
+          companyName: this.currentUser?.companyName || this.currentUser?.name || this.currentUser?.client?.company_name || '',
+          rif:         this.currentUser?.rif || this.currentUser?.client?.rif || ''
         };
 
+        console.log('🤖 [OCR] Enviando contexto del usuario:', userContext);
+
         const data = await clientOcrService.extractInvoiceData(file, this.formData.flow || null, userContext);
-        
+
+        console.log('🤖 [OCR] Respuesta recibida:', {
+          detectedFlow: data.detectedFlow,
+          flowConfidence: data.flowConfidence,
+          flowReason: data.flowReason,
+          documentType: data.documentType
+        });
+
         // Evitar que los watchers financieros re-escriban la data de la IA inmediatamente
         this.isMappingOcr = true;
 
-        // Aplicar flujo detectado
+        // ═══════════════════════════════════════════════════════════════
+        // PASO 1: APLICAR FLUJO DETECTADO
+        // ═══════════════════════════════════════════════════════════════
         if (data.detectedFlow) {
           let targetFlow = data.detectedFlow;
-          let targetExpense = 'COMPRA';
-          if (data.detectedFlow === 'GASTO') { targetFlow = 'COMPRA'; targetExpense = 'GASTO'; }
-          const matchingOpt = this.flowOptions.find(o => o.value === targetFlow && o.expenseType === (targetFlow === 'COMPRA' ? targetExpense : null));
-          if (matchingOpt) this.selectFlow(matchingOpt);
+          let targetExpense = data.detectedFlow === 'GASTO' ? 'GASTO' : (data.detectedFlow === 'COMPRA' ? 'COMPRA' : null);
+
+          // GASTO se guarda como COMPRA con expense_type='GASTO'
+          if (data.detectedFlow === 'GASTO') {
+            targetFlow = 'COMPRA';
+            targetExpense = 'GASTO';
+          }
+
+          const matchingOpt = this.flowOptions.find(o =>
+            o.value === targetFlow &&
+            (targetFlow === 'VENTA' || o.expenseType === targetExpense)
+          );
+
+          if (matchingOpt) {
+            this.selectFlow(matchingOpt);
+            console.log('✅ [OCR] Flujo aplicado:', matchingOpt.label);
+          }
         }
 
-        // Mapear campos extraídos
+        // ═══════════════════════════════════════════════════════════════
+        // PASO 2: MAPEAR DOCUMENTO
+        // ═══════════════════════════════════════════════════════════════
         if (data.invoiceNumber)  this.formData.invoiceNumber = data.invoiceNumber;
         if (data.controlNumber)  this.formData.controlNumber = data.controlNumber;
         if (data.issueDate)      this.formData.issueDate     = data.issueDate;
         if (data.documentType)   this.formData.documentType  = data.documentType;
+        if (data.documentCategory) this.formData.documentCategory = data.documentCategory;
 
-        // Empresa contraparte
-        if (data.issuer) {
-          if (this.formData.flow === 'COMPRA' && data.issuer.companyName) {
-            this.formData.issuer.companyName = data.issuer.companyName;
-            this.formData.issuer.rif         = data.issuer.rif || '';
+        // ═══════════════════════════════════════════════════════════════
+        // PASO 3: MAPEAR CONTRAPARTE (LA PARTE MÁS IMPORTANTE)
+        // ═══════════════════════════════════════════════════════════════
+        // En VENTA: el usuario es el EMISOR, la contraparte es el CLIENTE del documento
+        // En COMPRA/GASTO: el usuario es el CLIENTE, la contraparte es el EMISOR del documento
+
+        console.log('🤖 [OCR] Flujo actual:', this.formData.flow);
+        console.log('🤖 [OCR] Issuer extraído:', data.issuer);
+        console.log('🤖 [OCR] Client extraído:', data.client);
+
+        if (this.formData.flow === 'VENTA') {
+          // En VENTA: Yo soy el emisor, la contraparte es el cliente que aparece en el documento
+          // El campo "client" del documento es quien me compró
+          if (data.client?.companyName) {
+            this.counterpartName = data.client.companyName;
+            this.counterpartRif = data.client.rif || '';
+            console.log('✅ [OCR] VENTA - Contraparte (cliente):', data.client.companyName);
           }
-          if (this.formData.flow === 'VENTA' && data.client?.companyName) {
-            this.formData.client.companyName = data.client.companyName;
-            this.formData.client.rif         = data.client.rif || '';
+          // Mis datos como emisor (pre-llenados, pero actualizamos si hay datos nuevos)
+          if (data.issuer?.address) this.myAddress = data.issuer.address;
+          if (data.issuer?.phone) this.myPhone = data.issuer.phone;
+
+        } else {
+          // En COMPRA o GASTO: Yo soy el cliente, la contraparte es el emisor/proveedor
+          // El campo "issuer" del documento es quien me vendió
+          if (data.issuer?.companyName) {
+            this.counterpartName = data.issuer.companyName;
+            this.counterpartRif = data.issuer.rif || '';
+            console.log('✅ [OCR] COMPRA/GASTO - Contraparte (proveedor):', data.issuer.companyName);
           }
+          // Mis datos como cliente (pre-llenados, pero actualizamos si hay datos nuevos)
+          if (data.client?.address) this.myAddress = data.client.address;
+          if (data.client?.phone) this.myPhone = data.client.phone;
         }
 
-        // Financieros
+        // ═══════════════════════════════════════════════════════════════
+        // PASO 4: MAPEAR FINANCIEROS
+        // ═══════════════════════════════════════════════════════════════
         if (data.financial) {
-          if (data.financial.totalSales)    this.formData.financial.totalSales    = data.financial.totalSales;
-          if (data.financial.taxableSales)  this.formData.financial.taxableSales  = data.financial.taxableSales;
-          if (data.financial.taxDebit)      this.formData.financial.taxDebit      = data.financial.taxDebit;
-          if (data.financial.nonTaxableSales) this.formData.financial.nonTaxableSales = data.financial.nonTaxableSales;
+          // Usar los campos del documento que vienen del OCR
+          if (data.financial.total) {
+            this.formData.financial.totalSales = parseFloat(data.financial.total) || 0;
+          }
+          if (data.financial.taxableAmount !== undefined) {
+            this.formData.financial.taxableSales = parseFloat(data.financial.taxableAmount) || 0;
+          }
+          if (data.financial.taxAmount !== undefined) {
+            this.formData.financial.taxDebit = parseFloat(data.financial.taxAmount) || 0;
+          }
+          if (data.financial.exemptAmount !== undefined) {
+            this.formData.financial.nonTaxableSales = parseFloat(data.financial.exemptAmount) || 0;
+          }
+          if (data.financial.subtotal !== undefined) {
+            this.formData.financial.taxableSales = parseFloat(data.financial.subtotal) || 0;
+          }
         }
 
-        // Ítems
+        // ═══════════════════════════════════════════════════════════════
+        // PASO 5: MAPEAR PRODUCTOS/ÍTEMS con matching automático de inventario
+        // ═══════════════════════════════════════════════════════════════
         if (data.items && data.items.length > 0) {
-          this.formData.items = data.items.map(it => ({
-            _key:        ++_itemKey,
-            description: it.description || '',
-            quantity:    it.quantity    || 1,
-            unitPrice:   it.unitPrice   || 0,
-            total:       it.total       || 0,
-            isInventory: this.showProductSearch,
-            product:     null,
-            product_id:  null
-          }));
+          // Para compras/ventas de mercancía, intentar match con inventario existente
+          const isInventoryFlow = this.showProductSearch;
+          let matchedCount = 0;
+
+          const mappedItems = await Promise.all(
+            data.items.map(async (it) => {
+              const qty   = parseFloat(it.quantity) || 1;
+              const price = parseFloat(it.unitPrice) || 0;
+              const total = parseFloat(it.amount) || (qty * price);
+
+              const baseItem = {
+                _key:        ++_itemKey,
+                code:        it.code || null,
+                description: it.description || '',
+                quantity:    qty,
+                unitPrice:   price,
+                total:       parseFloat(total.toFixed(2)),
+                unit:        it.unit || null,
+                isInventory: isInventoryFlow,
+                product:     null,
+                product_id:  null
+              };
+
+              // Matching con inventario si el flujo lo requiere
+              if (isInventoryFlow) {
+                try {
+                  // Buscar por código SKU primero (más exacto), luego por nombre
+                  const searchTerm = it.code || it.description;
+                  const match = await inventoryService.findProductByNameOrCode(searchTerm);
+
+                  if (match) {
+                    matchedCount++;
+                    console.log(`✅ [OCR Match] "${it.description}" → ${match.name} (ID: ${match.id})`);
+                    return {
+                      ...baseItem,
+                      code:        match.code || it.code || null,
+                      description: match.name,  // Usar nombre exacto del inventario
+                      unit:        match.unit || it.unit || null,
+                      unitPrice:   this.formData.flow === 'COMPRA'
+                        ? (match.cost_price || price)
+                        : (match.sale_price || price),
+                      total:       parseFloat((qty * (this.formData.flow === 'COMPRA'
+                        ? (match.cost_price || price)
+                        : (match.sale_price || price))).toFixed(2)),
+                      product:     match,
+                      product_id:  match.id  // ← Clave: vincula con inventario
+                    };
+                  }
+                } catch (matchErr) {
+                  console.warn('[OCR Match] Error buscando producto:', matchErr);
+                }
+              }
+
+              return baseItem;
+            })
+          );
+
+          this.formData.items = mappedItems;
+
+          // Recalcular totales desde los ítems
+          this.calculateFromItems();
+          console.log(`✅ [OCR] Productos mapeados: ${mappedItems.length} (${matchedCount} vinculados al inventario)`);
+
+          // Guardar el conteo de matches para el resumen
+          this._ocrMatchedCount = matchedCount;
         }
 
-        // Construir resumen legible
+        // ═══════════════════════════════════════════════════════════════
+        // PASO 6: MONEDA Y NOTAS
+        // ═══════════════════════════════════════════════════════════════
+        if (data.currency) {
+          this.formData.financial.currency = data.currency;
+        }
+        if (data.notes) {
+          this.formData.notes = data.notes;
+          this.notesExpanded = true;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // RESUMEN PARA EL USUARIO
+        // ═══════════════════════════════════════════════════════════════
+        const flowLabel = this.flowOptions.find(o =>
+          o.value === this.formData.flow && o.expenseType === this.formData.expense_type
+        )?.label || this.formData.flow;
+
         const summary = [
-          { label: 'N° Factura', found: !!data.invoiceNumber, value: data.invoiceNumber || 'No encontrado' },
-          { label: 'Fecha',      found: !!data.issueDate,     value: data.issueDate     || 'No encontrada' },
-          { label: 'Empresa',    found: !!(data.issuer?.companyName || data.client?.companyName), value: data.issuer?.companyName || data.client?.companyName || 'No encontrada' },
-          { label: 'Total',      found: !!data.financial?.totalSales, value: data.financial?.totalSales ? `Bs ${this.formatNumber(data.financial.totalSales)}` : 'No encontrado' },
-          { label: 'Productos',  found: !!(data.items?.length), value: data.items?.length ? `${data.items.length} detectado(s)` : 'No detectados' }
+          { label: 'Tipo', found: true, value: flowLabel },
+          { label: 'Documento', found: !!data.invoiceNumber, value: data.invoiceNumber || 'No encontrado' },
+          { label: 'Fecha', found: !!data.issueDate, value: data.issueDate || 'No encontrada' },
+          { label: 'Contraparte', found: !!(data.issuer?.companyName || data.client?.companyName), value: this.counterpartName || 'No encontrada' },
+          { label: 'Total', found: !!(data.financial?.total), value: data.financial?.total ? `${data.currency || 'Bs'} ${this.formatNumber(data.financial.total)}` : 'No encontrado' },
+          {
+            label: 'Productos',
+            found: !!(data.items?.length),
+            value: data.items?.length
+              ? `${data.items.length} detectado(s)${this._ocrMatchedCount > 0 ? ` · ${this._ocrMatchedCount} vinculado(s) al inventario` : ''}`
+              : 'No detectados'
+          }
         ];
 
+        // Mostrar razón del flujo detectado si está disponible
+        if (data.flowReason) {
+          console.log('🤖 [OCR] Razón del flujo:', data.flowReason);
+        }
+
+        const matchMsg = this._ocrMatchedCount > 0
+          ? `✅ ${this._ocrMatchedCount} producto(s) vinculados automáticamente al inventario.`
+          : '✅ Documento leído. Revisa los datos antes de guardar.';
+
         this.ocrResult = { success: true, summary };
-        this.showSnackbar('✅ Documento leído. Revisa los datos antes de guardar.', 'success');
+        this.showSnackbar(matchMsg, 'success');
 
       } catch (err) {
-        console.error('❌ [SimpleInvoiceForm] Error OCR:', err);
+        console.error('❌ [OCR] Error:', err);
         this.ocrResult = { success: false, message: 'No se pudo leer el documento. Por favor, ingresa los datos manualmente.' };
         this.showSnackbar('No se pudo leer el documento', 'error');
       } finally {

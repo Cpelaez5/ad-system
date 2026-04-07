@@ -817,43 +817,17 @@ export default {
       }
     },
     async loadDashboard() {
-      // Cargar stats
+      // Ejecutar las 3 queries en PARALELO — server-side, no client-side
       try {
-        const stats = await inventoryService.getDashboardStats()
-        if (stats) {
-          this.stats = stats
-        }
-        
-        // Calcular Top Productos (Client side aggregation)
-        // Pedimos movimientos de SALIDA
-        const movements = await inventoryService.getAllMovements({ limit: 1000 })
-        if (movements) {
-            const sales = movements.filter(m => m.movement_type === 'OUT_SALE');
-            const productSales = {}; // { id: { name, unit, totalSold, totalRevenue } }
-            
-            sales.forEach(m => {
-                const pid = m.product_id;
-                const pName = m.products?.name || 'Desconocido';
-                const pUnit = m.products?.unit || 'U';
-                const qty = Math.abs(m.quantity);
-                const price = m.products?.sale_price || 0; // Aproximación, ideal usar precio de venta real del item, pero no lo tenemos en movements directo
-                
-                if (!productSales[pid]) {
-                    productSales[pid] = { name: pName, unit: pUnit, totalSold: 0, totalRevenue: 0 };
-                }
-                productSales[pid].totalSold += qty;
-                productSales[pid].totalRevenue += (qty * price); // Estimado
-            });
-            
-            this.topSellingProducts = Object.values(productSales)
-                .sort((a, b) => b.totalSold - a.totalSold)
-                .slice(0, 5);
-        }
+        const [stats, topSelling, lowStock] = await Promise.all([
+          inventoryService.getDashboardStats(),
+          inventoryService.getTopSellingProducts(5),    // RPC: GROUP BY en BD
+          inventoryService.getLowStockProducts()         // RPC: filtro stock <= min en BD
+        ])
 
-        // Cargar alerta de stock (fetch simple y filtrar en cliente o query especifico)
-        // Por ahora cargamos productos y filtramos
-        const prods = await inventoryService.getProducts()
-        this.lowStockProducts = prods.filter(p => p.stock <= p.min_stock)
+        if (stats) this.stats = stats
+        this.topSellingProducts = topSelling || []
+        this.lowStockProducts   = lowStock   || []
       } catch (e) {
         console.error('Error loading dashboard', e)
       }
@@ -895,25 +869,30 @@ export default {
       try {
         const payload = { ...this.productForm }
         const initialStock = payload.initial_stock // Extract simple property
-        delete payload.initial_stock // No enviar al update/create directamente si no es campoe
-        
+        delete payload.initial_stock // No enviar al update/create directamente
+
         let productId
         
         if (this.editingProduct) {
           await inventoryService.updateProduct(this.editingProduct.id, payload)
           productId = this.editingProduct.id
         } else {
-          // Crear
-          // Payload tiene stock = 0 por defecto.
-          // Si hay initial_stock, se maneja como movimiento INITIAL
+          // Auto-generar SKU si el usuario no ingresó código
+          if (!payload.code || payload.code.trim() === '') {
+            try {
+              payload.code = await inventoryService.getNextProductSku()
+            } catch {
+              payload.code = `PROD-${Date.now().toString().slice(-5)}`
+            }
+          }
+
+          // Crear producto con stock 0 y registrar movimiento inicial
           const { data: newProds, error } = await inventoryService.createProduct({
             ...payload,
-            stock: 0 // Iniciar en 0 y hacer movimiento
+            stock: 0
           })
           
-          if(error) throw error
-          // Supabase insert devuelve array si select es usado, o null
-          // En inventoryService usamos insertWithTenant que devuelve data
+          if (error) throw error
           const newProd = newProds[0]
           productId = newProd.id
           
@@ -930,8 +909,8 @@ export default {
         }
         
         this.productDialog = false
-        this.loadProducts()
-        this.loadDashboard()
+        // Recargar en paralelo para no bloquear la UI
+        await Promise.all([this.loadProducts(), this.loadDashboard()])
       } catch (e) {
         console.error('Error saving product', e)
       }
