@@ -279,12 +279,22 @@
               </v-chip>
             </template>
 
-            <!-- Precios -->
+            <!-- Precios con Multi-divisa -->
             <template v-slot:item.cost_price="{ item }">
-              {{ formatCurrency(item.cost_price) }}
+              <div class="d-flex flex-column">
+                <span>{{ formatCurrency(item.cost_price, item.currency) }}</span>
+                <span v-if="item.currency && item.currency !== 'VES'" class="text-caption text-grey">
+                  ≈ {{ formatCurrency(item.cost_price * exchangeRate, 'VES') }}
+                </span>
+              </div>
             </template>
             <template v-slot:item.sale_price="{ item }">
-              {{ formatCurrency(item.sale_price) }}
+              <div class="d-flex flex-column">
+                <span>{{ formatCurrency(item.sale_price, item.currency) }}</span>
+                <span v-if="item.currency && item.currency !== 'VES'" class="text-caption text-grey">
+                  ≈ {{ formatCurrency(item.sale_price * exchangeRate, 'VES') }}
+                </span>
+              </div>
             </template>
 
             <!-- Acciones -->
@@ -395,24 +405,40 @@
                   rows="2"
                 ></v-textarea>
               </v-col>
-              <v-col cols="12" sm="6">
+              <!-- Moneda del producto -->
+              <v-col cols="12" sm="4">
+                <v-select
+                  v-model="productForm.currency"
+                  :items="[
+                    { title: 'Bolívares (Bs)', value: 'VES' },
+                    { title: 'Dólares (USD)', value: 'USD' },
+                    { title: 'Euros (EUR)', value: 'EUR' }
+                  ]"
+                  item-title="title"
+                  item-value="value"
+                  label="Moneda del precio"
+                  variant="outlined"
+                  prepend-inner-icon="mdi-currency-usd"
+                ></v-select>
+              </v-col>
+              <v-col cols="12" sm="4">
                 <v-text-field
                   v-model.number="productForm.cost_price"
-                  label="Costo Unitario (Bs)"
+                  :label="`Costo Unitario (${productForm.currency || 'VES'})`"
                   type="number"
                   step="0.01"
                   variant="outlined"
-                  prefix="Bs"
+                  :prefix="productForm.currency === 'USD' ? '$' : productForm.currency === 'EUR' ? '€' : 'Bs'"
                 ></v-text-field>
               </v-col>
-              <v-col cols="12" sm="6">
+              <v-col cols="12" sm="4">
                 <v-text-field
                    v-model.number="productForm.sale_price"
-                   label="Precio Venta (Bs)"
+                   :label="`Precio Venta (${productForm.currency || 'VES'})`"
                    type="number"
                    step="0.01"
                    variant="outlined"
-                   prefix="Bs"
+                   :prefix="productForm.currency === 'USD' ? '$' : productForm.currency === 'EUR' ? '€' : 'Bs'"
                  ></v-text-field>
               </v-col>
               
@@ -722,12 +748,26 @@ export default {
       return result;
     },
     convertedTotalValueCost() {
-      if (this.currencyDisplay === 'VES') return this.stats.totalValueCost;
-      return this.stats.totalValueCost / this.exchangeRate;
+      // stats.totalValueCost is now an object: { VES: 100, USD: 20, EUR: 0 }
+      const costVES = this.stats?.totalValueCost?.VES || 0;
+      const costUSD = this.stats?.totalValueCost?.USD || 0;
+      
+      if (this.currencyDisplay === 'VES') {
+        return costVES + (costUSD * this.exchangeRate);
+      } else {
+        // En USD mostramos USD puros + VES convertidos
+        return costUSD + (costVES / this.exchangeRate);
+      }
     },
     convertedTotalValueSale() {
-      if (this.currencyDisplay === 'VES') return this.stats.totalValueSale;
-      return this.stats.totalValueSale / this.exchangeRate;
+      const saleVES = this.stats?.totalValueSale?.VES || 0;
+      const saleUSD = this.stats?.totalValueSale?.USD || 0;
+      
+      if (this.currencyDisplay === 'VES') {
+        return saleVES + (saleUSD * this.exchangeRate);
+      } else {
+        return saleUSD + (saleVES / this.exchangeRate);
+      }
     }
   },
   async mounted() {
@@ -854,6 +894,7 @@ export default {
           name: '',
           description: '',
           unit: 'UND',
+          currency: 'VES',
           cost_price: 0,
           sale_price: 0,
           min_stock: 5,
@@ -994,8 +1035,12 @@ export default {
         }
         return map[type] || type
     },
-    formatCurrency(val) {
-      return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES' }).format(val || 0)
+    formatCurrency(val, currency = 'VES') {
+      return new Intl.NumberFormat('es-VE', { 
+        style: 'currency', 
+        currency: currency === 'VES' ? 'VES' : 'USD', 
+        currencyDisplay: 'symbol' 
+      }).format(val || 0).replace('USD', '$')
     },
     formatDate(d, includeTime = false) {
        if(!d) return ''

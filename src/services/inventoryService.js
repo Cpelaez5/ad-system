@@ -388,24 +388,35 @@ class InventoryService {
             const { count: totalProducts } = await queryCount
             const { data: stockProducts } = await queryStock
 
-            let totalValueCost = 0
-            let totalValueSale = 0
+            let valuesCost = { VES: 0, USD: 0, EUR: 0 }
+            let valuesSale = { VES: 0, USD: 0, EUR: 0 }
 
             if (stockProducts) {
                 stockProducts.forEach(p => {
-                    totalValueCost += (p.stock * p.cost_price)
-                    totalValueSale += (p.stock * p.sale_price)
+                    const currency = p.currency || 'VES'
+                    if (valuesCost[currency] !== undefined) {
+                        valuesCost[currency] += (p.stock * p.cost_price)
+                        valuesSale[currency] += (p.stock * p.sale_price)
+                    } else {
+                        // Fallback safely mapped to VES 
+                        valuesCost.VES += (p.stock * p.cost_price)
+                        valuesSale.VES += (p.stock * p.sale_price)
+                    }
                 })
             }
 
             return {
                 totalProducts: totalProducts || 0,
-                totalValueCost,
-                totalValueSale
+                totalValueCost: valuesCost,
+                totalValueSale: valuesSale
             }
         } catch (error) {
             console.error('Error getDashboardStats', error)
-            return { totalProducts: 0, totalValueCost: 0, totalValueSale: 0 }
+            return { 
+                totalProducts: 0, 
+                totalValueCost: { VES: 0, USD: 0, EUR: 0 }, 
+                totalValueSale: { VES: 0, USD: 0, EUR: 0 } 
+            }
         }
     }
 

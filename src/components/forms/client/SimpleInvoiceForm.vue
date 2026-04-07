@@ -418,7 +418,7 @@
                   label="Precio"
                   type="number"
                   step="0.01"
-                  prefix="Bs"
+                  :prefix="currencySymbol"
                   variant="outlined"
                   density="compact"
                   hide-details
@@ -431,7 +431,7 @@
                 <v-text-field
                   :model-value="formatNumber(item.total)"
                   label="Total"
-                  prefix="Bs"
+                  :prefix="currencySymbol"
                   variant="outlined"
                   density="compact"
                   hide-details
@@ -479,7 +479,7 @@
               v-model.number="formData.financial.taxableSales"
               label="Subtotal (base)"
               type="number"
-              prefix="Bs"
+              :prefix="currencySymbol"
               variant="outlined"
               density="compact"
               hide-details
@@ -492,7 +492,7 @@
               v-model.number="formData.financial.taxDebit"
               label="IVA (16%)"
               type="number"
-              prefix="Bs"
+              :prefix="currencySymbol"
               variant="outlined"
               density="compact"
               hide-details
@@ -505,7 +505,7 @@
               v-model.number="formData.financial.nonTaxableSales"
               label="Monto exento"
               type="number"
-              prefix="Bs"
+              :prefix="currencySymbol"
               variant="outlined"
               density="compact"
               hide-details
@@ -521,7 +521,7 @@
                 <v-icon v-if="manualMode" size="10" class="ml-1 opacity-70">mdi-pencil</v-icon>
               </span>
               <div class="sif-total-box__value">
-                <span class="sif-total-box__prefix">Bs</span>
+                <span class="sif-total-box__prefix">{{ currencySymbol }}</span>
                 <input 
                   v-if="manualMode"
                   type="number"
@@ -535,14 +535,20 @@
           </v-col>
         </v-row>
 
-        <!-- Tasa de cambio -->
-        <div v-if="formData.financial.currency !== 'VES'" class="mt-2 d-flex align-center gap-2">
+        <!-- Tasa de cambio (sólo muestra equivalente para USD, ya que EUR no tiene API aún) -->
+        <div v-if="formData.financial.currency === 'USD'" class="mt-2 d-flex align-center gap-2">
           <v-icon color="info" size="16">mdi-swap-horizontal</v-icon>
           <span class="text-caption">
-            Tasa del día: <strong>{{ formData.financial.exchangeRate }} Bs/USD</strong>
+            Tasa de cambio: <strong>{{ formData.financial.exchangeRate }} Bs/USD</strong>
           </span>
+          <span class="text-caption text-grey ml-2">
+            Equivalente: ≈ <strong class="text-info">{{ formatNumber(formData.financial.totalSales * formData.financial.exchangeRate) }} Bs.</strong>
+          </span>
+        </div>
+        <div v-else-if="formData.financial.currency === 'EUR'" class="mt-2 d-flex align-center gap-2">
+          <v-icon color="warning" size="16">mdi-alert-circle-outline</v-icon>
           <span class="text-caption text-grey">
-            ≈ {{ formatNumber(formData.financial.totalSales / formData.financial.exchangeRate) }} USD
+            Conversión a Bolívares para Euros no disponible automáticamente.
           </span>
         </div>
       </div>
@@ -742,6 +748,14 @@ export default {
   // ─── COMPUTED ────────────────────────────────────────────────────────────────
   computed: {
     isEditing() { return !!this.invoice; },
+
+    // Símbolo de moneda dinámico
+    currencySymbol() {
+      const cur = this.formData.financial.currency;
+      if (cur === 'USD') return '$';
+      if (cur === 'EUR') return '€';
+      return 'Bs';
+    },
 
     // Muestra el buscador de productos si es VENTA o COMPRA de mercancía
     showProductSearch() {
@@ -1198,18 +1212,42 @@ export default {
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // PASO 5: MAPEAR PRODUCTOS/ÍTEMS con matching automático de inventario
+        // PASO 5: MAPEAR PRODUCTOS con matching automático + auto-create
         // ═══════════════════════════════════════════════════════════════
         if (data.items && data.items.length > 0) {
-          // Para compras/ventas de mercancía, intentar match con inventario existente
           const isInventoryFlow = this.showProductSearch;
+          const isPurchase = this.formData.flow === 'COMPRA';
+          const docCurrency = data.currency || 'VES';
           let matchedCount = 0;
+          let createdCount = 0;
+
+          // Obtener tasa de cambio BCV SOLO si el documento o algún ítem usa USD
+          // (hacemos una sola petición para todos los ítems, no una por cada producto)
+          const hasUsdItems = data.items.some(it =>
+            (it.currency || docCurrency) === 'USD'
+          );
+          let usdRate = 1;
+          if (hasUsdItems) {
+            try {
+              const rateRes = await import('@/services/bcvService').then(m => m.default.getCurrentRate());
+              if (rateRes?.success) usdRate = parseFloat(rateRes.data.dollar) || 1;
+              console.log(`💱 [OCR] Tasa BCV obtenida: 1 USD = ${usdRate} VES`);
+            } catch { /* usar 1:1 si falla */ }
+          }
+
+          // Helper: convertir precio a VES para almacenar en inventario
+          const toVES = (price, currency) => {
+            if (currency === 'USD') return parseFloat((price * usdRate).toFixed(2));
+            if (currency === 'EUR') return price; // Sin tasa EUR → guardar como está, user puede editar
+            return price; // VES
+          };
 
           const mappedItems = await Promise.all(
             data.items.map(async (it) => {
-              const qty   = parseFloat(it.quantity) || 1;
-              const price = parseFloat(it.unitPrice) || 0;
-              const total = parseFloat(it.amount) || (qty * price);
+              const qty      = parseFloat(it.quantity) || 1;
+              const itemCur  = it.currency || docCurrency; // moneda del ítem según IA
+              const price    = parseFloat(it.unitPrice) || 0;
+              const total    = parseFloat(it.amount) || parseFloat((qty * price).toFixed(2));
 
               const baseItem = {
                 _key:        ++_itemKey,
@@ -1217,6 +1255,7 @@ export default {
                 description: it.description || '',
                 quantity:    qty,
                 unitPrice:   price,
+                currency:    itemCur,
                 total:       parseFloat(total.toFixed(2)),
                 unit:        it.unit || null,
                 isInventory: isInventoryFlow,
@@ -1224,48 +1263,86 @@ export default {
                 product_id:  null
               };
 
-              // Matching con inventario si el flujo lo requiere
-              if (isInventoryFlow) {
-                try {
-                  // Buscar por código SKU primero (más exacto), luego por nombre
-                  const searchTerm = it.code || it.description;
-                  const match = await inventoryService.findProductByNameOrCode(searchTerm);
+              if (!isInventoryFlow) return baseItem;
 
-                  if (match) {
-                    matchedCount++;
-                    console.log(`✅ [OCR Match] "${it.description}" → ${match.name} (ID: ${match.id})`);
+              // ── 1. Intentar match con inventario existente ───────────────
+              try {
+                const searchTerm = it.code || it.description;
+                const match = await inventoryService.findProductByNameOrCode(searchTerm);
+
+                if (match) {
+                  matchedCount++;
+                  console.log(`✅ [OCR Match] "${it.description}" → ${match.name} (ID: ${match.id})`);
+                  return {
+                    ...baseItem,
+                    code:        match.code || it.code || null,
+                    description: match.name,
+                    unit:        match.unit || it.unit || null,
+                    unitPrice:   isPurchase ? (match.cost_price || price) : (match.sale_price || price),
+                    total:       parseFloat((qty * (isPurchase ? (match.cost_price || price) : (match.sale_price || price))).toFixed(2)),
+                    product:     match,
+                    product_id:  match.id
+                  };
+                }
+              } catch (matchErr) {
+                console.warn('[OCR Match] Error buscando producto:', matchErr);
+              }
+
+              // ── 2. No existe: auto-crear en inventario (solo en COMPRA) ──
+              if (isPurchase && it.description) {
+                try {
+                  console.log(`🆕 [OCR Auto-Create] Creando producto: "${it.description}" (${price} ${itemCur})`);
+
+                  // Precio nativo (si es USD, se guarda en USD, si es EUR en EUR, etc.)
+                  const nativePrice = parseFloat(price);
+
+                  // SKU auto-generado
+                  let autoCode = it.code || null;
+                  if (!autoCode) {
+                    try { autoCode = await inventoryService.getNextProductSku(); }
+                    catch { autoCode = `PROD-${Date.now().toString().slice(-5)}`; }
+                  }
+
+                  const newProduct = await inventoryService.createProduct({
+                    name:       it.description.trim(),
+                    code:       autoCode,
+                    currency:   itemCur,          // moneda original del documento
+                    cost_price: nativePrice,       // precio costo en su moneda NATVA
+                    sale_price: parseFloat((nativePrice * 1.30).toFixed(2)), // margen ganancia default 30%
+                    stock:      0,                 // el movimiento de factura lo actualizará
+                    unit:       it.unit || 'UND',
+                    min_stock:  0,
+                    status:     'ACTIVE'
+                  });
+
+                  const newId = newProduct?.data?.[0]?.id || newProduct?.id;
+                  if (newId) {
+                    createdCount++;
+                    console.log(`✅ [OCR Auto-Create] Producto creado: ${it.description} → ID ${newId} (SKU: ${autoCode})`);
                     return {
                       ...baseItem,
-                      code:        match.code || it.code || null,
-                      description: match.name,  // Usar nombre exacto del inventario
-                      unit:        match.unit || it.unit || null,
-                      unitPrice:   this.formData.flow === 'COMPRA'
-                        ? (match.cost_price || price)
-                        : (match.sale_price || price),
-                      total:       parseFloat((qty * (this.formData.flow === 'COMPRA'
-                        ? (match.cost_price || price)
-                        : (match.sale_price || price))).toFixed(2)),
-                      product:     match,
-                      product_id:  match.id  // ← Clave: vincula con inventario
+                      code:       autoCode,
+                      unit:       it.unit || 'UND',
+                      product_id: newId,
+                      product:    { id: newId, name: it.description, code: autoCode, currency: itemCur, cost_price: nativePrice, sale_price: parseFloat((nativePrice * 1.3).toFixed(2)) }
                     };
                   }
-                } catch (matchErr) {
-                  console.warn('[OCR Match] Error buscando producto:', matchErr);
+                } catch (createErr) {
+                  console.error(`❌ [OCR Auto-Create] Error creando "${it.description}":`, createErr);
                 }
               }
 
+              // Fallback: ítem como texto libre si todo falla
               return baseItem;
             })
           );
 
           this.formData.items = mappedItems;
-
-          // Recalcular totales desde los ítems
           this.calculateFromItems();
-          console.log(`✅ [OCR] Productos mapeados: ${mappedItems.length} (${matchedCount} vinculados al inventario)`);
 
-          // Guardar el conteo de matches para el resumen
           this._ocrMatchedCount = matchedCount;
+          this._ocrCreatedCount = createdCount;
+          console.log(`✅ [OCR] ${mappedItems.length} ítems: ${matchedCount} vinculados, ${createdCount} auto-creados en inventario`);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -1295,9 +1372,13 @@ export default {
           {
             label: 'Productos',
             found: !!(data.items?.length),
-            value: data.items?.length
-              ? `${data.items.length} detectado(s)${this._ocrMatchedCount > 0 ? ` · ${this._ocrMatchedCount} vinculado(s) al inventario` : ''}`
-              : 'No detectados'
+            value: (() => {
+              if (!data.items?.length) return 'No detectados';
+              const parts = [`${data.items.length} detectado(s)`];
+              if (this._ocrMatchedCount > 0) parts.push(`${this._ocrMatchedCount} vinculado(s)`);
+              if (this._ocrCreatedCount > 0) parts.push(`${this._ocrCreatedCount} creado(s) en inventario`);
+              return parts.join(' · ');
+            })()
           }
         ];
 
@@ -1306,9 +1387,17 @@ export default {
           console.log('🤖 [OCR] Razón del flujo:', data.flowReason);
         }
 
-        const matchMsg = this._ocrMatchedCount > 0
-          ? `✅ ${this._ocrMatchedCount} producto(s) vinculados automáticamente al inventario.`
-          : '✅ Documento leído. Revisa los datos antes de guardar.';
+        // Mensaje contextual según resultado
+        let matchMsg = '✅ Documento leído. Revisa los datos antes de guardar.';
+        const mc = this._ocrMatchedCount || 0;
+        const cc = this._ocrCreatedCount || 0;
+        if (mc > 0 && cc > 0) {
+          matchMsg = `✅ ${mc} producto(s) vinculados y ${cc} registrado(s) automáticamente en inventario.`;
+        } else if (cc > 0) {
+          matchMsg = `✅ ${cc} producto(s) registrado(s) automáticamente en inventario. ¡Verifica los precios!`;
+        } else if (mc > 0) {
+          matchMsg = `✅ ${mc} producto(s) vinculados al inventario correctamente.`;
+        }
 
         this.ocrResult = { success: true, summary };
         this.showSnackbar(matchMsg, 'success');

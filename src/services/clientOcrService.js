@@ -92,6 +92,7 @@ ESTRUCTURA JSON REQUERIDA (Retorna SOLO esto)
       "description": "Descripción completa del producto o servicio",
       "quantity": 1.0,
       "unitPrice": 0.00,
+      "currency": "VES|USD|EUR (moneda del precio de este ítem; usar la del documento si no hay símbolo propio)",
       "unit": "Und|Kg|Lts|Mts o null",
       "amount": 0.00
     }
@@ -117,15 +118,18 @@ REGLAS CRÍTICAS DE EXTRACCIÓN
 1. NÚMEROS: Usa formato JSON estándar (punto decimal, sin separador de miles).
    Ejemplo: "1,250.50" → 1250.50   |   "Bs. 35.000,00" → 35000.00
 
-2. MONEDA:
-   - "Bs", "Bolívares", "Bs.S" → "VES"
-   - "USD", "$", "Dólares" → "USD"
-   - Si es ambiguo → "VES"
+2. MONEDA (aplica a nivel documento Y por ítem):
+   - "Bs", "Bolívares", "Bs.S", "BsS", "Bs.F", "VES" → "VES"
+   - "USD", "$", "Dólares", "Dls", "US$" → "USD"
+   - "EUR", "€", "Euros" → "EUR"
+   - Si un ítem tiene su propio símbolo de moneda, úsalo para ese ítem
+   - Si es ambiguo → heredar la moneda principal del documento
 
 3. PRODUCTOS:
-   - Extrae TODOS los productos que aparezcan
+   - Extrae TODOS los productos/ítems que aparezcan en el documento
    - Si hay código/SKU visible, inclúyelo en "code"
-   - "amount" = cantidad × precio unitario
+   - "amount" = cantidad × precio unitario (en la misma moneda del ítem)
+   - El campo "currency" de cada ítem indica en qué moneda está su precio unitario
 
 4. FLUJO:
    - Compara Nombre/RIF del contexto con EMISOR y CLIENTE del documento
