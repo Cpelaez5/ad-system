@@ -1242,100 +1242,113 @@ export default {
             return price; // VES
           };
 
-          const mappedItems = await Promise.all(
-            data.items.map(async (it) => {
-              const qty      = parseFloat(it.quantity) || 1;
-              const itemCur  = it.currency || docCurrency; // moneda del ítem según IA
-              const price    = parseFloat(it.unitPrice) || 0;
-              const total    = parseFloat(it.amount) || parseFloat((qty * price).toFixed(2));
+          // Procesar items secuencialmente para evitar condiciones de carrera
+          // (ej. el mismo producto aparece 2 veces en la misma factura, si es en paralelo se crearía 2 veces)
+          const mappedItems = [];
+          for (const it of data.items || []) {
+            const qty      = parseFloat(it.quantity) || 1;
+            const itemCur  = it.currency || docCurrency;
+            const price    = parseFloat(it.unitPrice) || 0;
+            const total    = parseFloat(it.amount) || parseFloat((qty * price).toFixed(2));
 
-              const baseItem = {
-                _key:        ++_itemKey,
-                code:        it.code || null,
-                description: it.description || '',
-                quantity:    qty,
-                unitPrice:   price,
-                currency:    itemCur,
-                total:       parseFloat(total.toFixed(2)),
-                unit:        it.unit || null,
-                isInventory: isInventoryFlow,
-                product:     null,
-                product_id:  null
-              };
+             const baseItem = {
+              _key:        ++_itemKey,
+              code:        it.code || null,
+              description: it.description ? it.description.replace(/\s+/g, ' ').trim() : '',
+              quantity:    qty,
+              unitPrice:   price,
+              currency:    itemCur,
+              total:       parseFloat(total.toFixed(2)),
+              unit:        it.unit || null,
+              isInventory: isInventoryFlow,
+              product:     null,
+              product_id:  null
+            };
 
-              if (!isInventoryFlow) return baseItem;
+            if (!isInventoryFlow) {
+              mappedItems.push(baseItem);
+              continue;
+            }
 
-              // ── 1. Intentar match con inventario existente ───────────────
+            let foundMatch = null;
+
+            // ── 1. Intentar match con inventario existente ───────────────
+            try {
+              const searchTerm = it.code || baseItem.description;
+              const match = await inventoryService.findProductByNameOrCode(searchTerm);
+
+              if (match) {
+                matchedCount++;
+                console.log(`✅ [OCR Match] "${baseItem.description}" → ${match.name} (ID: ${match.id})`);
+                foundMatch = {
+                  ...baseItem,
+                  code:        match.code || it.code || null,
+                  description: match.name,
+                  unit:        match.unit || it.unit || null,
+                  unitPrice:   isPurchase ? (match.cost_price || price) : (match.sale_price || price),
+                  total:       parseFloat((qty * (isPurchase ? (match.cost_price || price) : (match.sale_price || price))).toFixed(2)),
+                  product:     match,
+                  product_id:  match.id
+                };
+              }
+            } catch (matchErr) {
+              console.warn('[OCR Match] Error buscando producto:', matchErr);
+            }
+
+            if (foundMatch) {
+              mappedItems.push(foundMatch);
+              continue;
+            }
+
+            // ── 2. No existe: auto-crear en inventario (solo en COMPRA) ──
+            let createdMatch = null;
+            if (isPurchase && baseItem.description) {
               try {
-                const searchTerm = it.code || it.description;
-                const match = await inventoryService.findProductByNameOrCode(searchTerm);
+                console.log(`🆕 [OCR Auto-Create] Creando producto: "${baseItem.description}" (${price} ${itemCur})`);
 
-                if (match) {
-                  matchedCount++;
-                  console.log(`✅ [OCR Match] "${it.description}" → ${match.name} (ID: ${match.id})`);
-                  return {
+                const nativePrice = parseFloat(price);
+                let autoCode = it.code || null;
+                if (!autoCode) {
+                  try { autoCode = await inventoryService.getNextProductSku(); }
+                  catch { autoCode = `PROD-${Date.now().toString().slice(-5)}`; }
+                }
+
+                const newProduct = await inventoryService.createProduct({
+                  name:       baseItem.description,
+                  code:       autoCode,
+                  currency:   itemCur,          
+                  cost_price: nativePrice,       
+                  sale_price: parseFloat((nativePrice * 1.30).toFixed(2)), 
+                  stock:      0,                 
+                  unit:       it.unit || 'UND',
+                  min_stock:  0,
+                  status:     'ACTIVE'
+                });
+
+                const newId = newProduct?.data?.[0]?.id || newProduct?.id;
+                if (newId) {
+                  createdCount++;
+                  console.log(`✅ [OCR Auto-Create] Producto creado: ${baseItem.description} → ID ${newId} (SKU: ${autoCode})`);
+                  createdMatch = {
                     ...baseItem,
-                    code:        match.code || it.code || null,
-                    description: match.name,
-                    unit:        match.unit || it.unit || null,
-                    unitPrice:   isPurchase ? (match.cost_price || price) : (match.sale_price || price),
-                    total:       parseFloat((qty * (isPurchase ? (match.cost_price || price) : (match.sale_price || price))).toFixed(2)),
-                    product:     match,
-                    product_id:  match.id
+                    code:       autoCode,
+                    unit:       it.unit || 'UND',
+                    product_id: newId,
+                    product:    { id: newId, name: baseItem.description, code: autoCode, currency: itemCur, cost_price: nativePrice, sale_price: parseFloat((nativePrice * 1.3).toFixed(2)) }
                   };
                 }
-              } catch (matchErr) {
-                console.warn('[OCR Match] Error buscando producto:', matchErr);
+              } catch (createErr) {
+                console.error(`❌ [OCR Auto-Create] Error creando "${baseItem.description}":`, createErr);
               }
+            }
 
-              // ── 2. No existe: auto-crear en inventario (solo en COMPRA) ──
-              if (isPurchase && it.description) {
-                try {
-                  console.log(`🆕 [OCR Auto-Create] Creando producto: "${it.description}" (${price} ${itemCur})`);
-
-                  // Precio nativo (si es USD, se guarda en USD, si es EUR en EUR, etc.)
-                  const nativePrice = parseFloat(price);
-
-                  // SKU auto-generado
-                  let autoCode = it.code || null;
-                  if (!autoCode) {
-                    try { autoCode = await inventoryService.getNextProductSku(); }
-                    catch { autoCode = `PROD-${Date.now().toString().slice(-5)}`; }
-                  }
-
-                  const newProduct = await inventoryService.createProduct({
-                    name:       it.description.trim(),
-                    code:       autoCode,
-                    currency:   itemCur,          // moneda original del documento
-                    cost_price: nativePrice,       // precio costo en su moneda NATVA
-                    sale_price: parseFloat((nativePrice * 1.30).toFixed(2)), // margen ganancia default 30%
-                    stock:      0,                 // el movimiento de factura lo actualizará
-                    unit:       it.unit || 'UND',
-                    min_stock:  0,
-                    status:     'ACTIVE'
-                  });
-
-                  const newId = newProduct?.data?.[0]?.id || newProduct?.id;
-                  if (newId) {
-                    createdCount++;
-                    console.log(`✅ [OCR Auto-Create] Producto creado: ${it.description} → ID ${newId} (SKU: ${autoCode})`);
-                    return {
-                      ...baseItem,
-                      code:       autoCode,
-                      unit:       it.unit || 'UND',
-                      product_id: newId,
-                      product:    { id: newId, name: it.description, code: autoCode, currency: itemCur, cost_price: nativePrice, sale_price: parseFloat((nativePrice * 1.3).toFixed(2)) }
-                    };
-                  }
-                } catch (createErr) {
-                  console.error(`❌ [OCR Auto-Create] Error creando "${it.description}":`, createErr);
-                }
-              }
-
+            if (createdMatch) {
+              mappedItems.push(createdMatch);
+            } else {
               // Fallback: ítem como texto libre si todo falla
-              return baseItem;
-            })
-          );
+              mappedItems.push(baseItem);
+            }
+          }
 
           this.formData.items = mappedItems;
           this.calculateFromItems();
@@ -1464,14 +1477,22 @@ export default {
         // Limpiar _key interno (no persistir)
         payload.items = payload.items.map(({ _key, ...rest }) => rest);
 
+        // Subir archivo adjunto si existe
+        if (this.uploadedFile) {
+           this.savingStep = 'Subiendo documento adjunto...';
+           const uploadRes = await invoiceService.uploadAttachment(this.uploadedFile);
+           if (uploadRes.success) {
+              payload.attachments = [uploadRes]; 
+           } else {
+              throw new Error('Error al subir el archivo: ' + uploadRes.message);
+           }
+        }
+
         this.savingStep = 'Guardando factura...';
 
         // Emitir al padre — el padre (Facturacion.vue) es quien llama a invoiceService
         // para mantener la responsabilidad separada (S de SOLID)
         this.$emit('submit', payload);
-
-        // No cerramos el form ni ponemos saving=false aquí
-        // El padre llama a un evento 'saved' o 'cancel' cuando termina
 
       } catch (err) {
         console.error('❌ [SimpleInvoiceForm] Error al guardar:', err);

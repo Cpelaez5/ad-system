@@ -8,6 +8,34 @@ import {
     handleTenantError
 } from '@/utils/tenantHelpers'
 
+// Función de utilidad para calcular similitud entre dos textos (Levenshtein Distance)
+function calculateSimilarity(str1, str2) {
+    const s1 = str1.toLowerCase().replace(/\s+/g, ' ').trim();
+    const s2 = str2.toLowerCase().replace(/\s+/g, ' ').trim();
+
+    if (s1 === s2) return 1.0;
+    if (s1.length === 0 || s2.length === 0) return 0.0;
+
+    const matrix = Array(s2.length + 1).fill(null).map(() => Array(s1.length + 1).fill(null));
+
+    for (let i = 0; i <= s1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= s2.length; j++) matrix[j][0] = j;
+
+    for (let j = 1; j <= s2.length; j++) {
+        for (let i = 1; i <= s1.length; i++) {
+            const indicator = s1[i - 1] === s2[j - 1] ? 0 : 1;
+            matrix[j][i] = Math.min(
+                matrix[j][i - 1] + 1,
+                matrix[j - 1][i] + 1,
+                matrix[j - 1][i - 1] + indicator
+            );
+        }
+    }
+    const distance = matrix[s2.length][s1.length];
+    const maxLength = Math.max(s1.length, s2.length);
+    return 1 - (distance / maxLength);
+}
+
 class InventoryService {
     constructor() {
         this.productsTable = 'inventory_products'
@@ -50,6 +78,75 @@ class InventoryService {
             return data
         } catch (error) {
             return handleTenantError(error, 'getProducts')
+        }
+    }
+
+    async findProductByNameOrCode(searchTerm) {
+        try {
+            if (!searchTerm) return null;
+
+            const targetClientId = getCurrentClientId();
+
+            const buildBaseQuery = () => {
+                let query = supabase
+                    .from(this.productsTable)
+                    .select('*')
+                    .eq('organization_id', getCurrentOrganizationId())
+                    .is('deleted_at', null);
+
+                if (targetClientId) {
+                    query = query.eq('client_id', targetClientId);
+                }
+                return query;
+            };
+
+            const exactSearchTerm = searchTerm.replace(/\s+/g, ' ').trim().toLowerCase();
+
+            // Debido a que las descripciones de la IA contienen comas y comillas (ej. 15.6", ),
+            // PostgREST frecuentemente falla al parsear estos símbolos en parámetros URL de .eq o .ilike
+            // Para asegurar un 100% de fiabilidad, obtenemos los productos y filtramos en JavaScript
+            const { data: allProducts, error: fetchErr } = await buildBaseQuery();
+
+            if (fetchErr) {
+                console.error('[findProduct] Error fetching all products for match:', fetchErr);
+                return null;
+            }
+
+            if (!allProducts || allProducts.length === 0) return null;
+
+            // Buscar por nombre exacto primero (ignorando mayúsculas)
+            const matchName = allProducts.find(p => p.name && p.name.replace(/\s+/g, ' ').trim().toLowerCase() === exactSearchTerm);
+            if (matchName) return matchName;
+
+            // Buscar por código
+            const matchCode = allProducts.find(p => p.code && p.code.replace(/\s+/g, ' ').trim().toLowerCase() === exactSearchTerm);
+            if (matchCode) return matchCode;
+
+            // --- Búsqueda Difusa (Fuzzy Match) como última opción ---
+            // Evalúa la "semejanza" para sortear pequeños errores tipográficos o alteraciones OCR
+            let bestMatch = null;
+            let highestSimilarity = 0;
+
+            for (const p of allProducts) {
+                if (p.name) {
+                    const sim = calculateSimilarity(p.name, exactSearchTerm);
+                    if (sim > highestSimilarity) {
+                        highestSimilarity = sim;
+                        bestMatch = p;
+                    }
+                }
+            }
+
+            // Si hay buena similitud (>85%), consideramos que es el mismo
+            if (highestSimilarity > 0.85 && bestMatch) {
+                console.log(`[findProduct] Fuzzy Match Exitoso: "${bestMatch.name}" (${(highestSimilarity * 100).toFixed(1)}% similar a "${searchTerm}")`);
+                return bestMatch;
+            }
+
+            return null;
+        } catch (error) {
+            console.error('Error findProductByNameOrCode', error);
+            return null;
         }
     }
 
@@ -496,37 +593,7 @@ class InventoryService {
         }
     }
 
-    /**
-     * Busca productos por nombre o código exacto para match de OCR.
-     * Retorna el primer match exacto o null.
-     * @param {string} nameOrCode - Nombre o código a buscar
-     * @returns {Promise<Object|null>}
-     */
-    async findProductByNameOrCode(nameOrCode) {
-        if (!nameOrCode) return null
-        try {
-            const term = nameOrCode.trim().toLowerCase()
-            const { data, error } = await supabase
-                .from(this.productsTable)
-                .select('*')
-                .eq('organization_id', getCurrentOrganizationId())
-                .is('deleted_at', null)
-                .or(`name.ilike.${term},code.ilike.${term}`)
-                .limit(10)
-
-            if (error) throw error
-
-            // Buscar match exacto primero, luego parcial
-            const exactMatch = (data || []).find(p =>
-                p.name.toLowerCase() === term ||
-                (p.code && p.code.toLowerCase() === term)
-            )
-            return exactMatch || data?.[0] || null
-        } catch (error) {
-            console.error('Error findProductByNameOrCode:', error)
-            return null
-        }
-    }
+    // The findProductByNameOrCode method previously duplicated here has been deleted to allow the correct one at the top of the file to execute.
 }
 
 export default new InventoryService()
