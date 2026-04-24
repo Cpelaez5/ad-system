@@ -1372,12 +1372,12 @@ export default {
     },
     
     editInvoice(invoice) {
-      this.editingInvoice = { ...invoice };
+      this.editingInvoice = JSON.parse(JSON.stringify(invoice));
       this.invoiceDialog = true;
     },
     
     viewInvoice(invoice) {
-      this.viewingInvoice = { ...invoice };
+      this.viewingInvoice = JSON.parse(JSON.stringify(invoice));
       this.viewDialog = true;
     },
     

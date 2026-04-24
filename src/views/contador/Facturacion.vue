@@ -431,11 +431,11 @@
                   <div class="info-item d-flex justify-space-between align-end">
                     <div>
                       <div class="text-caption text-grey-darken-1 mb-1">Total IVA</div>
-                      <div class="text-body-1 font-weight-medium">{{ formatCurrency(viewingInvoice.financial.taxDebit) }}</div>
+                      <div class="text-body-1 font-weight-medium">{{ formatCurrency(viewingInvoice.financial.taxDebit, viewingInvoice.financial.currency) }}</div>
                     </div>
                     <div class="text-right">
                       <div class="text-caption text-primary font-weight-bold mb-1">Monto Total</div>
-                      <div class="text-h6 font-weight-bold text-success">{{ formatCurrency(viewingInvoice.financial.totalSales) }}</div>
+                      <div class="text-h6 font-weight-bold text-success">{{ formatCurrency(viewingInvoice.financial.totalSales, viewingInvoice.financial.currency) }}</div>
                     </div>
                   </div>
                   
@@ -866,12 +866,12 @@ export default {
     },
     
     editInvoice(invoice) {
-      this.editingInvoice = { ...invoice };
+      this.editingInvoice = JSON.parse(JSON.stringify(invoice));
       this.invoiceDialog = true;
     },
     
     viewInvoice(invoice) {
-      this.viewingInvoice = { ...invoice };
+      this.viewingInvoice = JSON.parse(JSON.stringify(invoice));
       this.viewDialog = true;
     },
     
