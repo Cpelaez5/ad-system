@@ -53,32 +53,6 @@
 
           <!-- Controles: BCV + Moneda + Filtro -->
           <v-col cols="12" md="6" class="d-flex align-center justify-md-end flex-wrap ga-3 mt-3 mt-md-0">
-            <!-- Indicador BCV — Dólar -->
-            <v-chip
-              v-if="tasaBCV"
-              variant="tonal"
-              color="#1F355C"
-              size="small"
-              class="bcv-chip"
-            >
-              <v-icon start size="16">mdi-currency-usd</v-icon>
-              <span class="font-weight-medium">1 USD = Bs {{ tasaBCV.dollar ? tasaBCV.dollar.toFixed(4) : '—' }}</span>
-              <v-icon v-if="tasaBCV.trend === 'up'" end size="14" color="error">mdi-arrow-up-bold</v-icon>
-              <v-icon v-else-if="tasaBCV.trend === 'down'" end size="14" color="success">mdi-arrow-down-bold</v-icon>
-              <v-icon v-else end size="14" color="grey">mdi-minus</v-icon>
-            </v-chip>
-
-            <!-- Indicador BCV — Euro -->
-            <v-chip
-              v-if="tasaBCV && tasaBCV.euro"
-              variant="tonal"
-              color="#1F355C"
-              size="small"
-              class="bcv-chip"
-            >
-              <v-icon start size="16">mdi-currency-eur</v-icon>
-              <span class="font-weight-medium">1 EUR = Bs {{ tasaBCV.euro.toFixed(4) }}</span>
-            </v-chip>
 
             <!-- Toggle moneda USD / VES -->
             <v-btn-toggle
@@ -174,6 +148,7 @@
             <v-card-text class="pt-0 chart-body">
               <BarChart
                 v-if="chartEvolucionData.labels.length > 0"
+                :key="'bar-' + chartKey"
                 :data="chartEvolucionData"
                 :options="chartEvolucionOptions"
                 :height="340"
@@ -196,6 +171,7 @@
             <v-card-text class="pt-0 chart-body">
               <PieChart
                 v-if="chartGastosData.labels && chartGastosData.labels.length > 0"
+                :key="'pie-' + chartKey"
                 :data="chartGastosData"
                 :options="chartGastosOptions"
                 :height="300"
@@ -216,9 +192,11 @@
         <div data-swapy-slot="insights" class="swapy-slot animate-section" style="animation-delay: 0.6s">
           <div data-swapy-item="insights">
             <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row">
+              <v-card-title class="card-title-row" data-swapy-handle>
                 <v-icon class="mr-2" color="#A81C22" size="20">mdi-lightbulb-on-outline</v-icon>
                 <span>Insights</span>
+                <v-spacer />
+                <v-icon size="18" color="#bbb" class="drag-handle-icon">mdi-drag</v-icon>
               </v-card-title>
               <v-card-text>
                 <!-- Sin insights -->
@@ -261,9 +239,11 @@
         <div data-swapy-slot="actividad" class="swapy-slot animate-section" style="animation-delay: 0.7s">
           <div data-swapy-item="actividad">
             <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row">
+              <v-card-title class="card-title-row" data-swapy-handle>
                 <v-icon class="mr-2" color="#1F355C" size="20">mdi-history</v-icon>
                 <span>Actividad Reciente</span>
+                <v-spacer />
+                <v-icon size="18" color="#bbb" class="drag-handle-icon">mdi-drag</v-icon>
               </v-card-title>
               <v-card-text>
                 <!-- Sin actividad -->
@@ -295,9 +275,11 @@
         <div data-swapy-slot="top-productos" class="swapy-slot animate-section" style="animation-delay: 0.8s">
           <div data-swapy-item="top-productos">
             <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row">
+              <v-card-title class="card-title-row" data-swapy-handle>
                 <v-icon class="mr-2" color="#f2b648" size="20">mdi-trophy-outline</v-icon>
                 <span>Top Productos</span>
+                <v-spacer />
+                <v-icon size="18" color="#bbb" class="drag-handle-icon">mdi-drag</v-icon>
               </v-card-title>
               <v-card-text>
                 <!-- Sin productos -->
@@ -334,19 +316,22 @@
         <div data-swapy-slot="fiscal" class="swapy-slot animate-section" style="animation-delay: 0.9s">
           <div data-swapy-item="fiscal">
             <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row justify-space-between">
+              <v-card-title class="card-title-row justify-space-between" data-swapy-handle>
                 <div class="d-flex align-center">
                   <v-icon class="mr-2" color="#A81C22" size="20">mdi-shield-check-outline</v-icon>
                   <span>Expediente Fiscal</span>
                 </div>
-                <v-btn
-                  variant="text"
-                  size="small"
-                  color="#1F355C"
-                  @click="$router.push('/cliente/fiscal-360')"
-                >
-                  Ver todo
-                </v-btn>
+                <div class="d-flex align-center gap-2">
+                  <v-btn
+                    variant="text"
+                    size="small"
+                    color="#1F355C"
+                    @click="$router.push('/cliente/fiscal-360')"
+                  >
+                    Ver todo
+                  </v-btn>
+                  <v-icon size="18" color="#bbb" class="drag-handle-icon">mdi-drag</v-icon>
+                </div>
               </v-card-title>
               <v-card-text>
                 <!-- Tres mini KPIs fiscales -->
@@ -458,6 +443,10 @@ export default {
     return {
       // Estado general
       loading: true,
+
+      // Clave reactiva para forzar re-montaje de gráficos cuando llegan datos reales
+      // (evita el problema de Vue proxies con Chart.js)
+      chartKey: 0,
 
       // Usuario autenticado y su empresa
       usuario: null,
@@ -1103,6 +1092,10 @@ export default {
         // ── PRIMER PAINT: Quitar skeleton, el usuario ya ve KPIs y gráficos ──
         this.loading = false
 
+        // Incrementar chartKey para que los gráficos se remonten con los datos reales
+        // Esto es necesario porque el v-if monta los charts al mismo tiempo que llegan los datos
+        this.$nextTick(() => { this.chartKey++ })
+
         // ── TIER 2: Datos secundarios (background, sin bloquear UI) ──
         // Se ejecuta después del primer paint con requestAnimationFrame
         requestAnimationFrame(() => {
@@ -1244,7 +1237,9 @@ export default {
         this.swapyInstance = createSwapy(this.$refs.swapyContainer, {
           animation: 'dynamic',
           enabled: true,
-          swapMode: 'hover',
+          // 'drop' es más predecible que 'hover' cuando las cards contienen
+          // elementos interactivos (charts, listas, botones)
+          swapMode: 'drop',
           autoScrollOnDrag: true
         })
 
@@ -1386,10 +1381,14 @@ export default {
   async mounted() {
     await this.cargarDatos()
 
-    // Inicializar Swapy después de que el DOM esté completamente renderizado
-    this.$nextTick(() => {
+    // Inicializar Swapy con un pequeño delay para garantizar que el DOM
+    // esté completamente pintado, incluyendo los slots que se renderizan
+    // en el mismo ciclo que loading = false.
+    // $nextTick no es suficiente porque Vuetify puede necesitar un frame extra
+    // para generar los elementos internos de las v-card.
+    setTimeout(() => {
       this.inicializarSwapy()
-    })
+    }, 150)
   },
 
   beforeUnmount() {
@@ -1558,6 +1557,25 @@ export default {
 
 .swapy-slot .dashboard-card {
   height: 100%;
+}
+
+/* Ícono indicador de arrastre en card headers */
+.drag-handle-icon {
+  opacity: 0.35;
+  cursor: grab;
+  transition: opacity 0.2s ease;
+}
+
+[data-swapy-handle]:hover .drag-handle-icon {
+  opacity: 0.7;
+}
+
+[data-swapy-handle] {
+  cursor: grab;
+}
+
+[data-swapy-handle]:active {
+  cursor: grabbing;
 }
 
 /* ═══════════════════════════════════════════════════════ */

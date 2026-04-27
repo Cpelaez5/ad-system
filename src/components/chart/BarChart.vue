@@ -1,13 +1,13 @@
 <template>
-  <div class="chart-container animate-chart-fade-in">
-    <div class="chart-wrapper animate-chart-grow">
-      <canvas ref="chartCanvas"></canvas>
-    </div>
+  <!-- El div externo aplica la altura explícita pasada desde el padre -->
+  <div class="chart-container" :style="{ height: height + 'px' }">
+    <canvas ref="chartCanvas"></canvas>
   </div>
 </template>
 
 <script>
 import Chart from 'chart.js/auto'
+import { markRaw } from 'vue'
 
 export default {
   name: 'BarChart',
@@ -36,17 +36,15 @@ export default {
   // Watch whole data object as fallback
   data() {
     return {
+      // markRaw: le dice a Vue que NO envuelva el objeto Chart en un Proxy reactivo.
+      // Sin markRaw, Chart.js falla silenciosamente porque el Proxy intercepta
+      // las mutaciones internas necesarias para el renderizado del canvas.
       chart: null
     }
   },
   mounted() {
     this.$nextTick(() => {
       this.createChart()
-      // Forzar un resize/update por si el canvas aún no tenía tamaño
-      if (this.chart && typeof this.chart.resize === 'function') {
-        this.chart.resize()
-        this.chart.update('none')
-      }
       // Escuchar cambios de tamaño para redibujar correctamente
       window.addEventListener('resize', this.handleResize)
     })
@@ -110,18 +108,29 @@ export default {
   },
   methods: {
     handleResize() {
-      if (this.chart && typeof this.chart.resize === 'function') {
-        this.chart.resize()
-        this.chart.update('none')
+      // Verificar que el chart existe Y que su canvas interno está inicializado
+      // antes de llamar resize() para evitar "Cannot set properties of undefined"
+      if (this.chart && this.chart.canvas && typeof this.chart.resize === 'function') {
+        try {
+          this.chart.resize()
+        } catch (e) {
+          // Ignorar errores de resize si el chart fue destruido asincrónicamente
+        }
       }
     },
     createChart() {
       const canvas = this.$refs.chartCanvas
-      if (!canvas) return
+      console.log('[BarChart] createChart called, canvas:', canvas, 'data:', this.data?.labels?.length, 'labels')
+      if (!canvas) { console.warn('[BarChart] No canvas ref'); return }
       const ctx = canvas.getContext && canvas.getContext('2d')
-      if (!ctx) return
-      console.debug('BarChart: createChart canvas size', canvas.clientWidth, canvas.clientHeight)
-      
+      if (!ctx) { console.warn('[BarChart] No 2d context'); return }
+
+      // Destruir instancia previa si existe (evita "Canvas already in use")
+      if (this.chart) {
+        this.chart.destroy()
+        this.chart = null
+      }
+
       const defaultOptions = {
         responsive: true,
         maintainAspectRatio: false,
@@ -135,10 +144,7 @@ export default {
             labels: {
               usePointStyle: true,
               padding: 20,
-              font: {
-                family: 'Poppins, sans-serif',
-                size: 12
-              }
+              font: { family: 'Poppins, sans-serif', size: 12 }
             }
           },
           tooltip: {
@@ -153,173 +159,95 @@ export default {
         },
         scales: {
           x: {
-            grid: {
-              display: false
-            },
-            ticks: {
-              font: {
-                family: 'Poppins, sans-serif',
-                size: 11
-              },
-              color: '#010101'
-            }
+            grid: { display: false },
+            ticks: { font: { family: 'Poppins, sans-serif', size: 11 }, color: '#010101' }
           },
           y: {
             beginAtZero: true,
-            grid: {
-              color: 'rgba(237, 237, 237, 0.5)',
-              drawBorder: false
-            },
-            ticks: {
-              font: {
-                family: 'Poppins, sans-serif',
-                size: 11
-              },
-              color: '#010101'
-            }
+            grid: { color: 'rgba(237, 237, 237, 0.5)', drawBorder: false },
+            ticks: { font: { family: 'Poppins, sans-serif', size: 11 }, color: '#010101' }
           }
         },
-        animation: {
-          duration: 1200,
-          easing: 'easeOutCubic',
-          delay: (context) => {
-            // Delay escalonado para que las barras aparezcan una por una
-            return context.dataIndex * 80
-          }
-        },
-        animations: {
-          // Animación de las barras desde abajo
-          y: {
-            type: 'number',
-            easing: 'easeOutCubic',
-            duration: 1200,
-            from: 0,
-            delay: (context) => {
-              return context.dataIndex * 80
-            }
-          },
-          // Animación de opacidad para suavizar la aparición
-          colors: {
-            type: 'color',
-            easing: 'easeOutCubic',
-            duration: 800,
-            from: 'transparent'
-          }
-        },
-        transitions: {
-          // Desactivar animaciones de hover (active mode)
-          active: {
-            animation: {
-              duration: 0
-            }
-          },
-          // Desactivar animaciones en actualizaciones
-          resize: {
-            animation: {
-              duration: 0
-            }
-          }
-        }
+        animation: { duration: 800, easing: 'easeOutCubic' }
       }
 
-      // Evitar pasar objetos reactivos de Vue directamente a Chart.js.
-      // Hacemos una copia profunda de `data` y `options` para que Chart.js
-      // no intente mutar proxies reactivas de Vue (provoca recursión/errores).
+      // Clonar los datos con JSON para evitar proxies reactivas de Vue
       const dataCopy = JSON.parse(JSON.stringify(this.data || { labels: [], datasets: [] }))
-      const optionsCopy = Object.assign({}, defaultOptions, JSON.parse(JSON.stringify(this.options || {})))
 
-      console.debug('BarChart: creating chart with data', dataCopy, 'options', optionsCopy)
+      // Fusionar opciones respetando los callbacks (funciones) del padre
+      // usando Object.assign en profundidad en vez de JSON.parse (que elimina funciones)
+      const mergedOptions = this.deepMerge(defaultOptions, this.options || {})
 
-      this.chart = new Chart(ctx, {
-        type: 'bar',
-        data: dataCopy,
-        options: optionsCopy
-      })
-      // No llamar a update() inmediatamente sobre datos reactivos; el constructor
-      // ya dibuja el gráfico. Si es necesario, forzaremos un resize asíncrono.
-      setTimeout(() => {
-        try {
-          if (this.chart && typeof this.chart.resize === 'function') {
-            this.chart.resize()
-            this.chart.update('none')
-          }
-        } catch (e) {
-          console.warn('BarChart: error en resize inicial', e)
-        }
-      }, 0)
+      console.log('[BarChart] Creating chart with', dataCopy.labels?.length, 'labels,', dataCopy.datasets?.length, 'datasets')
+      try {
+        // markRaw: evita que Vue envuelva la instancia de Chart en un Proxy reactivo.
+        // El Proxy de Vue interfiere con las operaciones internas de Chart.js,
+        // causando que el canvas no se dibuje aunque la instancia 'exista'.
+        this.chart = markRaw(new Chart(ctx, {
+          type: 'bar',
+          data: dataCopy,
+          options: mergedOptions
+        }))
+        console.log('[BarChart] Chart created successfully (raw):', this.chart.constructor.name)
+      } catch (e) {
+        console.error('[BarChart] Error creating chart:', e)
+      }
     },
     updateChart() {
-      if (!this.chart) return
-      console.debug('BarChart: updateChart called - chart exists, canvas size', this.$refs.chartCanvas?.clientWidth, this.$refs.chartCanvas?.clientHeight)
-      
+      if (!this.chart) {
+        // Si no existe el chart todavía, intentar crearlo
+        this.$nextTick(() => this.createChart())
+        return
+      }
+
       try {
         // Validar que los datos sean válidos
         if (!this.data || !Array.isArray(this.data.labels) || !Array.isArray(this.data.datasets)) {
-          // Si no hay datos válidos, limpiar el gráfico
-          if (this.chart.data && (this.chart.data.labels.length > 0 || this.chart.data.datasets.length > 0)) {
-            this.chart.data.labels = []
-            this.chart.data.datasets = []
-            this.chart.update('none')
-          }
+          this.chart.data.labels = []
+          this.chart.data.datasets = []
+          this.chart.update('none')
           return
         }
-        
-        // Verificar si hay datos para mostrar
-        const hasData = this.data.labels.length > 0 && this.data.datasets.length > 0 && 
-                       this.data.datasets.some(ds => ds.data && ds.data.length > 0)
-        
+
+        const hasData = this.data.labels.length > 0 &&
+          this.data.datasets.some(ds => ds.data && ds.data.length > 0)
+
         if (!hasData) {
-          // Si no hay datos, limpiar el gráfico
-          if (this.chart.data && (this.chart.data.labels.length > 0 || this.chart.data.datasets.length > 0)) {
-            this.chart.data.labels = []
-            this.chart.data.datasets = []
-            this.chart.update('none')
-          }
+          this.chart.data.labels = []
+          this.chart.data.datasets = []
+          this.chart.update('none')
           return
         }
-        
-        // Crear copias de los datos para evitar referencias reactivas
-        const labels = [...(this.data.labels || [])]
-        const datasets = this.data.datasets.map(ds => ({
-          ...ds,
-          data: [...(ds.data || [])]
-        }))
-        console.debug('BarChart: updating chart data labels:', labels, 'datasets:', datasets)
-        
-        // Verificar si es la primera vez que se cargan datos (gráfico vacío)
-        const isFirstLoad = this.chart.data.labels.length === 0 && this.chart.data.datasets.length === 0
-        
-        // Actualizar datos directamente
-        this.chart.data.labels = labels
-        this.chart.data.datasets = datasets
-        
-        // Si es la primera carga, usar animación. Si no, intentar actualizar sin animación
-        try {
-          if (isFirstLoad) {
-            this.chart.update()
-          } else {
-            this.chart.update('none')
-          }
-        } catch (e) {
-          console.warn('BarChart: update failed, recreating chart', e)
-          try {
-            // Intentar recrear el chart desde cero como fallback seguro
-            this.chart.destroy()
-          } catch (dErr) {
-            console.warn('BarChart: error destroying chart during fallback', dErr)
-          }
-          // Forzar recreación asíncrona para evitar reentradas
-          this.$nextTick(() => {
-            try {
-              this.createChart()
-            } catch (cErr) {
-              console.error('BarChart: failed to recreate chart', cErr)
-            }
-          })
-        }
+
+        // Destruir y recrear siempre — evita problemas con proxies reactivas de Vue
+        // y garantiza que las animaciones funcionen correctamente en cada actualización
+        this.chart.destroy()
+        this.chart = null
+        this.$nextTick(() => this.createChart())
+
       } catch (error) {
-        console.error('Error actualizando gráfico:', error)
+        console.error('BarChart: error en updateChart', error)
+        // Fallback de seguridad
+        try { this.chart?.destroy() } catch (_) {}
+        this.chart = null
+        this.$nextTick(() => this.createChart())
       }
+    },
+    /**
+     * Fusión profunda de objetos preservando funciones (callbacks de Chart.js).
+     * JSON.parse/stringify no puede preservar funciones como los tooltip callbacks.
+     */
+    deepMerge(target, source) {
+      const result = Object.assign({}, target)
+      for (const key of Object.keys(source)) {
+        const srcVal = source[key]
+        if (srcVal && typeof srcVal === 'object' && !Array.isArray(srcVal) && typeof srcVal !== 'function') {
+          result[key] = this.deepMerge(target[key] || {}, srcVal)
+        } else {
+          result[key] = srcVal
+        }
+      }
+      return result
     }
   }
 }
@@ -329,26 +257,9 @@ export default {
 .chart-container {
   position: relative;
   width: 100%;
-  height: 100%;
-  min-height: 300px;
-  padding: var(--spacing-md);
-  background: var(--color-white);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  /* La altura viene del prop :style binding, no del CSS */
 }
 
-.chart-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-canvas {
-  border-radius: var(--radius-md);
-}
-
-/* Asegurar que el canvas ocupe el área disponible */
 canvas {
   display: block;
   width: 100% !important;
