@@ -674,7 +674,8 @@ export default {
 
       // UI Config
       currencyDisplay: 'VES',
-      exchangeRate: 1,
+      exchangeRate: 1,      // Tasa USD/VES
+      exchangeRateEur: 1,   // Tasa EUR/VES
 
       productSearch: '',
       productDialog: false,
@@ -751,22 +752,27 @@ export default {
       // stats.totalValueCost is now an object: { VES: 100, USD: 20, EUR: 0 }
       const costVES = this.stats?.totalValueCost?.VES || 0;
       const costUSD = this.stats?.totalValueCost?.USD || 0;
+      const costEUR = this.stats?.totalValueCost?.EUR || 0;
       
       if (this.currencyDisplay === 'VES') {
-        return costVES + (costUSD * this.exchangeRate);
+        // Todos los valores convertidos a Bs
+        return costVES + (costUSD * this.exchangeRate) + (costEUR * this.exchangeRateEur);
       } else {
-        // En USD mostramos USD puros + VES convertidos
-        return costUSD + (costVES / this.exchangeRate);
+        // En USD: USD puros + VES convertidos + EUR convertido a USD via Bs
+        const eurInUsd = this.exchangeRate > 0 ? (costEUR * this.exchangeRateEur) / this.exchangeRate : 0;
+        return costUSD + (costVES / this.exchangeRate) + eurInUsd;
       }
     },
     convertedTotalValueSale() {
       const saleVES = this.stats?.totalValueSale?.VES || 0;
       const saleUSD = this.stats?.totalValueSale?.USD || 0;
+      const saleEUR = this.stats?.totalValueSale?.EUR || 0;
       
       if (this.currencyDisplay === 'VES') {
-        return saleVES + (saleUSD * this.exchangeRate);
+        return saleVES + (saleUSD * this.exchangeRate) + (saleEUR * this.exchangeRateEur);
       } else {
-        return saleUSD + (saleVES / this.exchangeRate);
+        const eurInUsd = this.exchangeRate > 0 ? (saleEUR * this.exchangeRateEur) / this.exchangeRate : 0;
+        return saleUSD + (saleVES / this.exchangeRate) + eurInUsd;
       }
     }
   },
@@ -830,7 +836,12 @@ export default {
             const bcvServiceModule = await import('@/services/bcvService');
             const rate = await bcvServiceModule.default.getCurrentRate();
             if (rate && rate.success && rate.data) {
+                // Guardar tasa USD
                 this.exchangeRate = parseFloat(rate.data.dollar) || 1;
+                // Guardar tasa EUR si está disponible
+                if (rate.data.euro) {
+                    this.exchangeRateEur = parseFloat(rate.data.euro) || 1;
+                }
             }
         } catch(e) {
             console.warn('Could not fetch BCV exchange rate', e);

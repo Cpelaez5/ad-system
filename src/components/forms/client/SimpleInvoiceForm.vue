@@ -535,20 +535,24 @@
           </v-col>
         </v-row>
 
-        <!-- Tasa de cambio (sólo muestra equivalente para USD, ya que EUR no tiene API aún) -->
+        <!-- Tasa de cambio — USD y EUR -->
         <div v-if="formData.financial.currency === 'USD'" class="mt-2 d-flex align-center gap-2">
           <v-icon color="info" size="16">mdi-swap-horizontal</v-icon>
           <span class="text-caption">
-            Tasa de cambio: <strong>{{ formData.financial.exchangeRate }} Bs/USD</strong>
+            Tasa oficial BCV: <strong>{{ formData.financial.exchangeRate }} Bs/USD</strong>
           </span>
           <span class="text-caption text-grey ml-2">
             Equivalente: ≈ <strong class="text-info">{{ formatNumber(formData.financial.totalSales * formData.financial.exchangeRate) }} Bs.</strong>
           </span>
         </div>
         <div v-else-if="formData.financial.currency === 'EUR'" class="mt-2 d-flex align-center gap-2">
-          <v-icon color="warning" size="16">mdi-alert-circle-outline</v-icon>
-          <span class="text-caption text-grey">
-            Conversión a Bolívares para Euros no disponible automáticamente.
+          <v-icon color="warning" size="16">mdi-currency-eur</v-icon>
+          <span class="text-caption">
+            Tasa oficial BCV: <strong v-if="formData.financial.exchangeRateEur">{{ formData.financial.exchangeRateEur }} Bs/EUR</strong>
+            <span v-else class="text-grey">Cargando tasa...</span>
+          </span>
+          <span v-if="formData.financial.exchangeRateEur" class="text-caption text-grey ml-2">
+            Equivalente: ≈ <strong class="text-warning">{{ formatNumber(formData.financial.totalSales * formData.financial.exchangeRateEur) }} Bs.</strong>
           </span>
         </div>
       </div>
@@ -734,7 +738,7 @@ export default {
           totalSales: 0, nonTaxableSales: 0, taxableSales: 0,
           taxDebit: 0, ivaRetention: 0, islrRetention: 0,
           municipalRetention: 0, igtf: 0,
-          currency: 'VES', exchangeRate: 1
+          currency: 'VES', exchangeRate: 1, exchangeRateEur: null
         },
 
         items: [ this.newItem() ],
@@ -997,8 +1001,15 @@ export default {
           }
         }
 
-        if (r.success && r.data?.dollar) {
-          this.formData.financial.exchangeRate = r.data.dollar;
+        if (r.success && r.data) {
+          // Guardar tasa USD (siempre disponible)
+          if (r.data.dollar) {
+            this.formData.financial.exchangeRate = r.data.dollar;
+          }
+          // Guardar tasa EUR si está disponible
+          if (r.data.euro) {
+            this.formData.financial.exchangeRateEur = r.data.euro;
+          }
         }
       } catch (e) {
         console.warn('⚠️ No se pudo obtener tasa BCV:', e);
