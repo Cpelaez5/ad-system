@@ -319,8 +319,8 @@ export default {
     await this.loadUser();
   },
   methods: {
-    async loadUser() {
-      this.currentUser = await userService.getCurrentUser();
+    async loadUser(force = false) {
+      this.currentUser = await userService.getCurrentUser(force);
       if (this.currentUser) {
         // Load basic data
         this.form.firstName = this.currentUser.firstName || '';
@@ -360,7 +360,7 @@ export default {
         const result = await userService.updateUserProfile(this.currentUser.id, updates);
         if (result.success) {
           this.snackbar = { show: true, text: 'Datos de empresa actualizados', color: 'success' };
-          await this.loadUser();
+          await this.loadUser(true);
         } else throw result.error;
       } catch (e) {
         this.snackbar = { show: true, text: 'Error: ' + (e.message || 'Desconocido'), color: 'error' };
@@ -383,7 +383,7 @@ export default {
 
         if (result.success) {
           this.snackbar = { show: true, text: 'Datos personales actualizados', color: 'success' };
-          await this.loadUser();
+          await this.loadUser(true);
         } else {
           throw result.error;
         }
