@@ -1,126 +1,95 @@
-// Servicio para obtener tasas de cambio del BCV (Banco Central de Venezuela)
+// ═══════════════════════════════════════════════════════════
+// Servicio BCV — Tasas de Cambio (Dólar + Euro)
+// Obtiene tasas directamente del sitio oficial del BCV
+// mediante una Edge Function de Supabase (scraping server-side).
+// ═══════════════════════════════════════════════════════════
 import { supabase } from '@/lib/supabaseClient';
 
 class BCVService {
   constructor() {
-    this.baseURL = 'https://bcv-api.rafnixg.dev';
-    this.cacheKey = 'bcv_exchange_rates';
-    this.cacheExpiry = 5 * 60 * 1000; // 5 minutos en cache de RAM/LocalStorage
-    this.isProduction = import.meta.env.PROD;
+    this.cacheKey = 'bcv_exchange_rates_v3';
+    this.cacheExpiry = 30 * 60 * 1000; // 30 minutos — BCV solo actualiza 1 vez al día hábil
   }
 
-  // Helper para realizar peticiones a través de proxies (evitar CORS)
-  async fetchWithProxy(endpoint) {
-    const targetURL = `${this.baseURL}${endpoint}`;
-    const proxies = [
-      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-      (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-    ];
-
-    let lastError = null;
-
-    for (const proxyGen of proxies) {
-      try {
-        const proxyURL = proxyGen(targetURL);
-        const response = await fetch(proxyURL, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          cache: 'no-cache'
-        });
-
-        if (response.ok) {
-          const text = await response.text();
-          try {
-            return JSON.parse(text);
-          } catch (e) {
-            console.warn('Respuesta no es JSON válido:', text.substring(0, 50));
-          }
-        }
-      } catch (error) {
-        console.warn(`⚠️ Proxy falló, intentando siguiente...`, error.message);
-        lastError = error;
-      }
-    }
-    throw lastError || new Error('No se pudo conectar con el servicio del BCV');
-  }
+  // ═══════════════════════════════════════════
+  // MÉTODO PRINCIPAL: Obtener tasa actual
+  // ═══════════════════════════════════════════
 
   /**
-   * Obtiene la tasa del día.
-   * Estrategia: "Passive Write-Through"
-   * 1. Busca en API.
-   * 2. Si tiene éxito, intenta guardar en DB para "inmortalizar" el dato.
+   * Obtiene las tasas de cambio del día (USD y EUR).
+   * Estrategia de 3 capas:
+   *   1. Cache local (localStorage) → instantáneo
+   *   2. Edge Function (scraping BCV oficial) → 1-3s
+   *   3. Base de datos (última tasa guardada) → fallback
+   *
+   * @returns {{ success: boolean, data?: { dollar, euro, date, trend, source } }}
    */
   async getCurrentRate() {
     try {
-      // 1. Validar Cache Local (L1)
+      // ── Capa 1: Cache local ──
       const cached = this.getCachedRate();
       if (cached) {
-        console.log('📦 Usando tasa del BCV desde cache local:', cached.data);
+        console.log('📦 BCV: Usando cache local:', cached.data.dollar);
         return cached;
       }
 
-      console.log('🌐 Obteniendo tasa del BCV actual...');
-      let rawData;
+      console.log('🌐 BCV: Obteniendo tasas desde Edge Function...');
+
+      // ── Capa 2: Edge Function (scraping oficial) ──
+      let rateData = null;
       try {
-        rawData = await this.fetchWithProxy('/rates/');
+        rateData = await this.fetchFromEdgeFunction();
       } catch (e) {
-        console.warn('⚠️ Fallo al obtener tasa actual de API:', e);
-        // Fallback: Intentar buscar en DB la última guardada hoy
-        const dbRate = await this.getRateFromDB(new Date().toISOString().split('T')[0]);
-        if (dbRate) return { success: true, data: dbRate };
-
-        return { success: false, error: 'Servicio BCV no disponible' };
+        console.warn('⚠️ BCV Edge Function falló:', e.message);
       }
 
-      if (!rawData || typeof rawData.dollar !== 'number') {
-        throw new Error('Respuesta inválida del BCV: estructura de datos incorrecta');
+      // Si la Edge Function falla, intentar DB como fallback
+      if (!rateData) {
+        console.log('🗄️ BCV: Fallback a base de datos...');
+        const dbRate = await this.getLatestRateFromDB();
+        if (dbRate) {
+          // Guardar en cache para evitar llamadas futuras
+          this.setCachedRate(dbRate);
+          return { success: true, data: { ...dbRate, source: 'DB-Fallback' } };
+        }
+        return { success: false, error: 'No se pudo obtener la tasa del BCV' };
       }
 
-      // Preparar objeto de datos
-      // Notas del usuario contextual: BCV actualiza lun-vie, fines de semana mantiene anterior.
-      // La API ya devuelve "date" con la fecha de la tasa vigente.
-      const rateData = {
-        dollar: rawData.dollar,
-        date: rawData.date, // Fecha de vigencia según BCV
-        source: 'BCV',
-        timestamp: new Date().toISOString()
-      };
-
-      // 2. Guardar en Cache Local (L1)
+      // ── Persistir y cachear ──
       this.setCachedRate(rateData);
 
-      // 3. Guardar en Base de Datos (L2 - Persistencia Histórica)
-      // Optimización: Solo guardar si no existe o es diferente para evitar saturar DB/Logs
-      try {
-        const existingDbRate = await this.getRateFromDB(rateData.date);
-        const shouldSave = !existingDbRate || Math.abs(existingDbRate.dollar - rateData.dollar) > 0.0001;
+      // Guardar en DB (async, no bloquea)
+      this.persistRateToDB(rateData).catch(err => {
+        console.warn('⚠️ Error guardando tasa en DB:', err);
+      });
 
-        if (shouldSave) {
-          this.saveRateToDB(rateData.dollar, rateData.date).catch(err => {
-            console.warn('⚠️ No se pudo guardar tasa en histórico DB:', err);
-          });
-        } else {
-          console.log('📦 Tasa ya actualizada en DB, omitiendo guardado.');
+      // Calcular tendencia vs día anterior para USD
+      try {
+        const previousUsd = await this.getPreviousRateFromDB(rateData.date, 'USD');
+        if (previousUsd) {
+          if (rateData.dollar > previousUsd.dollar) rateData.trend = 'up';
+          else if (rateData.dollar < previousUsd.dollar) rateData.trend = 'down';
+          else rateData.trend = 'stable';
+          rateData.previousRate = previousUsd.dollar;
         }
-      } catch (err) {
-        console.warn('⚠️ Error verificando DB para guardado:', err);
+        
+        const previousEur = await this.getPreviousRateFromDB(rateData.date, 'EUR');
+        if (previousEur && rateData.euro) {
+          if (rateData.euro > previousEur.euro) rateData.trendEur = 'up';
+          else if (rateData.euro < previousEur.euro) rateData.trendEur = 'down';
+          else rateData.trendEur = 'stable';
+          rateData.previousRateEur = previousEur.euro;
+        }
+      } catch (e) {
+        console.warn('⚠️ Error calculando tendencia:', e);
       }
 
-      // 4. Calcular Tendencia (Trend)
-      // Buscamos la tasa del día anterior (o la más reciente anterior) para comparar
-      try {
-        const previousRateData = await this.getPreviousRateFromDB(rateData.date);
-        if (previousRateData) {
-          if (rateData.dollar > previousRateData.dollar) rateData.trend = 'up';
-          else if (rateData.dollar < previousRateData.dollar) rateData.trend = 'down';
-          else rateData.trend = 'stable';
+      console.log('✅ BCV: Tasas obtenidas →', {
+        dollar: rateData.dollar,
+        euro: rateData.euro,
+        date: rateData.date
+      });
 
-          rateData.previousRate = previousRateData.dollar;
-        }
-      } catch (e) { console.warn('⚠️ Error calculando tendencia:', e); }
-
-      console.log('✅ Tasa del BCV obtenida:', rateData);
       return { success: true, data: rateData };
 
     } catch (error) {
@@ -129,51 +98,93 @@ class BCVService {
     }
   }
 
+  // ═══════════════════════════════════════════
+  // EDGE FUNCTION (Scraping BCV Oficial)
+  // ═══════════════════════════════════════════
+
+  /**
+   * Llama a la Edge Function bcv-rates que hace scraping
+   * directamente del sitio oficial del BCV (sin CORS).
+   * @returns {Object} { dollar, euro, date, source, timestamp }
+   */
+  async fetchFromEdgeFunction() {
+    const { data, error } = await supabase.functions.invoke('bcv-rates', {
+      method: 'GET'
+    });
+
+    if (error) {
+      throw new Error(`Edge Function error: ${error.message}`);
+    }
+
+    // La Edge Function retorna { success, data: { dollar, euro, date, ... } }
+    if (!data || !data.success || !data.data) {
+      throw new Error(data?.error || 'Respuesta inválida de la Edge Function');
+    }
+
+    const rates = data.data;
+
+    if (typeof rates.dollar !== 'number' || rates.dollar <= 0) {
+      throw new Error('Tasa del dólar inválida en respuesta');
+    }
+
+    return {
+      dollar: rates.dollar,
+      euro: rates.euro || null,
+      date: rates.date,
+      dateText: rates.dateText || null,
+      source: 'BCV-OFICIAL',
+      timestamp: rates.timestamp || new Date().toISOString()
+    };
+  }
+
+  // ═══════════════════════════════════════════
+  // TASA POR FECHA ESPECÍFICA
+  // ═══════════════════════════════════════════
+
   /**
    * Obtiene tasa para una fecha específica (YYYY-MM-DD).
-   * Estrategia: DB -> API -> DB Save
+   * Estrategia: DB → Edge Function (solo tasa actual) → fallback
    */
   async getRateForDate(date) {
     if (!date) return { success: false, error: 'Fecha inválida' };
-    console.log(`🌐 Buscando tasa para ${date}...`);
+    console.log(`🌐 BCV: Buscando tasa para ${date}...`);
 
     try {
-      // 1. Buscar en Base de Datos (L2)
+      // 1. Buscar en Base de Datos
       const dbRate = await this.getRateFromDB(date);
       if (dbRate) {
-        console.log('🗄️ Tasa encontrada en Base de Datos:', dbRate);
+        console.log('🗄️ BCV: Tasa encontrada en DB:', dbRate);
         return { success: true, data: dbRate };
       }
 
-      // 2. Si no está en DB, buscar en API
-      console.log(`📡 Tasa no en DB, buscando en API para ${date}...`);
-      const rawData = await this.fetchWithProxy(`/rates/${date}`);
+      // 2. Si es la fecha de hoy, usar la Edge Function
+      const today = new Date().toISOString().split('T')[0];
+      if (date === today) {
+        const currentRate = await this.getCurrentRate();
+        if (currentRate.success) {
+          return currentRate;
+        }
+      }
 
-      if (rawData && (rawData.bank_rates || rawData.dollar)) {
-        const rateValue = rawData.dollar || (rawData.bank_rates ? 0 : 0); // Ajustar según estructura real histórica
-        // La estructura histórica a veces varía, asumiremos .dollar si existe
-
-        const finalRate = {
-          dollar: rawData.dollar,
-          date: rawData.date,
-          source: 'BCV-API-History'
-        };
-
-        // 3. Guardar en DB para el futuro
-        await this.saveRateToDB(finalRate.dollar, date); // Guardamos con la fecha solicitada para llenar el hueco
-
-        return { success: true, data: finalRate };
+      // 3. Si no se encontró, intentar obtener la más cercana de DB
+      const closestRate = await this.getClosestRateFromDB(date);
+      if (closestRate) {
+        console.log(`📊 BCV: Usando tasa más cercana (${closestRate.date}) como aproximación`);
+        return { success: true, data: { ...closestRate, approximate: true } };
       }
 
     } catch (error) {
-      console.warn(`⚠️ Error buscando tasa histórica para ${date}:`, error.message);
+      console.warn(`⚠️ Error buscando tasa para ${date}:`, error.message);
     }
 
     return { success: false, error: 'Tasa no encontrada para esta fecha' };
   }
 
-  // --- MÉTODOS DE BASE DE DATOS ---
+  // ═══════════════════════════════════════════
+  // MÉTODOS DE BASE DE DATOS
+  // ═══════════════════════════════════════════
 
+  /** Obtiene tasa de una fecha exacta desde la DB */
   async getRateFromDB(date) {
     const { data, error } = await supabase
       .from('exchange_rates')
@@ -191,11 +202,11 @@ class BCVService {
     };
   }
 
-  async getPreviousRateFromDB(currentDate) {
+  /** Obtiene la última tasa guardada en DB (sin importar fecha) */
+  async getLatestRateFromDB() {
     const { data, error } = await supabase
       .from('exchange_rates')
       .select('*')
-      .lt('date', currentDate)
       .eq('currency', 'USD')
       .order('date', { ascending: false })
       .limit(1)
@@ -210,50 +221,133 @@ class BCVService {
     };
   }
 
-  async saveRateToDB(rate, date) {
-    // Usar upsert para evitar errores de duplicados
-    const { error } = await supabase
+  /** Obtiene la tasa anterior más reciente desde DB (para calcular tendencia) */
+  async getPreviousRateFromDB(currentDate, currency = 'USD') {
+    const { data, error } = await supabase
       .from('exchange_rates')
-      .upsert({
-        date: date,
-        currency: 'USD',
-        rate: rate,
-        source: 'API'
-      }, { onConflict: 'date, currency' });
+      .select('*')
+      .lt('date', currentDate)
+      .eq('currency', currency)
+      .order('date', { ascending: false })
+      .limit(1)
+      .single();
 
-    if (error) throw error;
-    console.log(`💾 Tasa guardada en DB: ${date} = ${rate}`);
+    if (error || !data) return null;
+
+    if (currency === 'EUR') {
+      return {
+        euro: parseFloat(data.rate),
+        date: data.date,
+        source: 'DB'
+      };
+    }
+
+    return {
+      dollar: parseFloat(data.rate),
+      date: data.date,
+      source: 'DB'
+    };
   }
 
-  // --- MÉTODOS EXISTENTES (Cache Local L1) ---
+  /** Busca la tasa más cercana a una fecha dada */
+  async getClosestRateFromDB(date) {
+    // Intentar la más reciente anterior
+    const { data, error } = await supabase
+      .from('exchange_rates')
+      .select('*')
+      .lte('date', date)
+      .eq('currency', 'USD')
+      .order('date', { ascending: false })
+      .limit(1)
+      .single();
 
-  // Obtener tasa desde cache local (localStorage)
+    if (error || !data) return null;
+
+    return {
+      dollar: parseFloat(data.rate),
+      date: data.date,
+      source: 'DB-Closest'
+    };
+  }
+
+  /**
+   * Persiste la tasa del dólar (y euro si está disponible) en la DB.
+   * Usa upsert para evitar duplicados.
+   */
+  async persistRateToDB(rateData) {
+    const inserts = [];
+
+    // Guardar tasa del dólar
+    if (rateData.dollar) {
+      inserts.push({
+        date: rateData.date,
+        currency: 'USD',
+        rate: rateData.dollar,
+        source: 'BCV'
+      });
+    }
+
+    // Guardar tasa del euro
+    if (rateData.euro) {
+      inserts.push({
+        date: rateData.date,
+        currency: 'EUR',
+        rate: rateData.euro,
+        source: 'BCV'
+      });
+    }
+
+    if (inserts.length === 0) return;
+
+    const { error } = await supabase
+      .from('exchange_rates')
+      .upsert(inserts, { onConflict: 'date, currency' });
+
+    if (error) throw error;
+    console.log(`💾 BCV: ${inserts.length} tasa(s) guardada(s) en DB para ${rateData.date}`);
+  }
+
+  // ═══════════════════════════════════════════
+  // CACHE LOCAL (localStorage)
+  // ═══════════════════════════════════════════
+
+  /** Obtener tasa desde cache local (validando expiración) */
   getCachedRate() {
     try {
       const cached = localStorage.getItem(this.cacheKey);
       if (!cached) return null;
       const { data, timestamp } = JSON.parse(cached);
-      const now = new Date().getTime();
+      const now = Date.now();
       if (now - timestamp < this.cacheExpiry) {
         return { success: true, data: { ...data, cached: true } };
       }
-      localStorage.removeItem(this.cacheKey);
+      // Cache expirado — no eliminar, el dashboard lo usa como cache "caliente"
       return null;
     } catch (error) { return null; }
   }
 
+  /** Guardar tasa en cache local */
   setCachedRate(data) {
     try {
       localStorage.setItem(this.cacheKey, JSON.stringify({
         data,
-        timestamp: new Date().getTime()
+        timestamp: Date.now()
       }));
-    } catch (error) { console.error('Error cache local:', error); }
+    } catch (error) {
+      console.error('Error guardando cache BCV:', error);
+    }
   }
 
-  clearCache() { localStorage.removeItem(this.cacheKey); }
+  /** Limpiar cache */
+  clearCache() {
+    localStorage.removeItem(this.cacheKey);
+  }
 
-  // Utils
+  // ═══════════════════════════════════════════
+  // UTILIDADES
+  // ═══════════════════════════════════════════
+
+  /** Formatea una tasa como moneda venezolana */
   formatRate(rate) {
     if (!rate) return 'N/A';
     return new Intl.NumberFormat('es-VE', {
@@ -263,11 +357,50 @@ class BCVService {
     }).format(rate);
   }
 
-  // Convertidores legacy
+  /** Convierte USD a VES usando la tasa actual */
   async convertUSDToVES(usdAmount) {
     const res = await this.getCurrentRate();
     if (!res.success) return { success: false, error: 'Sin tasa' };
-    return { success: true, data: { vesAmount: usdAmount * res.data.dollar, rate: res.data.dollar } };
+    return {
+      success: true,
+      data: {
+        vesAmount: usdAmount * res.data.dollar,
+        rate: res.data.dollar
+      }
+    };
+  }
+
+  /** Convierte EUR a VES usando la tasa actual */
+  async convertEURToVES(eurAmount) {
+    const res = await this.getCurrentRate();
+    if (!res.success || !res.data.euro) return { success: false, error: 'Sin tasa EUR' };
+    return {
+      success: true,
+      data: {
+        vesAmount: eurAmount * res.data.euro,
+        rate: res.data.euro
+      }
+    };
+  }
+
+  /**
+   * Retorna una tasa por defecto configurada.
+   * Método de compatibilidad usado por múltiples vistas como fallback final
+   * cuando el cache y la API fallan.
+   * @returns {{ success: true, data: { dollar: number, date: string, source: string } } | null}
+   */
+  getConfiguredDefaultRate() {
+    // Intentar leer cache (aunque esté expirado) como último recurso
+    try {
+      const cached = localStorage.getItem(this.cacheKey);
+      if (cached) {
+        const { data } = JSON.parse(cached);
+        if (data && typeof data.dollar === 'number') {
+          return { success: true, data: { ...data, source: 'Cache-Expirado' } };
+        }
+      }
+    } catch (e) { /* silencioso */ }
+    return null;
   }
 }
 

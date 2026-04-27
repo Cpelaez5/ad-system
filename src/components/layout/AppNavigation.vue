@@ -22,52 +22,35 @@
 
     <v-spacer />
 
-        <!-- Tasa del BCV (Rediseñado) -->
-    <div class="bcv-rate-display mr-4">
-      <v-tooltip location="bottom" text="">
-        <template v-slot:activator="{ props }">
-            <v-chip
-                v-bind="props"
-                color="secondary" 
-                variant="flat"
-                size="default"
-                class="px-4 cursor-pointer transition-all hover-scale elevation-3"
-                @click="refreshBCVRate"
-                :disabled="bcvLoading"
-                style="border: 1px solid rgba(255,255,255,0.1)"
-            >
-                <!-- Loading State -->
-                <template v-if="bcvLoading">
-                    <v-icon size="small" class="animate-spin mr-2">mdi-loading</v-icon>
-                    <span class="text-body-2">Actualizando...</span>
-                </template>
+    <!-- Tasa del BCV (Rediseñado con Componente) -->
+    <div class="bcv-rate-display mr-4 d-flex align-center ga-2">
+      <!-- Chip Dólar -->
+      <ExchangeRateChip
+        currency="USD"
+        :rate-value="bcvRate?.dollar"
+        :trend="bcvRate?.trend"
+        :previous-rate="bcvRate?.previousRate"
+        :loading="bcvLoading"
+        :error="bcvError"
+        color="secondary"
+        variant="flat"
+        @click="refreshBCVRate"
+      />
 
-                <!-- Data State -->
-                <template v-else>
-                    <!-- Icono Moneda (Accent del sistema) -->
-                    <v-icon size="20" class="mr-2 text-accent">mdi-currency-usd</v-icon>
-
-                    <!-- Valor Numérico -->
-                    <span class="font-weight-bold text-subtitle-1 mr-2" style="font-family: 'Roboto Mono', monospace; letter-spacing: 0.5px; color: white;">
-                         {{ getBCVRateOnlyNumber() }}
-                    </span>
-                    
-                    <!-- Icono de Tendencia -->
-                    <v-icon 
-                        size="22" 
-                        :color="getTrendColor(bcvRate?.trend)"
-                        :icon="getTrendIcon(bcvRate?.trend)"
-                    ></v-icon>
-                </template>
-            </v-chip>
-        </template>
-        
-        <!-- Tooltip Content -->
-        <div class="text-center">
-            <div class="font-weight-bold">{{ getTrendTitle(bcvRate?.trend) }}</div>
-            <div class="text-caption text-grey-lighten-2">Click para forzar actualización</div>
-        </div>
-      </v-tooltip>
+      <!-- Chip Euro -->
+      <ExchangeRateChip
+        v-if="!bcvLoading && bcvRate?.euro"
+        currency="EUR"
+        :rate-value="bcvRate?.euro"
+        :trend="bcvRate?.trendEur"
+        :previous-rate="bcvRate?.previousRateEur"
+        :loading="bcvLoading"
+        :error="bcvError"
+        color="#02254d"
+        variant="flat"
+        class="d-none d-sm-inline-flex"
+        @click="refreshBCVRate"
+      />
     </div>
 
     <!-- Menú de usuario -->
@@ -116,11 +99,12 @@
 import bcvService from '@/services/bcvService.js';
 import Sidebar from './Sidebar.vue';
 import TrialBanner from './TrialBanner.vue';
+import ExchangeRateChip from '@/components/common/ExchangeRateChip.vue';
 import { supabase } from '@/lib/supabaseClient';
 
 export default {
 	name: 'AppNavigation',
-	components: { Sidebar, TrialBanner },
+	components: { Sidebar, TrialBanner, ExchangeRateChip },
 	data() {
 		return {
 			bcvRate: null,
@@ -349,42 +333,7 @@ export default {
 		async refreshBCVRate() {
 			bcvService.clearCache();
 			await this.loadBCVRate();
-		},
-    
-        // Helper simple para mostrar solo el número (limpieza visual)
-        getBCVRateOnlyNumber() {
-            if (this.bcvError) return 'Error';
-            if (!this.bcvRate) return '---';
-            return this.bcvRate.dollar;
-        },
-
-		getBCVChipColor() {
-			if (this.bcvError) return 'error';
-			if (this.bcvLoading) return 'warning';
-			if (this.bcvRate?.source === 'BCV') return 'success';
-			if (this.bcvRate?.source === 'DEFAULT') return 'info';
-			return 'warning';
-		},
-
-        getTrendColor(trend) {
-            if (trend === 'up') return 'red-accent-2'; // Rojo brillante
-            if (trend === 'down') return 'green-accent-3'; // Verde brillante
-            return 'grey-lighten-1'; // Gris claro para contraste con fondo oscuro
-        },
-
-        getTrendIcon(trend) {
-            if (trend === 'up') return 'mdi-arrow-up-bold';
-            if (trend === 'down') return 'mdi-arrow-down-bold';
-            return 'mdi-minus';
-        },
-
-        getTrendTitle(trend) {
-            if (!this.bcvRate?.previousRate) return 'Calculando tendencia...';
-            const prev = this.bcvRate.previousRate;
-            if (trend === 'up') return `Subió (Anterior: ${prev})`;
-            if (trend === 'down') return `Bajó (Anterior: ${prev})`;
-            return `Se mantiene igual (Anterior: ${prev})`;
-        }
+		}
 	}
 }
 </script>

@@ -241,6 +241,40 @@ const extracted = await ocrService.extractFromFile(file)
 
 ---
 
+## preferencesService
+
+**Archivo**: `src/services/preferencesService.js`
+
+Preferencias persistentes del usuario (layout del dashboard, tema, etc.) almacenadas en Supabase.
+
+### Métodos
+
+| Método | Parámetros | Retorna | Descripción |
+|--------|------------|---------|-------------|
+| `getPreference(key)` | `key: string` | `Object\|null` | Obtener una preferencia por clave |
+| `setPreference(key, value)` | `key, value: Object` | `{ success }` | Guardar/actualizar preferencia (upsert) |
+| `deletePreference(key)` | `key: string` | `{ success }` | Eliminar una preferencia |
+| `getDashboardLayout()` | - | `Object\|null` | Atajo: obtener layout del dashboard |
+| `saveDashboardLayout(layout)` | `layout: Object` | `{ success }` | Atajo: guardar layout del dashboard |
+
+### Uso
+
+```javascript
+import preferencesService from '@/services/preferencesService'
+
+// Guardar layout del dashboard
+await preferencesService.saveDashboardLayout({ insights: 'insights', actividad: 'actividad' })
+
+// Obtener layout
+const layout = await preferencesService.getDashboardLayout()
+
+// Preferencia genérica
+await preferencesService.setPreference('theme', { mode: 'dark' })
+const theme = await preferencesService.getPreference('theme')
+```
+
+---
+
 ## Patrones Comunes
 
 ### Multi-tenancy en todos los servicios

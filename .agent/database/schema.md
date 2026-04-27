@@ -333,6 +333,31 @@ CREATE TABLE payment_reports (
 
 ---
 
+### user_preferences
+Preferencias personalizadas por usuario (layout del dashboard, tema, filtros, etc.).
+
+```sql
+CREATE TABLE user_preferences (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  preference_key TEXT NOT NULL,
+  preference_value JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, organization_id, preference_key)
+);
+```
+
+**Claves de preferencia actuales**:
+| Clave | Descripción |
+|-------|-------------|
+| `dashboard_layout` | Layout Swapy del dashboard (posición de cards) |
+
+**RLS**: Cada usuario solo puede leer/escribir sus propias preferencias (`user_id = auth.uid()`).
+
+---
+
 ## Migraciones
 
 Ubicación: `/migrations/`
