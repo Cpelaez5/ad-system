@@ -178,23 +178,10 @@
                   density="compact"
                   variant="outlined"
                   hide-details
-                  style="width: 110px"
+                  style="width: 130px"
                   bg-color="white"
-                  label="Año"
+                  label="Año Fiscal"
                   prepend-inner-icon="mdi-calendar"
-                />
-
-                <!-- Selector de mes -->
-                <v-select
-                  v-model="selectedMonth"
-                  :items="monthOptions"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                  style="width: 160px"
-                  bg-color="white"
-                  label="Mes"
-                  prepend-inner-icon="mdi-calendar-month"
                 />
 
                 <v-spacer />
@@ -324,123 +311,140 @@
             </v-data-iterator>
           </template>
 
-          <!-- ===== MODO LISTA PLANA: Tabs de categoría individual ===== -->
+          <!-- ===== MODO PERÍODOS: Tabs de categoría individual ===== -->
           <template v-else>
-            <v-list lines="two" class="pa-2">
-              <!-- Documentos existentes -->
-              <v-list-item
-                v-for="doc in filteredDocs"
-                :key="doc.id"
-                class="py-3 rounded-lg mb-1 hover-bg cursor-pointer"
-                border
-                @click="openPreview(doc)"
-              >
-                <template v-slot:prepend>
-                  <div class="mr-4 text-center d-flex align-center justify-center" style="width: 50px; height: 50px">
-                    <template v-if="doc.expiration_date">
-                      <div>
-                        <div class="text-h6 font-weight-bold mb-n1" :class="getExpirationClass(doc.expiration_date)">
-                          {{ getDay(doc.expiration_date) }}
-                        </div>
-                        <div class="text-caption text-uppercase" :class="getExpirationClass(doc.expiration_date)">
-                          {{ getMonth(doc.expiration_date) }}
-                        </div>
+            <div class="pa-4">
+              <!-- Documentos Recurrentes / Trackers -->
+              <template v-if="getRecurringTypes(currentTab).length > 0">
+                <FiscalPeriodTracker
+                    v-for="type in getRecurringTypes(currentTab)"
+                    :key="type.id"
+                    :type="type"
+                    :category="currentTab"
+                    :documents="getDocsForType(type.id)"
+                    :year="selectedYear"
+                    @open-preview="openPreview"
+                    @open-dialog="openDialogForPeriod"
+                />
+              </template>
+              
+              <!-- Documentos No Recurrentes (Únicos / Permanentes) -->
+              <v-card v-if="getNonRecurringDocs().length > 0 || nonRecurringPendingDocs.length > 0" variant="outlined" class="rounded-xl mt-6 border-dashed" style="border-color: #e0e0e0 !important;">
+                <v-card-title class="text-subtitle-1 font-weight-bold text-secondary bg-grey-lighten-4 py-3">
+                  <v-icon start size="small">mdi-pin</v-icon>
+                  Documentos Permanentes / Ad-hoc
+                </v-card-title>
+                <v-list lines="two" class="bg-transparent pa-2">
+                  <!-- Documentos existentes -->
+                  <v-list-item
+                    v-for="doc in getNonRecurringDocs()"
+                    :key="doc.id"
+                    class="py-3 rounded-lg mb-1 hover-bg cursor-pointer"
+                    border
+                    @click="openPreview(doc)"
+                  >
+                    <template v-slot:prepend>
+                      <div class="mr-4 text-center d-flex align-center justify-center" style="width: 50px; height: 50px">
+                        <template v-if="doc.expiration_date">
+                          <div>
+                            <div class="text-h6 font-weight-bold mb-n1" :class="getExpirationClass(doc.expiration_date)">
+                              {{ getDay(doc.expiration_date) }}
+                            </div>
+                            <div class="text-caption text-uppercase" :class="getExpirationClass(doc.expiration_date)">
+                              {{ getMonth(doc.expiration_date) }}
+                            </div>
+                          </div>
+                        </template>
+                        <v-icon v-else :icon="getCategoryIcon(doc.category)" size="32" color="primary" />
                       </div>
                     </template>
-                    <v-icon v-else :icon="getCategoryIcon(doc.category)" size="32" color="primary" />
-                  </div>
-                </template>
 
-                <v-list-item-title class="font-weight-bold mb-1">{{ doc.name }}</v-list-item-title>
-                <v-list-item-subtitle class="d-flex align-center flex-wrap">
-                  <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2 mb-1">
-                    {{ getEffectiveStatus(doc) }}
-                  </v-chip>
-                  
-                  <!-- Expiration Warning -->
-                  <template v-if="doc.expiration_date">
-                      <v-chip
-                          size="x-small"
-                          variant="flat"
-                          :color="getExpirationInfo(doc.expiration_date).color"
-                          class="mr-2 mb-1"
-                      >
-                          <v-icon start size="x-small">{{ getExpirationInfo(doc.expiration_date).icon }}</v-icon>
-                          {{ getExpirationInfo(doc.expiration_date).label }}
+                    <v-list-item-title class="font-weight-bold mb-1">{{ doc.name }}</v-list-item-title>
+                    <v-list-item-subtitle class="d-flex align-center flex-wrap">
+                      <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2 mb-1">
+                        {{ getEffectiveStatus(doc) }}
                       </v-chip>
-                  </template>
+                      
+                      <!-- Expiration Warning -->
+                      <template v-if="doc.expiration_date">
+                          <v-chip
+                              size="x-small"
+                              variant="flat"
+                              :color="getExpirationInfo(doc.expiration_date).color"
+                              class="mr-2 mb-1"
+                          >
+                              <v-icon start size="x-small">{{ getExpirationInfo(doc.expiration_date).icon }}</v-icon>
+                              {{ getExpirationInfo(doc.expiration_date).label }}
+                          </v-chip>
+                      </template>
 
-                  <!-- Missing Dates Warning -->
-                  <template v-else-if="!doc.expiration_date || !doc.emission_date">
-                        <v-chip
-                          size="x-small"
-                          variant="tonal"
-                          color="warning"
-                          class="mb-1 cursor-pointer"
-                          @click.stop="openDialog(doc)"
-                      >
-                          <v-icon start size="x-small">mdi-calendar-alert</v-icon>
-                          Completar fechas
-                      </v-chip>
-                  </template>
-                </v-list-item-subtitle>
+                      <!-- Missing Dates Warning -->
+                      <template v-else-if="!doc.expiration_date || !doc.emission_date">
+                            <v-chip
+                              size="x-small"
+                              variant="tonal"
+                              color="warning"
+                              class="mb-1 cursor-pointer"
+                              @click.stop="openDialog(doc)"
+                          >
+                              <v-icon start size="x-small">mdi-calendar-alert</v-icon>
+                              Completar fechas
+                          </v-chip>
+                      </template>
+                    </v-list-item-subtitle>
 
-                <template v-slot:append>
-                  <div class="d-flex align-center">
-                    <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(doc)" v-tooltip="'Ver detalle'" class="mr-1" />
-                    <v-btn v-if="doc.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="doc.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" class="mr-1" />
-                    <v-btn icon="mdi-pencil" variant="text" size="small" color="grey" @click.stop="openDialog(doc)" v-tooltip="'Editar'" class="mr-1" />
-                    <v-btn icon="mdi-delete" variant="text" size="small" color="error" @click.stop="confirmDelete(doc)" v-tooltip="'Mover a Papelera'" />
-                  </div>
-                </template>
-              </v-list-item>
+                    <template v-slot:append>
+                      <div class="d-flex align-center">
+                        <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(doc)" v-tooltip="'Ver detalle'" class="mr-1" />
+                        <v-btn v-if="doc.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="doc.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" class="mr-1" />
+                        <v-btn icon="mdi-pencil" variant="text" size="small" color="grey" @click.stop="openDialog(doc)" v-tooltip="'Editar'" class="mr-1" />
+                        <v-btn icon="mdi-delete" variant="text" size="small" color="error" @click.stop="confirmDelete(doc)" v-tooltip="'Mover a Papelera'" />
+                      </div>
+                    </template>
+                  </v-list-item>
 
-              <!-- Documentos pendientes (requeridos pero no subidos) -->
-              <template v-if="pendingDocs.length > 0">
-                <v-divider class="my-3" />
-                <div class="text-caption text-grey-darken-1 font-weight-medium px-4 mb-2">
-                  <v-icon size="small" class="mr-1">mdi-alert-circle-outline</v-icon>
-                  Pendientes por subir
-                </div>
-                <v-list-item
-                  v-for="pending in pendingDocs"
-                  :key="pending.id"
-                  class="py-3 rounded-lg mb-1"
-                  border
-                  style="opacity: 0.6"
-                >
-                  <template v-slot:prepend>
-                    <div class="mr-4 d-flex align-center justify-center" style="width: 50px; height: 50px">
-                      <v-icon icon="mdi-file-question-outline" size="32" color="grey-lighten-1" />
-                    </div>
-                  </template>
-
-                  <v-list-item-title class="font-weight-medium text-grey-darken-1 mb-1">
-                    {{ pending.label }}
-                  </v-list-item-title>
-                  <v-list-item-subtitle class="text-grey">
-                    Documento requerido — No encontrado para este período
-                  </v-list-item-subtitle>
-
-                  <template v-slot:append>
-                    <v-btn
-                      prepend-icon="mdi-plus"
-                      variant="tonal"
-                      size="small"
-                      color="primary"
-                      class="text-none"
-                      @click.stop="openDialogForPending(pending)"
+                  <!-- Documentos pendientes (requeridos pero no subidos) -->
+                  <template v-if="nonRecurringPendingDocs.length > 0">
+                    <v-list-item
+                      v-for="pending in nonRecurringPendingDocs"
+                      :key="pending.id"
+                      class="py-3 rounded-lg mt-2 border-dashed"
+                      style="opacity: 0.7; border-color: #ffd54f !important;"
                     >
-                      Subir
-                    </v-btn>
+                      <template v-slot:prepend>
+                        <div class="mr-4 d-flex align-center justify-center" style="width: 50px; height: 50px">
+                          <v-icon icon="mdi-alert-circle-outline" size="28" color="warning" />
+                        </div>
+                      </template>
+
+                      <v-list-item-title class="font-weight-medium text-warning-darken-2 mb-1">
+                        {{ pending.label }}
+                      </v-list-item-title>
+                      <v-list-item-subtitle class="text-grey-darken-1">
+                        Documento permanente requerido
+                      </v-list-item-subtitle>
+
+                      <template v-slot:append>
+                        <v-btn
+                          prepend-icon="mdi-upload"
+                          variant="tonal"
+                          size="small"
+                          color="warning"
+                          class="text-none"
+                          @click.stop="openDialogForPending(pending)"
+                        >
+                          Subir Ahora
+                        </v-btn>
+                      </template>
+                    </v-list-item>
                   </template>
-                </v-list-item>
-              </template>
-            </v-list>
+                </v-list>
+              </v-card>
+            </div>
           </template>
           
           <!-- Estado vacío -->
-          <div v-if="filteredDocs.length === 0 && pendingDocs.length === 0" class="text-center py-10">
+          <div v-if="!hasAnyDocs" class="text-center py-10">
             <v-icon size="64" color="grey-lighten-2" class="mb-4">
                 {{ currentTab === 'trash' ? 'mdi-delete-empty' : 'mdi-file-document-outline' }}
             </v-icon>
@@ -666,6 +670,7 @@ import Chart from 'chart.js/auto'
 import { jsPDF } from 'jspdf'
 import StatsCard from '@/components/common/StatsCard.vue'
 import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
+import FiscalPeriodTracker from '@/components/fiscal/FiscalPeriodTracker.vue'
 import fiscalService from '@/services/fiscalService'
 import userService from '@/services/userService'
 import systemLogo from '@/assets/icon.png'
@@ -693,7 +698,6 @@ const snackbar = ref({ show: false, message: '', color: 'error' })
 // Selector de período
 const now = new Date()
 const selectedYear = ref(now.getFullYear())
-const selectedMonth = ref(now.getMonth()) // 0-based
 const statusFilter = ref('ALL')
 
 const statusOptions = [
@@ -711,10 +715,8 @@ const availableYears = computed(() => {
     return years.sort((a, b) => b - a) // Orden descendente para acceso rápido a recientes
 })
 
-// Opciones de meses para el selector
-const monthOptions = computed(() => {
-    return MONTHS.map((label, index) => ({ title: label, value: index }))
-})
+// (Meses eliminados ya que FiscalPeriodTracker maneja los períodos internamente)
+
 
 const categories = [
     { title: 'Legal', value: 'LEGAL' },
@@ -737,53 +739,46 @@ const getCategoryTitle = (catValue) => {
 }
 
 // Computed
-// Verifica si un documento pertenece al período seleccionado
-const isInSelectedPeriod = (doc) => {
-    if (!doc.emission_date) return true // Sin fecha de emisión: siempre visible
-    
-    const emissionDate = new Date(doc.emission_date)
-    const emYear = emissionDate.getFullYear()
-    const emMonth = emissionDate.getMonth()
-    
-    // Buscar la frecuencia del tipo de documento
-    const catTypes = FISCAL_TYPES[doc.category] || []
-    const typeInfo = catTypes.find(t => t.id === doc.doc_type)
-    const frequency = typeInfo?.frequency || 'PERMANENT'
-    
-    // Documentos permanentes/vigentes: siempre visibles
-    if (!isRecurringFrequency(frequency) && frequency !== 'ANNUAL') return true
-    
-    // Documentos anuales: filtrar solo por año
-    if (frequency === 'ANNUAL') return emYear === selectedYear.value
-    
-    // Documentos trimestrales: verificar si el mes de emisión está en el mismo trimestre
-    if (frequency === 'QUARTERLY') {
-        const selectedQ = Math.floor(selectedMonth.value / 3)
-        const docQ = Math.floor(emMonth / 3)
-        return emYear === selectedYear.value && docQ === selectedQ
-    }
-    
-    // Documentos mensuales/quincenales/semestrales: filtrar por mes exacto
-    return emYear === selectedYear.value && emMonth === selectedMonth.value
+// Utilities for the new grouping layout
+const getRecurringTypes = (cat) => {
+    const types = FISCAL_TYPES[cat] || []
+    return types.filter(t => isRecurringFrequency(t.frequency) || t.frequency === 'ANNUAL')
 }
+
+const getNonRecurringTypes = (cat) => {
+    const types = FISCAL_TYPES[cat] || []
+    return types.filter(t => !isRecurringFrequency(t.frequency) && t.frequency !== 'ANNUAL')
+}
+
+const getDocsForType = (typeId) => {
+    return docs.value.filter(d => d.doc_type === typeId)
+}
+
+const getNonRecurringDocs = () => {
+    if (currentTab.value === 'all' || currentTab.value === 'trash') return []
+    const nrTypes = getNonRecurringTypes(currentTab.value).map(t => t.id)
+    return filteredDocs.value.filter(d => {
+        if (!d.doc_type) return true // Ad-hoc sin tipo estricto
+        return nrTypes.includes(d.doc_type)
+    })
+}
+
+const hasAnyDocs = computed(() => {
+    if (currentTab.value === 'all' || currentTab.value === 'trash') {
+        return filteredDocs.value.length > 0
+    }
+    return getRecurringTypes(currentTab.value).length > 0 || getNonRecurringDocs().length > 0
+})
 
 const filteredDocs = computed(() => {
     let filtered = docs.value
     
-    // Papelera: retornar tal cual
     if (currentTab.value === 'trash') return filtered
     
-    // Filtrar por categoría (tab)
     if (currentTab.value !== 'all') {
         filtered = filtered.filter(d => d.category === currentTab.value)
     }
     
-    // Filtrar por período (solo si el selector está visible)
-    if (showPeriodSelector.value) {
-        filtered = filtered.filter(d => isInSelectedPeriod(d))
-    }
-    
-    // Filtrar por estado
     if (statusFilter.value !== 'ALL') {
         filtered = filtered.filter(d => getEffectiveStatus(d) === statusFilter.value)
     }
@@ -791,29 +786,18 @@ const filteredDocs = computed(() => {
     return filtered
 })
 
-// Documentos pendientes (requeridos pero no subidos) para el período actual
-const pendingDocs = computed(() => {
+// Documentos permanentes pendientes (los recurrentes pendientes los maneja FiscalPeriodTracker)
+const nonRecurringPendingDocs = computed(() => {
     if (currentTab.value === 'all' || currentTab.value === 'trash') return []
-    if (statusFilter.value !== 'ALL') return [] // No mostrar pendientes si hay filtro de estado
+    if (statusFilter.value !== 'ALL') return [] 
     
-    const catTypes = FISCAL_TYPES[currentTab.value] || []
     const pending = []
+    const nrTypes = getNonRecurringTypes(currentTab.value)
     
-    catTypes.forEach(type => {
+    nrTypes.forEach(type => {
         if (!type.required) return
-        
-        // Para docs permanentes, verificar si existe alguno sin importar período
-        if (!isRecurringFrequency(type.frequency) && type.frequency !== 'ANNUAL') {
-            const exists = docs.value.some(d => d.category === currentTab.value && d.doc_type === type.id)
-            if (!exists) {
-                pending.push({ ...type, category: currentTab.value, isPending: true })
-            }
-            return
-        }
-        
-        // Para docs recurrentes, verificar si existe para el período seleccionado
-        const existsInPeriod = filteredDocs.value.some(d => d.doc_type === type.id)
-        if (!existsInPeriod) {
+        const exists = docs.value.some(d => d.category === currentTab.value && d.doc_type === type.id)
+        if (!exists) {
             pending.push({ ...type, category: currentTab.value, isPending: true })
         }
     })
@@ -1053,13 +1037,31 @@ const openDialog = (item = null) => {
     dialogOpen.value = true
 }
 
-// Abrir diálogo pre-rellenado para un documento pendiente
+// Abrir diálogo pre-rellenado para un documento pendiente general
 const openDialogForPending = (pending) => {
     editingItem.value = {
         category: pending.category,
         doc_type: pending.id,
         name: pending.label,
         status: 'VIGENTE'
+    }
+    dialogOpen.value = true
+}
+
+// Abrir diálogo pre-rellenado para un período específico (desde el Tracker)
+const openDialogForPeriod = ({ typeId, category, periodInfo }) => {
+    // Calculamos una fecha de emisión aproximada para que el form se auto-llene con el mes/año correcto.
+    const month = periodInfo.monthIndex !== undefined ? periodInfo.monthIndex : (periodInfo.quarterIndex !== undefined ? periodInfo.quarterIndex * 3 : 0)
+    
+    const d = new Date(selectedYear.value, month, 1)
+    const emissionDateStr = d.toISOString().split('T')[0]
+
+    editingItem.value = {
+        category,
+        doc_type: typeId,
+        name: periodInfo.label,
+        status: 'VIGENTE',
+        emission_date: emissionDateStr
     }
     dialogOpen.value = true
 }
