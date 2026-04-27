@@ -120,10 +120,9 @@ export default {
     },
     createChart() {
       const canvas = this.$refs.chartCanvas
-      console.log('[BarChart] createChart called, canvas:', canvas, 'data:', this.data?.labels?.length, 'labels')
-      if (!canvas) { console.warn('[BarChart] No canvas ref'); return }
+      if (!canvas) return
       const ctx = canvas.getContext && canvas.getContext('2d')
-      if (!ctx) { console.warn('[BarChart] No 2d context'); return }
+      if (!ctx) return
 
       // Destruir instancia previa si existe (evita "Canvas already in use")
       if (this.chart) {
@@ -178,19 +177,17 @@ export default {
       // usando Object.assign en profundidad en vez de JSON.parse (que elimina funciones)
       const mergedOptions = this.deepMerge(defaultOptions, this.options || {})
 
-      console.log('[BarChart] Creating chart with', dataCopy.labels?.length, 'labels,', dataCopy.datasets?.length, 'datasets')
+      // markRaw: evita que Vue envuelva la instancia de Chart en un Proxy reactivo.
+      // El Proxy de Vue interfiere con las operaciones internas de Chart.js,
+      // causando que el canvas no se dibuje aunque la instancia 'exista'.
       try {
-        // markRaw: evita que Vue envuelva la instancia de Chart en un Proxy reactivo.
-        // El Proxy de Vue interfiere con las operaciones internas de Chart.js,
-        // causando que el canvas no se dibuje aunque la instancia 'exista'.
         this.chart = markRaw(new Chart(ctx, {
           type: 'bar',
           data: dataCopy,
           options: mergedOptions
         }))
-        console.log('[BarChart] Chart created successfully (raw):', this.chart.constructor.name)
       } catch (e) {
-        console.error('[BarChart] Error creating chart:', e)
+        console.error('[BarChart] Error creando chart:', e)
       }
     },
     updateChart() {

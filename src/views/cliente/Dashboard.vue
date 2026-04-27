@@ -192,7 +192,7 @@
         <div data-swapy-slot="insights" class="swapy-slot animate-section" style="animation-delay: 0.6s">
           <div data-swapy-item="insights">
             <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row" data-swapy-handle>
+              <v-card-title class="card-title-row">
                 <v-icon class="mr-2" color="#A81C22" size="20">mdi-lightbulb-on-outline</v-icon>
                 <span>Insights</span>
                 <v-spacer />
@@ -239,7 +239,7 @@
         <div data-swapy-slot="actividad" class="swapy-slot animate-section" style="animation-delay: 0.7s">
           <div data-swapy-item="actividad">
             <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row" data-swapy-handle>
+              <v-card-title class="card-title-row">
                 <v-icon class="mr-2" color="#1F355C" size="20">mdi-history</v-icon>
                 <span>Actividad Reciente</span>
                 <v-spacer />
@@ -275,7 +275,7 @@
         <div data-swapy-slot="top-productos" class="swapy-slot animate-section" style="animation-delay: 0.8s">
           <div data-swapy-item="top-productos">
             <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row" data-swapy-handle>
+              <v-card-title class="card-title-row">
                 <v-icon class="mr-2" color="#f2b648" size="20">mdi-trophy-outline</v-icon>
                 <span>Top Productos</span>
                 <v-spacer />
@@ -316,7 +316,7 @@
         <div data-swapy-slot="fiscal" class="swapy-slot animate-section" style="animation-delay: 0.9s">
           <div data-swapy-item="fiscal">
             <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row justify-space-between" data-swapy-handle>
+              <v-card-title class="card-title-row justify-space-between">
                 <div class="d-flex align-center">
                   <v-icon class="mr-2" color="#A81C22" size="20">mdi-shield-check-outline</v-icon>
                   <span>Expediente Fiscal</span>
@@ -481,6 +481,26 @@ export default {
 
       // Swapy
       swapyInstance: null
+    }
+  },
+
+  watch: {
+    /**
+     * Inicializar Swapy en cuanto loading pasa a false.
+     * El v-else (con el swapyContainer y los data-swapy-slot) solo existe en el DOM
+     * cuando loading = false. Por eso NO se puede inicializar en mounted() ni con setTimeout
+     * fijo — hay que esperar a que Vue renderice el v-else.
+     */
+    loading(nuevoValor) {
+      if (nuevoValor === false) {
+        // $nextTick: Vue ha actualizado el DOM virtual
+        // requestAnimationFrame: el navegador ha pintado los elementos de Vuetify
+        this.$nextTick(() => {
+          requestAnimationFrame(() => {
+            this.inicializarSwapy()
+          })
+        })
+      }
     }
   },
 
@@ -1090,6 +1110,7 @@ export default {
         console.log(`✅ Tier 1 completado en ${(t1 - t0).toFixed(0)}ms — Mostrando dashboard`)
 
         // ── PRIMER PAINT: Quitar skeleton, el usuario ya ve KPIs y gráficos ──
+        // El watcher de `loading` se encargará de inicializar Swapy automáticamente
         this.loading = false
 
         // Incrementar chartKey para que los gráficos se remonten con los datos reales
@@ -1235,11 +1256,14 @@ export default {
 
       try {
         this.swapyInstance = createSwapy(this.$refs.swapyContainer, {
+          // animation: 'none' evita el FLIP animation bug de Swapy:
+          // con 'dynamic', si el nodo es movido en el DOM durante el swap,
+          // el callback de fin de animación nunca llega y el transform queda
+          // residual en position:relative, causando el efecto "sticky".
+          // Con 'none', clearTransform() es inmediato y no puede quedar colgado.
           animation: 'dynamic',
           enabled: true,
-          // 'drop' es más predecible que 'hover' cuando las cards contienen
-          // elementos interactivos (charts, listas, botones)
-          swapMode: 'drop',
+          swapMode: 'hover',
           autoScrollOnDrag: true
         })
 
@@ -1380,15 +1404,8 @@ export default {
 
   async mounted() {
     await this.cargarDatos()
-
-    // Inicializar Swapy con un pequeño delay para garantizar que el DOM
-    // esté completamente pintado, incluyendo los slots que se renderizan
-    // en el mismo ciclo que loading = false.
-    // $nextTick no es suficiente porque Vuetify puede necesitar un frame extra
-    // para generar los elementos internos de las v-card.
-    setTimeout(() => {
-      this.inicializarSwapy()
-    }, 150)
+    // Swapy se inicializa dentro de cargarDatos() tras el primer paint.
+    // Ver: this.$nextTick → requestAnimationFrame → requestAnimationFrame → inicializarSwapy()
   },
 
   beforeUnmount() {
@@ -1477,7 +1494,10 @@ export default {
   border-radius: var(--radius-lg, 20px) !important;
   box-shadow: none !important;
   border: 1px solid rgba(0, 0, 0, 0.05);
+  /* IMPORTANTE: overflow:hidden está desactivado en slots Swapy
+     para permitir que el ghost del drag salga del contenedor */
   overflow: hidden;
+  /* transform solo en hover, pero se neutraliza durante drag (ver abajo) */
   transition: transform 0.3s ease, border-color 0.3s ease;
 }
 
@@ -1547,35 +1567,71 @@ export default {
   gap: 24px;
 }
 
+/* El slot ocupa todo el espacio disponible en el grid */
 .swapy-slot {
   min-height: 280px;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex: 1;
+  /* Sin overflow:hidden para que el ghost de Swapy pueda flotar fuera */
+  overflow: visible;
 }
 
+/* El item (div interno del slot) también llena el espacio */
 .swapy-slot > div {
   height: 100%;
+  width: 100%;
+  min-width: 100%;
+  flex: 1;
 }
 
-.swapy-slot .dashboard-card {
+/* La card dentro del item también llena el espacio */
+.swapy-slot .dashboard-card,
+.swapy-slot .v-card {
   height: 100%;
+  width: 100%;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* Quitar overflow:hidden en slots Swapy — necesario para el ghost del drag.
+     Sin esto, el ghost queda "atrapado" y aparece sticky al hacer scroll. */
+  overflow: visible !important;
 }
 
-/* Ícono indicador de arrastre en card headers */
-.drag-handle-icon {
-  opacity: 0.35;
-  cursor: grab;
+/* BUG FIX: Durante el drag, deshabilitar el transform hover de .dashboard-card.
+   El transform: translateY() activo en cualquier ancestro convierte ese elemento
+   en un "containing block" para position:fixed, rompiendo el ghost de Swapy
+   y dejando el item pegado (sticky) después del drop. */
+.swapy-grid [data-swapy-item] .dashboard-card:hover {
+  transform: none !important;
+}
+
+/* Feedback visual durante el drag */
+[data-swapy-item] {
   transition: opacity 0.2s ease;
 }
 
-[data-swapy-handle]:hover .drag-handle-icon {
-  opacity: 0.7;
+[data-swapy-item][data-swapy-dragging] {
+  opacity: 0.6 !important;
+  border-radius: 20px !important;
 }
 
-[data-swapy-handle] {
-  cursor: grab;
+/* Durante drag activo, neutralizar transform en TODAS las cards del grid */
+.swapy-grid:has([data-swapy-dragging]) .dashboard-card {
+  transform: none !important;
+  transition: none !important;
 }
 
-[data-swapy-handle]:active {
-  cursor: grabbing;
+[data-swapy-slot] {
+  border-radius: 20px !important;
+  transition: background 0.2s ease;
+}
+
+[data-swapy-slot][data-swapy-highlighted] {
+  background: rgba(168, 28, 34, 0.08);
+  transition: background 0.2s ease;
 }
 
 /* ═══════════════════════════════════════════════════════ */
@@ -1835,5 +1891,37 @@ export default {
   .chart-body {
     min-height: 260px;
   }
+}
+</style>
+
+<!-- Estilos globales para Swapy: los atributos data-swapy-* son inyectados
+     por la librería directamente en el DOM (sin pasar por Vue scoped),
+     por lo que deben estar en un bloque <style> sin scoped. -->
+<style>
+/* Ghost del drag: Swapy usa position:fixed internamente.
+   Para que este fixed sea relativo al viewport (y no quede sticky),
+   ningún ancestro del container debe tener transform activo. */
+[data-swapy-item][data-swapy-dragging] {
+  opacity: 0.5 !important;
+}
+
+/* Highlight del slot de destino */
+[data-swapy-slot][data-swapy-highlighted] {
+  background: rgba(168, 28, 34, 0.08) !important;
+  border-radius: 20px !important;
+  transition: background 0.2s ease;
+}
+
+/* Durante drag activo en el grid, bloquear el transform hover
+   para evitar que se cree un nuevo "containing block" para position:fixed */
+.swapy-grid:has([data-swapy-dragging]) .dashboard-card {
+  transform: none !important;
+  transition: none !important;
+}
+
+/* El contenido de los cards Swapy no debe recortar el ghost */
+.swapy-slot .dashboard-card,
+.swapy-slot .v-card {
+  overflow: visible !important;
 }
 </style>
