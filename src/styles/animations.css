@@ -41,6 +41,23 @@
   }
 }
 
+/* Fade/Slide Up used in Dashboards and Views */
+.animate-section {
+  opacity: 0;
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Slide In/Out */
 @keyframes slideInUp {
   from {

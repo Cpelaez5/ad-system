@@ -50,7 +50,7 @@
     <!-- CONTENIDO PRINCIPAL                             -->
     <!-- ═══════════════════════════════════════════════ -->
     <template v-else>
-      <div class="d-flex align-center justify-end mb-6">
+      <div class="d-flex align-center justify-end mb-6 animate-section" style="animation-delay: 0.1s">
         <div class="d-flex" style="gap: 12px;">
            <v-btn
             color="secondary"
@@ -100,7 +100,7 @@
       </div>
 
       <!-- Estadísticas rápidas -->
-      <v-row class="mb-6">
+      <v-row class="mb-6 animate-section" style="animation-delay: 0.2s">
         <v-col cols="12" sm="6" md="4">
           <StatsCard
             title="Total Productos"
@@ -134,7 +134,7 @@
       </v-row>
 
       <!-- Filtros Colapsables de Fecha -->
-      <v-expansion-panels class="mb-6" variant="accordion">
+      <v-expansion-panels class="mb-6 animate-section" style="animation-delay: 0.3s" variant="accordion">
         <v-expansion-panel>
           <v-expansion-panel-title>
             <div class="d-flex align-center">
@@ -199,13 +199,13 @@
     </v-expansion-panels>
 
     <!-- Tabs de Navegación -->
-    <v-tabs v-model="activeTab" color="primary" class="mb-6 bg-white rounded-lg elevation-1">
+    <v-tabs v-model="activeTab" color="primary" class="mb-6 bg-white rounded-lg elevation-1 animate-section" style="animation-delay: 0.4s">
       <v-tab value="dashboard" prepend-icon="mdi-view-dashboard">Tablero</v-tab>
       <v-tab value="products" prepend-icon="mdi-package-variant">Productos</v-tab>
       <v-tab value="movements" prepend-icon="mdi-history">Movimientos (Kardex)</v-tab>
     </v-tabs>
 
-    <v-window v-model="activeTab">
+    <v-window v-model="activeTab" class="animate-section" style="animation-delay: 0.5s">
       <!-- DASHBOARD TAB -->
       <v-window-item value="dashboard">
         <v-row class="ma-0">

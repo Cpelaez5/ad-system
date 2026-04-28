@@ -39,7 +39,7 @@
     <!-- ═══════════════════════════════════════════════ -->
     <template v-else>
       <!-- Header Section -->
-      <v-row class="mb-6">
+      <v-row class="mb-6 animate-section" style="animation-delay: 0.1s">
         <v-col cols="12" md="8">
           
         </v-col>
@@ -119,7 +119,7 @@
       </v-row>
 
       <!-- Estadísticas rápidas -->
-      <v-row class="mb-6">
+      <v-row class="mb-6 animate-section" style="animation-delay: 0.2s">
         <v-col cols="12" sm="6" md="3">
           <StatsCard
             title="Total de documentos"
@@ -160,7 +160,7 @@
       </v-row>
 
       <!-- Tabs de navegación por tipo de factura -->
-      <v-card class="mb-4" elevation="2">
+      <v-card class="mb-4 animate-section" style="animation-delay: 0.3s" elevation="2">
         <v-tabs
           v-model="currentTab"
           bg-color="white"
@@ -212,7 +212,7 @@
     </v-card>
 
     <!-- Filtros colapsables con búsqueda -->
-    <v-expansion-panels class="mb-4" variant="accordion">
+    <v-expansion-panels class="mb-4 animate-section" style="animation-delay: 0.4s" variant="accordion">
       <v-expansion-panel>
         <v-expansion-panel-title>
           <div class="d-flex align-center">
@@ -310,7 +310,7 @@
     </v-expansion-panels>
 
     <!-- Tabla de facturas -->
-    <v-card>
+    <v-card class="animate-section" style="animation-delay: 0.5s">
       <v-card-title>
         <v-icon left>mdi-receipt-long</v-icon>
         Lista de Facturas ({{ filteredInvoices.length }})

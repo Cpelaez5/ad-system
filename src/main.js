@@ -50,6 +50,9 @@ import 'vuetify/styles'
 // Importar sobrescrituras de Vuetify para Montserrat
 import './styles/vuetify-overrides.css'
 
+// Importar animaciones globales
+import './styles/animations.css'
+
 // Date Picker
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'

@@ -82,7 +82,7 @@
       </v-row>
 
       <!-- DASHBOARD -->
-      <v-row class="px-6 mb-6">
+      <v-row class="px-6 mb-6 animate-section" style="animation-delay: 0.1s">
         
         <!-- Chart -->
         <v-col cols="12" md="4" lg="3">
@@ -179,7 +179,7 @@
       <v-col cols="12">
         
         <!-- Tabs de navegación por categoría -->
-        <v-card class="mb-4" elevation="2">
+        <v-card class="mb-4 animate-section" style="animation-delay: 0.2s" elevation="2">
           <v-tabs
             v-model="currentTab"
             bg-color="white"
@@ -251,7 +251,7 @@
         </v-card>
 
         <!-- Document List -->
-        <v-card class="rounded-xl border-none" elevation="0" :loading="loading">
+        <v-card class="rounded-xl border-none animate-section" style="animation-delay: 0.3s" elevation="0" :loading="loading">
 
           <!-- ===== MODO EXPANSION PANELS: Tab "Todos" ===== -->
           <template v-if="currentTab === 'all' || currentTab === 'trash'">
