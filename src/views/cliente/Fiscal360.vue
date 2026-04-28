@@ -1,133 +1,178 @@
 <template>
   <v-container fluid class="fill-height align-start pa-0 bg-background">
     
-    <!-- HEADER -->
-    <v-row no-gutters class="pa-6 pb-2">
-      <v-col cols="12" md="8">
-        <h1 class="text-h4 text-md-h4 text-h5 font-weight-bold text-secondary mb-1">
-          Expediente Fiscal 360
-        </h1>
-        <p class="text-body-2 text-md-body-1 text-grey-darken-1">
-          Gestiona tus permisos y mantén tu empresa al día.
-        </p>
-      </v-col>
-      <v-col cols="12" md="4" class="d-flex align-center justify-start justify-md-end flex-wrap mt-4 mt-md-0">
-        <v-btn
-          color="secondary"
-          prepend-icon="mdi-file-pdf-box"
-          variant="outlined"
-          class="text-none px-4 mr-3"
-          rounded="lg"
-          @click="exportToPDF"
-          :loading="exporting"
-        >
-          <span class="d-none d-sm-inline mr-1">Exportar</span> Expediente
-        </v-btn>
-        <v-btn
-          color="primary"
-          prepend-icon="mdi-plus"
-          elevation="2"
-          class="text-none px-4"
-          rounded="lg"
-          @click="openDialog()"
-        >
-          <span class="d-none d-sm-inline mr-1">Nuevo</span> Documento
-        </v-btn>
-      </v-col>
-    </v-row>
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- SKELETON LOADING                                -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <template v-if="initialLoading">
+      <!-- Skeleton Header -->
+      <v-row no-gutters class="pa-6 pb-2">
+        <v-col cols="12" md="8">
+          <v-skeleton-loader type="heading" width="300" class="mb-2" />
+          <v-skeleton-loader type="text" width="400" />
+        </v-col>
+        <v-col cols="12" md="4" class="d-flex align-center justify-start justify-md-end flex-wrap mt-4 mt-md-0">
+          <v-skeleton-loader type="button" width="150" class="mr-3" />
+          <v-skeleton-loader type="button" width="150" />
+        </v-col>
+      </v-row>
 
-    <!-- DASHBOARD -->
-    <v-row class="px-6 mb-6">
-      
-      <!-- Chart -->
-      <v-col cols="12" md="4" lg="3">
-        <v-card class="rounded-xl h-100 pa-4" variant="outlined" style="border-color: rgba(0,0,0,0.05)">
-          <div class="d-flex align-center justify-space-between mb-4">
-            <h3 class="text-subtitle-1 font-weight-bold text-secondary">Progreso General</h3>
-          </div>
-          <div style="height: 180px; position: relative">
-            <canvas ref="chartCanvas" style="position: relative; z-index: 2"></canvas>
-            <div class="chart-center-text">
-                <div class="text-h4 font-weight-bold text-secondary">{{ progressRate }}%</div>
+      <!-- Skeleton Dashboard -->
+      <v-row class="px-6 mb-6">
+        <v-col cols="12" md="4" lg="3">
+          <v-skeleton-loader type="card" height="250" class="rounded-xl" />
+        </v-col>
+        <v-col cols="12" md="8" lg="9">
+          <v-row class="fill-height">
+            <v-col cols="6" sm="4" v-for="n in 3" :key="'f-sk-card-' + n">
+              <v-skeleton-loader type="card" height="120" class="rounded-xl" />
+            </v-col>
+            <v-col cols="12">
+              <v-skeleton-loader type="list-item-two-line" height="110" class="rounded-xl" />
+            </v-col>
+          </v-row>
+        </v-col>
+      </v-row>
+
+      <!-- Skeleton Content -->
+      <v-row class="px-6">
+        <v-col cols="12">
+          <v-skeleton-loader type="table-thead, table-tbody" class="rounded-xl" />
+        </v-col>
+      </v-row>
+    </template>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- CONTENIDO PRINCIPAL                             -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <template v-else>
+      <!-- HEADER -->
+      <v-row no-gutters class="pa-6 pb-2">
+        <v-col cols="12" md="8">
+          <h1 class="text-h4 text-md-h4 text-h5 font-weight-bold text-secondary mb-1">
+            Expediente Fiscal 360
+          </h1>
+          <p class="text-body-2 text-md-body-1 text-grey-darken-1">
+            Gestiona tus permisos y mantén tu empresa al día.
+          </p>
+        </v-col>
+        <v-col cols="12" md="4" class="d-flex align-center justify-start justify-md-end flex-wrap mt-4 mt-md-0">
+          <v-btn
+            color="secondary"
+            prepend-icon="mdi-file-pdf-box"
+            variant="outlined"
+            class="text-none px-4 mr-3"
+            rounded="lg"
+            @click="exportToPDF"
+            :loading="exporting"
+          >
+            <span class="d-none d-sm-inline mr-1">Exportar</span> Expediente
+          </v-btn>
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-plus"
+            elevation="2"
+            class="text-none px-4"
+            rounded="lg"
+            @click="openDialog()"
+          >
+            <span class="d-none d-sm-inline mr-1">Nuevo</span> Documento
+          </v-btn>
+        </v-col>
+      </v-row>
+
+      <!-- DASHBOARD -->
+      <v-row class="px-6 mb-6">
+        
+        <!-- Chart -->
+        <v-col cols="12" md="4" lg="3">
+          <v-card class="rounded-xl h-100 pa-4" variant="outlined" style="border-color: rgba(0,0,0,0.05)">
+            <div class="d-flex align-center justify-space-between mb-4">
+              <h3 class="text-subtitle-1 font-weight-bold text-secondary">Progreso General</h3>
             </div>
-          </div>
-        </v-card>
-      </v-col>
+            <div style="height: 180px; position: relative">
+              <canvas ref="chartCanvas" style="position: relative; z-index: 2"></canvas>
+              <div class="chart-center-text">
+                  <div class="text-h4 font-weight-bold text-secondary">{{ progressRate }}%</div>
+              </div>
+            </div>
+          </v-card>
+        </v-col>
 
-      <!-- Stats Cards -->
-      <v-col cols="12" md="8" lg="9">
-        <v-row class="fill-height">
-          <v-col cols="6" sm="4">
-            <StatsCard
-               title="Vigentes"
-               :value="stats.vigente"
-               bg-color="#02254d"
-               text-color="white"
-               icon="mdi-check-circle"
-            />
-          </v-col>
-          <v-col cols="6" sm="4">
-            <StatsCard
-               title="En Trámite"
-               :value="stats.tramite"
-               bg-color="#f2b648"
-               text-color="#010101"
-               icon="mdi-clock-outline"
-            />
-          </v-col>
-          <v-col cols="12" sm="4">
-            <StatsCard
-               title="Vencidos / Por Vencer"
-               :value="stats.vencido + stats.porVencer"
-               bg-color="#961112"
-               text-color="white"
-               icon="mdi-alert-circle"
-            />
-          </v-col>
-          
-          <!-- Checklist Progress -->
-          <v-col cols="12">
-            <v-card class="rounded-xl pa-4 bg-surface" elevation="0">
-              <div class="d-flex justify-space-between mb-2">
-                <span class="text-subtitle-2 font-weight-bold text-secondary">
-                  Progreso del Expediente
-                </span>
-              </div>
-              <v-progress-linear
-                :model-value="progressRate"
-                height="12"
-                rounded
-                color="primary"
-                bg-color="grey-lighten-3"
-              >
-                <template v-slot:default="{ value }">
-                  <span class="text-white text-caption font-weight-bold">{{ Math.ceil(value) }}%</span>
-                </template>
-              </v-progress-linear>
-              <v-tooltip activator="parent" location="top">
-                Completados: {{ complianceDetail.total.covered }} / {{ complianceDetail.total.required }}
-              </v-tooltip>
-              <div class="d-flex mt-2 gap-2 overflow-x-auto py-2">
-                 <v-chip 
-                    v-for="cat in categories" 
-                    :key="cat.value"
-                    size="small" 
-                    :variant="getCategoryVariant(cat.value)"
-                    :color="getCategoryColor(cat.value)"
-                    class="mr-2"
-                 >
-                    <v-icon start :icon="getCategoryIconStatus(cat.value)"></v-icon>
-                    {{ cat.title }} 
-                    <span v-if="complianceDetail[cat.value]" class="ml-1 font-weight-bold">
-                        ({{ complianceDetail[cat.value].rate }}%)
-                    </span>
-                 </v-chip>
-              </div>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-col>
-    </v-row>
+        <!-- Stats Cards -->
+        <v-col cols="12" md="8" lg="9">
+          <v-row class="fill-height">
+            <v-col cols="6" sm="4">
+              <StatsCard
+                 title="Vigentes"
+                 :value="stats.vigente"
+                 bg-color="#02254d"
+                 text-color="white"
+                 icon="mdi-check-circle"
+              />
+            </v-col>
+            <v-col cols="6" sm="4">
+              <StatsCard
+                 title="En Trámite"
+                 :value="stats.tramite"
+                 bg-color="#f2b648"
+                 text-color="#010101"
+                 icon="mdi-clock-outline"
+              />
+            </v-col>
+            <v-col cols="12" sm="4">
+              <StatsCard
+                 title="Vencidos / Por Vencer"
+                 :value="stats.vencido + stats.porVencer"
+                 bg-color="#961112"
+                 text-color="white"
+                 icon="mdi-alert-circle"
+              />
+            </v-col>
+            
+            <!-- Checklist Progress -->
+            <v-col cols="12">
+              <v-card class="rounded-xl pa-4 bg-surface" elevation="0">
+                <div class="d-flex justify-space-between mb-2">
+                  <span class="text-subtitle-2 font-weight-bold text-secondary">
+                    Progreso del Expediente
+                  </span>
+                </div>
+                <v-progress-linear
+                  :model-value="progressRate"
+                  height="12"
+                  rounded
+                  color="primary"
+                  bg-color="grey-lighten-3"
+                >
+                  <template v-slot:default="{ value }">
+                    <span class="text-white text-caption font-weight-bold">{{ Math.ceil(value) }}%</span>
+                  </template>
+                </v-progress-linear>
+                <v-tooltip activator="parent" location="top">
+                  Completados: {{ complianceDetail.total.covered }} / {{ complianceDetail.total.required }}
+                </v-tooltip>
+                <div class="d-flex mt-2 gap-2 overflow-x-auto py-2">
+                   <v-chip 
+                      v-for="cat in categories" 
+                      :key="cat.value"
+                      size="small" 
+                      :variant="getCategoryVariant(cat.value)"
+                      :color="getCategoryColor(cat.value)"
+                      class="mr-2"
+                   >
+                      <v-icon start :icon="getCategoryIconStatus(cat.value)"></v-icon>
+                      {{ cat.title }} 
+                      <span v-if="complianceDetail[cat.value]" class="ml-1 font-weight-bold">
+                          ({{ complianceDetail[cat.value].rate }}%)
+                      </span>
+                   </v-chip>
+                </div>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-col>
+      </v-row>
 
     <!-- CONTENT (LIST) -->
     <v-row class="px-6 pb-10">
@@ -661,6 +706,7 @@
         </template>
     </v-snackbar>
 
+    </template>
   </v-container>
 </template>
 
@@ -677,6 +723,7 @@ import systemLogo from '@/assets/icon.png'
 import { FISCAL_TYPES, MONTHS, isRecurringFrequency, getExpirationInfo } from '@/constants/fiscalDocuments'
 
 // Data
+const initialLoading = ref(true)
 const loading = ref(true)
 const saving = ref(false)
 const deleting = ref(false)
@@ -937,6 +984,13 @@ const loadData = async () => {
         loading.value = false
     }
 }
+
+// Asegurar que la gráfica se inicialice cuando termina la carga
+watch(initialLoading, (isLoading) => {
+    if (!isLoading) {
+        setTimeout(updateChart, 100) // Pequeño delay para asegurar renderizado de Vuetify
+    }
+})
 
 // Watch tab change - recargar datos si cambia hacia/desde papelera
 watch(currentTab, (newTab, oldTab) => {
@@ -1505,6 +1559,7 @@ const exportToPDF = async () => {
 
 onMounted(async () => {
     await loadData()
+    initialLoading.value = false
     updateChart()
 })
 

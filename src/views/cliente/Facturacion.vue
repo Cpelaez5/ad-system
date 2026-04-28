@@ -1,153 +1,192 @@
 <template>
   <v-container fluid class="pa-6">
-    <!-- Header Section -->
-    <v-row class="mb-6">
-      <v-col cols="12" md="8">
-        
-      </v-col>
-      <v-col cols="12" md="4" class="d-flex align-center justify-end">
-        <v-btn
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- SKELETON LOADING                                -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <template v-if="initialLoading">
+      <!-- Skeleton Header -->
+      <v-row class="mb-6">
+        <v-col cols="12" md="8">
+          <v-skeleton-loader type="heading" width="300" class="mb-2" />
+          <v-skeleton-loader type="text" width="400" />
+        </v-col>
+        <v-col cols="12" md="4" class="d-flex align-center justify-end">
+          <v-skeleton-loader type="button" width="150" class="mr-2" />
+          <v-skeleton-loader type="button" width="120" />
+        </v-col>
+      </v-row>
+
+      <!-- Skeleton KPIs -->
+      <v-row class="mb-6">
+        <v-col v-for="n in 4" :key="'kpi-sk-' + n" cols="12" sm="6" md="3">
+          <v-skeleton-loader type="card" height="130" class="rounded-xl" />
+        </v-col>
+      </v-row>
+
+      <!-- Skeleton Tabs -->
+      <v-card class="mb-4 rounded-xl border-none">
+        <v-skeleton-loader type="table-row" height="64" />
+      </v-card>
+
+      <!-- Skeleton Table -->
+      <v-card class="rounded-xl border-none">
+        <v-skeleton-loader type="table-thead, table-tbody" />
+      </v-card>
+    </template>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- CONTENIDO PRINCIPAL                             -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <template v-else>
+      <!-- Header Section -->
+      <v-row class="mb-6">
+        <v-col cols="12" md="8">
+          
+        </v-col>
+        <v-col cols="12" md="4" class="d-flex align-center justify-end">
+          <v-btn
+            color="primary"
+            size="large"
+            prepend-icon="mdi-plus"
+            @click="openNewInvoiceDialog"
+            class="mr-2"
+          >
+            Nuevo Registro
+          </v-btn>
+          <v-menu>
+            <template v-slot:activator="{ props }">
+              <v-btn
+                color="success"
+                variant="outlined"
+                size="large"
+                prepend-icon="mdi-download"
+                v-bind="props"
+                :disabled="filteredInvoices.length === 0"
+              >
+                Exportar
+                <v-icon>mdi-chevron-down</v-icon>
+              </v-btn>
+            </template>
+            <v-list>
+              <!-- Libros Fiscales (SENIAT) -->
+              <v-list-subheader class="text-primary font-weight-bold">
+                <v-icon start size="small">mdi-gavel</v-icon>
+                Libros Fiscales (SENIAT)
+              </v-list-subheader>
+              
+              <v-list-item @click="exportFiscal('COMPRA')">
+                <template v-slot:prepend>
+                  <v-icon color="blue">mdi-book-open-variant</v-icon>
+                </template>
+                <v-list-item-title>Libro de Compras</v-list-item-title>
+                <v-list-item-subtitle>Solo facturas fiscales (compras y gastos)</v-list-item-subtitle>
+              </v-list-item>
+              
+              <v-list-item @click="exportFiscal('VENTA')">
+                <template v-slot:prepend>
+                  <v-icon color="green">mdi-book-open-variant</v-icon>
+                </template>
+                <v-list-item-title>Libro de Ventas</v-list-item-title>
+                <v-list-item-subtitle>Solo facturas fiscales de ventas</v-list-item-subtitle>
+              </v-list-item>
+              
+              <v-divider class="my-2"></v-divider>
+              
+              <!-- Reportes Generales -->
+              <v-list-subheader class="text-grey-darken-1 font-weight-bold">
+                <v-icon start size="small">mdi-file-chart</v-icon>
+                Reportes Generales
+              </v-list-subheader>
+              
+              <v-list-item @click="exportGeneral('COMPRA')">
+                <template v-slot:prepend>
+                  <v-icon color="orange">mdi-file-excel</v-icon>
+                </template>
+                <v-list-item-title>Compras General</v-list-item-title>
+                <v-list-item-subtitle>Facturas + Recibos de compras y gastos</v-list-item-subtitle>
+              </v-list-item>
+              
+              <v-list-item @click="exportGeneral('VENTA')">
+                <template v-slot:prepend>
+                  <v-icon color="teal">mdi-file-excel</v-icon>
+                </template>
+                <v-list-item-title>Ventas General</v-list-item-title>
+                <v-list-item-subtitle>Facturas + Recibos de ventas</v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+        </v-col>
+      </v-row>
+
+      <!-- Estadísticas rápidas -->
+      <v-row class="mb-6">
+        <v-col cols="12" sm="6" md="3">
+          <StatsCard
+            title="Total de documentos"
+            :value="stats.total"
+            bg-color="#02254d"
+            text-color="white"
+          />
+        </v-col>
+
+        <v-col cols="12" sm="6" md="3">
+          <StatsCard
+            title="Emitidas"
+            :value="stats.byStatus?.EMITIDA || 0"
+            bg-color="#961112"
+            text-color="white"
+          />
+        </v-col>
+
+        <v-col cols="12" sm="6" md="3">
+          <StatsCard
+            title="Pagadas"
+            :value="stats.byStatus?.PAGADA || 0"
+            bg-color="#f2b648"
+            text-color="#010101"
+          />
+        </v-col>
+
+        <v-col cols="12" sm="6" md="3">
+          <CurrencyStatsCard
+            :title="currentTab === 'all' ? 'Rentabilidad' : 'Monto Total'"
+            :value="convertedStatsTotal"
+            bg-color="#f0d29b"
+            text-color="#010101"
+            :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
+            @toggle-currency="toggleCurrency"
+          />
+        </v-col>
+      </v-row>
+
+      <!-- Tabs de navegación por tipo de factura -->
+      <v-card class="mb-4" elevation="2">
+        <v-tabs
+          v-model="currentTab"
+          bg-color="white"
           color="primary"
-          size="large"
-          prepend-icon="mdi-plus"
-          @click="openNewInvoiceDialog"
-          class="mr-2"
+          grow
+          height="64"
         >
-          Nuevo Registro
-        </v-btn>
-        <v-menu>
-          <template v-slot:activator="{ props }">
-            <v-btn
-              color="success"
-              variant="outlined"
-              size="large"
-              prepend-icon="mdi-download"
-              v-bind="props"
-              :disabled="filteredInvoices.length === 0"
-            >
-              Exportar
-              <v-icon>mdi-chevron-down</v-icon>
-            </v-btn>
-          </template>
-          <v-list>
-            <!-- Libros Fiscales (SENIAT) -->
-            <v-list-subheader class="text-primary font-weight-bold">
-              <v-icon start size="small">mdi-gavel</v-icon>
-              Libros Fiscales (SENIAT)
-            </v-list-subheader>
-            
-            <v-list-item @click="exportFiscal('COMPRA')">
-              <template v-slot:prepend>
-                <v-icon color="blue">mdi-book-open-variant</v-icon>
-              </template>
-              <v-list-item-title>Libro de Compras</v-list-item-title>
-              <v-list-item-subtitle>Solo facturas fiscales (compras y gastos)</v-list-item-subtitle>
-            </v-list-item>
-            
-            <v-list-item @click="exportFiscal('VENTA')">
-              <template v-slot:prepend>
-                <v-icon color="green">mdi-book-open-variant</v-icon>
-              </template>
-              <v-list-item-title>Libro de Ventas</v-list-item-title>
-              <v-list-item-subtitle>Solo facturas fiscales de ventas</v-list-item-subtitle>
-            </v-list-item>
-            
-            <v-divider class="my-2"></v-divider>
-            
-            <!-- Reportes Generales -->
-            <v-list-subheader class="text-grey-darken-1 font-weight-bold">
-              <v-icon start size="small">mdi-file-chart</v-icon>
-              Reportes Generales
-            </v-list-subheader>
-            
-            <v-list-item @click="exportGeneral('COMPRA')">
-              <template v-slot:prepend>
-                <v-icon color="orange">mdi-file-excel</v-icon>
-              </template>
-              <v-list-item-title>Compras General</v-list-item-title>
-              <v-list-item-subtitle>Facturas + Recibos de compras y gastos</v-list-item-subtitle>
-            </v-list-item>
-            
-            <v-list-item @click="exportGeneral('VENTA')">
-              <template v-slot:prepend>
-                <v-icon color="teal">mdi-file-excel</v-icon>
-              </template>
-              <v-list-item-title>Ventas General</v-list-item-title>
-              <v-list-item-subtitle>Facturas + Recibos de ventas</v-list-item-subtitle>
-            </v-list-item>
-          </v-list>
-        </v-menu>
-      </v-col>
-    </v-row>
+          <v-tab value="all" class="text-none font-weight-medium">
+            <v-icon start size="24">mdi-view-list</v-icon>
+            Todas
+            <v-chip size="small" class="ml-2" color="primary" variant="tonal">
+              {{ invoices.length }}
+            </v-chip>
+          </v-tab>
+          
+          <v-tab value="ventas" class="text-none font-weight-medium">
+            <v-icon start size="24" color="success">mdi-cash-plus</v-icon>
+            Ventas
+            <v-chip size="small" class="ml-2" color="success" variant="tonal">
+              {{ ventasCount }}
+            </v-chip>
+          </v-tab>
+          
+          <v-tab value="compras" class="text-none font-weight-medium">
+            <v-icon start size="24" color="orange">mdi-cart</v-icon>
 
-    <!-- Estadísticas rápidas -->
-    <v-row class="mb-6">
-      <v-col cols="12" sm="6" md="3">
-        <StatsCard
-          title="Total de documentos"
-          :value="stats.total"
-          bg-color="#02254d"
-          text-color="white"
-        />
-      </v-col>
-
-      <v-col cols="12" sm="6" md="3">
-        <StatsCard
-          title="Emitidas"
-          :value="stats.byStatus?.EMITIDA || 0"
-          bg-color="#961112"
-          text-color="white"
-        />
-      </v-col>
-
-      <v-col cols="12" sm="6" md="3">
-        <StatsCard
-          title="Pagadas"
-          :value="stats.byStatus?.PAGADA || 0"
-          bg-color="#f2b648"
-          text-color="#010101"
-        />
-      </v-col>
-
-      <v-col cols="12" sm="6" md="3">
-        <CurrencyStatsCard
-          :title="currentTab === 'all' ? 'Rentabilidad' : 'Monto Total'"
-          :value="convertedStatsTotal"
-          bg-color="#f0d29b"
-          text-color="#010101"
-          :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
-          @toggle-currency="toggleCurrency"
-        />
-      </v-col>
-    </v-row>
-
-    <!-- Tabs de navegación por tipo de factura -->
-    <v-card class="mb-4" elevation="2">
-      <v-tabs
-        v-model="currentTab"
-        bg-color="white"
-        color="primary"
-        grow
-        height="64"
-      >
-        <v-tab value="all" class="text-none font-weight-medium">
-          <v-icon start size="24">mdi-view-list</v-icon>
-          Todas
-          <v-chip size="small" class="ml-2" color="primary" variant="tonal">
-            {{ invoices.length }}
-          </v-chip>
-        </v-tab>
-        
-        <v-tab value="ventas" class="text-none font-weight-medium">
-          <v-icon start size="24" color="success">mdi-cash-plus</v-icon>
-          Ventas
-          <v-chip size="small" class="ml-2" color="success" variant="tonal">
-            {{ ventasCount }}
-          </v-chip>
-        </v-tab>
-        
-        <v-tab value="compras" class="text-none font-weight-medium">
-          <v-icon start size="24" color="orange">mdi-cart</v-icon>
           Compras
           <v-chip size="small" class="ml-2" color="orange" variant="tonal">
             {{ comprasCount }}
@@ -849,6 +888,7 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    </template>
   </v-container>
 </template>
 
@@ -877,7 +917,8 @@ export default {
   },
   data() {
     return {
-      loading: false,
+      initialLoading: true,
+      loading: true,
       invoices: [],
       trashInvoices: [], 
       filteredInvoices: [],
@@ -1123,6 +1164,7 @@ export default {
 
     await this.loadUser();
     await this.loadInvoices();
+    this.initialLoading = false;
   },
   methods: {
     async loadUser() {

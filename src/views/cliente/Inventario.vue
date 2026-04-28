@@ -1,144 +1,194 @@
 <template>
   <v-container fluid class="pa-4">
-    <div class="d-flex align-center justify-end mb-6">
-      <div class="d-flex" style="gap: 12px;">
-         <v-btn
-          color="secondary"
-          variant="elevated"
-          prepend-icon="mdi-file-document-outline"
-          @click="adjustmentDialog = true"
-        >
-          Escanear Documento (IA)
-        </v-btn>
-        <v-btn
-          color="primary"
-          variant="elevated"
-          prepend-icon="mdi-plus"
-          @click="openProductDialog()"
-        >
-          Nuevo Producto
-        </v-btn>
-        <v-btn
-          color="white"
-          variant="elevated"
-          class="text-secondary"
-          prepend-icon="mdi-export"
-        >
-          Exportar
-          
-          <v-menu activator="parent">
-            <v-list>
-              <v-list-item 
-                prepend-icon="mdi-cash-multiple" 
-                title="Inventario Valorizado" 
-                @click="downloadValuation" 
-              />
-              <v-list-item 
-                prepend-icon="mdi-history" 
-                title="Kardex Global" 
-                @click="downloadKardex" 
-              />
-              <v-list-item 
-                prepend-icon="mdi-table-arrow-right" 
-                title="Resumen Horizontal" 
-                @click="openExportDialog"
-              />
-            </v-list>
-          </v-menu>
-        </v-btn>
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- SKELETON LOADING                                -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <template v-if="initialLoading">
+      <!-- Skeleton Header -->
+      <div class="d-flex align-center justify-end mb-6">
+        <div class="d-flex" style="gap: 12px;">
+          <v-skeleton-loader type="button" width="200" />
+          <v-skeleton-loader type="button" width="160" />
+          <v-skeleton-loader type="button" width="120" />
+        </div>
       </div>
-    </div>
 
-    <!-- Estadísticas rápidas -->
-    <v-row class="mb-6">
-      <v-col cols="12" sm="6" md="4">
-        <StatsCard
-          title="Total Productos"
-          :value="stats.totalProducts"
-          bg-color="#02254d"
-          text-color="white"
-        />
-      </v-col>
-      
-      <v-col cols="12" sm="6" md="4">
-        <CurrencyStatsCard
-          title="Valor en Inventario (Costo)"
-          :value="convertedTotalValueCost"
-          bg-color="#f0d29b"
-          text-color="#010101"
-          :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
-          @toggle-currency="toggleCurrency"
-        />
-      </v-col>
+      <!-- Skeleton KPIs -->
+      <v-row class="mb-6">
+        <v-col v-for="n in 3" :key="'inv-sk-' + n" cols="12" sm="6" md="4">
+          <v-skeleton-loader type="card" height="130" class="rounded-xl" />
+        </v-col>
+      </v-row>
 
-      <v-col cols="12" sm="6" md="4">
-        <CurrencyStatsCard
-          title="Valor Estimado (Venta)"
-          :value="convertedTotalValueSale"
-          bg-color="#f2b648"
-          text-color="#010101"
-          :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
-          @toggle-currency="toggleCurrency"
-        />
-      </v-col>
-    </v-row>
+      <!-- Skeleton Filters -->
+      <v-skeleton-loader type="list-item" height="64" class="mb-6 rounded-xl" />
 
-    <!-- Filtros Colapsables de Fecha -->
-    <v-expansion-panels class="mb-6" variant="accordion">
-      <v-expansion-panel>
-        <v-expansion-panel-title>
-          <div class="d-flex align-center">
-            <v-icon start>mdi-filter-variant</v-icon>
-            <span class="font-weight-medium">Filtros de Fecha</span>
-            <v-chip 
-              v-if="dateFromFilter || dateToFilter" 
-              size="small" 
-              color="primary" 
-              variant="tonal"
-              class="ml-3"
-            >
-              Filtro Activo
-            </v-chip>
-          </div>
-        </v-expansion-panel-title>
-        <v-expansion-panel-text>
-          <v-row class="mt-2">
-            <!-- Selector Rápido -->
-            <v-col cols="12" md="4">
-              <v-select
-                v-model="quickDateFilter"
-                :items="quickDateOptions"
-                item-title="title"
-                item-value="value"
-                prepend-inner-icon="mdi-clock-fast"
-                label="Intervalos de tiempo"
-                variant="outlined"
-                hide-details
-                @update:model-value="applyQuickDate"
-              ></v-select>
-            </v-col>
+      <!-- Tab Specific Skeleton -->
+      <v-tabs color="primary" class="mb-6 bg-white rounded-lg elevation-1">
+        <v-tab v-for="t in 3" :key="'tab-sk-'+t" disabled>
+           <v-skeleton-loader type="text" width="100" />
+        </v-tab>
+      </v-tabs>
+
+      <v-row v-if="activeTab === 'dashboard' && loadingDashboard">
+         <v-col cols="12" md="6">
+            <v-skeleton-loader type="card" height="350" class="rounded-xl" />
+         </v-col>
+         <v-col cols="12" md="6">
+            <v-skeleton-loader type="table-thead, table-tbody" height="350" class="rounded-xl" />
+         </v-col>
+      </v-row>
+      <v-card v-else-if="activeTab === 'products' && loadingProducts" class="rounded-xl border-none">
+        <v-skeleton-loader type="table-thead, table-tbody" />
+      </v-card>
+      <v-card v-else-if="activeTab === 'movements' && loadingMovements" class="rounded-xl border-none">
+        <v-skeleton-loader type="table-thead, table-tbody" />
+      </v-card>
+    </template>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- CONTENIDO PRINCIPAL                             -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <template v-else>
+      <div class="d-flex align-center justify-end mb-6">
+        <div class="d-flex" style="gap: 12px;">
+           <v-btn
+            color="secondary"
+            variant="elevated"
+            prepend-icon="mdi-file-document-outline"
+            @click="adjustmentDialog = true"
+          >
+            Escanear Documento (IA)
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="elevated"
+            prepend-icon="mdi-plus"
+            @click="openProductDialog()"
+          >
+            Nuevo Producto
+          </v-btn>
+          <v-btn
+            color="white"
+            variant="elevated"
+            class="text-secondary"
+            prepend-icon="mdi-export"
+          >
+            Exportar
             
-            <!-- Fecha Desde -->
-            <v-col cols="12" md="4">
-              <v-text-field
-                v-model="dateFromFilter"
-                label="Desde"
-                type="date"
-                variant="outlined"
-                hide-details
-              ></v-text-field>
-            </v-col>
+            <v-menu activator="parent">
+              <v-list>
+                <v-list-item 
+                  prepend-icon="mdi-cash-multiple" 
+                  title="Inventario Valorizado" 
+                  @click="downloadValuation" 
+                />
+                <v-list-item 
+                  prepend-icon="mdi-history" 
+                  title="Kardex Global" 
+                  @click="downloadKardex" 
+                />
+                <v-list-item 
+                  prepend-icon="mdi-table-arrow-right" 
+                  title="Resumen Horizontal" 
+                  @click="openExportDialog"
+                />
+              </v-list>
+            </v-menu>
+          </v-btn>
+        </div>
+      </div>
 
-            <!-- Fecha Hasta -->
-            <v-col cols="12" md="4">
-              <v-text-field
-                v-model="dateToFilter"
-                label="Hasta"
-                type="date"
-                variant="outlined"
-                hide-details
-              ></v-text-field>
-            </v-col>
+      <!-- Estadísticas rápidas -->
+      <v-row class="mb-6">
+        <v-col cols="12" sm="6" md="4">
+          <StatsCard
+            title="Total Productos"
+            :value="stats.totalProducts"
+            bg-color="#02254d"
+            text-color="white"
+          />
+        </v-col>
+        
+        <v-col cols="12" sm="6" md="4">
+          <CurrencyStatsCard
+            title="Valor en Inventario (Costo)"
+            :value="convertedTotalValueCost"
+            bg-color="#f0d29b"
+            text-color="#010101"
+            :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
+            @toggle-currency="toggleCurrency"
+          />
+        </v-col>
+
+        <v-col cols="12" sm="6" md="4">
+          <CurrencyStatsCard
+            title="Valor Estimado (Venta)"
+            :value="convertedTotalValueSale"
+            bg-color="#f2b648"
+            text-color="#010101"
+            :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
+            @toggle-currency="toggleCurrency"
+          />
+        </v-col>
+      </v-row>
+
+      <!-- Filtros Colapsables de Fecha -->
+      <v-expansion-panels class="mb-6" variant="accordion">
+        <v-expansion-panel>
+          <v-expansion-panel-title>
+            <div class="d-flex align-center">
+              <v-icon start>mdi-filter-variant</v-icon>
+              <span class="font-weight-medium">Filtros de Fecha</span>
+              <v-chip 
+                v-if="dateFromFilter || dateToFilter" 
+                size="small" 
+                color="primary" 
+                variant="tonal"
+                class="ml-3"
+              >
+                Filtro Activo
+              </v-chip>
+            </div>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <v-row class="mt-2">
+              <!-- Selector Rápido -->
+              <v-col cols="12" md="4">
+                <v-select
+                  v-model="quickDateFilter"
+                  :items="quickDateOptions"
+                  item-title="title"
+                  item-value="value"
+                  prepend-inner-icon="mdi-clock-fast"
+                  label="Intervalos de tiempo"
+                  variant="outlined"
+                  hide-details
+                  @update:model-value="applyQuickDate"
+                ></v-select>
+              </v-col>
+              
+              <!-- Fecha Desde -->
+              <v-col cols="12" md="4">
+                <v-text-field
+                  v-model="dateFromFilter"
+                  label="Desde"
+                  type="date"
+                  variant="outlined"
+                  hide-details
+                ></v-text-field>
+              </v-col>
+
+              <!-- Fecha Hasta -->
+              <v-col cols="12" md="4">
+                <v-text-field
+                  v-model="dateToFilter"
+                  label="Hasta"
+                  type="date"
+                  variant="outlined"
+                  hide-details
+                ></v-text-field>
+              </v-col>
             
             <v-col cols="12" class="d-flex justify-end mt-2 pt-0">
                <v-btn variant="text" color="error" class="mr-2" @click="resetDateFilters">Limpiar</v-btn>
@@ -620,6 +670,7 @@
       </v-card>
     </v-dialog>
 
+    </template>
   </v-container>
 </template>
 
@@ -668,6 +719,8 @@ export default {
       exportDates: { start: new Date().toISOString().substr(0, 10), end: new Date().toISOString().substr(0, 10) },
 
       // Loading states
+      initialLoading: true,
+      loadingDashboard: false,
       loadingProducts: false,
       loadingMovements: false,
       loadingProductMovements: false,
@@ -779,6 +832,7 @@ export default {
   async mounted() {
     await this.loadDashboard()
     await this.fetchExchangeRate()
+    this.initialLoading = false
   },
   watch: {
     activeTab(val) {
@@ -860,7 +914,10 @@ export default {
     async loadMovements() {
       this.loadingMovements = true
       try {
-        this.movements = await inventoryService.getAllMovements({ limit: 500 })
+        this.movements = await inventoryService.getAllMovements({ 
+            limit: this.itemsPerPage, 
+            offset: (this.movementsPage - 1) * this.itemsPerPage 
+        })
       } catch (e) {
         console.error('Error loading movements', e)
       } finally {
@@ -869,6 +926,7 @@ export default {
     },
     async loadDashboard() {
       // Ejecutar las 3 queries en PARALELO — server-side, no client-side
+      this.loadingDashboard = true
       try {
         const [stats, topSelling, lowStock] = await Promise.all([
           inventoryService.getDashboardStats(),
@@ -881,6 +939,8 @@ export default {
         this.lowStockProducts   = lowStock   || []
       } catch (e) {
         console.error('Error loading dashboard', e)
+      } finally {
+        this.loadingDashboard = false
       }
     },
     async loadProducts() {
