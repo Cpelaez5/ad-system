@@ -54,12 +54,12 @@
         ></v-list-item>
        
 
-        <v-list-item
+        <!-- <v-list-item
           :to="{ name: 'ClienteArchivo' }"
           prepend-icon="mdi-folder-multiple"
           title="Mis Documentos"
           value="cliente-archivo"
-        ></v-list-item>
+        ></v-list-item> -->
 
         <v-list-item
           :to="{ name: 'ClienteFiscal360' }"
@@ -76,12 +76,12 @@
           value="cliente-inventario"
         ></v-list-item>
 
-        <v-list-item
+        <!-- <v-list-item
           :to="{ name: 'ClienteFacturacionSuscripcion' }"
           prepend-icon="mdi-credit-card-outline"
           title="Mi Facturación"
           value="cliente-facturacion-suscripcion"
-        ></v-list-item>
+        ></v-list-item> -->
       </template>
 
 

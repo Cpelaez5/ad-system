@@ -137,12 +137,12 @@ const routes = [
     name: 'ClienteVentas',
     redirect: to => { return { path: '/cliente/facturacion', query: { tab: 'ventas' } } }
   },
-  {
+  /* {
     path: '/cliente/archivo',
     name: 'ClienteArchivo',
     component: ClienteArchivo,
     meta: { requiresAuth: true, title: 'Mis Documentos', roles: ['cliente'] }
-  },
+  }, */
   {
     path: '/cliente/planes',
     name: 'ClientePlanes',

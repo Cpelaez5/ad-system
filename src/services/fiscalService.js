@@ -143,6 +143,15 @@ const fiscalService = {
             }
 
             // 2. Guardar metadatos en fiscal_docs
+            // IMPORTANTE: las fechas se guardan como 'YYYY-MM-DD' (sin hora) para evitar
+            // el desfase de zona horaria que ocurre cuando el navegador convierte a UTC
+            // y un día en hora local aparece como el día anterior en la BD.
+            const formatDate = (dateStr) => {
+                if (!dateStr) return null
+                // Si ya es YYYY-MM-DD, devolverlo tal cual; si viene como ISO, recortar
+                return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr
+            }
+
             const payload = {
                 organization_id: organizationId,
                 client_id: clientId,
@@ -150,8 +159,8 @@ const fiscalService = {
                 category: docData.category,
                 doc_type: docData.doc_type || null,
                 status: docData.status,
-                emission_date: docData.emission_date || null,
-                expiration_date: docData.expiration_date || null,
+                emission_date: formatDate(docData.emission_date),
+                expiration_date: formatDate(docData.expiration_date),
                 notes: docData.notes || null,
                 document_id: documentId
             }
@@ -185,40 +194,46 @@ const fiscalService = {
 
     async getStats() {
         const docs = await this.getFiscalDocs({ trashed: false })
-
-        // Contar eliminados
-        // Reusamos getFiscalDocs con trashed: true para respetar filtros de seguridad
         const trashDocs = await this.getFiscalDocs({ trashed: true })
 
         const now = new Date()
+        now.setHours(0, 0, 0, 0)
+
         const stats = {
             total: docs.length,
             vigente: 0,
             tramite: 0,
             vencido: 0,
+            noAplica: 0, // Excluidos del cálculo de progreso
             porVencer: 0,
             trash: trashDocs.length
         }
 
         docs.forEach(doc => {
-            // Contar por estado
+            // NO_APLICA: contabilizar aparte y no afectar el progreso
+            if (doc.status === 'NO_APLICA') {
+                stats.noAplica++
+                return
+            }
+
             const status = doc.status.toLowerCase() // vigente, tramite, vencido
             if (stats[status] !== undefined) stats[status]++
 
-            // Calcular por vencer (próximos 30 días)
-            if (doc.expiration_date) {
-                const expDate = new Date(doc.expiration_date)
+            // Por vencer: solo documentos VIGENTES con fecha de vencimiento en los próximos 30 días
+            if (doc.expiration_date && doc.status === 'VIGENTE') {
+                // Parsear fecha en hora local para evitar desfase UTC
+                const expDate = new Date(doc.expiration_date + 'T00:00:00')
                 const diffDays = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24))
-                if (diffDays > 0 && diffDays <= 30 && doc.status === 'VIGENTE') {
+
+                if (diffDays > 0 && diffDays <= 30) {
                     stats.porVencer++
                 }
 
-                // Auto-actualizar a VENCIDO si ya pasó la fecha
-                // (Esto es solo visual, idealmente un cron job lo haría en backend)
-                if (diffDays < 0 && doc.status === 'VIGENTE') {
+                // Auto-marcar como vencido si la fecha ya pasó (solo visual)
+                if (diffDays < 0) {
                     stats.vigente--
                     stats.vencido++
-                    doc.status = 'VENCIDO' // Actualizar localmente para la UI
+                    doc.status = 'VENCIDO'
                 }
             }
         })

@@ -102,7 +102,7 @@
         <!-- Stats Cards -->
         <v-col cols="12" md="8" lg="9">
           <v-row class="fill-height">
-            <v-col cols="6" sm="4">
+            <v-col cols="6" sm="3">
               <StatsCard
                  title="Vigentes"
                  :value="stats.vigente"
@@ -111,7 +111,7 @@
                  icon="mdi-check-circle"
               />
             </v-col>
-            <v-col cols="6" sm="4">
+            <v-col cols="6" sm="3">
               <StatsCard
                  title="En Trámite"
                  :value="stats.tramite"
@@ -120,13 +120,22 @@
                  icon="mdi-clock-outline"
               />
             </v-col>
-            <v-col cols="12" sm="4">
+            <v-col cols="6" sm="3">
               <StatsCard
                  title="Vencidos / Por Vencer"
                  :value="stats.vencido + stats.porVencer"
                  bg-color="#961112"
                  text-color="white"
                  icon="mdi-alert-circle"
+              />
+            </v-col>
+            <v-col cols="6" sm="3">
+              <StatsCard
+                 title="No Aplica"
+                 :value="stats.noAplica"
+                 bg-color="#757575"
+                 text-color="white"
+                 icon="mdi-minus-circle-outline"
               />
             </v-col>
             
@@ -253,10 +262,65 @@
         <!-- Document List -->
         <v-card class="rounded-xl border-none animate-section" style="animation-delay: 0.3s" elevation="0" :loading="loading">
 
-          <!-- ===== MODO EXPANSION PANELS: Tab "Todos" ===== -->
+          <!-- ===== MODO "TODOS" / "PAPELERA" ===== -->
           <template v-if="currentTab === 'all' || currentTab === 'trash'">
-            <v-data-iterator :items="filteredDocs" :items-per-page="-1">
-              <template v-slot:default="{ items }">
+            <!-- View Mode Toggle -->
+            <div class="d-flex justify-end pa-2 border-b bg-grey-lighten-5">
+              <v-btn-toggle v-model="viewMode" color="primary" mandatory density="compact" variant="outlined">
+                <v-btn value="accordion" size="small" prepend-icon="mdi-view-sequential">Acordeón</v-btn>
+                <v-btn value="table" size="small" prepend-icon="mdi-table">Tabla</v-btn>
+              </v-btn-toggle>
+            </div>
+
+            <!-- TABLA RESUMEN -->
+            <template v-if="viewMode === 'table'">
+              <v-data-table
+                :headers="tableHeaders"
+                :items="filteredDocs"
+                :items-per-page="10"
+                class="bg-transparent"
+                hover
+              >
+                <template v-slot:item.category="{ item }">
+                  <v-chip size="small" :color="getCategoryChipColor(item.category)" variant="tonal">
+                    <v-icon start size="x-small">{{ getCategoryIcon(item.category) }}</v-icon>
+                    {{ getCategoryTitle(item.category) }}
+                  </v-chip>
+                </template>
+                <template v-slot:item.emission_date="{ item }">
+                  {{ formatDate(item.emission_date) || '--' }}
+                </template>
+                <template v-slot:item.expiration_date="{ item }">
+                  <span :class="getExpirationClass(item.expiration_date)">
+                    {{ formatDate(item.expiration_date) || '--' }}
+                  </span>
+                </template>
+                <template v-slot:item.status="{ item }">
+                  <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(item))">
+                    {{ getEffectiveStatus(item) }}
+                  </v-chip>
+                </template>
+                <template v-slot:item.actions="{ item }">
+                  <div class="d-flex justify-end">
+                    <template v-if="currentTab !== 'trash'">
+                      <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(item)" v-tooltip="'Ver detalle'" />
+                      <v-btn v-if="item.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="item.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" />
+                      <v-btn icon="mdi-pencil" variant="text" size="small" color="grey" @click.stop="openDialog(item)" v-tooltip="'Editar'" />
+                      <v-btn icon="mdi-delete" variant="text" size="small" color="error" @click.stop="confirmDelete(item)" v-tooltip="'Mover a Papelera'" />
+                    </template>
+                    <template v-else>
+                      <v-btn icon="mdi-refresh" variant="text" size="small" color="success" @click.stop="restoreDoc(item)" :loading="restoring" v-tooltip="'Restaurar'" />
+                      <v-btn icon="mdi-delete-forever" variant="text" size="small" color="error" @click.stop="confirmDelete(item)" v-tooltip="'Eliminar Definitivamente'" />
+                    </template>
+                  </div>
+                </template>
+              </v-data-table>
+            </template>
+
+            <!-- ACORDEÓN -->
+            <template v-else>
+              <v-data-iterator :items="filteredDocs" :items-per-page="-1">
+                <template v-slot:default="{ items }">
                 <v-expansion-panels variant="accordion" class="rounded-xl">
                   <v-expansion-panel
                     v-for="cat in groupedCategories"
@@ -352,8 +416,9 @@
                     </v-expansion-panel-text>
                   </v-expansion-panel>
                 </v-expansion-panels>
-              </template>
-            </v-data-iterator>
+                </template>
+              </v-data-iterator>
+            </template>
           </template>
 
           <!-- ===== MODO PERÍODOS: Tabs de categoría individual ===== -->
@@ -730,8 +795,9 @@ const deleting = ref(false)
 const restoring = ref(false)
 const exporting = ref(false)
 const docs = ref([])
-const stats = reactive({ total: 0, vigente: 0, tramite: 0, vencido: 0, porVencer: 0, trash: 0 })
+const stats = reactive({ total: 0, vigente: 0, tramite: 0, vencido: 0, noAplica: 0, porVencer: 0, trash: 0 })
 const currentTab = ref('all') // 'all' | 'LEGAL' | 'MUNICIPAL' | 'SENIAT' | 'NOMINA' | 'OTROS' | 'trash'
+const viewMode = ref('accordion') // 'accordion' | 'table'
 const dialogOpen = ref(false)
 const deleteDialog = ref(false)
 const previewDialog = ref(false)
@@ -749,9 +815,19 @@ const statusFilter = ref('ALL')
 
 const statusOptions = [
     { label: 'Todos los estados', value: 'ALL' },
-    { label: 'Vigentes', value: 'VIGENTE' },
-    { label: 'En Trámite', value: 'TRAMITE' },
-    { label: 'Vencidos', value: 'VENCIDO' }
+    { label: 'Vigentes',         value: 'VIGENTE'   },
+    { label: 'En Trámite',       value: 'TRAMITE'   },
+    { label: 'Vencidos',         value: 'VENCIDO'   },
+    { label: 'No Aplica',        value: 'NO_APLICA' }
+]
+
+const tableHeaders = [
+    { title: 'Documento', key: 'name', sortable: true },
+    { title: 'Categoría', key: 'category', sortable: true },
+    { title: 'Emisión', key: 'emission_date', sortable: true },
+    { title: 'Vencimiento', key: 'expiration_date', sortable: true },
+    { title: 'Estado', key: 'status', sortable: true },
+    { title: 'Acciones', key: 'actions', sortable: false, align: 'end' }
 ]
 
 // Años disponibles para el selector (desde 2020 hasta el próximo año)
@@ -925,8 +1001,9 @@ const complianceDetail = computed(() => {
                 return isTypeMatch || isNameMatch
             })
 
-            // Check if any matching doc is valid
-            const hasValidDoc = matchingDocs.some(d => {
+            // Check if any matching doc is valid (NO_APLICA = cuenta como cubierto)
+            const hasNoAplica = matchingDocs.some(d => d.status === 'NO_APLICA')
+            const hasValidDoc = hasNoAplica || matchingDocs.some(d => {
                 const status = getEffectiveStatus(d)
                 return status === 'VIGENTE' || status === 'TRAMITE'
             })
@@ -1050,17 +1127,21 @@ const updateChart = () => {
                 }
             }
         })
+
     })
+
+    // Documentos NO_APLICA (se muestran en gris en la gráfica)
+    const cNoAplica = docs.value.filter(d => d.status === 'NO_APLICA').length
 
     // Configurar gráfica
     chartInstance = new Chart(chartCanvas.value, {
         type: 'doughnut',
         data: {
-             labels: ['Vigentes', 'En Trámite', 'Vencidos', 'Pendientes'],
+             labels: ['Vigentes', 'En Trámite', 'Vencidos', 'Pendientes', 'No Aplica'],
              datasets: [{
-                 data: [cVigente, cTramite, cVencido, cPendiente],
-                 backgroundColor: ['#4CAF50', '#FFC107', '#F44336', '#E0E0E0'],
-                 hoverBackgroundColor: ['#66BB6A', '#FFD54F', '#EF5350', '#BDBDBD'],
+                 data: [cVigente, cTramite, cVencido, cPendiente, cNoAplica],
+                 backgroundColor:      ['#4CAF50', '#FFC107', '#F44336', '#E0E0E0', '#9E9E9E'],
+                 hoverBackgroundColor: ['#66BB6A', '#FFD54F', '#EF5350', '#BDBDBD', '#757575'],
                  borderWidth: 0,
                  hoverOffset: 4
              }]
@@ -1107,8 +1188,9 @@ const openDialogForPeriod = ({ typeId, category, periodInfo }) => {
     // Calculamos una fecha de emisión aproximada para que el form se auto-llene con el mes/año correcto.
     const month = periodInfo.monthIndex !== undefined ? periodInfo.monthIndex : (periodInfo.quarterIndex !== undefined ? periodInfo.quarterIndex * 3 : 0)
     
+    // Usar fecha local (YYYY-MM-DD) para evitar desfase UTC
     const d = new Date(selectedYear.value, month, 1)
-    const emissionDateStr = d.toISOString().split('T')[0]
+    const emissionDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 
     editingItem.value = {
         category,
@@ -1218,8 +1300,9 @@ const restoreDoc = async (item) => {
 const getEffectiveStatus = (doc) => {
     if (!doc) return 'VIGENTE'
     
-    // Si está en trámite, mantener ese estado
+    // Si está en trámite o no aplica, mantener ese estado
     if (doc.status === 'TRAMITE') return 'TRAMITE'
+    if (doc.status === 'NO_APLICA') return 'NO_APLICA'
     
     // Si tiene fecha de vencimiento y ya pasó, es VENCIDO
     if (doc.expiration_date) {
@@ -1237,7 +1320,7 @@ const getEffectiveStatus = (doc) => {
 }
 
 const getStatusColor = (status) => {
-    const map = { 'VIGENTE': 'success', 'TRAMITE': 'warning', 'VENCIDO': 'error' }
+    const map = { 'VIGENTE': 'success', 'TRAMITE': 'warning', 'VENCIDO': 'error', 'NO_APLICA': 'grey' }
     return map[status] || 'grey'
 }
 
@@ -1426,9 +1509,9 @@ const exportToPDF = async () => {
                      
                      if (!(isTypeMatch || isNameMatch)) return false
                      
-                     // Must be non-expired
+                     // Must be non-expired or NO_APLICA
                      const status = getEffectiveStatus(d)
-                     return status === 'VIGENTE' || status === 'TRAMITE'
+                     return status === 'VIGENTE' || status === 'TRAMITE' || status === 'NO_APLICA'
                 })
                 
                 if (!hasValid) {

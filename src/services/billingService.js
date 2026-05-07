@@ -96,10 +96,46 @@ export default {
                     due_date: invoiceData.due_date,
                     notes: invoiceData.notes || null
                 }])
-                .select('*, client:clients(company_name, rif)')
+                .select('*, client:clients(company_name, rif, organization_id)')
                 .single();
 
             if (error) throw error;
+
+            // ---> NUEVA LÓGICA: Sincronización con módulo contable del cliente
+            if (data && data.client && data.client.organization_id) {
+                try {
+                    const invoiceRecord = {
+                        organization_id: data.client.organization_id,
+                        client_id: null, // Factura a nombre de la organización
+                        invoice_number: data.invoice_number,
+                        document_type: 'FACTURA',
+                        flow: 'COMPRA',
+                        expense_type: 'GASTO',
+                        issue_date: data.period_start,
+                        due_date: data.due_date,
+                        status: 'EMITIDA',
+                        issuer: { name: 'AD System', rif: '' },
+                        client_info: { company_name: data.client.company_name, rif: data.client.rif },
+                        financial: {
+                            currency: data.currency,
+                            subtotal: parseFloat(data.amount),
+                            total: parseFloat(data.amount)
+                        },
+                        items: [{
+                            description: 'Suscripción al sistema',
+                            quantity: 1,
+                            unitPrice: parseFloat(data.amount),
+                            total: parseFloat(data.amount)
+                        }],
+                        notes: `Factura de Suscripción al Sistema - Ref: ${data.invoice_number}`
+                    };
+
+                    await supabase.from('invoices').insert([invoiceRecord]);
+                } catch (e) {
+                    console.error('❌ Error sincronizando factura al módulo contable:', e);
+                }
+            }
+
             return { success: true, data };
         } catch (error) {
             console.error('❌ Error creando factura:', error);
@@ -587,6 +623,20 @@ export default {
                     .eq('id', report.invoice_id);
 
                 if (invoiceError) throw invoiceError;
+
+                // ---> NUEVA LÓGICA: Actualizar factura contable a PAGADA
+                try {
+                    const { data: sysInvoice } = await supabase.from('system_invoices').select('invoice_number, client:clients(organization_id)').eq('id', report.invoice_id).single();
+                    if (sysInvoice && sysInvoice.client?.organization_id) {
+                        await supabase.from('invoices')
+                            .update({ status: 'PAGADA', updated_at: new Date().toISOString() })
+                            .eq('organization_id', sysInvoice.client.organization_id)
+                            .eq('invoice_number', sysInvoice.invoice_number)
+                            .eq('flow', 'COMPRA');
+                    }
+                } catch (e) {
+                    console.error('❌ Error sincronizando pago al módulo contable:', e);
+                }
             }
 
             // 5. Abonar a saldo si hay excedente (Credit System)
@@ -661,7 +711,6 @@ export default {
                     invoice_id,
                     client_id,
                     payment_method_id: null, // Sin método externo
-                    payment_method_type: 'balance', // Identificador especial
                     reference: `BAL-${Date.now()}`, // Referencia interna
                     amount: payAmount,
                     status: 'approved', // Auto-aprobado
@@ -705,6 +754,20 @@ export default {
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', invoice_id);
+
+                // ---> NUEVA LÓGICA: Actualizar factura contable a PAGADA
+                try {
+                    const { data: sysInvoice } = await supabase.from('system_invoices').select('invoice_number, client:clients(organization_id)').eq('id', invoice_id).single();
+                    if (sysInvoice && sysInvoice.client?.organization_id) {
+                        await supabase.from('invoices')
+                            .update({ status: 'PAGADA', updated_at: new Date().toISOString() })
+                            .eq('organization_id', sysInvoice.client.organization_id)
+                            .eq('invoice_number', sysInvoice.invoice_number)
+                            .eq('flow', 'COMPRA');
+                    }
+                } catch (e) {
+                    console.error('❌ Error sincronizando pago al módulo contable:', e);
+                }
             } else {
                 // Si es parcial, asegurar que esté en 'pending' (o partial si existiera)
                 // Como ya estaba 'pending', no hace falta cambiar a menos que estuviera 'overdue'?

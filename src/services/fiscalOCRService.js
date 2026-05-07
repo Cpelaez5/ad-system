@@ -52,6 +52,10 @@ class FiscalOCRService extends BaseOCRService {
 
     /**
      * Analiza un documento fiscal
+     * Estrategia: OCR local (Tesseract) + Análisis de texto con DeepSeek
+     * Nota: DeepSeek deepseek-chat NO soporta contenido multimodal (image_url),
+     * por lo que usamos directamente el flujo de OCR + análisis de texto.
+     * 
      * @param {File} file 
      * @returns {Promise<Object>} Datos extraídos
      */
@@ -60,53 +64,49 @@ class FiscalOCRService extends BaseOCRService {
             console.log('🕵️‍♂️ Iniciando análisis fiscal IA:', file.name)
 
             // 1. Pre-procesamiento (Validar, Convertir PDF->Img, Comprimir)
-            // Reutilizamos métodos de BaseOCRService
-
-            // Validar
             this.validateFile(file)
 
             let imageFile = file
             if (file.type === 'application/pdf') {
-                console.log('📑 Convirtiendo PDF a imagen para análisis visual...')
-                // Nota: Para clasificación visual, es mejor convertir a imagen que leer texto plano,
-                // ya que la estructura visual (logos, sellos) ayuda a la IA.
+                // Intentar primero extracción directa de texto del PDF
+                console.log('📑 Intentando extracción directa de texto del PDF...')
+                const directText = await this.extractTextFromPdf(file)
+                
+                if (directText && directText.length > 100) {
+                    // PDF digital con texto suficiente — analizar directamente
+                    console.log('✨ Texto extraído digitalmente del PDF (sin OCR). Longitud:', directText.length)
+                    console.log('🧠 Analizando texto con IA...')
+                    const response = await this.analyzeTextWithDeepSeek(directText)
+                    const data = this.parseResponse(response)
+                    console.log('✅ Análisis fiscal completado (PDF digital):', data)
+                    return data
+                }
+
+                // PDF escaneado — convertir a imagen para OCR
+                console.log('📑 PDF escaneado detectado, convirtiendo a imagen...')
                 imageFile = await this.convertPdfToImage(file)
             }
 
-            // Comprimir
+            // 2. Comprimir imagen
             console.log('🗜️ Optimizando imagen...')
             const compressedImage = await this.compressImage(imageFile)
 
-            // Convertir a base64
-            const base64 = await this.fileToBase64(compressedImage)
+            // 3. OCR Local con Tesseract
+            console.log('👁️ Ejecutando OCR local con Tesseract...')
+            const text = await this.performLocalOCR(compressedImage)
+            console.log('📝 Texto extraído (longitud):', text.length)
 
-            // 2. Intentar DeepSeek Vision (o Fallback)
-            try {
-                console.log('🤖 Consultando modelo de visión...')
-                const response = await this.callDeepSeekVision(base64)
-
-                // 3. Parsear respuesta
-                const data = this.parseResponse(response)
-                console.log('✅ Análisis visual completado:', data)
-                return data
-
-            } catch (visionError) {
-                console.warn('⚠️ DeepSeek Vision falló (probablemente no soportado), iniciando fallback OCR local:', visionError.message)
-
-                // FALLBACK: Tesseract OCR + Text Analysis
-                // 2b. OCR Local
-                console.log('👁️ Ejecutando OCR local con Tesseract...')
-                const text = await this.performLocalOCR(compressedImage)
-                console.log('📝 Texto extraído (longitud):', text.length)
-
-                // 2c. Análisis de Texto con DeepSeek
-                console.log('🧠 Analizando texto extraído con IA...')
-                const response = await this.analyzeTextWithDeepSeek(text)
-
-                const data = this.parseResponse(response)
-                console.log('✅ Análisis de texto completado:', data)
-                return data
+            if (!text || text.trim().length < 20) {
+                throw new Error('No se pudo extraer texto suficiente del documento. Intente con una imagen más nítida.')
             }
+
+            // 4. Análisis de Texto con DeepSeek
+            console.log('🧠 Analizando texto extraído con IA...')
+            const response = await this.analyzeTextWithDeepSeek(text)
+
+            const data = this.parseResponse(response)
+            console.log('✅ Análisis fiscal completado:', data)
+            return data
 
         } catch (error) {
             console.error('❌ Error en análisis fiscal:', error)

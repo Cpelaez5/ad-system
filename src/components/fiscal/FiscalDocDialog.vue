@@ -18,8 +18,8 @@
       <v-card-text class="pa-6">
         <v-form ref="form" v-model="valid" @submit.prevent>
           <v-row>
-            <!-- Zona de Carga de Archivo (PRIMERO) -->
-            <v-col cols="12">
+            <!-- Zona de Carga de Archivo (oculta si el doc no aplica) -->
+            <v-col cols="12" v-if="!formData.noAplica">
               <label class="text-subtitle-2 font-weight-bold mb-2 d-block">
                 1. Subir Documento (PDF o Imagen)
               </label>
@@ -52,6 +52,19 @@
                       </v-alert>
                   </div>
               </v-fade-transition>
+            </v-col>
+
+            <!-- Banner No Aplica (visible en su lugar si está activado) -->
+            <v-col cols="12" v-else>
+              <v-alert
+                color="grey"
+                variant="tonal"
+                icon="mdi-file-cancel-outline"
+                class="mb-0"
+              >
+                <strong>Documento no requerido para esta empresa</strong>
+                <div class="text-caption">Este documento está marcado como “No Aplica”. No se requiere subir archivo. Complete la observación abajo.</div>
+              </v-alert>
             </v-col>
 
             <v-col cols="12">
@@ -110,9 +123,10 @@
               </v-select>
             </v-col>
 
-            <!-- Estado -->
+            <!-- Estado + toggle No Aplica -->
             <v-col cols="12" sm="6">
               <v-select
+                v-if="!formData.noAplica"
                 v-model="formData.status"
                 :items="statusOptions"
                 label="Estado Actual *"
@@ -122,6 +136,25 @@
                 :rules="[v => !!v || 'El estado es requerido']"
                 required
               />
+              <v-chip v-else color="grey" variant="tonal" size="large" prepend-icon="mdi-minus-circle-outline" class="w-100 justify-start">No Aplica</v-chip>
+            </v-col>
+
+            <!-- Toggle No Aplica -->
+            <v-col cols="12" sm="6" class="d-flex align-center">
+              <v-switch
+                v-model="formData.noAplica"
+                color="grey-darken-1"
+                inset
+                hide-details
+                @update:model-value="handleNoAplicaToggle"
+              >
+                <template #label>
+                  <div>
+                    <span class="font-weight-medium">No Aplica a esta empresa</span>
+                    <div class="text-caption text-grey">El documento no es requerido por naturaleza del negocio</div>
+                  </div>
+                </template>
+              </v-switch>
             </v-col>
 
             <!-- Nombre del Documento (Opcional, auto-llenado) -->
@@ -137,51 +170,57 @@
               />
             </v-col>
 
-            <v-col cols="12">
-                <v-divider class="my-2" />
-                <div class="text-subtitle-2 font-weight-bold mb-3">3. Fechas</div>
-            </v-col>
+            <!-- Fechas: ocultas cuando no aplica -->
+            <template v-if="!formData.noAplica">
+              <v-col cols="12">
+                  <v-divider class="my-2" />
+                  <div class="text-subtitle-2 font-weight-bold mb-3">3. Fechas</div>
+              </v-col>
 
-            <!-- Fecha de Emisión -->
-            <v-col cols="12" sm="6">
-              <v-text-field
-                v-model="formData.emission_date"
-                label="Fecha de Emisión *"
-                type="date"
-                variant="outlined"
-                density="comfortable"
-                persistent-hint
-                hint="Fecha en que se emitió el documento"
-                :rules="[v => !!v || 'La fecha de emisión es requerida']"
-                required
-              />
-            </v-col>
+              <!-- Fecha de Emisión -->
+              <v-col cols="12" sm="6">
+                <v-text-field
+                  v-model="formData.emission_date"
+                  label="Fecha de Emisión *"
+                  type="date"
+                  variant="outlined"
+                  density="comfortable"
+                  persistent-hint
+                  hint="Fecha en que se emitió el documento"
+                  :rules="[v => !!v || 'La fecha de emisión es requerida']"
+                  required
+                />
+              </v-col>
 
-            <!-- Fecha de Vencimiento -->
-            <v-col cols="12" sm="6">
-              <v-text-field
-                v-model="formData.expiration_date"
-                label="Fecha de Vencimiento *"
-                type="date"
-                variant="outlined"
-                density="comfortable"
-                persistent-hint
-                hint="Indique cuándo vence este documento"
-                :rules="expirationDateRules"
-                required
-              />
-            </v-col>
+              <!-- Fecha de Vencimiento -->
+              <v-col cols="12" sm="6">
+                <v-text-field
+                  v-model="formData.expiration_date"
+                  label="Fecha de Vencimiento *"
+                  type="date"
+                  variant="outlined"
+                  density="comfortable"
+                  persistent-hint
+                  hint="Indique cuándo vence este documento"
+                  :rules="expirationDateRules"
+                  required
+                />
+              </v-col>
+            </template>
 
-            <!-- Notas -->
+            <!-- Notas / Observaciones: obligatorio si No Aplica -->
             <v-col cols="12">
               <v-textarea
                 v-model="formData.notes"
-                label="Notas / Observaciones (Opcional)"
-                placeholder="Información relevante extraída del documento o anotaciones manuales..."
+                :label="formData.noAplica ? 'Observación *' : 'Notas / Observaciones (Opcional)'"
+                :placeholder="formData.noAplica
+                  ? '¿Por qué no aplica a esta empresa? Ej: No vendemos alimentos, no se requiere permiso sanitario.'
+                  : 'Información relevante extraída del documento o anotaciones manuales...'"
                 variant="outlined"
                 density="comfortable"
                 rows="3"
                 auto-grow
+                :rules="formData.noAplica ? [v => !!v || 'La observación es obligatoria cuando el documento No Aplica'] : []"
               />
             </v-col>
           </v-row>
@@ -261,6 +300,7 @@ const defaultForm = {
   category: null,
   doc_type: null,
   status: 'VIGENTE',
+  noAplica: false, // Switch UI — se convierte a status='NO_APLICA' al guardar
   emission_date: null,
   expiration_date: null,
   notes: ''
@@ -278,9 +318,9 @@ const categories = [
 ]
 
 const statusOptions = [
-  { title: 'Vigente', value: 'VIGENTE', color: 'success' },
-  { title: 'En Trámite', value: 'TRAMITE', color: 'warning' },
-  { title: 'Vencido', value: 'VENCIDO', color: 'error' }
+  { title: 'Vigente',    value: 'VIGENTE',   color: 'success', icon: 'mdi-check-circle'     },
+  { title: 'En Trámite', value: 'TRAMITE',   color: 'warning', icon: 'mdi-clock-outline'    },
+  { title: 'Vencido',   value: 'VENCIDO',   color: 'error',   icon: 'mdi-alert-circle'     },
 ]
 
 // Computed
@@ -301,28 +341,40 @@ const existingFile = computed(() => {
   return null
 })
 
-// Validación: fecha de vencimiento es requerida y debe ser posterior a la emisión
-const expirationDateRules = computed(() => [
-    v => !!v || 'La fecha de vencimiento es requerida',
-    v => {
-        if (!v || !formData.emission_date) return true
-        const emission = new Date(formData.emission_date)
-        const expiration = new Date(v)
-        if (expiration <= emission) {
-            return 'La fecha de vencimiento debe ser posterior a la fecha de emisión'
+// Validación: fecha de vencimiento requerida solo si no es No Aplica
+const expirationDateRules = computed(() => {
+    if (formData.noAplica) return [] // No se exige fecha cuando No Aplica
+    return [
+        v => !!v || 'La fecha de vencimiento es requerida',
+        v => {
+            if (!v || !formData.emission_date) return true
+            const emission   = new Date(formData.emission_date)
+            const expiration = new Date(v)
+            return expiration > emission || 'La fecha de vencimiento debe ser posterior a la de emisión'
         }
-        return true
-    }
-])
+    ]
+})
 
 // Methods
 const handleCategoryChange = () => {
     formData.doc_type = null
 }
 
-const handleTypeChange = (typeId) => {
-    // Ya no auto-llenamos el nombre desde el tipo
-    // El usuario puede usar el nombre personalizado si lo desea
+const handleTypeChange = (_typeId) => {
+    // El nombre personalizado es opcional; no auto-llenamos
+}
+
+// Al activar/desactivar el toggle, sincronizamos el status
+const handleNoAplicaToggle = (val) => {
+    if (val) {
+        formData.status = 'NO_APLICA'
+        formData.emission_date = null
+        formData.expiration_date = null
+        newFile.value = null
+        analysisComplete.value = false
+    } else {
+        formData.status = 'VIGENTE'
+    }
 }
 
 const getStatusProps = (item) => {
@@ -354,7 +406,8 @@ const analyzeDocument = async (file) => {
         let detectedItems = []
 
         // Categoría
-        if (data.category && categories.includes(data.category)) {
+        const validCategories = categories.map(c => c.value)
+        if (data.category && validCategories.includes(data.category)) {
             formData.category = data.category
             detectedItems.push(`Categoría: ${data.category}`)
         }
@@ -493,17 +546,18 @@ const resetForm = () => {
 watch(() => props.modelValue, (val) => {
   if (val) {
     if (props.editingItem) {
-        // Cargar datos para editar
+        const isNoAplica = props.editingItem.status === 'NO_APLICA'
         Object.assign(formData, {
-          id: props.editingItem.id,
-          name: props.editingItem.name,
-          category: props.editingItem.category,
-          doc_type: props.editingItem.doc_type,
-          status: props.editingItem.status,
-          emission_date: props.editingItem.emission_date,
+          id:              props.editingItem.id,
+          name:            props.editingItem.name,
+          category:        props.editingItem.category,
+          doc_type:        props.editingItem.doc_type,
+          status:          isNoAplica ? 'NO_APLICA' : props.editingItem.status,
+          noAplica:        isNoAplica,
+          emission_date:   props.editingItem.emission_date,
           expiration_date: props.editingItem.expiration_date,
-          notes: props.editingItem.notes || '',
-          document_id: props.editingItem.document_id
+          notes:           props.editingItem.notes || '',
+          document_id:     props.editingItem.document_id
         })
     } else {
         resetForm()
