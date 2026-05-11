@@ -181,13 +181,13 @@
               <v-col cols="12" sm="6">
                 <v-text-field
                   v-model="formData.emission_date"
-                  label="Fecha de Emisión *"
+                  label="Fecha del Período / Emisión *"
                   type="date"
                   variant="outlined"
                   density="comfortable"
                   persistent-hint
-                  hint="Fecha en que se emitió el documento"
-                  :rules="[v => !!v || 'La fecha de emisión es requerida']"
+                  hint="Para reportes periódicos, indica una fecha dentro del mes a declarar."
+                  :rules="[v => !!v || 'La fecha es requerida']"
                   required
                 />
               </v-col>
@@ -221,6 +221,19 @@
                 rows="3"
                 auto-grow
                 :rules="formData.noAplica ? [v => !!v || 'La observación es obligatoria cuando el documento No Aplica'] : []"
+              />
+            </v-col>
+
+            <!-- Observaciones -->
+            <v-col cols="12">
+              <v-textarea
+                v-model="formData.observations"
+                label="Observaciones Adicionales"
+                placeholder="Ej: Trámite en espera por firma del socio, etc."
+                variant="outlined"
+                density="comfortable"
+                rows="2"
+                hide-details
               />
             </v-col>
           </v-row>
@@ -303,7 +316,8 @@ const defaultForm = {
   noAplica: false, // Switch UI — se convierte a status='NO_APLICA' al guardar
   emission_date: null,
   expiration_date: null,
-  notes: ''
+  notes: '',
+  observations: ''
 }
 
 const formData = reactive({ ...defaultForm })
@@ -368,7 +382,6 @@ const handleTypeChange = (_typeId) => {
 const handleNoAplicaToggle = (val) => {
     if (val) {
         formData.status = 'NO_APLICA'
-        formData.emission_date = null
         formData.expiration_date = null
         newFile.value = null
         analysisComplete.value = false

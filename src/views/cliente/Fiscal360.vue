@@ -440,9 +440,11 @@
               
               <!-- Documentos No Recurrentes (Únicos / Permanentes) -->
               <v-card v-if="getNonRecurringDocs().length > 0 || nonRecurringPendingDocs.length > 0" variant="outlined" class="rounded-xl mt-6 border-dashed" style="border-color: #e0e0e0 !important;">
-                <v-card-title class="text-subtitle-1 font-weight-bold text-secondary bg-grey-lighten-4 py-3">
+                <v-card-title class="text-subtitle-1 font-weight-bold text-secondary bg-grey-lighten-4 py-3 d-flex align-center">
                   <v-icon start size="small">mdi-pin</v-icon>
                   Documentos Permanentes / Ad-hoc
+                  <v-spacer />
+                  <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-plus" @click="openDialog({ category: currentTab, status: 'VIGENTE' })">Añadir</v-btn>
                 </v-card-title>
                 <v-list lines="two" class="bg-transparent pa-2">
                   <!-- Documentos existentes -->
@@ -813,12 +815,12 @@ const now = new Date()
 const selectedYear = ref(now.getFullYear())
 const statusFilter = ref('ALL')
 
-const statusOptions = [
-    { label: 'Todos los estados', value: 'ALL' },
-    { label: 'Vigentes',         value: 'VIGENTE'   },
-    { label: 'En Trámite',       value: 'TRAMITE'   },
-    { label: 'Vencidos',         value: 'VENCIDO'   },
-    { label: 'No Aplica',        value: 'NO_APLICA' }
+const statusFilterOptions = [
+    { text: 'Todos', value: 'ALL' },
+    { text: 'Vigentes / Presentados', value: 'VIGENTE' },
+    { text: 'En Trámite', value: 'TRAMITE' },
+    { text: 'Vencidos', value: 'VENCIDO' },
+    { text: 'No Aplica', value: 'NO_APLICA' }
 ]
 
 const tableHeaders = [
@@ -903,7 +905,11 @@ const filteredDocs = computed(() => {
     }
     
     if (statusFilter.value !== 'ALL') {
-        filtered = filtered.filter(d => getEffectiveStatus(d) === statusFilter.value)
+        filtered = filtered.filter(d => {
+            const st = getEffectiveStatus(d)
+            if (statusFilter.value === 'VIGENTE') return st === 'VIGENTE' || st === 'PRESENTADO'
+            return st === statusFilter.value
+        })
     }
     
     return filtered
@@ -919,7 +925,18 @@ const nonRecurringPendingDocs = computed(() => {
     
     nrTypes.forEach(type => {
         if (!type.required) return
-        const exists = docs.value.some(d => d.category === currentTab.value && d.doc_type === type.id)
+        const exists = docs.value.some(d => {
+            if (d.category !== currentTab.value) return false
+            if (d.doc_type === type.id) return true
+            // Fallback fuzzy match only if doc_type is missing
+            let isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
+            // Evitar falso positivo: "RIF de Socios" contiene "RIF"
+            if (isNameMatch && type.id === 'RIF' && d.name.toLowerCase().includes('socios')) {
+                isNameMatch = false
+            }
+            return isNameMatch
+        })
+        
         if (!exists) {
             pending.push({ ...type, category: currentTab.value, isPending: true })
         }
@@ -1003,9 +1020,9 @@ const complianceDetail = computed(() => {
 
             // Check if any matching doc is valid (NO_APLICA = cuenta como cubierto)
             const hasNoAplica = matchingDocs.some(d => d.status === 'NO_APLICA')
-            const hasValidDoc = hasNoAplica || matchingDocs.some(d => {
+            const hasValidDoc = matchingDocs.some(d => {
                 const status = getEffectiveStatus(d)
-                return status === 'VIGENTE' || status === 'TRAMITE'
+                return status === 'VIGENTE' || status === 'PRESENTADO' || status === 'TRAMITE' || status === 'NO_APLICA'
             })
 
             if (hasValidDoc) {
@@ -1111,12 +1128,13 @@ const updateChart = () => {
             // Prioridad: 1. Vigente, 2. Trámite, 3. Vencido, 4. Pendiente
             const validDoc = matchingDocs.find(d => {
                 const s = getEffectiveStatus(d)
-                return s === 'VIGENTE' || s === 'TRAMITE'
+                return s === 'VIGENTE' || s === 'PRESENTADO' || s === 'TRAMITE'
             })
             
             if (validDoc) {
                 const s = getEffectiveStatus(validDoc)
                 if (s === 'VIGENTE') cVigente++
+                else if (s === 'PRESENTADO') cVigente++
                 else if (s === 'TRAMITE') cTramite++
             } else {
                 const expiredDoc = matchingDocs.find(d => getEffectiveStatus(d) === 'VENCIDO')
@@ -1293,34 +1311,39 @@ const restoreDoc = async (item) => {
 
 // Helpers
 
-/**
- * Calcula el estado efectivo del documento basado en la fecha de vencimiento
- * Si la fecha de vencimiento ya pasó y el estado no es TRAMITE, se considera VENCIDO
- */
-const getEffectiveStatus = (doc) => {
-    if (!doc) return 'VIGENTE'
+const getEffectiveStatus = (docItem) => {
+    if (docItem.status === 'NO_APLICA') return 'NO_APLICA'
+    if (docItem.status === 'TRAMITE') return 'TRAMITE'
     
-    // Si está en trámite o no aplica, mantener ese estado
-    if (doc.status === 'TRAMITE') return 'TRAMITE'
-    if (doc.status === 'NO_APLICA') return 'NO_APLICA'
+    // Buscar si es recurrente
+    let isRecurring = false
+    if (docItem.category && docItem.doc_type) {
+        const types = FISCAL_TYPES[docItem.category] || []
+        const typeInfo = types.find(t => t.id === docItem.doc_type)
+        if (typeInfo && isRecurringFrequency(typeInfo.frequency)) {
+            isRecurring = true
+        }
+    }
     
-    // Si tiene fecha de vencimiento y ya pasó, es VENCIDO
-    if (doc.expiration_date) {
-        const expDate = new Date(doc.expiration_date)
-        const today = new Date()
-        today.setHours(0, 0, 0, 0) // Comparar solo fechas, no horas
-        
-        if (expDate < today) {
+    if (isRecurring) {
+        return 'PRESENTADO'
+    }
+
+    if (docItem.status === 'VENCIDO') return 'VENCIDO'
+    
+    // Si tiene expiration_date, validar (solo aplica para documentos NO recurrentes)
+    if (docItem.expiration_date) {
+        const expDate = new Date(docItem.expiration_date)
+        if (expDate < new Date()) {
             return 'VENCIDO'
         }
     }
     
-    // En cualquier otro caso, usar el estado guardado
-    return doc.status || 'VIGENTE'
+    return docItem.status || 'VIGENTE'
 }
 
 const getStatusColor = (status) => {
-    const map = { 'VIGENTE': 'success', 'TRAMITE': 'warning', 'VENCIDO': 'error', 'NO_APLICA': 'grey' }
+    const map = { 'VIGENTE': 'success', 'PRESENTADO': 'success', 'TRAMITE': 'warning', 'VENCIDO': 'error', 'NO_APLICA': 'grey' }
     return map[status] || 'grey'
 }
 
@@ -1511,7 +1534,7 @@ const exportToPDF = async () => {
                      
                      // Must be non-expired or NO_APLICA
                      const status = getEffectiveStatus(d)
-                     return status === 'VIGENTE' || status === 'TRAMITE' || status === 'NO_APLICA'
+                     return status === 'VIGENTE' || status === 'PRESENTADO' || status === 'TRAMITE' || status === 'NO_APLICA'
                 })
                 
                 if (!hasValid) {
@@ -1590,7 +1613,7 @@ const exportToPDF = async () => {
                     // Existing Item styling
                     // Status with color
                     const effectiveStatus = getEffectiveStatus(docItem)
-                    if (effectiveStatus === 'VIGENTE') {
+                    if (effectiveStatus === 'VIGENTE' || effectiveStatus === 'PRESENTADO') {
                         doc.setTextColor(76, 175, 80) // Green
                     } else if (effectiveStatus === 'TRAMITE') {
                         doc.setTextColor(255, 193, 7) // Yellow/Orange

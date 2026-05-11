@@ -249,7 +249,13 @@ const periods = computed(() => {
     })
     const isFuture  = props.year > currentYear
     const isCurrent = props.year === currentYear
-    result.push(buildPeriod(`Año ${props.year}`, matchingDocs, isFuture, isCurrent))
+    
+    let periodLabel = `Año ${props.year}`
+    if (props.type.id === 'ISLR_ANUAL' || props.type.id === 'IGP') {
+        periodLabel = `Ejercicio ${props.year - 1}`
+    }
+    
+    result.push(buildPeriod(periodLabel, matchingDocs, isFuture, isCurrent))
 
   } else if (props.type.frequency === 'QUINCENAL') {
     const monthsShort = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -362,12 +368,12 @@ const handlePeriodClick = (period) => {
     return
   }
 
-  if (period.docs.length > 1) {
-    // Múltiples docs: mostrar modal con la lista
+  if (period.docs.length > 1 || (period.docs.length === 1 && props.type.allowMultiple)) {
+    // Múltiples docs o permite múltiples: mostrar modal con la lista y botón "Añadir otro"
     multiDocPeriod.value = period
     multiDocDialog.value = true
   } else if (period.docs.length === 1) {
-    // Un solo doc: abrir preview
+    // Un solo doc (y no permite múltiples): abrir preview
     emit('open-preview', period.docs[0])
   } else {
     // Sin doc: abrir diálogo de creación
