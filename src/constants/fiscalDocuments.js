@@ -12,8 +12,9 @@ export const FISCAL_TYPES = {
         { id: 'RIF',                    label: 'RIF',                                frequency: 'VIGENTE',   required: true,  allowMultiple: false },
         { id: 'PUBLICACION_MERCANTIL',  label: 'Publicación Mercantil',              frequency: 'PERMANENT', required: true,  allowMultiple: false },
         { id: 'ACTA_ASAMBLEA',          label: 'Acta de Asamblea',                   frequency: 'PERMANENT', required: false, allowMultiple: true  }, // Puede haber varias actas
-        { id: 'CEDULA_SOCIOS',          label: 'Cédula de Socios',                   frequency: 'VIGENTE',   required: true,  allowMultiple: true  }, // 1 por socio
-        { id: 'RIF_SOCIOS',             label: 'RIF de Socios',                      frequency: 'VIGENTE',   required: true,  allowMultiple: true  }, // 1 por socio
+        // flexible: true → se sube uno por cada socio (sin límite de cantidad)
+        { id: 'CEDULA_SOCIOS',          label: 'Cédula de Socios',                   frequency: 'VIGENTE',   required: true,  allowMultiple: true, flexible: true }, // 1 por socio
+        { id: 'RIF_SOCIOS',             label: 'RIF de Socios',                      frequency: 'VIGENTE',   required: true,  allowMultiple: true, flexible: true }, // 1 por socio
     ],
     'MUNICIPAL': [
         { id: 'CONFORMIDAD_USO',        label: 'Conformidad de Uso',                 frequency: 'PERMANENT', required: true,  allowMultiple: false },

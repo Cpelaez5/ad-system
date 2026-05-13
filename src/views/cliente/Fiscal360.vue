@@ -867,7 +867,8 @@ const getCategoryTitle = (catValue) => {
 // Utilities for the new grouping layout
 const getRecurringTypes = (cat) => {
     const types = FISCAL_TYPES[cat] || []
-    return types.filter(t => isRecurringFrequency(t.frequency) || t.frequency === 'ANNUAL')
+    // Incluir: frecuencias recurrentes, ANNUAL, y tipos "flexible" (sin cadencia fija pero con lista libre)
+    return types.filter(t => isRecurringFrequency(t.frequency) || t.frequency === 'ANNUAL' || t.flexible)
 }
 
 const getNonRecurringTypes = (cat) => {
@@ -1481,7 +1482,8 @@ const getPeriodRowsForPdf = (type, catDocs, year) => {
                 const dt = new Date(d.emission_date + 'T00:00:00')
                 return dt.getFullYear() === year && dt.getMonth() === i
             })
-            const isFuture = year > currentYear || (year === currentYear && i > currentMonth)
+            // El mes actual no ha terminado → tratar como pendiente (mismo criterio que la UI)
+            const isFuture = year > currentYear || (year === currentYear && i >= currentMonth)
             return buildRow(`${names[i]} ${year}`, bestDoc(cands), isFuture)
         })
     }
@@ -1496,10 +1498,12 @@ const getPeriodRowsForPdf = (type, catDocs, year) => {
                     if (dt.getFullYear() !== year || dt.getMonth() !== m) return false
                     return q === 1 ? dt.getDate() <= 15 : dt.getDate() > 15
                 })
-                const curQ     = currentDay <= 15 ? 1 : 2
-                const isFuture = year > currentYear ||
-                    (year === currentYear && m > currentMonth) ||
-                    (year === currentYear && m === currentMonth && q > curQ)
+                const curQ = currentDay <= 15 ? 1 : 2
+                // La quincena actual aún no ha terminado → pendiente
+                const isPast = year < currentYear ||
+                    (year === currentYear && m < currentMonth) ||
+                    (year === currentYear && m === currentMonth && q < curQ)
+                const isFuture = !isPast
                 rows.push(buildRow(`${q}ª Quincena ${names[m]} ${year}`, bestDoc(cands), isFuture))
             }
         }
@@ -1514,7 +1518,8 @@ const getPeriodRowsForPdf = (type, catDocs, year) => {
                 return dt.getFullYear() === year && Math.floor(dt.getMonth() / 3) === i
             })
             const curQ     = Math.floor(currentMonth / 3)
-            const isFuture = year > currentYear || (year === currentYear && i > curQ)
+            // El trimestre actual no ha terminado → pendiente
+            const isFuture = year > currentYear || (year === currentYear && i >= curQ)
             return buildRow(`${labels[i]} ${year}`, bestDoc(cands), isFuture)
         })
     }

@@ -373,8 +373,9 @@ const periods = computed(() => {
         const dt = new Date(d.emission_date + 'T00:00:00')
         return dt.getFullYear() === props.year && dt.getMonth() === i
       })
-      const doc       = bestDoc(candidates)
-      const isFuture  = props.year > currentYear || (props.year === currentYear && i > currentMonth)
+      const doc = bestDoc(candidates)
+      // El mes actual aún no ha terminado → tratar como "pendiente" (gris), no como "Falta"
+      const isFuture  = props.year > currentYear || (props.year === currentYear && i >= currentMonth)
       const isCurrent = props.year === currentYear && i === currentMonth
       return buildPeriod(`${monthNames[i]} ${props.year}`, doc, isFuture, isCurrent, { monthIndex: i })
     })
@@ -394,10 +395,12 @@ const periods = computed(() => {
         })
         const doc = bestDoc(candidates)
         const currentQ = currentDay <= 15 ? 1 : 2
-        const isFuture =
-          props.year > currentYear ||
-          (props.year === currentYear && m > currentMonth) ||
-          (props.year === currentYear && m === currentMonth && q > currentQ)
+        // La quincena actual aún no ha terminado → "pendiente" (gris)
+        // Quincena pasada: m < currentMonth, o mismo mes pero quincena < currentQ
+        const isPast = props.year < currentYear ||
+          (props.year === currentYear && m < currentMonth) ||
+          (props.year === currentYear && m === currentMonth && q < currentQ)
+        const isFuture  = !isPast
         const isCurrent = props.year === currentYear && m === currentMonth && q === currentQ
         result.push(buildPeriod(
           `${q}ª Quincena ${monthNames[m]} ${props.year}`,
@@ -417,10 +420,11 @@ const periods = computed(() => {
         const dt = new Date(d.emission_date + 'T00:00:00')
         return dt.getFullYear() === props.year && Math.floor(dt.getMonth() / 3) === i
       })
-      const doc          = bestDoc(candidates)
-      const currentQ     = Math.floor(currentMonth / 3)
-      const isFuture     = props.year > currentYear || (props.year === currentYear && i > currentQ)
-      const isCurrent    = props.year === currentYear && i === currentQ
+      const doc       = bestDoc(candidates)
+      const currentQ  = Math.floor(currentMonth / 3)
+      // El trimestre actual no ha terminado → tratar como pendiente
+      const isFuture  = props.year > currentYear || (props.year === currentYear && i >= currentQ)
+      const isCurrent = props.year === currentYear && i === currentQ
       return buildPeriod(`${labels[i]} ${props.year}`, doc, isFuture, isCurrent, { quarterIndex: i })
     })
   }
@@ -435,7 +439,8 @@ const periods = computed(() => {
       })
       const doc        = bestDoc(candidates)
       const currentSem = Math.floor(currentMonth / 6)
-      const isFuture   = props.year > currentYear || (props.year === currentYear && i > currentSem)
+      // El semestre actual no ha terminado → tratar como pendiente
+      const isFuture   = props.year > currentYear || (props.year === currentYear && i >= currentSem)
       const isCurrent  = props.year === currentYear && i === currentSem
       return buildPeriod(`${i === 0 ? '1er' : '2do'} Semestre ${props.year}`, doc, isFuture, isCurrent, {})
     })
