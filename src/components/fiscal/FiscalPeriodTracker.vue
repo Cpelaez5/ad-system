@@ -1,422 +1,385 @@
 <template>
-  <v-card class="mb-4 border rounded-xl overflow-hidden" elevation="0" variant="outlined">
-    <!-- Encabezado del tipo de documento -->
-    <div class="px-4 py-3 bg-grey-lighten-4 border-b d-flex align-center flex-wrap">
-      <v-icon :icon="getCategoryIcon(category)" color="primary" class="mr-3" />
-      <div>
+  <v-card class="mb-4 rounded-xl overflow-hidden" elevation="0" variant="outlined">
+    <!-- ══════════════════════════════════════════ -->
+    <!-- Encabezado: Tipo de Documento              -->
+    <!-- ══════════════════════════════════════════ -->
+    <div
+      class="px-4 py-3 d-flex align-center flex-wrap"
+      style="background: linear-gradient(90deg, #f8f9fa 0%, #fff 100%); border-bottom: 1px solid rgba(0,0,0,0.07)"
+    >
+      <v-icon :icon="categoryIcon" color="primary" class="mr-3" size="22" />
+      <div class="flex-grow-1">
         <div class="text-subtitle-1 font-weight-bold text-secondary">{{ type.label }}</div>
         <div class="text-caption text-grey-darken-1 d-flex align-center">
           <v-icon size="x-small" class="mr-1">mdi-refresh</v-icon>
-          Frecuencia: <strong class="ml-1">{{ getFrequencyLabel(type.frequency) }}</strong>
+          Frecuencia:
+          <strong class="ml-1">{{ frequencyLabel }}</strong>
         </div>
       </div>
-      <v-spacer />
 
-      <!-- Badges de resumen -->
-      <div class="d-flex align-center gap-2 mt-2 mt-sm-0">
-        <v-chip size="small" :color="completionColor" variant="flat">
-          {{ uploadedCount }} / {{ pastPeriods.length }} Completados
-        </v-chip>
-        <v-chip v-if="noAplicaCount > 0" size="small" color="grey" variant="flat" prepend-icon="mdi-minus-circle-outline">
-          {{ noAplicaCount }} No Aplica
-        </v-chip>
-      </div>
+      <!-- Resumen de completitud -->
+      <v-chip
+        size="small"
+        :color="completionColor"
+        variant="tonal"
+        class="mt-2 mt-sm-0"
+      >
+        <v-icon start size="x-small">
+          {{ uploadedCount === passedPeriods ? 'mdi-check-all' : 'mdi-chart-arc' }}
+        </v-icon>
+        {{ uploadedCount }} / {{ passedPeriods }} Completados
+      </v-chip>
     </div>
 
-    <!-- Tracker / Grid de períodos -->
-    <v-card-text class="pa-4 bg-white">
-      <v-row dense>
-        <v-col
-          v-for="(period, index) in periods"
-          :key="index"
-          :cols="12"
-          :sm="getColSize(type.frequency)"
+    <!-- ══════════════════════════════════════════ -->
+    <!-- Lista de Períodos                          -->
+    <!-- ══════════════════════════════════════════ -->
+    <v-list class="pa-0" lines="one">
+      <template v-for="(period, index) in periods" :key="index">
+        <v-divider v-if="index > 0" />
+
+        <v-list-item
+          :class="[
+            'py-2 px-4',
+            period.isFuture ? 'opacity-50' : '',
+            period.doc ? 'cursor-pointer' : ''
+          ]"
+          @click="period.doc ? $emit('open-preview', period.doc) : null"
+          :ripple="!!period.doc"
         >
-          <!-- Tarjeta de Período -->
-          <v-card
-            :variant="period.docs.length > 0 ? 'flat' : 'outlined'"
-            :class="[
-              'period-card d-flex flex-column justify-center align-center h-100 pa-2',
-              'cursor-pointer'
-            ]"
-            :style="getPeriodStyle(period)"
-            @click="handlePeriodClick(period)"
-            v-ripple
-            :aria-label="`${period.label}: ${period.statusLabel}`"
-          >
-            <!-- Título del Período (Ej. Ene, Q1, etc) -->
-            <div class="text-caption font-weight-bold mb-1" :class="getPeriodTextClass(period)">
-              {{ period.label }}
-            </div>
-
-            <!-- Indicador de múltiples documentos -->
-            <div v-if="period.docs.length > 1" class="position-relative">
-              <v-icon :color="getMultiDocColor(period)" size="22">mdi-file-multiple</v-icon>
-              <v-badge
-                :content="period.docs.length"
-                :color="getMultiDocColor(period)"
-                floating
-                inline
-                class="text-caption"
-              />
-            </div>
-
-            <!-- Ícono único cuando hay 1 doc -->
-            <v-icon v-else-if="period.docs.length === 1" :color="getDocColor(period.docs[0])" size="24">
-              {{ getDocIcon(period.docs[0]) }}
-            </v-icon>
-
-            <!-- Sin documentos -->
-            <v-icon
-              v-else
-              :color="period.isFuture ? 'grey-lighten-2' : (period.isCurrent ? 'warning' : 'error')"
-              size="24"
+          <!-- Ícono de estado (lado izquierdo) -->
+          <template #prepend>
+            <v-avatar
+              :color="getPeriodAvatarColor(period)"
+              size="32"
+              class="mr-3"
+              variant="tonal"
             >
-              {{ period.isFuture ? 'mdi-clock-outline' : 'mdi-plus-circle-outline' }}
-            </v-icon>
+              <v-icon size="16" :color="getPeriodIconColor(period)">
+                {{ getPeriodIcon(period) }}
+              </v-icon>
+            </v-avatar>
+          </template>
 
-            <!-- Subtítulo pequeño de estado -->
-            <div class="text-micro mt-1 text-center" :class="getPeriodTextClass(period)">
+          <!-- Etiqueta del período -->
+          <v-list-item-title class="text-body-2 font-weight-medium">
+            {{ period.label }}
+          </v-list-item-title>
+
+          <!-- Chip de estado -->
+          <v-list-item-subtitle>
+            <v-chip
+              size="x-small"
+              :color="getPeriodStatusColor(period)"
+              variant="tonal"
+              class="mt-1"
+            >
               {{ period.statusLabel }}
-            </div>
-          </v-card>
-        </v-col>
-      </v-row>
-    </v-card-text>
+            </v-chip>
+          </v-list-item-subtitle>
 
-    <!-- Modal de lista de archivos cuando hay múltiples -->
-    <v-dialog v-model="multiDocDialog" max-width="500px">
-      <v-card rounded="xl">
-        <v-card-title class="bg-primary text-white py-3 px-4 d-flex align-center">
-          <v-icon start>mdi-file-multiple</v-icon>
-          {{ multiDocPeriod?.label }} — {{ multiDocPeriod?.docs.length }} archivos
-          <v-spacer />
-          <v-btn icon="mdi-close" variant="text" color="white" @click="multiDocDialog = false" />
-        </v-card-title>
-        <v-list lines="two">
-          <v-list-item
-            v-for="doc in multiDocPeriod?.docs"
-            :key="doc.id"
-            :title="doc.name"
-            :subtitle="doc.emission_date"
-            @click="openDocPreview(doc)"
-            class="cursor-pointer"
-          >
-            <template #prepend>
-              <v-icon :color="getDocColor(doc)" class="mr-2">{{ getDocIcon(doc) }}</v-icon>
-            </template>
-            <template #append>
-              <v-chip size="x-small" :color="getDocColor(doc)" variant="tonal">{{ doc.status }}</v-chip>
-            </template>
-          </v-list-item>
-        </v-list>
-        <v-card-actions class="pa-3 justify-end">
-          <v-btn variant="tonal" color="primary" prepend-icon="mdi-plus" @click="openNewDocForPeriod">
-            Agregar otro archivo
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          <!-- Acciones (lado derecho) -->
+          <template #append>
+            <div class="d-flex align-center" style="gap: 2px">
+              <!-- Período con documento cargado -->
+              <template v-if="period.doc">
+                <!-- Ver archivo -->
+                <v-btn
+                  icon
+                  size="x-small"
+                  variant="text"
+                  color="info"
+                  v-tooltip="'Ver detalle'"
+                  @click.stop="$emit('open-preview', period.doc)"
+                >
+                  <v-icon size="16">mdi-eye</v-icon>
+                </v-btn>
+
+                <!-- Descargar archivo (solo si existe) -->
+                <v-btn
+                  v-if="period.doc.documents?.file_url"
+                  icon
+                  size="x-small"
+                  variant="text"
+                  color="primary"
+                  :href="period.doc.documents.file_url"
+                  target="_blank"
+                  v-tooltip="'Descargar archivo'"
+                  @click.stop
+                >
+                  <v-icon size="16">mdi-download</v-icon>
+                </v-btn>
+
+                <!-- Editar -->
+                <v-btn
+                  icon
+                  size="x-small"
+                  variant="text"
+                  color="grey-darken-1"
+                  v-tooltip="'Editar'"
+                  @click.stop="$emit('open-dialog', {
+                    typeId: type.id,
+                    category: category,
+                    periodInfo: period,
+                    doc: period.doc
+                  })"
+                >
+                  <v-icon size="16">mdi-pencil</v-icon>
+                </v-btn>
+              </template>
+
+              <!-- Período sin documento -->
+              <template v-else-if="!period.isFuture">
+                <!-- Subir documento -->
+                <v-btn
+                  size="x-small"
+                  variant="tonal"
+                  color="primary"
+                  class="text-none"
+                  prepend-icon="mdi-upload"
+                  @click.stop="$emit('open-dialog', {
+                    typeId: type.id,
+                    category: category,
+                    periodInfo: period
+                  })"
+                >
+                  Subir
+                </v-btn>
+              </template>
+
+              <!-- Período futuro -->
+              <template v-else>
+                <v-chip size="x-small" variant="text" color="grey" class="text-caption">
+                  Próximo
+                </v-chip>
+              </template>
+            </div>
+          </template>
+        </v-list-item>
+      </template>
+
+      <!-- Estado vacío (no aplica, etc.) -->
+      <v-list-item v-if="periods.length === 0" class="py-4 text-center text-grey">
+        <v-list-item-title>Sin períodos para el año seleccionado</v-list-item-title>
+      </v-list-item>
+    </v-list>
   </v-card>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { getExpirationInfo, FREQUENCIES } from '@/constants/fiscalDocuments'
+import { computed } from 'vue'
+import { FREQUENCIES } from '@/constants/fiscalDocuments'
 
+// ──────────────────────────────────────────────
+// Props
+// ──────────────────────────────────────────────
 const props = defineProps({
-  type: {
-    type: Object,
-    required: true
-  },
-  category: {
-    type: String,
-    required: true
-  },
-  documents: {
-    type: Array,
-    required: true
-  },
-  year: {
-    type: Number,
-    required: true
-  }
+  /** Tipo de documento: { id, label, frequency, required } */
+  type: { type: Object, required: true },
+  /** Categoría: 'LEGAL' | 'MUNICIPAL' | 'SENIAT' | 'NOMINA' | 'OTROS' */
+  category: { type: String, required: true },
+  /** Documentos del sistema correspondientes a este tipo */
+  documents: { type: Array, required: true },
+  /** Año fiscal seleccionado en la vista padre */
+  year: { type: Number, required: true }
 })
 
 const emit = defineEmits(['open-preview', 'open-dialog'])
 
-// Estado del modal de múltiples archivos
-const multiDocDialog = ref(false)
-const multiDocPeriod = ref(null)
+// ──────────────────────────────────────────────
+// Helpers de etiquetas
+// ──────────────────────────────────────────────
+const frequencyLabel = computed(() => FREQUENCIES[props.type.frequency] || props.type.frequency)
 
-// Helper: Etiquetas de frecuencia
-const getFrequencyLabel = (freq) => {
-  return FREQUENCIES[freq] || freq
-}
-
-const getCategoryIcon = (category) => {
+const categoryIcon = computed(() => {
   const icons = {
-    'LEGAL': 'mdi-gavel',
-    'MUNICIPAL': 'mdi-city',
-    'SENIAT': 'mdi-bank',
-    'NOMINA': 'mdi-account-group',
-    'OTROS': 'mdi-folder-outline'
+    LEGAL:    'mdi-gavel',
+    MUNICIPAL:'mdi-city',
+    SENIAT:   'mdi-bank',
+    NOMINA:   'mdi-account-group',
+    OTROS:    'mdi-folder-outline'
   }
-  return icons[category] || 'mdi-file-document-outline'
-}
+  return icons[props.category] || 'mdi-file-document-outline'
+})
 
-// ---------------------------------------------------------------
-// Construcción de períodos
-// Cada período ahora tiene `docs: Array` en lugar de `doc: Object`
-// para soportar múltiples archivos por período.
-// ---------------------------------------------------------------
+// ──────────────────────────────────────────────
+// Cálculo de períodos (S - Single Responsibility)
+// Cada bloque de frecuencia es independiente.
+// ──────────────────────────────────────────────
 const periods = computed(() => {
-  const result = []
   const now = new Date()
-  const currentYear = now.getFullYear()
-  const currentMonth = now.getMonth() // 0-11
+  const currentYear  = now.getFullYear()
+  const currentMonth = now.getMonth()   // 0-11
+  const currentDay   = now.getDate()
+  const freq = props.type.frequency
 
-  const buildPeriod = (label, matchingDocs, isFuture, isCurrent, extra = {}) => {
-    // Separar NO_APLICA del resto
-    const noAplicaDocs = matchingDocs.filter(d => d.status === 'NO_APLICA')
-    const activeDocs   = matchingDocs.filter(d => d.status !== 'NO_APLICA')
+  // Buscar el doc más válido para un conjunto de documentos candidatos
+  const bestDoc = (candidates) =>
+    candidates.find(d => d.status !== 'VENCIDO') || candidates[0] || null
 
-    // Si el período está marcado como No Aplica (y no hay docs activos), mostrar estado N/A
-    if (noAplicaDocs.length > 0 && activeDocs.length === 0) {
-      return { label, docs: noAplicaDocs, isFuture, isCurrent, statusLabel: 'N/A', isNoAplica: true, ...extra }
-    }
-
-    let statusLabel = ''
-    if (activeDocs.length > 0) {
-      if (activeDocs.length > 1)       statusLabel = `${activeDocs.length} archivos`
-      else if (activeDocs[0].status === 'VIGENTE')  statusLabel = 'Subido'
-      else if (activeDocs[0].status === 'TRAMITE')  statusLabel = 'En Trámite'
-      else                             statusLabel = 'Vencido'
-    } else {
-      statusLabel = isFuture ? 'Espera' : 'Falta'
-    }
-
-    return { label, docs: activeDocs, isFuture, isCurrent, statusLabel, isNoAplica: false, ...extra }
+  // ── MENSUAL ──────────────────────────────────
+  if (freq === 'MONTHLY') {
+    const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+    return Array.from({ length: 12 }, (_, i) => {
+      const candidates = props.documents.filter(d => {
+        if (!d.emission_date) return false
+        const dt = new Date(d.emission_date + 'T00:00:00')
+        return dt.getFullYear() === props.year && dt.getMonth() === i
+      })
+      const doc       = bestDoc(candidates)
+      const isFuture  = props.year > currentYear || (props.year === currentYear && i > currentMonth)
+      const isCurrent = props.year === currentYear && i === currentMonth
+      return buildPeriod(`${monthNames[i]} ${props.year}`, doc, isFuture, isCurrent, { monthIndex: i })
+    })
   }
 
-  if (props.type.frequency === 'MONTHLY') {
-    const monthsShort = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-
-    for (let i = 0; i < 12; i++) {
-      const matchingDocs = props.documents.filter(d => {
-        if (!d.emission_date) return false
-        // Parsear en hora local para evitar desfase UTC
-        const date = new Date(d.emission_date + 'T00:00:00')
-        return date.getFullYear() === props.year && date.getMonth() === i
-      })
-      const isFuture = props.year > currentYear || (props.year === currentYear && i > currentMonth)
-      const isCurrent = props.year === currentYear && i === currentMonth
-      result.push(buildPeriod(monthsShort[i], matchingDocs, isFuture, isCurrent, { monthIndex: i }))
+  // ── QUINCENAL ────────────────────────────────
+  if (freq === 'QUINCENAL') {
+    const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+    const result = []
+    for (let m = 0; m < 12; m++) {
+      for (let q = 1; q <= 2; q++) {
+        const candidates = props.documents.filter(d => {
+          if (!d.emission_date) return false
+          const dt = new Date(d.emission_date + 'T00:00:00')
+          if (dt.getFullYear() !== props.year || dt.getMonth() !== m) return false
+          return q === 1 ? dt.getDate() <= 15 : dt.getDate() > 15
+        })
+        const doc = bestDoc(candidates)
+        const currentQ = currentDay <= 15 ? 1 : 2
+        const isFuture =
+          props.year > currentYear ||
+          (props.year === currentYear && m > currentMonth) ||
+          (props.year === currentYear && m === currentMonth && q > currentQ)
+        const isCurrent = props.year === currentYear && m === currentMonth && q === currentQ
+        result.push(buildPeriod(
+          `${q}ª Quincena ${monthNames[m]} ${props.year}`,
+          doc, isFuture, isCurrent, { monthIndex: m, quincenal: q }
+        ))
+      }
     }
+    return result
+  }
 
-  } else if (props.type.frequency === 'QUARTERLY') {
-    const quarters = ['1er Trim.', '2do Trim.', '3er Trim.', '4to Trim.']
-    for (let i = 0; i < 4; i++) {
-      const matchingDocs = props.documents.filter(d => {
+  // ── TRIMESTRAL ───────────────────────────────
+  if (freq === 'QUARTERLY') {
+    const labels = ['1er Trimestre', '2do Trimestre', '3er Trimestre', '4to Trimestre']
+    return Array.from({ length: 4 }, (_, i) => {
+      const candidates = props.documents.filter(d => {
         if (!d.emission_date) return false
-        const date = new Date(d.emission_date + 'T00:00:00')
-        return date.getFullYear() === props.year && Math.floor(date.getMonth() / 3) === i
+        const dt = new Date(d.emission_date + 'T00:00:00')
+        return dt.getFullYear() === props.year && Math.floor(dt.getMonth() / 3) === i
       })
-      const currentQuarter = Math.floor(currentMonth / 3)
-      const isFuture = props.year > currentYear || (props.year === currentYear && i > currentQuarter)
-      const isCurrent = props.year === currentYear && i === currentQuarter
-      result.push(buildPeriod(quarters[i], matchingDocs, isFuture, isCurrent, { quarterIndex: i }))
-    }
+      const doc          = bestDoc(candidates)
+      const currentQ     = Math.floor(currentMonth / 3)
+      const isFuture     = props.year > currentYear || (props.year === currentYear && i > currentQ)
+      const isCurrent    = props.year === currentYear && i === currentQ
+      return buildPeriod(`${labels[i]} ${props.year}`, doc, isFuture, isCurrent, { quarterIndex: i })
+    })
+  }
 
-  } else if (props.type.frequency === 'SEMESTRAL') {
-    const semesters = ['1er Sem.', '2do Sem.']
-    for (let i = 0; i < 2; i++) {
-      const matchingDocs = props.documents.filter(d => {
+  // ── SEMESTRAL ────────────────────────────────
+  if (freq === 'SEMESTRAL') {
+    return Array.from({ length: 2 }, (_, i) => {
+      const candidates = props.documents.filter(d => {
         if (!d.emission_date) return false
-        const date = new Date(d.emission_date + 'T00:00:00')
-        return date.getFullYear() === props.year && Math.floor(date.getMonth() / 6) === i
+        const dt = new Date(d.emission_date + 'T00:00:00')
+        return dt.getFullYear() === props.year && Math.floor(dt.getMonth() / 6) === i
       })
-      const currentSemester = Math.floor(currentMonth / 6)
-      const isFuture = props.year > currentYear || (props.year === currentYear && i > currentSemester)
-      const isCurrent = props.year === currentYear && i === currentSemester
-      result.push(buildPeriod(semesters[i], matchingDocs, isFuture, isCurrent))
-    }
+      const doc        = bestDoc(candidates)
+      const currentSem = Math.floor(currentMonth / 6)
+      const isFuture   = props.year > currentYear || (props.year === currentYear && i > currentSem)
+      const isCurrent  = props.year === currentYear && i === currentSem
+      return buildPeriod(`${i === 0 ? '1er' : '2do'} Semestre ${props.year}`, doc, isFuture, isCurrent, {})
+    })
+  }
 
-  } else if (props.type.frequency === 'ANNUAL') {
-    const matchingDocs = props.documents.filter(d => {
+  // ── ANUAL ────────────────────────────────────
+  if (freq === 'ANNUAL') {
+    const candidates = props.documents.filter(d => {
       if (!d.emission_date) return false
       return new Date(d.emission_date + 'T00:00:00').getFullYear() === props.year
     })
-    const isFuture  = props.year > currentYear
-    const isCurrent = props.year === currentYear
-    
-    let periodLabel = `Año ${props.year}`
-    if (props.type.id === 'ISLR_ANUAL' || props.type.id === 'IGP') {
-        periodLabel = `Ejercicio ${props.year - 1}`
-    }
-    
-    result.push(buildPeriod(periodLabel, matchingDocs, isFuture, isCurrent))
-
-  } else if (props.type.frequency === 'QUINCENAL') {
-    const monthsShort = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    for (let m = 0; m < 12; m++) {
-      for (let q = 1; q <= 2; q++) {
-        const matchingDocs = props.documents.filter(d => {
-          if (!d.emission_date) return false
-          const date = new Date(d.emission_date + 'T00:00:00')
-          if (date.getFullYear() !== props.year || date.getMonth() !== m) return false
-          return q === 1 ? date.getDate() <= 15 : date.getDate() > 15
-        })
-        const currentQ  = now.getDate() <= 15 ? 1 : 2
-        const isFuture  = props.year > currentYear || (props.year === currentYear && m > currentMonth) ||
-                          (props.year === currentYear && m === currentMonth && q > currentQ)
-        const isCurrent = props.year === currentYear && m === currentMonth && q === currentQ
-        result.push(buildPeriod(`${monthsShort[m]} Q${q}`, matchingDocs, isFuture, isCurrent))
-      }
-    }
+    const doc      = bestDoc(candidates)
+    const isFuture = props.year > currentYear
+    return [buildPeriod(`Año ${props.year}`, doc, isFuture, props.year === currentYear, {})]
   }
 
-  return result
+  return []
 })
 
-// Períodos ya pasados (para calcular el denominador del progreso)
-const pastPeriods = computed(() =>
-  periods.value.filter(p => !p.isFuture && !p.isNoAplica)
+/**
+ * Construye un objeto de período estandarizado.
+ * (Open/Closed: agregar nueva frecuencia sin tocar este helper)
+ */
+const buildPeriod = (label, doc, isFuture, isCurrent, extra) => {
+  let statusLabel
+  if (doc) {
+    const s = doc.status
+    if (s === 'VIGENTE' || s === 'PRESENTADO') statusLabel = 'Presentado'
+    else if (s === 'TRAMITE') statusLabel = 'En Trámite'
+    else statusLabel = 'Vencido'
+  } else {
+    statusLabel = isFuture ? 'Pendiente' : (isCurrent ? 'Falta' : 'No Presentado')
+  }
+  return { label, doc, isFuture, isCurrent, statusLabel, ...extra }
+}
+
+// ──────────────────────────────────────────────
+// Contadores (Single Responsibility)
+// ──────────────────────────────────────────────
+/** Períodos ya transcurridos (incluyendo el actual) */
+const passedPeriods = computed(() =>
+  periods.value.filter(p => !p.isFuture).length
 )
 
 const uploadedCount = computed(() =>
-  pastPeriods.value.filter(p => p.docs.length > 0).length
-)
-
-const noAplicaCount = computed(() =>
-  periods.value.filter(p => p.isNoAplica).length
+  periods.value.filter(p => !!p.doc).length
 )
 
 const completionColor = computed(() => {
-  const needed = pastPeriods.value.length
-  if (needed === 0) return 'grey'
-  const rate = uploadedCount.value / needed
+  if (passedPeriods.value === 0) return 'grey'
+  const rate = uploadedCount.value / passedPeriods.value
   if (rate >= 1)   return 'success'
   if (rate >= 0.5) return 'warning'
   return 'error'
 })
 
-// ---------------------------------------------------------------
-// Estilos por período
-// ---------------------------------------------------------------
-const getDocColor = (doc) => {
-  if (doc.status === 'NO_APLICA') return 'grey'
-  if (doc.status === 'VIGENTE')   return 'success'
-  if (doc.status === 'TRAMITE')   return 'warning'
+// ──────────────────────────────────────────────
+// Helpers de estilo por período (Liskov: misma interfaz para todo período)
+// ──────────────────────────────────────────────
+const getPeriodStatusColor = (period) => {
+  if (period.isFuture) return 'grey'
+  if (!period.doc) return period.isCurrent ? 'warning' : 'error'
+  const s = period.doc.status
+  if (s === 'VIGENTE' || s === 'PRESENTADO') return 'success'
+  if (s === 'TRAMITE') return 'warning'
   return 'error'
 }
 
-const getDocIcon = (doc) => {
-  if (doc.status === 'NO_APLICA') return 'mdi-minus-circle-outline'
-  if (doc.status === 'VIGENTE')   return 'mdi-check-circle'
-  if (doc.status === 'TRAMITE')   return 'mdi-clock-outline'
+const getPeriodAvatarColor = (period) => getPeriodStatusColor(period)
+
+const getPeriodIconColor = (period) => {
+  if (period.isFuture) return 'grey'
+  if (!period.doc) return period.isCurrent ? 'warning' : 'error'
+  const s = period.doc.status
+  if (s === 'VIGENTE' || s === 'PRESENTADO') return 'success'
+  if (s === 'TRAMITE') return 'warning'
+  return 'error'
+}
+
+const getPeriodIcon = (period) => {
+  if (period.isFuture) return 'mdi-clock-outline'
+  if (!period.doc) return period.isCurrent ? 'mdi-alert-outline' : 'mdi-close-circle-outline'
+  const s = period.doc.status
+  if (s === 'VIGENTE' || s === 'PRESENTADO') return 'mdi-check-circle'
+  if (s === 'TRAMITE') return 'mdi-clock-outline'
   return 'mdi-alert-circle'
-}
-
-const getMultiDocColor = (period) => {
-  // Color basado en el documento más importante del período
-  const hasVencido  = period.docs.some(d => d.status === 'VENCIDO')
-  const hasTramite  = period.docs.some(d => d.status === 'TRAMITE')
-  if (hasVencido) return 'error'
-  if (hasTramite) return 'warning'
-  return 'success'
-}
-
-const getPeriodStyle = (period) => {
-  if (period.isNoAplica) {
-    return 'background-color: #f5f5f5 !important; border: 1px dashed #9e9e9e; opacity: 0.75;'
-  }
-  if (period.docs.length === 0) {
-    return 'border-style: dashed;'
-  }
-  const color = getMultiDocColor(period)
-  const hex = color === 'success' ? '#4caf50' : color === 'warning' ? '#ff9800' : '#f44336'
-  return `background-color: ${hex}15 !important; border: 1px solid ${hex}50`
-}
-
-const getPeriodTextClass = (period) => {
-  if (period.isNoAplica) return 'text-grey'
-  if (period.docs.length === 0) {
-    return period.isFuture ? 'text-grey-darken-1' : (period.isCurrent ? 'text-warning' : 'text-error')
-  }
-  return `text-${getMultiDocColor(period)}`
-}
-
-// ---------------------------------------------------------------
-// Interacción
-// ---------------------------------------------------------------
-const getColSize = (frequency) => {
-  switch (frequency) {
-    case 'MONTHLY':   return 2
-    case 'QUARTERLY': return 3
-    case 'SEMESTRAL': return 6
-    case 'ANNUAL':    return 12
-    case 'QUINCENAL': return 2
-    default:          return 4
-  }
-}
-
-const handlePeriodClick = (period) => {
-  if (period.isNoAplica) {
-    // Abrir el primer doc N/A para ver/editar la observación
-    emit('open-preview', period.docs[0])
-    return
-  }
-
-  if (period.docs.length > 1 || (period.docs.length === 1 && props.type.allowMultiple)) {
-    // Múltiples docs o permite múltiples: mostrar modal con la lista y botón "Añadir otro"
-    multiDocPeriod.value = period
-    multiDocDialog.value = true
-  } else if (period.docs.length === 1) {
-    // Un solo doc (y no permite múltiples): abrir preview
-    emit('open-preview', period.docs[0])
-  } else {
-    // Sin doc: abrir diálogo de creación
-    emit('open-dialog', {
-      typeId:     props.type.id,
-      category:   props.category,
-      periodInfo: period
-    })
-  }
-}
-
-const openDocPreview = (doc) => {
-  multiDocDialog.value = false
-  emit('open-preview', doc)
-}
-
-const openNewDocForPeriod = () => {
-  multiDocDialog.value = false
-  emit('open-dialog', {
-    typeId:     props.type.id,
-    category:   props.category,
-    periodInfo: multiDocPeriod.value
-  })
 }
 </script>
 
 <style scoped>
-.period-card {
-    transition: all 0.2s ease;
-    border-radius: 8px;
-    height: 64px;
-}
-.period-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-.text-micro {
-    font-size: 0.65rem;
-    line-height: 1;
-    text-transform: uppercase;
-    font-weight: 600;
-}
-.gap-2 {
-    gap: 8px;
-}
+.cursor-pointer { cursor: pointer; }
+.opacity-50 { opacity: 0.5; }
 </style>

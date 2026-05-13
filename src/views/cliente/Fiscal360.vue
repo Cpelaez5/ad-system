@@ -1417,7 +1417,189 @@ const getCategoryIconStatus = (cat) => {
     return 'mdi-circle-outline'
 }
 
-// PDF Export
+// ─────────────────────────────────────────────────────────────────
+// PDF Export — Helpers (S.O.L.I.D.: cada función tiene una sola tarea)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Calcula los períodos para un tipo de documento dado,
+ * equivalente a la lógica de FiscalPeriodTracker pero para el PDF.
+ * Retorna array de { label, doc, isFuture, statusLabel }
+ */
+const getPeriodRowsForPdf = (type, catDocs, year) => {
+    const now          = new Date()
+    const currentYear  = now.getFullYear()
+    const currentMonth = now.getMonth()
+    const currentDay   = now.getDate()
+    const freq         = type.frequency
+
+    const docsOfType = catDocs.filter(d => d.doc_type === type.id)
+
+    const bestDoc = (candidates) =>
+        candidates.find(d => d.status !== 'VENCIDO') || candidates[0] || null
+
+    const buildRow = (label, doc, isFuture) => {
+        let statusLabel
+        if (doc) {
+            const s = doc.status
+            if (s === 'VIGENTE' || s === 'PRESENTADO') statusLabel = 'PRESENTADO'
+            else if (s === 'TRAMITE')                  statusLabel = 'EN TRÁMITE'
+            else if (s === 'NO_APLICA')                statusLabel = 'NO APLICA'
+            else                                       statusLabel = 'VENCIDO'
+        } else {
+            statusLabel = isFuture ? '—' : 'NO PRESENTADO'
+        }
+        return { label, doc, isFuture, statusLabel }
+    }
+
+    if (freq === 'MONTHLY') {
+        const names = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                       'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+        return Array.from({ length: 12 }, (_, i) => {
+            const cands = docsOfType.filter(d => {
+                const dt = new Date(d.emission_date + 'T00:00:00')
+                return dt.getFullYear() === year && dt.getMonth() === i
+            })
+            const isFuture = year > currentYear || (year === currentYear && i > currentMonth)
+            return buildRow(`${names[i]} ${year}`, bestDoc(cands), isFuture)
+        })
+    }
+
+    if (freq === 'QUINCENAL') {
+        const names = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+        const rows = []
+        for (let m = 0; m < 12; m++) {
+            for (let q = 1; q <= 2; q++) {
+                const cands = docsOfType.filter(d => {
+                    const dt = new Date(d.emission_date + 'T00:00:00')
+                    if (dt.getFullYear() !== year || dt.getMonth() !== m) return false
+                    return q === 1 ? dt.getDate() <= 15 : dt.getDate() > 15
+                })
+                const curQ     = currentDay <= 15 ? 1 : 2
+                const isFuture = year > currentYear ||
+                    (year === currentYear && m > currentMonth) ||
+                    (year === currentYear && m === currentMonth && q > curQ)
+                rows.push(buildRow(`${q}ª Quincena ${names[m]} ${year}`, bestDoc(cands), isFuture))
+            }
+        }
+        return rows
+    }
+
+    if (freq === 'QUARTERLY') {
+        const labels = ['1er Trimestre','2do Trimestre','3er Trimestre','4to Trimestre']
+        return Array.from({ length: 4 }, (_, i) => {
+            const cands = docsOfType.filter(d => {
+                const dt = new Date(d.emission_date + 'T00:00:00')
+                return dt.getFullYear() === year && Math.floor(dt.getMonth() / 3) === i
+            })
+            const curQ     = Math.floor(currentMonth / 3)
+            const isFuture = year > currentYear || (year === currentYear && i > curQ)
+            return buildRow(`${labels[i]} ${year}`, bestDoc(cands), isFuture)
+        })
+    }
+
+    if (freq === 'SEMESTRAL') {
+        return Array.from({ length: 2 }, (_, i) => {
+            const cands = docsOfType.filter(d => {
+                const dt = new Date(d.emission_date + 'T00:00:00')
+                return dt.getFullYear() === year && Math.floor(dt.getMonth() / 6) === i
+            })
+            const curSem   = Math.floor(currentMonth / 6)
+            const isFuture = year > currentYear || (year === currentYear && i > curSem)
+            return buildRow(`${i === 0 ? '1er' : '2do'} Semestre ${year}`, bestDoc(cands), isFuture)
+        })
+    }
+
+    if (freq === 'ANNUAL') {
+        const cands    = docsOfType.filter(d =>
+            new Date(d.emission_date + 'T00:00:00').getFullYear() === year)
+        const isFuture = year > currentYear
+        return [buildRow(`Año ${year}`, bestDoc(cands), isFuture)]
+    }
+
+    // Permanentes / Ad-hoc: listar todos los docs existentes de este tipo
+    if (docsOfType.length === 0) return []
+    return docsOfType.map(d => buildRow(d.name || type.label, d, false))
+}
+
+/** Dibuja el header de categoría. Retorna la nueva posición Y. */
+const pdfDrawCategoryHeader = (doc, pageWidth, margin, catName, progress, y) => {
+    doc.setFontSize(13)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(168, 28, 34)   // #A81C22 rojo corporativo
+    doc.text(catName, margin, y)
+
+    if (progress) {
+        doc.setFontSize(9)
+        doc.setFont(undefined, 'normal')
+        doc.setTextColor(120)
+        doc.text(`(${progress.covered}/${progress.total} — ${progress.rate}%)`, margin + 60, y)
+    }
+
+    return y + 3
+}
+
+/** Dibuja el sub-header de tipo de documento. Retorna la nueva posición Y. */
+const pdfDrawTypeHeader = (doc, margin, label, freqLabel, y) => {
+    doc.setFontSize(10)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(31, 53, 92)   // #1F355C azul corporativo
+    doc.text(`  ${label}`, margin, y)
+
+    doc.setFontSize(8)
+    doc.setFont(undefined, 'normal')
+    doc.setTextColor(140)
+    doc.text(`(${freqLabel})`, margin + 70, y)
+
+    return y + 2
+}
+
+/** Dibuja una fila de período. Retorna la nueva posición Y. */
+const pdfDrawPeriodRow = (doc, margin, pageWidth, label, statusLabel, isFuture, y) => {
+    // Columnas: label | estado
+    const colStatus = pageWidth - margin - 45
+
+    doc.setFontSize(9)
+    doc.setFont(undefined, 'normal')
+
+    // Fondo alternado sutil — no implementado para mantener simplicidad
+
+    // Label (sangría para indicar jerarquía)
+    doc.setTextColor(40)
+    const truncated = label.length > 38 ? label.substring(0, 35) + '…' : label
+    doc.text(`    · ${truncated}`, margin, y)
+
+    // Estado con color
+    if (isFuture) {
+        doc.setTextColor(180)
+    } else if (statusLabel === 'PRESENTADO') {
+        doc.setTextColor(46, 125, 50)   // verde
+    } else if (statusLabel === 'EN TRÁMITE') {
+        doc.setTextColor(230, 120, 0)   // naranja
+    } else if (statusLabel === 'NO APLICA') {
+        doc.setTextColor(120)           // gris
+    } else if (statusLabel === 'NO PRESENTADO') {
+        doc.setTextColor(198, 40, 40)   // rojo
+    } else {
+        doc.setTextColor(198, 40, 40)
+    }
+    doc.text(statusLabel, colStatus, y)
+
+    return y + 6
+}
+
+/** Verifica si falta espacio y agrega nueva página si es necesario. */
+const pdfCheckPage = (doc, y, threshold = 265) => {
+    if (y > threshold) {
+        doc.addPage()
+        return 20
+    }
+    return y
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PDF Export — Función principal
+// ─────────────────────────────────────────────────────────────────
 const exportToPDF = async () => {
     exporting.value = true
     
@@ -1500,142 +1682,130 @@ const exportToPDF = async () => {
         doc.rect(margin, y, barWidth * (progressRate.value / 100), barHeight, 'F')
         
         y += 15
-        
-        // Category headers
-        const categories = ['LEGAL', 'MUNICIPAL', 'SENIAT', 'NOMINA', 'OTROS']
-        const categoryNames = {
-            'LEGAL': 'Legal',
-            'MUNICIPAL': 'Municipal', 
-            'SENIAT': 'SENIAT',
-            'NOMINA': 'Nómina y Parafiscales',
-            'OTROS': 'Otros'
+
+        // ── Leyenda de estado (sin símbolos ● — jsPDF no los soporta sin font especial) ──
+        doc.setFontSize(8)
+        doc.setFont(undefined, 'normal')
+        const legendItems = [
+            { label: 'PRESENTADO / VIGENTE', r: 46,  g: 125, b: 50  },
+            { label: 'EN TRAMITE',           r: 230, g: 120, b: 0   },
+            { label: 'NO PRESENTADO',        r: 198, g: 40,  b: 40  },
+            { label: 'NO APLICA',            r: 120, g: 120, b: 120 },
+        ]
+        let lx = margin
+        for (const l of legendItems) {
+            // Cuadrito de color (en vez del símbolo ●)
+            doc.setFillColor(l.r, l.g, l.b)
+            doc.rect(lx, y - 3, 4, 4, 'F')
+            doc.setTextColor(60)
+            doc.text(l.label, lx + 6, y)
+            lx += 45
         }
-        
-        for (const cat of categories) {
-            const catDocs = docs.value.filter(d => d.category === cat)
-            
-            // 1. Existing docs
-            const allItems = [...catDocs]
-            
-            // 2. Identify missing required docs
-            const types = FISCAL_TYPES[cat] || []
-            const requiredTypes = types.filter(t => t.required)
-            
-            for (const type of requiredTypes) {
-                // Check if any valid doc matches this type
-                const hasValid = catDocs.some(d => {
-                     // Match logic mirrors complianceDetail
-                     const isTypeMatch = d.doc_type === type.id
-                     // Fuzzy match
-                     let isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
-                     if (isNameMatch && type.id === 'RIF' && d.name.toLowerCase().includes('socios')) isNameMatch = false
-                     
-                     if (!(isTypeMatch || isNameMatch)) return false
-                     
-                     // Must be non-expired or NO_APLICA
-                     const status = getEffectiveStatus(d)
-                     return status === 'VIGENTE' || status === 'PRESENTADO' || status === 'TRAMITE' || status === 'NO_APLICA'
-                })
-                
-                if (!hasValid) {
-                     // Add placeholder for missing doc
-                     allItems.push({
-                         name: type.label,
-                         status: 'NO PRESENTADO',
-                         expiration_date: null,
-                         isMissing: true
-                     })
-                }
-            }
+        y += 10
 
-            // Skip category only if absolutely nothing to show
-            if (allItems.length === 0) continue
-            
-            // Check if we need a new page
-            if (y > 260) {
-                doc.addPage()
-                y = 20
-            }
-            
-            // Category Header
-            doc.setFontSize(14)
-            doc.setTextColor(168, 28, 34) // #A81C22 - primary color
-            doc.text(categoryNames[cat], margin, y)
-            
-            // Category progress
-            const catProgress = complianceDetail.value[cat]
-            if (catProgress) {
-                doc.setFontSize(10)
-                doc.setTextColor(100)
-                doc.text(`(${catProgress.covered}/${catProgress.total} - ${catProgress.rate}%)`, margin + 55, y)
-            }
-            
-            y += 8
-            
-            // Table header
-            doc.setFontSize(9)
-            doc.setTextColor(80)
-            doc.text('Documento', margin, y)
-            doc.text('Estado', margin + 80, y)
-            doc.text('Vencimiento', margin + 110, y)
-            
-            y += 2
-            doc.setDrawColor(200)
-            doc.line(margin, y, pageWidth - margin, y)
-            y += 5
-            
-            // Sort: Existing first, then Missing. Or Alphabetical?
-            // Let's sort by name for a clean report.
-            allItems.sort((a, b) => a.name.localeCompare(b.name))
+        // ── Línea divisoria ──────────────────────────────────────────────
+        doc.setDrawColor(200)
+        doc.line(margin, y, pageWidth - margin, y)
+        y += 8
 
-            // Documents Loop
-            for (const docItem of allItems) {
-                if (y > 270) {
-                    doc.addPage()
-                    y = 20
+        // ─────────────────────────────────────────────────────────────────
+        // Loop principal: Categoría → Tipo → Períodos (compacto)
+        // ─────────────────────────────────────────────────────────────────
+        const PDF_CAT_NAMES = {
+            LEGAL:     'Legal',
+            MUNICIPAL: 'Municipal',
+            SENIAT:    'SENIAT',
+            NOMINA:    'Nomina y Parafiscales',
+            OTROS:     'Otros'
+        }
+        const FREQ_LABELS = {
+            PERMANENT: 'Permanente', VIGENTE: 'Vigente (variable)',
+            ANNUAL: 'Anual', SEMESTRAL: 'Semestral',
+            QUARTERLY: 'Trimestral', MONTHLY: 'Mensual',
+            QUINCENAL: 'Quincenal', AdHoc: 'Eventual'
+        }
+
+        const pdfYear = selectedYear.value
+
+        for (const cat of ['LEGAL', 'MUNICIPAL', 'SENIAT', 'NOMINA', 'OTROS']) {
+            const catDocs  = docs.value.filter(d => d.category === cat)
+            const catTypes = FISCAL_TYPES[cat] || []
+            if (catTypes.length === 0 && catDocs.length === 0) continue
+
+            // Anticipar si la categoría entera tiene tipos con contenido
+            // para no imprimir el header si todo está vacío y no requerido
+            const catHasContent = catTypes.some(type => {
+                const docsOfType = catDocs.filter(d => d.doc_type === type.id)
+                return docsOfType.length > 0 || type.required
+            })
+            if (!catHasContent) continue
+
+            // ── Header de categoría ──────────────────────────────────────
+            // Reservar espacio: al menos 25px para el header + primera línea
+            y = pdfCheckPage(doc, y, 250)
+            y = pdfDrawCategoryHeader(
+                doc, pageWidth, margin,
+                PDF_CAT_NAMES[cat],
+                complianceDetail.value[cat],
+                y
+            )
+            doc.setDrawColor(220)
+            doc.line(margin, y + 2, pageWidth - margin, y + 2)
+            y += 7
+
+            // ── Por cada tipo de documento de esta categoría ──────────────
+            for (const type of catTypes) {
+                const rows       = getPeriodRowsForPdf(type, catDocs, pdfYear)
+                const docsOfType = catDocs.filter(d => d.doc_type === type.id)
+
+                // Filas con documento real (cargado)
+                const uploadedRows  = rows.filter(r => r.doc)
+                // Filas pasadas sin documento
+                const missingRows   = rows.filter(r => !r.doc && !r.isFuture)
+
+                // ── Omitir tipos que no son requeridos Y no tienen ningún doc
+                if (!type.required && uploadedRows.length === 0) continue
+
+                // Reservar espacio: header del tipo + al menos 1 fila
+                y = pdfCheckPage(doc, y, 255)
+                y = pdfDrawTypeHeader(
+                    doc, margin,
+                    type.label,
+                    FREQ_LABELS[type.frequency] || type.frequency,
+                    y
+                )
+                y += 5
+
+                // ── Caso 1: No hay ningún documento cargado para este tipo ──
+                if (uploadedRows.length === 0) {
+                    // Mostrar una sola línea resumen en lugar de N filas rojas
+                    const label = missingRows.length > 0
+                        ? `${missingRows.length} periodo(s) sin presentar`
+                        : 'Sin registro cargado'
+                    y = pdfCheckPage(doc, y)
+                    y = pdfDrawPeriodRow(doc, margin, pageWidth, label, 'NO PRESENTADO', false, y)
                 }
-                
-                doc.setFontSize(10)
-                doc.setTextColor(0)
-                
-                // Name (truncate if too long)
-                const docName = docItem.name || 'Sin nombre'
-                const truncatedName = docName.length > 40 ? docName.substring(0, 37) + '...' : docName
-                doc.text(truncatedName, margin, y)
-                
-                if (docItem.isMissing) {
-                    // Missing Item styling
-                    doc.setTextColor(244, 67, 54) // Red
-                    doc.text('NO PRESENTADO', margin + 80, y)
-                    doc.setTextColor(150)
-                    doc.text('--', margin + 110, y)
-                } else {
-                    // Existing Item styling
-                    // Status with color
-                    const effectiveStatus = getEffectiveStatus(docItem)
-                    if (effectiveStatus === 'VIGENTE' || effectiveStatus === 'PRESENTADO') {
-                        doc.setTextColor(76, 175, 80) // Green
-                    } else if (effectiveStatus === 'TRAMITE') {
-                        doc.setTextColor(255, 193, 7) // Yellow/Orange
-                    } else {
-                        doc.setTextColor(244, 67, 54) // Red
+                // ── Caso 2: Hay documentos cargados — mostrar cada uno ──────
+                else {
+                    for (const row of uploadedRows) {
+                        y = pdfCheckPage(doc, y)
+                        y = pdfDrawPeriodRow(doc, margin, pageWidth, row.label, row.statusLabel, false, y)
                     }
-                    doc.text(effectiveStatus, margin + 80, y)
-                    
-                    // Expiration date
-                    doc.setTextColor(100)
-                    if (docItem.expiration_date) {
-                        const expDate = new Date(docItem.expiration_date)
-                        doc.text(expDate.toLocaleDateString('es-ES'), margin + 110, y)
-                    } else {
-                        doc.text('N/A', margin + 110, y)
+                    // Resumir los faltantes en una sola línea
+                    if (missingRows.length > 0) {
+                        y = pdfCheckPage(doc, y)
+                        y = pdfDrawPeriodRow(
+                            doc, margin, pageWidth,
+                            `+ ${missingRows.length} periodo(s) sin presentar`,
+                            'NO PRESENTADO', false, y
+                        )
                     }
                 }
-                
-                y += 6
+
+                y += 4 // Espacio entre tipos
             }
-            
-            y += 8
+
+            y += 8 // Espacio entre categorías
         }
         
         // Footer
