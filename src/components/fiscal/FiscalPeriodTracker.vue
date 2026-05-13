@@ -453,7 +453,8 @@ const periods = computed(() => {
       return new Date(d.emission_date + 'T00:00:00').getFullYear() === props.year
     })
     const doc      = bestDoc(candidates)
-    const isFuture = props.year > currentYear
+    // El año actual aún no ha terminado → pendiente (ej: IGP Oct-Nov 2026 en mayo = gris, no "Falta")
+    const isFuture = props.year >= currentYear
     return [buildPeriod(`Año ${props.year}`, doc, isFuture, props.year === currentYear, {})]
   }
 

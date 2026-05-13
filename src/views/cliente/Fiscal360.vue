@@ -1539,7 +1539,8 @@ const getPeriodRowsForPdf = (type, catDocs, year) => {
     if (freq === 'ANNUAL') {
         const cands    = docsOfType.filter(d =>
             new Date(d.emission_date + 'T00:00:00').getFullYear() === year)
-        const isFuture = year > currentYear
+        // El año actual no ha terminado → pendiente (misma lógica que la UI)
+        const isFuture = year >= currentYear
         return [buildRow(`Año ${year}`, bestDoc(cands), isFuture)]
     }
 
