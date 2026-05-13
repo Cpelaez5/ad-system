@@ -63,7 +63,7 @@
                 class="mb-0"
               >
                 <strong>Documento no requerido para esta empresa</strong>
-                <div class="text-caption">Este documento está marcado como “No Aplica”. No se requiere subir archivo. Complete la observación abajo.</div>
+                <div class="text-caption">Este documento está marcado como “No Aplica”. No se requiere subir archivo ni completar observaciones.</div>
               </v-alert>
             </v-col>
 
@@ -212,7 +212,7 @@
             <v-col cols="12">
               <v-textarea
                 v-model="formData.notes"
-                :label="formData.noAplica ? 'Observación *' : 'Notas / Observaciones (Opcional)'"
+                :label="formData.noAplica ? 'Observación (Opcional)' : 'Notas / Observaciones (Opcional)'"
                 :placeholder="formData.noAplica
                   ? '¿Por qué no aplica a esta empresa? Ej: No vendemos alimentos, no se requiere permiso sanitario.'
                   : 'Información relevante extraída del documento o anotaciones manuales...'"
@@ -220,7 +220,6 @@
                 density="comfortable"
                 rows="3"
                 auto-grow
-                :rules="formData.noAplica ? [v => !!v || 'La observación es obligatoria cuando el documento No Aplica'] : []"
               />
             </v-col>
 

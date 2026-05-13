@@ -24,19 +24,22 @@ export const FISCAL_TYPES = {
         { id: 'ARRENDAMIENTO',          label: 'Contrato de Arrendamiento / Propiedad', frequency: 'VIGENTE', required: true, allowMultiple: false },
         // LICENCIA_AE: duración real 3 años → medir por fecha de vencimiento, no exigir anualmente
         { id: 'LICENCIA_AE',            label: 'Licencia de Actividad Económica',    frequency: 'VIGENTE',   required: true,  allowMultiple: false },
-        { id: 'INGRESOS_BRUTOS',        label: 'Declaración y Pago de Ingresos Brutos Mensual', frequency: 'MONTHLY', required: true, allowMultiple: true },
-        { id: 'RETENCION_MUNICIPAL',    label: 'Declaración de Retención Municipal', frequency: 'MONTHLY',   required: false, allowMultiple: true  }, // Solo contribuyente especial
+        // flexible: true → la empresa puede declarar mensual o quincenal; el sistema no exige ni cuenta faltantes
+        { id: 'INGRESOS_BRUTOS',        label: 'Declaración y Pago de Ingresos Brutos', frequency: 'MONTHLY', required: true, allowMultiple: true, flexible: true },
+        { id: 'RETENCION_MUNICIPAL',    label: 'Declaración de Retención Municipal',    frequency: 'MONTHLY', required: false, allowMultiple: true, flexible: true }, // Solo contribuyente especial
     ],
     'SENIAT': [
-        { id: 'IVA',             label: 'Declaración IVA',                 frequency: 'MONTHLY',   required: true,  allowMultiple: true  },
-        { id: 'RETENCION_ISLR',  label: 'Declaración de Retención ISLR',   frequency: 'MONTHLY',   required: true,  allowMultiple: true  },
-        { id: 'PENSIONES',       label: 'Protección de Pensiones',         frequency: 'MONTHLY',   required: true,  allowMultiple: true  },
-        // ISLR Anual: corresponde al año fiscal ANTERIOR (ej. en 2025 se declara 2024)
-        { id: 'ISLR_ANUAL',      label: 'Declaración ISLR Anual',          frequency: 'ANNUAL',    required: true,  allowMultiple: false },
-        { id: 'ISLR_ESTIMADA',   label: 'Declaración Estimada ISLR (Jun-Jul)', frequency: 'ANNUAL', required: true, allowMultiple: false },
-        { id: 'RETENCION_IVA',   label: 'Declaración Retención IVA',       frequency: 'QUINCENAL', required: true,  allowMultiple: true  },
-        { id: 'ANTICIPO_ISLR',   label: 'Anticipo ISLR',                   frequency: 'QUINCENAL', required: false, allowMultiple: true  },
-        { id: 'IGTF',            label: 'IGTF',                            frequency: 'QUINCENAL', required: true,  allowMultiple: true  },
+        // flexible: true → puede ser mensual o quincenal según la empresa; el sistema no exige cadencia fija
+        { id: 'IVA',             label: 'Declaración IVA',                     frequency: 'MONTHLY',   required: true,  allowMultiple: true, flexible: true  },
+        { id: 'RETENCION_ISLR',  label: 'Declaración de Retención ISLR',       frequency: 'MONTHLY',   required: false, allowMultiple: true, flexible: true  }, // Solo contribuyente especial
+        { id: 'PENSIONES',       label: 'Protección de Pensiones',             frequency: 'MONTHLY',   required: true,  allowMultiple: true, flexible: true  },
+        // ISLR Anual: se declara el año ANTERIOR; flexible para subir múltiples años históricos
+        { id: 'ISLR_ANUAL',      label: 'Declaración ISLR Anual',              frequency: 'ANNUAL',    required: true,  allowMultiple: true, flexible: true  },
+        // ISLR Estimada: Jun-Jul del año actual; flexible por la misma razón
+        { id: 'ISLR_ESTIMADA',   label: 'Declaración Estimada ISLR (Jun-Jul)', frequency: 'ANNUAL',    required: false, allowMultiple: true, flexible: true  },
+        { id: 'RETENCION_IVA',   label: 'Declaración Retención IVA',           frequency: 'QUINCENAL', required: false, allowMultiple: true, flexible: true  }, // Quincenal solo contribuyente especial
+        { id: 'ANTICIPO_ISLR',   label: 'Anticipo ISLR',                       frequency: 'QUINCENAL', required: false, allowMultiple: true, flexible: true  },
+        { id: 'IGTF',            label: 'IGTF',                                frequency: 'QUINCENAL', required: false, allowMultiple: true, flexible: true  },
         // IGP: corresponde al año fiscal ANTERIOR (Oct-Nov del año siguiente)
         { id: 'IGP',             label: 'Impuesto a los Grandes Patrimonios (Oct-Nov)', frequency: 'ANNUAL', required: false, allowMultiple: false },
     ],
@@ -62,13 +65,17 @@ export const FREQUENCIES = {
     QUARTERLY: 'Trimestral',
     MONTHLY:   'Mensual',
     QUINCENAL: 'Quincenal',
-    AdHoc:     'Eventual'
+    AdHoc:     'Eventual',
+    FLEXIBLE:  'Periodicidad libre'
 }
 
 // Helper: determina si una frecuencia es recurrente (necesita filtro por período)
 export const isRecurringFrequency = (frequency) => {
     return ['MONTHLY', 'QUARTERLY', 'QUINCENAL', 'SEMESTRAL'].includes(frequency)
 }
+
+// Helper: tipos flexibles no imponen cadencia → el usuario sube libremente
+export const isFlexibleType = (type) => !!type?.flexible
 
 // Meses del año para el selector de período
 export const MONTHS = [

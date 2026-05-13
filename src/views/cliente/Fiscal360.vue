@@ -434,7 +434,7 @@
                     :documents="getDocsForType(type.id)"
                     :year="selectedYear"
                     @open-preview="openPreview"
-                    @open-dialog="openDialogForPeriod"
+                    @open-dialog="handleTrackerDialog"
                 />
               </template>
               
@@ -1220,6 +1220,27 @@ const openDialogForPeriod = ({ typeId, category, periodInfo }) => {
     dialogOpen.value = true
 }
 
+/**
+ * Handler unificado para el evento @open-dialog del FiscalPeriodTracker.
+ * - Modo flexible (sin periodInfo): abre el dialog sin fecha pre-llenada,
+ *   solo con la categoría y tipo para que el usuario complete libremente.
+ * - Modo normal (con periodInfo): delega a openDialogForPeriod que
+ *   pre-llena la fecha de emisión según el período calculado.
+ */
+const handleTrackerDialog = ({ typeId, category, periodInfo }) => {
+    if (!periodInfo) {
+        // Modo flexible: el usuario define el período manualmente
+        editingItem.value = {
+            category,
+            doc_type: typeId,
+            status: 'VIGENTE'
+        }
+        dialogOpen.value = true
+    } else {
+        openDialogForPeriod({ typeId, category, periodInfo })
+    }
+}
+
 const openPreview = (doc) => {
     previewItem.value = doc
     previewDialog.value = true
@@ -1776,30 +1797,41 @@ const exportToPDF = async () => {
                 )
                 y += 5
 
-                // ── Caso 1: No hay ningún documento cargado para este tipo ──
-                if (uploadedRows.length === 0) {
-                    // Mostrar una sola línea resumen en lugar de N filas rojas
-                    const label = missingRows.length > 0
-                        ? `${missingRows.length} periodo(s) sin presentar`
-                        : 'Sin registro cargado'
-                    y = pdfCheckPage(doc, y)
-                    y = pdfDrawPeriodRow(doc, margin, pageWidth, label, 'NO PRESENTADO', false, y)
+                // ── Caso 1: Tipo FLEXIBLE — lista solo los docs existentes ─
+                if (type.flexible) {
+                    const flexRows = catDocs
+                        .filter(d => d.doc_type === type.id)
+                        .sort((a, b) => new Date(b.emission_date || 0) - new Date(a.emission_date || 0))
+
+                    if (flexRows.length === 0) {
+                        // No hay nada cargado → una línea informativa neutra
+                        y = pdfCheckPage(doc, y)
+                        y = pdfDrawPeriodRow(doc, margin, pageWidth, 'Sin declaraciones cargadas', 'NO PRESENTADO', false, y)
+                    } else {
+                        for (const d of flexRows) {
+                            const lbl = d.name || (d.emission_date
+                                ? new Date(d.emission_date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+                                : 'Sin fecha')
+                            const sMap = { VIGENTE: 'PRESENTADO', PRESENTADO: 'PRESENTADO', TRAMITE: 'EN TRAMITE', NO_APLICA: 'NO APLICA' }
+                            const statusLabel = sMap[d.status] || 'VENCIDO'
+                            y = pdfCheckPage(doc, y)
+                            y = pdfDrawPeriodRow(doc, margin, pageWidth, lbl, statusLabel, false, y)
+                        }
+                    }
                 }
-                // ── Caso 2: Hay documentos cargados — mostrar cada uno ──────
+                // ── Caso 2: Sin ningún documento cargado ────────────────────
+                else if (uploadedRows.length === 0) {
+                    // Una sola línea neutra — sin contar ni mencionar periodos faltantes
+                    y = pdfCheckPage(doc, y)
+                    y = pdfDrawPeriodRow(doc, margin, pageWidth, 'Sin registro cargado', 'NO PRESENTADO', false, y)
+                }
+                // ── Caso 3: Hay documentos cargados — mostrar cada uno ──────
                 else {
                     for (const row of uploadedRows) {
                         y = pdfCheckPage(doc, y)
                         y = pdfDrawPeriodRow(doc, margin, pageWidth, row.label, row.statusLabel, false, y)
                     }
-                    // Resumir los faltantes en una sola línea
-                    if (missingRows.length > 0) {
-                        y = pdfCheckPage(doc, y)
-                        y = pdfDrawPeriodRow(
-                            doc, margin, pageWidth,
-                            `+ ${missingRows.length} periodo(s) sin presentar`,
-                            'NO PRESENTADO', false, y
-                        )
-                    }
+                    // SIN resumen de faltantes — la cliente no lo quiere
                 }
 
                 y += 4 // Espacio entre tipos

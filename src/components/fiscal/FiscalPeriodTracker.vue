@@ -17,8 +17,21 @@
         </div>
       </div>
 
-      <!-- Resumen de completitud -->
+      <!-- Chip flexible: muestra cuántas declaraciones hay cargadas -->
       <v-chip
+        v-if="isFlexible"
+        size="small"
+        color="primary"
+        variant="tonal"
+        class="mt-2 mt-sm-0"
+      >
+        <v-icon start size="x-small">mdi-upload-multiple</v-icon>
+        {{ flexDocs.length }} cargado(s)
+      </v-chip>
+
+      <!-- Chip normal: muestra progreso X/Y -->
+      <v-chip
+        v-else
         size="small"
         :color="completionColor"
         variant="tonal"
@@ -32,143 +45,220 @@
     </div>
 
     <!-- ══════════════════════════════════════════ -->
-    <!-- Lista de Períodos                          -->
+    <!-- MODO FLEXIBLE: solo muestra docs cargados  -->
     <!-- ══════════════════════════════════════════ -->
-    <v-list class="pa-0" lines="one">
-      <template v-for="(period, index) in periods" :key="index">
-        <v-divider v-if="index > 0" />
+    <template v-if="isFlexible">
+      <v-list class="pa-0" lines="one">
+        <template v-for="(doc, index) in flexDocs" :key="doc.id">
+          <v-divider v-if="index > 0" />
+          <v-list-item class="py-2 px-4 cursor-pointer" @click="$emit('open-preview', doc)">
+            <template #prepend>
+              <v-avatar
+                :color="getFlexDocColor(doc)"
+                size="32"
+                class="mr-3"
+                variant="tonal"
+              >
+                <v-icon size="16" :color="getFlexDocColor(doc)">
+                  {{ getFlexDocIcon(doc) }}
+                </v-icon>
+              </v-avatar>
+            </template>
 
-        <v-list-item
-          :class="[
-            'py-2 px-4',
-            period.isFuture ? 'opacity-50' : '',
-            period.doc ? 'cursor-pointer' : ''
-          ]"
-          @click="period.doc ? $emit('open-preview', period.doc) : null"
-          :ripple="!!period.doc"
-        >
-          <!-- Ícono de estado (lado izquierdo) -->
-          <template #prepend>
-            <v-avatar
-              :color="getPeriodAvatarColor(period)"
-              size="32"
-              class="mr-3"
-              variant="tonal"
-            >
-              <v-icon size="16" :color="getPeriodIconColor(period)">
-                {{ getPeriodIcon(period) }}
-              </v-icon>
-            </v-avatar>
-          </template>
+            <v-list-item-title class="text-body-2 font-weight-medium">
+              <!-- Nombre del período: usar el nombre del doc o la fecha de emisión -->
+              {{ doc.name || formatFlexLabel(doc.emission_date) }}
+            </v-list-item-title>
+            <v-list-item-subtitle>
+              <v-chip size="x-small" :color="getFlexDocColor(doc)" variant="tonal" class="mt-1">
+                {{ getFlexStatusLabel(doc) }}
+              </v-chip>
+            </v-list-item-subtitle>
 
-          <!-- Etiqueta del período -->
-          <v-list-item-title class="text-body-2 font-weight-medium">
-            {{ period.label }}
-          </v-list-item-title>
-
-          <!-- Chip de estado -->
-          <v-list-item-subtitle>
-            <v-chip
-              size="x-small"
-              :color="getPeriodStatusColor(period)"
-              variant="tonal"
-              class="mt-1"
-            >
-              {{ period.statusLabel }}
-            </v-chip>
-          </v-list-item-subtitle>
-
-          <!-- Acciones (lado derecho) -->
-          <template #append>
-            <div class="d-flex align-center" style="gap: 2px">
-              <!-- Período con documento cargado -->
-              <template v-if="period.doc">
-                <!-- Ver archivo -->
-                <v-btn
-                  icon
-                  size="x-small"
-                  variant="text"
-                  color="info"
-                  v-tooltip="'Ver detalle'"
-                  @click.stop="$emit('open-preview', period.doc)"
-                >
+            <template #append>
+              <div class="d-flex align-center" style="gap: 2px">
+                <v-btn icon size="x-small" variant="text" color="info" v-tooltip="'Ver detalle'" @click.stop="$emit('open-preview', doc)">
                   <v-icon size="16">mdi-eye</v-icon>
                 </v-btn>
-
-                <!-- Descargar archivo (solo si existe) -->
                 <v-btn
-                  v-if="period.doc.documents?.file_url"
-                  icon
-                  size="x-small"
-                  variant="text"
-                  color="primary"
-                  :href="period.doc.documents.file_url"
-                  target="_blank"
-                  v-tooltip="'Descargar archivo'"
-                  @click.stop
+                  v-if="doc.documents?.file_url"
+                  icon size="x-small" variant="text" color="primary"
+                  :href="doc.documents.file_url" target="_blank"
+                  v-tooltip="'Descargar'" @click.stop
                 >
                   <v-icon size="16">mdi-download</v-icon>
                 </v-btn>
-
-                <!-- Editar -->
-                <v-btn
-                  icon
-                  size="x-small"
-                  variant="text"
-                  color="grey-darken-1"
-                  v-tooltip="'Editar'"
-                  @click.stop="$emit('open-dialog', {
-                    typeId: type.id,
-                    category: category,
-                    periodInfo: period,
-                    doc: period.doc
-                  })"
+                <v-btn icon size="x-small" variant="text" color="grey-darken-1" v-tooltip="'Editar'"
+                  @click.stop="$emit('open-dialog', { typeId: type.id, category: category, doc: doc })"
                 >
                   <v-icon size="16">mdi-pencil</v-icon>
                 </v-btn>
-              </template>
+              </div>
+            </template>
+          </v-list-item>
+        </template>
 
-              <!-- Período sin documento -->
-              <template v-else-if="!period.isFuture">
-                <!-- Subir documento -->
-                <v-btn
-                  size="x-small"
-                  variant="tonal"
-                  color="primary"
-                  class="text-none"
-                  prepend-icon="mdi-upload"
-                  @click.stop="$emit('open-dialog', {
-                    typeId: type.id,
-                    category: category,
-                    periodInfo: period
-                  })"
-                >
-                  Subir
-                </v-btn>
-              </template>
-
-              <!-- Período futuro -->
-              <template v-else>
-                <v-chip size="x-small" variant="text" color="grey" class="text-caption">
-                  Próximo
-                </v-chip>
-              </template>
-            </div>
-          </template>
+        <!-- Estado vacío -->
+        <v-list-item v-if="flexDocs.length === 0" class="py-4 text-center text-grey">
+          <v-list-item-title class="text-caption">Sin declaraciones cargadas aún</v-list-item-title>
         </v-list-item>
-      </template>
+      </v-list>
 
-      <!-- Estado vacío (no aplica, etc.) -->
-      <v-list-item v-if="periods.length === 0" class="py-4 text-center text-grey">
-        <v-list-item-title>Sin períodos para el año seleccionado</v-list-item-title>
-      </v-list-item>
-    </v-list>
+      <!-- Botón agregar nuevo período -->
+      <div class="pa-3 d-flex justify-end" style="border-top: 1px solid rgba(0,0,0,0.07)">
+        <v-btn
+          size="small"
+          variant="tonal"
+          color="primary"
+          prepend-icon="mdi-plus"
+          class="text-none"
+          @click="$emit('open-dialog', { typeId: type.id, category: category })"
+        >
+          Agregar declaración
+        </v-btn>
+      </div>
+    </template>
+
+    <!-- ══════════════════════════════════════════ -->
+    <!-- MODO NORMAL: grilla de períodos calculada  -->
+    <!-- ══════════════════════════════════════════ -->
+    <template v-else>
+      <v-list class="pa-0" lines="one">
+        <template v-for="(period, index) in periods" :key="index">
+          <v-divider v-if="index > 0" />
+
+          <v-list-item
+            :class="[
+              'py-2 px-4',
+              period.isFuture ? 'opacity-50' : '',
+              period.doc ? 'cursor-pointer' : ''
+            ]"
+            @click="period.doc ? $emit('open-preview', period.doc) : null"
+            :ripple="!!period.doc"
+          >
+            <!-- Ícono de estado (lado izquierdo) -->
+            <template #prepend>
+              <v-avatar
+                :color="getPeriodAvatarColor(period)"
+                size="32"
+                class="mr-3"
+                variant="tonal"
+              >
+                <v-icon size="16" :color="getPeriodIconColor(period)">
+                  {{ getPeriodIcon(period) }}
+                </v-icon>
+              </v-avatar>
+            </template>
+
+            <!-- Etiqueta del período -->
+            <v-list-item-title class="text-body-2 font-weight-medium">
+              {{ period.label }}
+            </v-list-item-title>
+
+            <!-- Chip de estado -->
+            <v-list-item-subtitle>
+              <v-chip
+                size="x-small"
+                :color="getPeriodStatusColor(period)"
+                variant="tonal"
+                class="mt-1"
+              >
+                {{ period.statusLabel }}
+              </v-chip>
+            </v-list-item-subtitle>
+
+            <!-- Acciones (lado derecho) -->
+            <template #append>
+              <div class="d-flex align-center" style="gap: 2px">
+                <!-- Período con documento cargado -->
+                <template v-if="period.doc">
+                  <!-- Ver archivo -->
+                  <v-btn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    color="info"
+                    v-tooltip="'Ver detalle'"
+                    @click.stop="$emit('open-preview', period.doc)"
+                  >
+                    <v-icon size="16">mdi-eye</v-icon>
+                  </v-btn>
+
+                  <!-- Descargar archivo (solo si existe) -->
+                  <v-btn
+                    v-if="period.doc.documents?.file_url"
+                    icon
+                    size="x-small"
+                    variant="text"
+                    color="primary"
+                    :href="period.doc.documents.file_url"
+                    target="_blank"
+                    v-tooltip="'Descargar archivo'"
+                    @click.stop
+                  >
+                    <v-icon size="16">mdi-download</v-icon>
+                  </v-btn>
+
+                  <!-- Editar -->
+                  <v-btn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    color="grey-darken-1"
+                    v-tooltip="'Editar'"
+                    @click.stop="$emit('open-dialog', {
+                      typeId: type.id,
+                      category: category,
+                      periodInfo: period,
+                      doc: period.doc
+                    })"
+                  >
+                    <v-icon size="16">mdi-pencil</v-icon>
+                  </v-btn>
+                </template>
+
+                <!-- Período sin documento -->
+                <template v-else-if="!period.isFuture">
+                  <!-- Subir documento -->
+                  <v-btn
+                    size="x-small"
+                    variant="tonal"
+                    color="primary"
+                    class="text-none"
+                    prepend-icon="mdi-upload"
+                    @click.stop="$emit('open-dialog', {
+                      typeId: type.id,
+                      category: category,
+                      periodInfo: period
+                    })"
+                  >
+                    Subir
+                  </v-btn>
+                </template>
+
+                <!-- Período futuro -->
+                <template v-else>
+                  <v-chip size="x-small" variant="text" color="grey" class="text-caption">
+                    Próximo
+                  </v-chip>
+                </template>
+              </div>
+            </template>
+          </v-list-item>
+        </template>
+
+        <!-- Estado vacío (no aplica, etc.) -->
+        <v-list-item v-if="periods.length === 0" class="py-4 text-center text-grey">
+          <v-list-item-title>Sin períodos para el año seleccionado</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </template>
   </v-card>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { FREQUENCIES } from '@/constants/fiscalDocuments'
+import { FREQUENCIES, isFlexibleType } from '@/constants/fiscalDocuments'
 
 // ──────────────────────────────────────────────
 // Props
@@ -201,6 +291,62 @@ const categoryIcon = computed(() => {
   }
   return icons[props.category] || 'mdi-file-document-outline'
 })
+
+// ──────────────────────────────────────────────
+// Modo Flexible (periodicidad libre)
+// ──────────────────────────────────────────────
+
+/** ¿Este tipo de documento no impone cadencia fija? */
+const isFlexible = computed(() => isFlexibleType(props.type))
+
+/**
+ * Lista de docs del año seleccionado para este tipo (modo flexible).
+ * Ordenados por fecha de emisión, el más reciente primero.
+ */
+const flexDocs = computed(() => {
+  return props.documents
+    .filter(d => {
+      if (d.doc_type !== props.type.id) return false
+      if (!d.emission_date) return true // Sin fecha: igual se muestra
+      return new Date(d.emission_date + 'T00:00:00').getFullYear() === props.year
+    })
+    .sort((a, b) => {
+      if (!a.emission_date) return 1
+      if (!b.emission_date) return -1
+      return new Date(b.emission_date) - new Date(a.emission_date)
+    })
+})
+
+/** Etiqueta de fecha para un doc flexible que no tiene nombre personalizado */
+const formatFlexLabel = (dateStr) => {
+  if (!dateStr) return 'Período sin fecha'
+  const dt = new Date(dateStr + 'T00:00:00')
+  return dt.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
+}
+
+const getFlexDocColor = (doc) => {
+  const s = doc.status
+  if (s === 'VIGENTE' || s === 'PRESENTADO') return 'success'
+  if (s === 'TRAMITE') return 'warning'
+  if (s === 'NO_APLICA') return 'grey'
+  return 'error'
+}
+
+const getFlexDocIcon = (doc) => {
+  const s = doc.status
+  if (s === 'VIGENTE' || s === 'PRESENTADO') return 'mdi-check-circle'
+  if (s === 'TRAMITE') return 'mdi-clock-outline'
+  if (s === 'NO_APLICA') return 'mdi-minus-circle-outline'
+  return 'mdi-alert-circle'
+}
+
+const getFlexStatusLabel = (doc) => {
+  const s = doc.status
+  if (s === 'VIGENTE' || s === 'PRESENTADO') return 'Presentado'
+  if (s === 'TRAMITE') return 'En Trámite'
+  if (s === 'NO_APLICA') return 'No Aplica'
+  return 'Vencido'
+}
 
 // ──────────────────────────────────────────────
 // Cálculo de períodos (S - Single Responsibility)
@@ -317,9 +463,10 @@ const buildPeriod = (label, doc, isFuture, isCurrent, extra) => {
   let statusLabel
   if (doc) {
     const s = doc.status
-    if (s === 'VIGENTE' || s === 'PRESENTADO') statusLabel = 'Presentado'
-    else if (s === 'TRAMITE') statusLabel = 'En Trámite'
-    else statusLabel = 'Vencido'
+    if (s === 'NO_APLICA')                    statusLabel = 'No Aplica'
+    else if (s === 'VIGENTE' || s === 'PRESENTADO') statusLabel = 'Presentado'
+    else if (s === 'TRAMITE')                 statusLabel = 'En Trámite'
+    else                                      statusLabel = 'Vencido'
   } else {
     statusLabel = isFuture ? 'Pendiente' : (isCurrent ? 'Falta' : 'No Presentado')
   }
@@ -353,8 +500,9 @@ const getPeriodStatusColor = (period) => {
   if (period.isFuture) return 'grey'
   if (!period.doc) return period.isCurrent ? 'warning' : 'error'
   const s = period.doc.status
+  if (s === 'NO_APLICA')                    return 'grey'
   if (s === 'VIGENTE' || s === 'PRESENTADO') return 'success'
-  if (s === 'TRAMITE') return 'warning'
+  if (s === 'TRAMITE')                      return 'warning'
   return 'error'
 }
 
@@ -364,8 +512,9 @@ const getPeriodIconColor = (period) => {
   if (period.isFuture) return 'grey'
   if (!period.doc) return period.isCurrent ? 'warning' : 'error'
   const s = period.doc.status
+  if (s === 'NO_APLICA')                    return 'grey'
   if (s === 'VIGENTE' || s === 'PRESENTADO') return 'success'
-  if (s === 'TRAMITE') return 'warning'
+  if (s === 'TRAMITE')                      return 'warning'
   return 'error'
 }
 
@@ -373,8 +522,9 @@ const getPeriodIcon = (period) => {
   if (period.isFuture) return 'mdi-clock-outline'
   if (!period.doc) return period.isCurrent ? 'mdi-alert-outline' : 'mdi-close-circle-outline'
   const s = period.doc.status
+  if (s === 'NO_APLICA')                    return 'mdi-minus-circle-outline'
   if (s === 'VIGENTE' || s === 'PRESENTADO') return 'mdi-check-circle'
-  if (s === 'TRAMITE') return 'mdi-clock-outline'
+  if (s === 'TRAMITE')                      return 'mdi-clock-outline'
   return 'mdi-alert-circle'
 }
 </script>
