@@ -500,9 +500,9 @@ const buildPeriod = (label, doc, isFuture, isCurrent, extra) => {
 // ──────────────────────────────────────────────
 // Contadores (Single Responsibility)
 // ──────────────────────────────────────────────
-/** Períodos ya transcurridos (incluyendo el actual) */
+/** Períodos ya transcurridos O con doc cargado (ambos cuentan como exigibles/completables) */
 const passedPeriods = computed(() =>
-  periods.value.filter(p => !p.isFuture).length
+  periods.value.filter(p => !p.isFuture || !!p.doc).length
 )
 
 const uploadedCount = computed(() =>
@@ -518,35 +518,35 @@ const completionColor = computed(() => {
 })
 
 // ──────────────────────────────────────────────
-// Helpers de estilo por período (Liskov: misma interfaz para todo período)
+// Helpers de estilo por período
+// Regla: si HAY doc, el estado del doc SIEMPRE tiene prioridad sobre isFuture
 // ──────────────────────────────────────────────
 const getPeriodStatusColor = (period) => {
+  // Si hay documento, el color refleja su estado sin importar si el período es "futuro"
+  if (period.doc) {
+    const s = period.doc.status
+    if (s === 'NO_APLICA') return 'grey'
+    if (s === 'TRAMITE')   return 'warning'
+    return 'success'  // VIGENTE, PRESENTADO, VENCIDO = presentado = verde
+  }
+  // Sin documento: futuro = gris, actual = amarillo, pasado = rojo
   if (period.isFuture) return 'grey'
-  if (!period.doc) return period.isCurrent ? 'warning' : 'error'
-  const s = period.doc.status
-  if (s === 'NO_APLICA') return 'grey'
-  if (s === 'TRAMITE')   return 'warning'
-  return 'success'  // todo doc subido = presentado (VIGENTE, PRESENTADO, VENCIDO)
+  return period.isCurrent ? 'warning' : 'error'
 }
 
 const getPeriodAvatarColor = (period) => getPeriodStatusColor(period)
 
-const getPeriodIconColor = (period) => {
-  if (period.isFuture) return 'grey'
-  if (!period.doc) return period.isCurrent ? 'warning' : 'error'
-  const s = period.doc.status
-  if (s === 'NO_APLICA') return 'grey'
-  if (s === 'TRAMITE')   return 'warning'
-  return 'success'
-}
+const getPeriodIconColor = (period) => getPeriodStatusColor(period)
 
 const getPeriodIcon = (period) => {
+  if (period.doc) {
+    const s = period.doc.status
+    if (s === 'NO_APLICA') return 'mdi-minus-circle-outline'
+    if (s === 'TRAMITE')   return 'mdi-clock-outline'
+    return 'mdi-check-circle'  // doc subido = presentado
+  }
   if (period.isFuture) return 'mdi-clock-outline'
-  if (!period.doc) return period.isCurrent ? 'mdi-alert-outline' : 'mdi-close-circle-outline'
-  const s = period.doc.status
-  if (s === 'NO_APLICA')  return 'mdi-minus-circle-outline'
-  if (s === 'TRAMITE')    return 'mdi-clock-outline'
-  return 'mdi-check-circle'
+  return period.isCurrent ? 'mdi-alert-outline' : 'mdi-close-circle-outline'
 }
 </script>
 
