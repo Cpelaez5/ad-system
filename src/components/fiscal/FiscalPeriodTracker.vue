@@ -136,7 +136,7 @@
           <v-list-item
             :class="[
               'py-2 px-4',
-              period.isFuture ? 'opacity-50' : '',
+              (period.isFuture && !period.doc) ? 'opacity-50' : '',
               period.doc ? 'cursor-pointer' : ''
             ]"
             @click="period.doc ? $emit('open-preview', period.doc) : null"
