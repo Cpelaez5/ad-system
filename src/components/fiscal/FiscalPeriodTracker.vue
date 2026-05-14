@@ -93,6 +93,12 @@
                 >
                   <v-icon size="16">mdi-pencil</v-icon>
                 </v-btn>
+                <!-- Papelera: enviar a la papelera desde cualquier pestaña -->
+                <v-btn icon size="x-small" variant="text" color="error" v-tooltip="'Mover a Papelera'"
+                  @click.stop="$emit('delete-doc', doc)"
+                >
+                  <v-icon size="16">mdi-delete</v-icon>
+                </v-btn>
               </div>
             </template>
           </v-list-item>
@@ -214,6 +220,17 @@
                     })"
                   >
                     <v-icon size="16">mdi-pencil</v-icon>
+                  </v-btn>
+                  <!-- Papelera: disponible en todas las pestañas -->
+                  <v-btn
+                    icon
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    v-tooltip="'Mover a Papelera'"
+                    @click.stop="$emit('delete-doc', period.doc)"
+                  >
+                    <v-icon size="16">mdi-delete</v-icon>
                   </v-btn>
                 </template>
 
@@ -469,10 +486,11 @@ const buildPeriod = (label, doc, isFuture, isCurrent, extra) => {
   let statusLabel
   if (doc) {
     const s = doc.status
-    if (s === 'NO_APLICA')                    statusLabel = 'No Aplica'
-    else if (s === 'VIGENTE' || s === 'PRESENTADO') statusLabel = 'Presentado'
-    else if (s === 'TRAMITE')                 statusLabel = 'En Trámite'
-    else                                      statusLabel = 'Vencido'
+    if (s === 'NO_APLICA') statusLabel = 'No Aplica'
+    else if (s === 'TRAMITE') statusLabel = 'En Trámite'
+    // VIGENTE, PRESENTADO o VENCIDO → el doc fue subido → siempre "Presentado"
+    // (BANAVIH, IVSS y otros mensuales no se "vencen"; el hecho de existir = presentado)
+    else statusLabel = 'Presentado'
   } else {
     statusLabel = isFuture ? 'Pendiente' : (isCurrent ? 'Falta' : 'No Presentado')
   }
@@ -506,10 +524,9 @@ const getPeriodStatusColor = (period) => {
   if (period.isFuture) return 'grey'
   if (!period.doc) return period.isCurrent ? 'warning' : 'error'
   const s = period.doc.status
-  if (s === 'NO_APLICA')                    return 'grey'
-  if (s === 'VIGENTE' || s === 'PRESENTADO') return 'success'
-  if (s === 'TRAMITE')                      return 'warning'
-  return 'error'
+  if (s === 'NO_APLICA') return 'grey'
+  if (s === 'TRAMITE')   return 'warning'
+  return 'success'  // todo doc subido = presentado (VIGENTE, PRESENTADO, VENCIDO)
 }
 
 const getPeriodAvatarColor = (period) => getPeriodStatusColor(period)
@@ -518,20 +535,18 @@ const getPeriodIconColor = (period) => {
   if (period.isFuture) return 'grey'
   if (!period.doc) return period.isCurrent ? 'warning' : 'error'
   const s = period.doc.status
-  if (s === 'NO_APLICA')                    return 'grey'
-  if (s === 'VIGENTE' || s === 'PRESENTADO') return 'success'
-  if (s === 'TRAMITE')                      return 'warning'
-  return 'error'
+  if (s === 'NO_APLICA') return 'grey'
+  if (s === 'TRAMITE')   return 'warning'
+  return 'success'
 }
 
 const getPeriodIcon = (period) => {
   if (period.isFuture) return 'mdi-clock-outline'
   if (!period.doc) return period.isCurrent ? 'mdi-alert-outline' : 'mdi-close-circle-outline'
   const s = period.doc.status
-  if (s === 'NO_APLICA')                    return 'mdi-minus-circle-outline'
-  if (s === 'VIGENTE' || s === 'PRESENTADO') return 'mdi-check-circle'
-  if (s === 'TRAMITE')                      return 'mdi-clock-outline'
-  return 'mdi-alert-circle'
+  if (s === 'NO_APLICA')  return 'mdi-minus-circle-outline'
+  if (s === 'TRAMITE')    return 'mdi-clock-outline'
+  return 'mdi-check-circle'
 }
 </script>
 

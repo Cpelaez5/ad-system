@@ -435,6 +435,7 @@
                     :year="selectedYear"
                     @open-preview="openPreview"
                     @open-dialog="handleTrackerDialog"
+                    @delete-doc="confirmDelete"
                 />
               </template>
               
@@ -1464,10 +1465,11 @@ const getPeriodRowsForPdf = (type, catDocs, year) => {
         let statusLabel
         if (doc) {
             const s = doc.status
-            if (s === 'VIGENTE' || s === 'PRESENTADO') statusLabel = 'PRESENTADO'
-            else if (s === 'TRAMITE')                  statusLabel = 'EN TRÁMITE'
-            else if (s === 'NO_APLICA')                statusLabel = 'NO APLICA'
-            else                                       statusLabel = 'VENCIDO'
+            if (s === 'TRAMITE')     statusLabel = 'EN TRÁMITE'
+            else if (s === 'NO_APLICA') statusLabel = 'NO APLICA'
+            // VIGENTE, PRESENTADO o VENCIDO → fue presentado
+            // (mismo criterio que la UI: el hecho de existir el doc = presentado)
+            else                     statusLabel = 'PRESENTADO'
         } else {
             statusLabel = isFuture ? '—' : 'NO PRESENTADO'
         }
