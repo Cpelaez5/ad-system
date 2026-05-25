@@ -30,6 +30,7 @@ import AppNavigation from './components/layout/AppNavigation.vue'
 import AppFooter from './components/layout/AppFooter.vue'
 import NotificationSystem from './components/common/NotificationSystem.vue'
 import PageTransition from './components/common/PageTransition.vue'
+import userSettingsService from '@/services/user-settings-service.js'
 // (Se elimina ThemeFavicon para usar solo los <link rel="icon"> de index.html)
 
 export default {
@@ -54,7 +55,22 @@ export default {
   methods: {
     handleBannerVisibility(isVisible) {
       this.isBannerVisible = isVisible;
+    },
+    applyThemeMode() {
+      const settings = userSettingsService.getSettings();
+      this.$vuetify.theme.global.name = settings.forceDarkMode ? 'dark' : 'light';
+    },
+    onSettingsChanged(event) {
+      const settings = event.detail;
+      this.$vuetify.theme.global.name = settings.forceDarkMode ? 'dark' : 'light';
     }
+  },
+  mounted() {
+    this.applyThemeMode();
+    window.addEventListener('ad-settings-changed', this.onSettingsChanged);
+  },
+  beforeUnmount() {
+    window.removeEventListener('ad-settings-changed', this.onSettingsChanged);
   }
 }
 </script>

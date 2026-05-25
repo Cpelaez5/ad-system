@@ -24,6 +24,9 @@ const STORAGE_KEY = 'ad_system_user_settings'
  * Los toggles aquí solo aplican a correos adicionales.
  */
 const DEFAULT_SETTINGS = {
+  // ── Apariencia ──────────────────────────────────────────────────────────
+  forceDarkMode: false,
+
   // ── Tasas de cambio en el header ─────────────────────────────────────────
   showUsdRate: true,
   showEurRate: true,

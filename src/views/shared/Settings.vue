@@ -21,6 +21,33 @@
     </v-row>
 
     <v-row>
+      <!-- ─── Apariencia ─────────────────────────────── -->
+      <v-col cols="12">
+        <v-card class="settings-card" rounded="xl" elevation="0">
+          <div class="settings-card-header">
+            <v-icon color="white" class="mr-2">mdi-palette</v-icon>
+            <span>Apariencia</span>
+          </div>
+
+          <v-card-text class="pa-6">
+            <div class="pref-row">
+              <div class="d-flex align-center ga-3">
+                <div class="currency-icon-wrap" style="background: linear-gradient(135deg, #1e1e1e, #333333);">
+                  <v-icon size="20" color="white">mdi-theme-light-dark</v-icon>
+                </div>
+                <div>
+                  <p class="font-weight-semibold mb-0" style="color:#1F355C;">Modo Oscuro Forzado</p>
+                  <p class="text-caption text-grey ma-0">Aplica un tema oscuro a toda la aplicación</p>
+                </div>
+              </div>
+              <v-switch v-model="form.forceDarkMode" color="primary" hide-details inset density="compact" />
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-row>
 
       <!-- ─── Tasas de Cambio ─────────────────────────── -->
       <v-col cols="12" md="5">
