@@ -186,6 +186,49 @@ await exportService.exportInvoice(factura, 'xlsx')
 
 ---
 
+## receiptPdfService
+
+**Archivo**: `src/services/receipt-pdf-service.js`
+
+Generación de recibos PDF individuales para facturas del módulo de facturación.
+Usa jsPDF con colores corporativos, logo del sistema, y diseño profesional.
+
+### Métodos
+
+| Método | Parámetros | Retorna | Descripción |
+|--------|------------|---------|-------------|
+| `generateReceiptPdf(invoice)` | `Invoice` (formato frontend) | `void` | Genera y descarga un recibo PDF |
+
+### Uso
+
+```javascript
+import { generateReceiptPdf } from '@/services/receipt-pdf-service'
+
+// Descargar recibo PDF de una factura
+await generateReceiptPdf(invoice)
+// Descarga automáticamente: Recibo_F-2024-001_15-05-2026.pdf
+```
+
+### Secciones del recibo
+
+1. **Encabezado**: Logo AD System + nombre del sistema
+2. **Título**: Tipo de documento, número, control, estado (con color)
+3. **Partes**: Emisor y Receptor/Cliente lado a lado (nombre, RIF, dirección, teléfono, email)
+4. **Fechas**: Emisión, Vencimiento, Moneda
+5. **Tabla de ítems**: #, Descripción, Cantidad, Precio Unitario, Total
+6. **Resumen financiero**: Base imponible, IVA, retenciones (IVA/ISLR/Municipal), IGTF, Total
+7. **Notas**: Observaciones de la factura
+8. **Pie de página**: Fecha de generación + URL del sistema
+
+### Tipos de documento soportados
+
+- `FACTURA` (Venta/Compra)
+- `RECIBO` (Nota de Entrega)
+- `NOTA DE CRÉDITO`
+- `NOTA DE DÉBITO`
+
+---
+
 ## bcvService
 
 **Archivo**: `src/services/bcvService.js`
