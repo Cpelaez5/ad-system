@@ -374,8 +374,8 @@ export default {
 }
 .app-bar {
 	z-index: 1000 !important;
-	background-color: white !important;
-	border-bottom: 1px solid #E0E0E0 !important;
+	background-color: var(--color-background) !important;
+	border-bottom: 1px solid var(--color-surface) !important;
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
 }
 

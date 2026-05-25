@@ -73,6 +73,29 @@
   --font-secondary: 'Open Sans', sans-serif;
 }
 
+/* Variables CSS para Modo Oscuro (se activan cuando Vuetify añade la clase v-theme--dark) */
+.v-theme--dark {
+  --color-primary: #E57373;
+  --color-secondary: #90caf9;
+  --color-accent: #E0B04F;
+  --color-error: #EF5350;
+  --color-info: #90caf9;
+  --color-success: #81C784;
+  --color-warning: #FFD54F;
+  
+  /* Superficies adaptadas al modo oscuro (colores tipo devtools) */
+  --color-surface: #2d2d2d;
+  --color-background: #1e1e1e;
+  --color-black: #ffffff; 
+  --color-white: #2d2d2d; /* Invertido para tarjetas que usan --color-white */
+  
+  --text-primary: #ffffff;
+  --text-secondary: #90caf9;
+  --text-disabled: #888888;
+  --text-on-primary: #000000;
+  --text-on-secondary: #000000;
+}
+
 /* Reset y estilos base */
 * {
   box-sizing: border-box;
@@ -215,6 +238,8 @@ select {
 #app {
   min-height: 100vh;
   width: 100%;
+  background-color: var(--color-background);
+  color: var(--text-primary);
 }
 
 /* Tipografía */
