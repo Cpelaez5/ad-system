@@ -1,0 +1,29 @@
+# robots.txt para AD SYSTEM
+# Permite la indexación de páginas de marketing y bloquea de forma segura el área del ERP privado.
+
+User-agent: *
+
+# Permitir indexar la web pública
+Allow: /$
+Allow: /login$
+Allow: /signup$
+Allow: /pricing$
+Allow: /test-form$
+
+# Evitar indexación de áreas administrativas, de clientes, contables y onboarding
+Disallow: /cliente/
+Disallow: /contador/
+Disallow: /admin/
+Disallow: /organizacion/
+Disallow: /dashboard
+Disallow: /welcome
+Disallow: /registration-success
+Disallow: /ocr-demo
+Disallow: /profile
+Disallow: /settings
+
+# Evitar indexación de recursos API locales o mocks
+Disallow: /api/
+
+# Ruta al sitemap (puedes actualizar el dominio cuando esté en producción)
+Sitemap: https://ad-system.com/sitemap.xml

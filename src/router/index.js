@@ -43,7 +43,11 @@ const routes = [
     path: '/',
     name: 'LandingPage',
     component: LandingPage,
-    meta: { requiresAuth: false }
+    meta: { 
+      requiresAuth: false,
+      title: 'Gestión Contable Inteligente y Simple | AD SYSTEM',
+      description: 'Lleva la contabilidad de tu empresa al siguiente nivel. Automatiza tu facturación, controla compras, gastos y tu expediente fiscal 360.'
+    }
   },
   {
     path: '/organizacion/gastos',
@@ -90,13 +94,21 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: Login,
-    meta: { requiresAuth: false }
+    meta: { 
+      requiresAuth: false,
+      title: 'Iniciar Sesión | AD SYSTEM',
+      description: 'Accede de forma segura a tu cuenta en AD SYSTEM. Gestiona tus facturas, declaraciones fiscales e inventarios en línea.'
+    }
   },
   {
     path: '/signup',
     name: 'Register',
     component: Register,
-    meta: { requiresAuth: false }
+    meta: { 
+      requiresAuth: false,
+      title: 'Registrarse y Comenzar Prueba Gratuita | AD SYSTEM',
+      description: 'Crea tu cuenta empresarial en AD SYSTEM hoy mismo. Pruébalo gratis sin compromiso y automatiza tus obligaciones fiscales.'
+    }
   },
   {
     path: '/dashboard',
@@ -231,7 +243,11 @@ const routes = [
     path: '/pricing',
     name: 'Pricing',
     component: Pricing,
-    meta: { requiresAuth: false, title: 'Planes y Precios' }
+    meta: { 
+      requiresAuth: false, 
+      title: 'Planes y Precios Competitivos | AD SYSTEM',
+      description: 'Conoce nuestros planes de suscripción mensuales y anuales adaptados a tu negocio. Transparencia sin cargos ocultos.'
+    }
   }
 ]
 
@@ -377,6 +393,31 @@ router.beforeEach(async (to, from, next) => {
   } else {
     // Ruta pública, permitir acceso
     next()
+  }
+})
+
+// Hook global para actualizar dinámicamente las cabeceras HTML para SEO y experiencia de usuario
+router.afterEach((to) => {
+  // 1. Título dinámico
+  const baseTitle = 'AD SYSTEM'
+  if (to.meta && to.meta.title) {
+    document.title = to.meta.title
+  } else {
+    document.title = baseTitle
+  }
+
+  // 2. Descripción meta dinámica
+  const metaDescription = document.querySelector('meta[name="description"]')
+  if (metaDescription) {
+    if (to.meta && to.meta.description) {
+      metaDescription.setAttribute('content', to.meta.description)
+    } else {
+      // Fallback a la descripción por defecto del index.html
+      metaDescription.setAttribute(
+        'content', 
+        'AD Business System - Sistema de gestión contable, facturación inteligente, control de compras, gastos y expediente fiscal 360 para empresas y contadores.'
+      )
+    }
   }
 })
 
