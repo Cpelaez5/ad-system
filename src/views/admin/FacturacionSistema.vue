@@ -3,8 +3,8 @@
     <!-- Encabezado -->
     <div class="d-flex flex-column flex-md-row align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-h4 font-weight-bold" style="color: #1F355C;">
-          <v-icon class="mr-2" color="#1F355C">mdi-receipt-text-outline</v-icon>
+        <h1 class="text-h4 font-weight-bold text-secondary">
+          <v-icon class="mr-2" color="secondary">mdi-receipt-text-outline</v-icon>
           Facturación del Sistema
         </h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
@@ -387,7 +387,7 @@
               placeholder="Instrucciones que verá el cliente a la hora de pagar" class="mb-3"></v-textarea>
 
             <v-divider class="mb-4"></v-divider>
-            <p class="text-subtitle-2 font-weight-bold mb-3" style="color: #1F355C;">Datos del Método</p>
+            <p class="text-subtitle-2 font-weight-bold mb-3 text-secondary">Datos del Método</p>
 
             <!-- Campos dinámicos según tipo -->
             <!-- Pago Móvil -->
@@ -439,7 +439,7 @@
             <v-divider class="mb-4"></v-divider>
 
             <!-- Soporte -->
-            <p class="text-subtitle-2 font-weight-bold mb-3" style="color: #1F355C;">Soporte (contacto de asistencia)</p>
+            <p class="text-subtitle-2 font-weight-bold mb-3 text-secondary">Soporte (contacto de asistencia)</p>
             <v-row>
               <v-col cols="12" sm="4">
                 <v-select v-model="methodFormData.support_phone_prefix"
@@ -517,7 +517,7 @@
           <!-- Datos del emisor -->
           <template v-if="selectedReport.sender_details && Object.keys(selectedReport.sender_details).length">
             <v-divider class="my-4"></v-divider>
-            <p class="text-subtitle-2 font-weight-bold mb-2" style="color: #1F355C;">Datos del Emisor</p>
+            <p class="text-subtitle-2 font-weight-bold mb-2 text-secondary">Datos del Emisor</p>
             <v-row dense>
               <v-col v-if="selectedReport.sender_details.sender_phone" cols="6"><div class="text-caption text-medium-emphasis">Teléfono</div><div>{{ selectedReport.sender_details.sender_phone }}</div></v-col>
               <v-col v-if="selectedReport.sender_details.sender_document" cols="6"><div class="text-caption text-medium-emphasis">Documento</div><div>{{ selectedReport.sender_details.sender_document }}</div></v-col>
@@ -543,7 +543,7 @@
           <!-- Comprobante -->
           <template v-if="selectedReport.proof_url">
             <v-divider class="my-4"></v-divider>
-            <p class="text-subtitle-2 font-weight-bold mb-2" style="color: #1F355C;">Comprobante</p>
+            <p class="text-subtitle-2 font-weight-bold mb-2 text-secondary">Comprobante</p>
             <div v-if="!selectedReportSignedUrl" class="text-caption text-grey">Cargando comprobante...</div>
             <template v-else>
               <v-img v-if="isImage(selectedReport.proof_url)" :src="selectedReportSignedUrl" max-height="300"
@@ -936,5 +936,5 @@ export default {
 .billing-admin { max-width: 1400px; margin: 0 auto; }
 .stat-card { transition: transform 0.2s ease; }
 .stat-card:hover { transform: translateY(-3px); }
-.billing-table :deep(th) { font-weight: 700 !important; color: #1F355C !important; font-size: 0.8rem !important; text-transform: uppercase; }
+.billing-table :deep(th) { font-weight: 700 !important; color: rgb(var(--v-theme-secondary)) !important; font-size: 0.8rem !important; text-transform: uppercase; }
 </style>

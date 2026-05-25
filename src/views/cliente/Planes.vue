@@ -3,7 +3,7 @@
     <!-- Header compacto -->
     <div class="d-flex flex-column flex-md-row align-center justify-space-between mb-6">
       <div class="mb-4 mb-md-0">
-        <h1 class="text-h4 font-weight-bold" style="color: #1F355C;">
+        <h1 class="text-h4 font-weight-bold text-secondary">
           Planes y Precios
         </h1>
         <p class="text-body-2 text-medium-emphasis mb-0">

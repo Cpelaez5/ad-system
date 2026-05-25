@@ -92,6 +92,20 @@ const vuetify = createVuetify({
           background: '#efefef',     /* Gris claro para fondo de aplicación */
         },
       },
+      dark: {
+        dark: true,
+        colors: {
+          primary: '#E57373',        /* Rojo más claro para dark mode */
+          secondary: '#90caf9',      /* Azul claro para textos oscuros */
+          accent: '#E0B04F',         /* Dorado se mantiene bien */
+          error: '#EF5350',          /* Rojo error adaptado */
+          info: '#90caf9',           /* Azul claro info */
+          success: '#81C784',        /* Verde éxito adaptado */
+          warning: '#FFD54F',        /* Amarillo adaptado */
+          surface: '#1E1E1E',        /* Superficie oscura típica */
+          background: '#121212',     /* Fondo oscuro nativo */
+        },
+      },
     },
   },
   defaults: {

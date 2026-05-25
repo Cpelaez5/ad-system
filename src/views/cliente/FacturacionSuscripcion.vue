@@ -3,8 +3,8 @@
     <!-- Encabezado -->
     <div class="d-flex flex-column flex-md-row align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-h4 font-weight-bold" style="color: #1F355C;">
-          <v-icon class="mr-2" color="#1F355C">mdi-receipt-text-outline</v-icon>
+        <h1 class="text-h4 font-weight-bold text-secondary">
+          <v-icon class="mr-2" color="secondary">mdi-receipt-text-outline</v-icon>
           Facturación
         </h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
@@ -232,7 +232,7 @@
 
           <v-form ref="paymentForm" @submit.prevent="submitPayment">
             <!-- Paso 1: Seleccionar método de pago -->
-            <p class="text-subtitle-2 font-weight-bold mb-2" style="color: #1F355C;">
+            <p class="text-subtitle-2 font-weight-bold mb-2 text-secondary">
               1. ¿Cómo deseas pagar?
             </p>
             <v-select
@@ -283,7 +283,7 @@
             </v-card>
 
             <!-- ============ Paso 2: Comprobante de pago (PRIORIZADO) ============ -->
-            <p class="text-subtitle-2 font-weight-bold mb-1 mt-4" style="color: #1F355C;">
+            <p class="text-subtitle-2 font-weight-bold mb-1 mt-4 text-secondary">
               2. Comprobante de pago
               <v-chip v-if="selectedMethodRequireProof" size="x-small" color="error" variant="tonal" class="ml-1">Obligatorio</v-chip>
               <span v-else class="text-caption text-medium-emphasis font-weight-regular"> (recomendado)</span>
@@ -393,7 +393,7 @@
 
             <!-- ============ Paso 3: Datos del pago ============ -->
             <v-divider class="mb-4"></v-divider>
-            <p class="text-subtitle-2 font-weight-bold mb-2" style="color: #1F355C;">
+            <p class="text-subtitle-2 font-weight-bold mb-2 text-secondary">
               3. Datos de tu pago
               <v-chip v-if="ocrCompleted" size="x-small" color="success" variant="tonal" class="ml-1">
                 <v-icon start size="12">mdi-robot-outline</v-icon>
@@ -1296,7 +1296,7 @@ export default {
 .billing-page { max-width: 1200px; margin: 0 auto; }
 .stat-card { transition: transform 0.2s ease; }
 .stat-card:hover { transform: translateY(-3px); }
-.billing-table :deep(th) { font-weight: 700 !important; color: #1F355C !important; font-size: 0.8rem !important; text-transform: uppercase; }
+.billing-table :deep(th) { font-weight: 700 !important; color: rgb(var(--v-theme-secondary)) !important; font-size: 0.8rem !important; text-transform: uppercase; }
 
 /* Zona de upload de comprobante */
 .proof-upload-zone {

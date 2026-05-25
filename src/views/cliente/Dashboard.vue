@@ -61,7 +61,7 @@
               density="compact"
               variant="outlined"
               divided
-              color="#1F355C"
+              color="secondary"
               class="moneda-toggle"
             >
               <v-btn value="USD" size="small">USD</v-btn>
@@ -142,7 +142,7 @@
         <v-col cols="12" md="8" class="animate-section" style="animation-delay: 0.4s">
           <v-card class="dashboard-card chart-card">
             <v-card-title class="card-title-row">
-              <v-icon class="mr-2" color="#1F355C" size="20">mdi-chart-timeline-variant-shimmer</v-icon>
+              <v-icon class="mr-2" color="secondary" size="20">mdi-chart-timeline-variant-shimmer</v-icon>
               <span>Evolución de Rendimiento</span>
             </v-card-title>
             <v-card-text class="pt-0 chart-body">
@@ -240,7 +240,7 @@
           <div data-swapy-item="actividad">
             <v-card class="dashboard-card full-height">
               <v-card-title class="card-title-row">
-                <v-icon class="mr-2" color="#1F355C" size="20">mdi-history</v-icon>
+                <v-icon class="mr-2" color="secondary" size="20">mdi-history</v-icon>
                 <span>Actividad Reciente</span>
                 <v-spacer />
                 <v-icon size="18" color="#bbb" class="drag-handle-icon">mdi-drag</v-icon>
@@ -325,7 +325,7 @@
                   <v-btn
                     variant="text"
                     size="small"
-                    color="#1F355C"
+                    color="secondary"
                     @click="$router.push('/cliente/fiscal-360')"
                   >
                     Ver todo
