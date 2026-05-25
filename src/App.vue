@@ -58,11 +58,11 @@ export default {
     },
     applyThemeMode() {
       const settings = userSettingsService.getSettings();
-      this.$vuetify.theme.global.name = settings.forceDarkMode ? 'dark' : 'light';
+      this.$vuetify.theme.change(settings.forceDarkMode ? 'dark' : 'light');
     },
     onSettingsChanged(event) {
       const settings = event.detail;
-      this.$vuetify.theme.global.name = settings.forceDarkMode ? 'dark' : 'light';
+      this.$vuetify.theme.change(settings.forceDarkMode ? 'dark' : 'light');
     }
   },
   async mounted() {

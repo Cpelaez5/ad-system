@@ -106,6 +106,7 @@ import userSettingsService from '@/services/user-settings-service.js';
 export default {
 	name: 'AppNavigation',
 	components: { Sidebar, TrialBanner, ExchangeRateChip },
+	emits: ['banner-visibility-change'],
 	data() {
 		return {
 			bcvRate: null,

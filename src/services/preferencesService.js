@@ -27,11 +27,9 @@ const preferencesService = {
         .eq('user_id', userId)
         .eq('organization_id', organizationId)
         .eq('preference_key', key)
-        .single()
+        .maybeSingle()
 
       if (error) {
-        // Error "No rows" no es un error real, simplemente no existe aún
-        if (error.code === 'PGRST116') return null
         console.warn('⚠️ Error obteniendo preferencia:', error.message)
         return null
       }
