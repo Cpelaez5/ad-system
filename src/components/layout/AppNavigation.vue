@@ -7,15 +7,14 @@
 
   <!-- App Bar -->
   <v-app-bar
-    color="white"
+    color="surface"
     elevation="0"
-    class="app-bar"
-    style="border-bottom: 1px solid #E0E0E0;"
+    class="app-bar border-b"
   >
     <!-- Logo y título -->
     <v-toolbar-title
       :class="['text-h5', 'font-weight-bold', 'animate-fade-in', 'animate-delay-200', { 'title-adjusted': sidebarExpanded }]"
-      style="color: #000000; font-weight: 800 !important;"
+      style="font-weight: 800 !important;"
     >
       {{ getCurrentPageTitle() }}
     </v-toolbar-title>
@@ -374,8 +373,6 @@ export default {
 }
 .app-bar {
 	z-index: 1000 !important;
-	background-color: var(--color-background) !important;
-	border-bottom: 1px solid var(--color-surface) !important;
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
 }
 

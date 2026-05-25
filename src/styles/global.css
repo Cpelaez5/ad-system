@@ -108,8 +108,8 @@ body {
   font-family: var(--font-primary);
   font-size: 16px;
   line-height: 1.6;
-  color: var(--text-primary);
-  background-color: var(--color-background);
+  color: rgb(var(--v-theme-on-background));
+  background-color: rgb(var(--v-theme-background));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -238,8 +238,8 @@ select {
 #app {
   min-height: 100vh;
   width: 100%;
-  background-color: var(--color-background);
-  color: var(--text-primary);
+  background-color: rgb(var(--v-theme-background));
+  color: rgb(var(--v-theme-on-background));
 }
 
 /* Tipografía */

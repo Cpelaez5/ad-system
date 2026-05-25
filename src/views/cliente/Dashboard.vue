@@ -1424,7 +1424,7 @@ export default {
 
 /* ── Layout principal ── */
 .dashboard-ejecutivo {
-  background-color: var(--color-background, #efefef);
+  background-color: rgb(var(--v-theme-background));
   min-height: 100vh;
 }
 
