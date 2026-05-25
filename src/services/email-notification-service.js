@@ -16,16 +16,15 @@ class EmailNotificationService {
   }
 
   /**
-   * Verifica si el flujo del documento tiene notificaciones habilitadas.
+   * Verifica si un correo adicional debe recibir notificación según el flujo del documento.
+   * @param {{ notifyOnVenta, notifyOnCompra, notifyOnGasto }} emailEntry
    * @param {string} flow - 'VENTA', 'COMPRA', 'GASTO'
-   * @param {object} settings - Configuraciones del usuario
-   * @returns {boolean}
    */
-  isFlowEnabled(flow, settings) {
-    if (flow === 'VENTA')  return settings.notifyOnVenta  !== false
-    if (flow === 'COMPRA') return settings.notifyOnCompra !== false
-    if (flow === 'GASTO')  return settings.notifyOnGasto  === true
-    return true // flujo desconocido: enviar por defecto
+  isEmailEnabledForFlow(emailEntry, flow) {
+    if (flow === 'VENTA')  return emailEntry.notifyOnVenta  === true
+    if (flow === 'COMPRA') return emailEntry.notifyOnCompra === true
+    if (flow === 'GASTO')  return emailEntry.notifyOnGasto  === true
+    return false
   }
 
   /**

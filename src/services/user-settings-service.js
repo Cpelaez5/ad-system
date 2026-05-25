@@ -8,23 +8,33 @@
 
 const STORAGE_KEY = 'ad_system_user_settings'
 
-/** Valores por defecto del sistema */
+/**
+ * Valores por defecto del sistema.
+ *
+ * notificationEmails: array de objetos con configuración individual por correo adicional.
+ * Estructura de cada objeto:
+ * {
+ *   email: string,
+ *   notifyOnVenta:  boolean,
+ *   notifyOnCompra: boolean,
+ *   notifyOnGasto:  boolean,
+ * }
+ *
+ * NOTA: El correo principal del usuario SIEMPRE recibe notificaciones.
+ * Los toggles aquí solo aplican a correos adicionales.
+ */
 const DEFAULT_SETTINGS = {
   // ── Tasas de cambio en el header ─────────────────────────────────────────
   showUsdRate: true,
   showEurRate: true,
 
-  // ── Notificaciones por email ──────────────────────────────────────────────
-  notificationEmails: [],   // correos adicionales (además del propio usuario)
-  notifyOnVenta:   true,
-  notifyOnCompra:  true,
-  notifyOnGasto:   false,
+  // ── Correos adicionales con configuración individual por flujo ────────────
+  notificationEmails: [],
+  // Ejemplo de entrada:
+  // { email: 'contador@firma.com', notifyOnVenta: true, notifyOnCompra: true, notifyOnGasto: true }
 }
 
-/**
- * Obtiene las configuraciones actuales del usuario.
- * Fusiona con defaults para garantizar compatibilidad con versiones futuras.
- */
+/** Obtiene las configuraciones actuales, fusionando con defaults */
 function getSettings() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -43,16 +53,13 @@ function getSettings() {
 function saveSettings(settings) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
-    // Notificar cambios a todos los componentes que escuchen este evento
     window.dispatchEvent(new CustomEvent('ad-settings-changed', { detail: settings }))
   } catch (e) {
     console.warn('⚠️ [UserSettings] Error guardando configuración:', e)
   }
 }
 
-/**
- * Restaura todas las configuraciones a los valores por defecto.
- */
+/** Restaura todas las configuraciones a los valores por defecto */
 function resetSettings() {
   saveSettings({ ...DEFAULT_SETTINGS })
 }

@@ -20,13 +20,10 @@
       </v-col>
     </v-row>
 
-    <!-- ═══════════════════════════════════════════════ -->
-    <!-- TARJETAS DE CONFIGURACIÓN                       -->
-    <!-- ═══════════════════════════════════════════════ -->
     <v-row>
 
       <!-- ─── Tasas de Cambio ─────────────────────────── -->
-      <v-col cols="12" md="6">
+      <v-col cols="12" md="5">
         <v-card class="settings-card h-100" rounded="xl" elevation="0">
           <div class="settings-card-header">
             <v-icon color="white" class="mr-2">mdi-chart-line</v-icon>
@@ -35,50 +32,37 @@
 
           <v-card-text class="pa-6">
             <p class="text-body-2 text-grey-darken-2 mb-5">
-              Selecciona cuáles tasas de cambio deseas ver en la barra superior del sistema.
+              Selecciona cuáles tasas deseas ver en la barra superior del sistema.
             </p>
 
             <!-- Dólar -->
-            <div class="pref-row mb-4">
+            <div class="pref-row mb-3">
               <div class="d-flex align-center ga-3">
                 <div class="currency-icon-wrap usd">
-                  <v-icon size="22" color="white">mdi-currency-usd</v-icon>
+                  <v-icon size="20" color="white">mdi-currency-usd</v-icon>
                 </div>
                 <div>
-                  <p class="font-weight-semibold mb-0" style="color:#1F355C;">Dólar Americano (USD)</p>
-                  <p class="text-caption text-grey ma-0">Tasa oficial BCV en tiempo real</p>
+                  <p class="font-weight-semibold mb-0" style="color:#1F355C;">Dólar (USD)</p>
+                  <p class="text-caption text-grey ma-0">Tasa oficial BCV</p>
                 </div>
               </div>
-              <v-switch
-                v-model="form.showUsdRate"
-                color="primary"
-                hide-details
-                inset
-                density="compact"
-              />
+              <v-switch v-model="form.showUsdRate" color="primary" hide-details inset density="compact" />
             </div>
 
             <!-- Euro -->
             <div class="pref-row">
               <div class="d-flex align-center ga-3">
                 <div class="currency-icon-wrap eur">
-                  <v-icon size="22" color="white">mdi-currency-eur</v-icon>
+                  <v-icon size="20" color="white">mdi-currency-eur</v-icon>
                 </div>
                 <div>
                   <p class="font-weight-semibold mb-0" style="color:#1F355C;">Euro (EUR)</p>
-                  <p class="text-caption text-grey ma-0">Tasa oficial BCV en tiempo real</p>
+                  <p class="text-caption text-grey ma-0">Tasa oficial BCV</p>
                 </div>
               </div>
-              <v-switch
-                v-model="form.showEurRate"
-                color="primary"
-                hide-details
-                inset
-                density="compact"
-              />
+              <v-switch v-model="form.showEurRate" color="primary" hide-details inset density="compact" />
             </div>
 
-            <!-- Aviso si ambas están desactivadas -->
             <v-alert
               v-if="!form.showUsdRate && !form.showEurRate"
               type="warning"
@@ -87,14 +71,14 @@
               class="mt-4"
               rounded="lg"
             >
-              Se recomienda mostrar al menos una tasa de cambio.
+              Se recomienda mostrar al menos una tasa.
             </v-alert>
           </v-card-text>
         </v-card>
       </v-col>
 
       <!-- ─── Notificaciones por Email ────────────────── -->
-      <v-col cols="12" md="6">
+      <v-col cols="12" md="7">
         <v-card class="settings-card h-100" rounded="xl" elevation="0">
           <div class="settings-card-header">
             <v-icon color="white" class="mr-2">mdi-email-outline</v-icon>
@@ -102,123 +86,174 @@
           </div>
 
           <v-card-text class="pa-6">
-            <p class="text-body-2 text-grey-darken-2 mb-5">
-              Recibirás un correo automático cuando registres un documento.
-              Puedes agregar correos adicionales (ej: tu contador) para que también los reciban.
-            </p>
 
-            <!-- Email principal del usuario (siempre incluido, no removible) -->
+            <!-- ── Correo principal (siempre, no configurable) ── -->
             <p class="text-caption font-weight-bold text-uppercase text-grey-darken-1 mb-2">
-              Correo principal (siempre incluido)
+              Correo principal
             </p>
             <div class="primary-email-row mb-5">
-              <div class="d-flex align-center ga-2">
+              <div class="d-flex align-center ga-2 flex-1">
                 <v-icon color="secondary" size="18">mdi-lock</v-icon>
                 <span class="text-body-2 font-weight-medium" style="color:#1F355C;">
                   {{ userEmail || 'Cargando...' }}
                 </span>
               </div>
-              <v-chip size="x-small" color="success" variant="tonal" class="ml-2">
-                Predeterminado
-              </v-chip>
-            </div>
-            <p class="text-caption font-weight-bold text-uppercase text-grey-darken-1 mb-2">
-              Correos adicionales
-            </p>
-
-            <!-- Lista de correos -->
-            <div v-if="form.notificationEmails.length > 0" class="mb-3">
-              <v-chip
-                v-for="(email, i) in form.notificationEmails"
-                :key="i"
-                closable
-                color="secondary"
-                variant="tonal"
-                class="mr-2 mb-2"
-                @click:close="removeEmail(i)"
-              >
-                <v-icon start size="14">mdi-email</v-icon>
-                {{ email }}
-              </v-chip>
+              <div class="d-flex align-center ga-1 flex-wrap">
+                <v-chip size="x-small" color="success" variant="flat">Predeterminado</v-chip>
+                <v-chip size="x-small" color="secondary" variant="tonal">Siempre recibe todo</v-chip>
+              </div>
             </div>
 
-            <!-- Input para agregar correo -->
-            <div class="d-flex ga-2 mb-5">
-              <v-text-field
-                v-model="newEmail"
-                placeholder="correo@ejemplo.com"
-                variant="outlined"
-                density="compact"
-                hide-details="auto"
-                :error-messages="emailError"
-                prepend-inner-icon="mdi-email-plus-outline"
-                @keyup.enter="addEmail"
-                style="flex:1;"
-              />
-              <v-btn
-                color="secondary"
-                variant="tonal"
-                @click="addEmail"
-                :disabled="!newEmail"
-                icon="mdi-plus"
-              />
-            </div>
-
-            <!-- Toggles por tipo de flujo -->
+            <!-- ── Correos adicionales ── -->
             <p class="text-caption font-weight-bold text-uppercase text-grey-darken-1 mb-3">
-              Enviar notificación cuando registro...
+              Correos adicionales
+              <span class="text-grey font-weight-regular normal-case ml-1">(opcional)</span>
             </p>
 
-            <div class="pref-row mb-3">
-              <div class="d-flex align-center ga-3">
-                <v-icon color="success" size="22">mdi-arrow-up-circle</v-icon>
-                <div>
-                  <p class="font-weight-semibold mb-0" style="color:#1F355C;">Una Venta</p>
-                  <p class="text-caption text-grey ma-0">Facturas y notas de venta</p>
+            <!-- Lista de correos adicionales con sus toggles -->
+            <div v-if="form.notificationEmails.length > 0" class="mb-4">
+              <div
+                v-for="(entry, i) in form.notificationEmails"
+                :key="i"
+                class="email-entry-card mb-3"
+              >
+                <!-- Email + botón eliminar -->
+                <div class="d-flex align-center justify-space-between mb-3">
+                  <div class="d-flex align-center ga-2">
+                    <v-icon color="secondary" size="16">mdi-email</v-icon>
+                    <span class="text-body-2 font-weight-medium" style="color:#1F355C;">
+                      {{ entry.email }}
+                    </span>
+                  </div>
+                  <v-btn
+                    icon="mdi-close"
+                    size="x-small"
+                    variant="text"
+                    color="error"
+                    @click="removeEmail(i)"
+                  />
+                </div>
+
+                <!-- Toggles de flujo para este correo -->
+                <p class="text-caption text-grey mb-2">Recibe notificación cuando registro:</p>
+                <div class="d-flex ga-2 flex-wrap">
+                  <v-chip
+                    :color="entry.notifyOnVenta ? 'success' : 'grey-lighten-2'"
+                    :variant="entry.notifyOnVenta ? 'flat' : 'tonal'"
+                    size="small"
+                    class="cursor-pointer flow-chip"
+                    prepend-icon="mdi-arrow-up-circle"
+                    @click="toggleFlow(i, 'notifyOnVenta')"
+                  >
+                    Venta
+                    <v-icon end size="14">{{ entry.notifyOnVenta ? 'mdi-check' : 'mdi-close' }}</v-icon>
+                  </v-chip>
+
+                  <v-chip
+                    :color="entry.notifyOnCompra ? 'primary' : 'grey-lighten-2'"
+                    :variant="entry.notifyOnCompra ? 'flat' : 'tonal'"
+                    size="small"
+                    class="cursor-pointer flow-chip"
+                    prepend-icon="mdi-arrow-down-circle"
+                    @click="toggleFlow(i, 'notifyOnCompra')"
+                  >
+                    Compra
+                    <v-icon end size="14">{{ entry.notifyOnCompra ? 'mdi-check' : 'mdi-close' }}</v-icon>
+                  </v-chip>
+
+                  <v-chip
+                    :color="entry.notifyOnGasto ? 'warning' : 'grey-lighten-2'"
+                    :variant="entry.notifyOnGasto ? 'flat' : 'tonal'"
+                    size="small"
+                    class="cursor-pointer flow-chip"
+                    prepend-icon="mdi-cash-minus"
+                    @click="toggleFlow(i, 'notifyOnGasto')"
+                  >
+                    Gasto
+                    <v-icon end size="14">{{ entry.notifyOnGasto ? 'mdi-check' : 'mdi-close' }}</v-icon>
+                  </v-chip>
                 </div>
               </div>
-              <v-switch
-                v-model="form.notifyOnVenta"
-                color="success"
-                hide-details
-                inset
-                density="compact"
-              />
             </div>
 
-            <div class="pref-row mb-3">
-              <div class="d-flex align-center ga-3">
-                <v-icon color="primary" size="22">mdi-arrow-down-circle</v-icon>
-                <div>
-                  <p class="font-weight-semibold mb-0" style="color:#1F355C;">Una Compra</p>
-                  <p class="text-caption text-grey ma-0">Facturas y notas de compra</p>
-                </div>
-              </div>
-              <v-switch
-                v-model="form.notifyOnCompra"
-                color="primary"
-                hide-details
-                inset
-                density="compact"
-              />
+            <!-- Estado vacío -->
+            <div v-else class="empty-emails mb-4">
+              <v-icon color="grey-lighten-1" size="32">mdi-email-plus-outline</v-icon>
+              <p class="text-caption text-grey mt-2 ma-0">
+                Agrega correos adicionales para que otras personas también reciban notificaciones.
+              </p>
             </div>
 
-            <div class="pref-row">
-              <div class="d-flex align-center ga-3">
-                <v-icon color="warning" size="22">mdi-cash-minus</v-icon>
-                <div>
-                  <p class="font-weight-semibold mb-0" style="color:#1F355C;">Un Gasto</p>
-                  <p class="text-caption text-grey ma-0">Registro de gastos operativos</p>
-                </div>
-              </div>
-              <v-switch
-                v-model="form.notifyOnGasto"
-                color="warning"
-                hide-details
-                inset
-                density="compact"
-              />
+            <!-- ── Formulario para agregar correo ── -->
+            <v-divider class="mb-4" />
+            <p class="text-caption font-weight-bold text-uppercase text-grey-darken-1 mb-3">
+              Agregar correo adicional
+            </p>
+
+            <v-text-field
+              v-model="newEmail"
+              placeholder="correo@ejemplo.com"
+              variant="outlined"
+              density="compact"
+              hide-details="auto"
+              :error-messages="emailError"
+              prepend-inner-icon="mdi-email-plus-outline"
+              class="mb-3"
+              @keyup.enter="addEmail"
+            />
+
+            <!-- Selección de flujos para el nuevo correo -->
+            <p class="text-caption text-grey-darken-1 mb-2">¿Cuándo notificar a este correo?</p>
+            <div class="d-flex ga-2 flex-wrap mb-4">
+              <v-chip
+                :color="newEmailFlows.notifyOnVenta ? 'success' : 'grey-lighten-2'"
+                :variant="newEmailFlows.notifyOnVenta ? 'flat' : 'tonal'"
+                size="small"
+                class="cursor-pointer flow-chip"
+                prepend-icon="mdi-arrow-up-circle"
+                @click="newEmailFlows.notifyOnVenta = !newEmailFlows.notifyOnVenta"
+              >
+                Venta
+                <v-icon end size="14">{{ newEmailFlows.notifyOnVenta ? 'mdi-check' : 'mdi-plus' }}</v-icon>
+              </v-chip>
+
+              <v-chip
+                :color="newEmailFlows.notifyOnCompra ? 'primary' : 'grey-lighten-2'"
+                :variant="newEmailFlows.notifyOnCompra ? 'flat' : 'tonal'"
+                size="small"
+                class="cursor-pointer flow-chip"
+                prepend-icon="mdi-arrow-down-circle"
+                @click="newEmailFlows.notifyOnCompra = !newEmailFlows.notifyOnCompra"
+              >
+                Compra
+                <v-icon end size="14">{{ newEmailFlows.notifyOnCompra ? 'mdi-check' : 'mdi-plus' }}</v-icon>
+              </v-chip>
+
+              <v-chip
+                :color="newEmailFlows.notifyOnGasto ? 'warning' : 'grey-lighten-2'"
+                :variant="newEmailFlows.notifyOnGasto ? 'flat' : 'tonal'"
+                size="small"
+                class="cursor-pointer flow-chip"
+                prepend-icon="mdi-cash-minus"
+                @click="newEmailFlows.notifyOnGasto = !newEmailFlows.notifyOnGasto"
+              >
+                Gasto
+                <v-icon end size="14">{{ newEmailFlows.notifyOnGasto ? 'mdi-check' : 'mdi-plus' }}</v-icon>
+              </v-chip>
             </div>
+
+            <v-btn
+              color="secondary"
+              variant="tonal"
+              prepend-icon="mdi-plus"
+              :disabled="!newEmail"
+              @click="addEmail"
+              block
+              rounded="lg"
+            >
+              Agregar correo
+            </v-btn>
+
           </v-card-text>
         </v-card>
       </v-col>
@@ -248,7 +283,7 @@
                 :disabled="!isDirty || saving"
                 @click="resetForm"
               >
-                Descartar cambios
+                Descartar
               </v-btn>
               <v-btn
                 color="primary"
@@ -290,21 +325,33 @@ export default {
   name: 'SettingsView',
 
   data() {
-    // Carga las configuraciones actuales como valores iniciales del formulario
     const saved = userSettingsService.getSettings()
     return {
-      // Copia del formulario (se compara con 'original' para detectar cambios)
-      form: { ...saved },
-      original: { ...saved },
+      form: {
+        ...saved,
+        // Asegurar que notificationEmails sea siempre array de objetos
+        notificationEmails: (saved.notificationEmails || []).map(e =>
+          typeof e === 'string'
+            ? { email: e, notifyOnVenta: true, notifyOnCompra: true, notifyOnGasto: false }
+            : e
+        ),
+      },
+      original: JSON.parse(JSON.stringify(saved)),
 
-      // Email principal del usuario (siempre incluido, no removible)
+      // Email del usuario registrado (siempre recibe todo)
       userEmail: '',
+
+      // Estado del formulario de nuevo correo
+      newEmail: '',
+      emailError: '',
+      newEmailFlows: {
+        notifyOnVenta:  true,
+        notifyOnCompra: true,
+        notifyOnGasto:  false,
+      },
 
       // Estado de UI
       saving: false,
-      newEmail: '',
-      emailError: '',
-
       snackbar: {
         show: false,
         text: '',
@@ -315,7 +362,6 @@ export default {
   },
 
   async mounted() {
-    // Cargar el email del usuario autenticado para mostrarlo como destinatario fijo
     try {
       const { data } = await supabase.auth.getUser()
       this.userEmail = data?.user?.email || ''
@@ -325,54 +371,73 @@ export default {
   },
 
   computed: {
-    /** Detecta si hay cambios sin guardar comparando form vs original */
     isDirty() {
       return JSON.stringify(this.form) !== JSON.stringify(this.original)
     },
   },
 
   methods: {
-    /** Agrega un correo a la lista de notificaciones */
+    /** Alterna un flujo (notifyOnVenta/Compra/Gasto) de un correo existente */
+    toggleFlow(index, field) {
+      // Crear una copia del array para que Vue detecte el cambio
+      const emails = [...this.form.notificationEmails]
+      emails[index] = { ...emails[index], [field]: !emails[index][field] }
+      this.form.notificationEmails = emails
+    },
+
+    /** Agrega un nuevo correo con sus flujos configurados */
     addEmail() {
       this.emailError = ''
       const email = this.newEmail.trim().toLowerCase()
 
       if (!email) return
 
-      // Validación básica de formato
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(email)) {
         this.emailError = 'Formato de correo inválido'
         return
       }
 
+      // Verificar que no sea el correo principal
+      if (email === this.userEmail) {
+        this.emailError = 'Este es tu correo principal, ya siempre recibe notificaciones'
+        return
+      }
+
       // Verificar duplicado
-      if (this.form.notificationEmails.includes(email)) {
+      if (this.form.notificationEmails.some(e => e.email === email)) {
         this.emailError = 'Este correo ya está en la lista'
         return
       }
 
-      // Agregar y limpiar input
-      this.form.notificationEmails = [...this.form.notificationEmails, email]
+      // Agregar con configuración de flujos seleccionada
+      this.form.notificationEmails = [
+        ...this.form.notificationEmails,
+        {
+          email,
+          notifyOnVenta:  this.newEmailFlows.notifyOnVenta,
+          notifyOnCompra: this.newEmailFlows.notifyOnCompra,
+          notifyOnGasto:  this.newEmailFlows.notifyOnGasto,
+        },
+      ]
+
+      // Limpiar formulario
       this.newEmail = ''
+      this.newEmailFlows = { notifyOnVenta: true, notifyOnCompra: true, notifyOnGasto: false }
     },
 
-    /** Elimina un correo de la lista por índice */
+    /** Elimina un correo adicional por índice */
     removeEmail(index) {
       this.form.notificationEmails = this.form.notificationEmails.filter((_, i) => i !== index)
     },
 
-    /** Guarda las configuraciones en localStorage y notifica al sistema */
+    /** Guarda las configuraciones */
     async saveSettings() {
       this.saving = true
-
-      // Simular un pequeño delay para que el usuario vea el loading
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(r => setTimeout(r, 400))
 
       userSettingsService.saveSettings({ ...this.form })
-
-      // Actualizar 'original' para que isDirty vuelva a false
-      this.original = { ...this.form }
+      this.original = JSON.parse(JSON.stringify(this.form))
       this.saving = false
 
       this.snackbar = {
@@ -383,9 +448,9 @@ export default {
       }
     },
 
-    /** Descarta los cambios y vuelve a los valores guardados */
+    /** Descarta los cambios y vuelve al estado guardado */
     resetForm() {
-      this.form = { ...this.original }
+      this.form = JSON.parse(JSON.stringify(this.original))
       this.newEmail = ''
       this.emailError = ''
     },
@@ -399,7 +464,6 @@ export default {
   margin: 0 auto;
 }
 
-/* Ícono del encabezado */
 .settings-icon-wrap {
   width: 52px;
   height: 52px;
@@ -412,7 +476,6 @@ export default {
   box-shadow: 0 4px 14px rgba(168, 28, 34, 0.3);
 }
 
-/* Tarjetas */
 .settings-card {
   border: 1px solid #e8ecf0;
   overflow: hidden;
@@ -422,7 +485,6 @@ export default {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
 }
 
-/* Header de cada tarjeta */
 .settings-card-header {
   background: linear-gradient(135deg, #1F355C, #2d4a7a);
   padding: 16px 24px;
@@ -434,18 +496,52 @@ export default {
   letter-spacing: 0.3px;
 }
 
-/* Fila del email principal */
+/* Email principal fijo */
 .primary-email-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
   border-radius: 10px;
   background: #eef2f7;
   border: 1px dashed #c5d0e0;
 }
 
-/* Fila de preferencia (label + switch) */
+/* Tarjeta de cada correo adicional */
+.email-entry-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f8f9fb;
+  border: 1px solid #e8ecf0;
+  transition: border-color 0.2s ease;
+}
+.email-entry-card:hover {
+  border-color: #c5d0e0;
+}
+
+/* Estado vacío */
+.empty-emails {
+  text-align: center;
+  padding: 20px;
+  background: #f8f9fb;
+  border-radius: 12px;
+  border: 1px dashed #dde2ea;
+}
+
+/* Chips de flujo clickeables */
+.flow-chip {
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.flow-chip:hover {
+  opacity: 0.85;
+  transform: scale(1.03);
+}
+
+/* Fila de preferencia (tasas) */
 .pref-row {
   display: flex;
   align-items: center;
@@ -459,26 +555,24 @@ export default {
   background: #f0f3f8;
 }
 
-/* Íconos de moneda */
 .currency-icon-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.currency-icon-wrap.usd {
-  background: linear-gradient(135deg, #1F355C, #2d4a7a);
-}
-.currency-icon-wrap.eur {
-  background: linear-gradient(135deg, #02254d, #1F355C);
-}
+.currency-icon-wrap.usd { background: linear-gradient(135deg, #1F355C, #2d4a7a); }
+.currency-icon-wrap.eur { background: linear-gradient(135deg, #02254d, #1F355C); }
 
 /* Barra de guardado */
 .save-bar {
   border: 1px solid #e8ecf0;
   background: #fff;
 }
+
+.normal-case { text-transform: none; }
+.flex-1 { flex: 1; }
 </style>
