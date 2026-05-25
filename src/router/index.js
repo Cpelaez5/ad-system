@@ -415,7 +415,7 @@ router.afterEach((to) => {
       // Fallback a la descripción por defecto del index.html
       metaDescription.setAttribute(
         'content', 
-        'AD Business System - Sistema de gestión contable, facturación inteligente, control de compras, gastos y expediente fiscal 360 para empresas y contadores.'
+        'AD System - Sistema de gestión contable, facturación inteligente, control de compras, gastos y expediente fiscal 360 para empresas y contadores.'
       )
     }
   }
