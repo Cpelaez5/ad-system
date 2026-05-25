@@ -6,6 +6,8 @@
     color="#010101"
     class="animate-slide-in-left"
     theme="dark"
+    @mouseenter="isExpanded = true"
+    @mouseleave="isExpanded = false"
   >
     <!-- Header del sidebar con logo (Fijo, no scrolleable) -->
     <template v-slot:prepend>
@@ -45,38 +47,48 @@
 
 
       
-        <v-list-group value="cliente-facturacion-group">
+        <!-- En modo contraído: solo ícono de Facturación → va directo a Todas -->
+        <v-list-item
+          v-if="!isExpanded"
+          :to="{ name: 'ClienteFacturacion', query: { tab: 'all' } }"
+          prepend-icon="mdi-receipt"
+          title="Facturación"
+          value="cliente-facturacion-rail"
+        ></v-list-item>
+
+        <!-- En modo expandido: dropdown con sub-pestañas -->
+        <v-list-group v-else value="cliente-facturacion-group">
           <template #activator="{ props }">
             <v-list-item
               v-bind="props"
               prepend-icon="mdi-receipt"
               title="Facturación"
               value="cliente-facturacion-activator"
-              @click="$router.push({ name: 'ClienteFacturacion', query: { tab: 'all' } })"
+              @click.stop="$router.push({ name: 'ClienteFacturacion', query: { tab: 'all' } })"
             ></v-list-item>
           </template>
-          
+
           <v-list-item
             :to="{ name: 'ClienteFacturacion', query: { tab: 'all' } }"
             prepend-icon="mdi-view-list"
             title="Todas"
             value="cliente-facturacion-todas"
           ></v-list-item>
-          
+
           <v-list-item
             :to="{ name: 'ClienteVentas' }"
             prepend-icon="mdi-cash-plus"
             title="Ventas"
             value="cliente-ventas"
           ></v-list-item>
-          
+
           <v-list-item
             :to="{ name: 'ClienteCompras' }"
             prepend-icon="mdi-cart"
             title="Compras"
             value="cliente-compras"
           ></v-list-item>
-          
+
           <v-list-item
             :to="{ name: 'ClienteGastos' }"
             prepend-icon="mdi-cash-minus"
@@ -231,6 +243,7 @@ export default {
   data() {
     return {
       currentUserData: null, // Almacenar usuario en data para reactividad
+      isExpanded: false,     // Controla si el sidebar está hovereado/expandido
     };
   },
   computed: {
