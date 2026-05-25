@@ -399,12 +399,20 @@
               title="Editar"
             ></v-btn>
             <v-btn
+              icon="mdi-file-pdf-box"
+              size="small"
+              color="error"
+              variant="text"
+              @click="downloadReceiptPdf(item)"
+              title="Descargar Recibo PDF"
+            ></v-btn>
+            <v-btn
               icon="mdi-download"
               size="small"
               color="success"
               variant="text"
               @click="exportInvoice(item)"
-              title="Exportar factura"
+              title="Exportar Excel"
             ></v-btn>
             <v-btn
               icon="mdi-delete"
@@ -609,6 +617,14 @@
         </v-card-text>
         <v-divider></v-divider>
         <v-card-actions class="pa-4 bg-grey-lighten-5">
+          <v-btn
+            color="error"
+            variant="tonal"
+            prepend-icon="mdi-file-pdf-box"
+            @click="downloadReceiptPdf(viewingInvoice)"
+          >
+            Descargar Recibo
+          </v-btn>
           <v-spacer></v-spacer>
           <v-btn color="primary" variant="elevated" @click="viewDialog = false" class="px-6">
             Cerrar
@@ -903,6 +919,7 @@ import exportService from '@/services/exportService.js';
 import ClientInvoiceForm from '@/components/forms/client/ClientInvoiceForm.vue';
 import SimpleInvoiceForm  from '@/components/forms/client/SimpleInvoiceForm.vue';
 import userService from '@/services/userService.js';
+import { generateReceiptPdf } from '@/services/receipt-pdf-service.js';
 import dayjs from 'dayjs';
 
 export default {
@@ -1903,6 +1920,16 @@ export default {
       this.filteredInvoices = [invoice];
       this.exportOptions.scope = 'filtered';
       this.showExportDialog = true;
+    },
+
+    /** Descarga un recibo PDF individual de la factura */
+    async downloadReceiptPdf(invoice) {
+      try {
+        await generateReceiptPdf(invoice)
+      } catch (error) {
+        console.error('Error generando recibo PDF:', error)
+        this.$root?.showSnackbar?.('Error al generar el recibo PDF', 'error')
+      }
     }
   }
 };
