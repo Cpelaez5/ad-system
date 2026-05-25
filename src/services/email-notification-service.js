@@ -97,11 +97,7 @@ class EmailNotificationService {
       const settings = userSettingsService.getSettings()
       const flow = invoiceData.flow || 'VENTA'
 
-      // Verificar si este flujo tiene notificaciones habilitadas
-      if (!this.isFlowEnabled(flow, settings)) {
-        console.log(`📧 [Email] Notificación omitida: flujo ${flow} desactivado en configuración`)
-        return { success: true, message: 'Notificación desactivada para este flujo' }
-      }
+
 
       // Obtener email del usuario autenticado (el cliente)
       const { data: authData } = await supabase.auth.getUser()
@@ -118,10 +114,12 @@ class EmailNotificationService {
         || `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim()
         || userEmail
 
-      // Construir lista de destinatarios: usuario principal + correos adicionales configurados
+      // Construir lista de destinatarios: usuario principal + correos adicionales configurados que acepten el flujo
       const allRecipients = [
         userEmail,
-        ...settings.notificationEmails.filter(e => e && e !== userEmail)
+        ...(settings.notificationEmails || [])
+          .filter(e => e && e.email && e.email !== userEmail && this.isEmailEnabledForFlow(e, flow))
+          .map(e => e.email)
       ]
 
       console.log(`📧 [Email] Enviando a ${allRecipients.length} destinatario(s):`, allRecipients)
