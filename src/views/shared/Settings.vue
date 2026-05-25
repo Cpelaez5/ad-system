@@ -290,9 +290,9 @@
     <!-- ═══════════════════════════════════════════════ -->
     <!-- BARRA DE ACCIÓN — GUARDAR                       -->
     <!-- ═══════════════════════════════════════════════ -->
-    <v-row class="mt-4">
+    <v-row :class="['mt-4', 'transition-all', { 'sticky-bottom': isDirty }]">
       <v-col cols="12">
-        <v-card class="save-bar" rounded="xl" elevation="0">
+        <v-card :class="['save-bar', { 'save-bar-active': isDirty }]" rounded="xl" elevation="0">
           <v-card-text class="d-flex align-center justify-space-between pa-4">
             <div class="d-flex align-center ga-2">
               <v-icon :color="isDirty ? 'warning' : 'success'" size="20">
@@ -598,6 +598,22 @@ export default {
 .save-bar {
   border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
   background: rgb(var(--v-theme-surface));
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.save-bar-active {
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(var(--v-theme-primary), 0.2) !important;
+}
+
+.sticky-bottom {
+  position: sticky;
+  bottom: 24px;
+  z-index: 90;
+}
+
+.transition-all {
+  transition: all 0.3s ease;
 }
 
 .normal-case { text-transform: none; }
