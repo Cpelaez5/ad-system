@@ -6,8 +6,8 @@
     color="#010101"
     class="animate-slide-in-left"
     theme="dark"
-    @mouseenter="isExpanded = true"
-    @mouseleave="isExpanded = false"
+    @mouseenter="handleSidebarEnter"
+    @mouseleave="handleSidebarLeave"
   >
     <!-- Header del sidebar con logo (Fijo, no scrolleable) -->
     <template v-slot:prepend>
@@ -68,33 +68,37 @@
             ></v-list-item>
           </template>
 
-          <v-list-item
-            :to="{ name: 'ClienteFacturacion', query: { tab: 'all' } }"
-            prepend-icon="mdi-view-list"
-            title="Todas"
-            value="cliente-facturacion-todas"
-          ></v-list-item>
+          <transition name="facturacion-sub">
+            <div class="facturacion-subitems">
+              <v-list-item
+                :to="{ name: 'ClienteFacturacion', query: { tab: 'all' } }"
+                prepend-icon="mdi-view-list"
+                title="Todas"
+                value="cliente-facturacion-todas"
+              ></v-list-item>
 
-          <v-list-item
-            :to="{ name: 'ClienteVentas' }"
-            prepend-icon="mdi-cash-plus"
-            title="Ventas"
-            value="cliente-ventas"
-          ></v-list-item>
+              <v-list-item
+                :to="{ name: 'ClienteVentas' }"
+                prepend-icon="mdi-cash-plus"
+                title="Ventas"
+                value="cliente-ventas"
+              ></v-list-item>
 
-          <v-list-item
-            :to="{ name: 'ClienteCompras' }"
-            prepend-icon="mdi-cart"
-            title="Compras"
-            value="cliente-compras"
-          ></v-list-item>
+              <v-list-item
+                :to="{ name: 'ClienteCompras' }"
+                prepend-icon="mdi-cart"
+                title="Compras"
+                value="cliente-compras"
+              ></v-list-item>
 
-          <v-list-item
-            :to="{ name: 'ClienteGastos' }"
-            prepend-icon="mdi-cash-minus"
-            title="Gastos"
-            value="cliente-gastos"
-          ></v-list-item>
+              <v-list-item
+                :to="{ name: 'ClienteGastos' }"
+                prepend-icon="mdi-cash-minus"
+                title="Gastos"
+                value="cliente-gastos"
+              ></v-list-item>
+            </div>
+          </transition>
         </v-list-group>
 
         <v-list-item
@@ -244,6 +248,7 @@ export default {
     return {
       currentUserData: null, // Almacenar usuario en data para reactividad
       isExpanded: false,     // Controla si el sidebar está hovereado/expandido
+      collapseTimer: null,   // Timer para delay en el cierre del dropdown
     };
   },
   computed: {
@@ -331,6 +336,17 @@ export default {
         console.error("Error verificando permisos:", error);
         return false;
       }
+    },
+    /** Expande inmediatamente al hacer hover */
+    handleSidebarEnter() {
+      clearTimeout(this.collapseTimer)
+      this.isExpanded = true
+    },
+    /** Espera 280ms antes de contraer (coincide con la animación del drawer de Vuetify ~300ms) */
+    handleSidebarLeave() {
+      this.collapseTimer = setTimeout(() => {
+        this.isExpanded = false
+      }, 280)
     },
     async logout() {
       console.log("🔴 Cerrando sesión...");
@@ -500,5 +516,26 @@ export default {
 /* Ocultar el icono de flecha del group en modo rail */
 :deep(.v-navigation-drawer--rail) .v-list-group__header .v-list-item__append {
   display: none !important;
+}
+
+/* ─── Transición suave del sub-menú de Facturación ──────────────────────── */
+.facturacion-sub-enter-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.facturacion-sub-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.facturacion-sub-enter-from {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.facturacion-sub-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* Contenedor de los sub-items para que la transición funcione correctamente */
+.facturacion-subitems {
+  overflow: hidden;
 }
 </style>
