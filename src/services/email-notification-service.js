@@ -114,13 +114,25 @@ class EmailNotificationService {
         || `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim()
         || userEmail
 
-      // Construir lista de destinatarios: usuario principal + correos adicionales configurados que acepten el flujo
-      const allRecipients = [
-        userEmail,
-        ...(settings.notificationEmails || [])
-          .filter(e => e && e.email && e.email !== userEmail && this.isEmailEnabledForFlow(e, flow))
-          .map(e => e.email)
-      ]
+      // Construir lista de destinatarios según configuración del usuario
+      const allRecipients = []
+
+      // Correo principal: solo incluir si el usuario lo tiene activo (por defecto: true)
+      if (settings.notifyPrimaryEmail !== false) {
+        allRecipients.push(userEmail)
+      }
+
+      // Correos adicionales: filtrar por flujo configurado individualmente
+      const additionalEmails = (settings.notificationEmails || [])
+        .filter(e => e && e.email && e.email !== userEmail && this.isEmailEnabledForFlow(e, flow))
+        .map(e => e.email)
+      allRecipients.push(...additionalEmails)
+
+      // Si no hay destinatarios, no enviar nada
+      if (allRecipients.length === 0) {
+        console.log(`📧 [Email] Sin destinatarios configurados para flujo ${flow} — no se envía correo`)
+        return { success: true, message: 'Sin destinatarios configurados' }
+      }
 
       console.log(`📧 [Email] Enviando a ${allRecipients.length} destinatario(s):`, allRecipients)
 

@@ -114,22 +114,38 @@
 
           <v-card-text class="pa-6">
 
-            <!-- ── Correo principal (siempre, no configurable) ── -->
+            <!-- ── Correo principal (configurable) ── -->
             <p class="text-caption font-weight-bold text-uppercase text-grey-darken-1 mb-2">
               Correo principal
             </p>
             <div class="primary-email-row mb-5">
               <div class="d-flex align-center ga-2 flex-1">
-                <v-icon color="secondary" size="18">mdi-lock</v-icon>
+                <v-icon color="secondary" size="18">mdi-shield-account</v-icon>
                 <span class="text-body-2 font-weight-medium text-high-emphasis">
                   {{ userEmail || 'Cargando...' }}
                 </span>
               </div>
               <div class="d-flex align-center ga-1 flex-wrap">
-                <v-chip size="x-small" color="success" variant="flat">Predeterminado</v-chip>
-                <v-chip size="x-small" color="secondary" variant="tonal">Siempre recibe todo</v-chip>
+                <v-chip size="x-small" color="secondary" variant="tonal">Cuenta registrada</v-chip>
+                <v-switch
+                  v-model="form.notifyPrimaryEmail"
+                  color="success"
+                  hide-details
+                  inset
+                  density="compact"
+                />
               </div>
             </div>
+            <v-alert
+              v-if="!form.notifyPrimaryEmail"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-5"
+              rounded="lg"
+            >
+              No recibirás notificaciones en tu correo principal. Si no tienes correos adicionales activos, no se enviará ningún correo.
+            </v-alert>
 
             <!-- ── Correos adicionales ── -->
             <p class="text-caption font-weight-bold text-uppercase text-grey-darken-1 mb-3">
@@ -352,6 +368,7 @@ export default {
   name: 'SettingsView',
 
   data() {
+    // Carga síncrona desde cache local (instantánea)
     const saved = userSettingsService.getSettings()
     return {
       form: {
@@ -365,8 +382,11 @@ export default {
       },
       original: JSON.parse(JSON.stringify(saved)),
 
-      // Email del usuario registrado (siempre recibe todo)
+      // Email del usuario registrado
       userEmail: '',
+
+      // Indica si estamos cargando datos desde Supabase
+      loadingRemote: true,
 
       // Estado del formulario de nuevo correo
       newEmail: '',
@@ -390,10 +410,29 @@ export default {
 
   async mounted() {
     try {
+      // Obtener email del usuario autenticado
       const { data } = await supabase.auth.getUser()
       this.userEmail = data?.user?.email || ''
     } catch (e) {
       console.warn('No se pudo obtener email del usuario:', e)
+    }
+
+    // Cargar configuración fresca desde Supabase (reemplaza cache local si hay datos remotos)
+    try {
+      const remote = await userSettingsService.loadFromSupabase()
+      this.form = {
+        ...remote,
+        notificationEmails: (remote.notificationEmails || []).map(e =>
+          typeof e === 'string'
+            ? { email: e, notifyOnVenta: true, notifyOnCompra: true, notifyOnGasto: false }
+            : e
+        ),
+      }
+      this.original = JSON.parse(JSON.stringify(this.form))
+    } catch (e) {
+      console.warn('No se pudo cargar configuración remota:', e)
+    } finally {
+      this.loadingRemote = false
     }
   },
 
@@ -458,20 +497,39 @@ export default {
       this.form.notificationEmails = this.form.notificationEmails.filter((_, i) => i !== index)
     },
 
-    /** Guarda las configuraciones */
+    /** Guarda las configuraciones en localStorage + Supabase */
     async saveSettings() {
       this.saving = true
-      await new Promise(r => setTimeout(r, 400))
 
-      userSettingsService.saveSettings({ ...this.form })
-      this.original = JSON.parse(JSON.stringify(this.form))
-      this.saving = false
+      try {
+        const result = await userSettingsService.saveSettings({ ...this.form })
+        this.original = JSON.parse(JSON.stringify(this.form))
 
-      this.snackbar = {
-        show: true,
-        text: '¡Configuración guardada correctamente!',
-        color: 'success',
-        icon: 'mdi-check-circle',
+        if (result.success) {
+          this.snackbar = {
+            show: true,
+            text: '¡Configuración guardada correctamente!',
+            color: 'success',
+            icon: 'mdi-check-circle',
+          }
+        } else {
+          // Se guardó localmente pero falló Supabase
+          this.snackbar = {
+            show: true,
+            text: 'Guardado localmente. Se sincronizará cuando haya conexión.',
+            color: 'warning',
+            icon: 'mdi-cloud-off-outline',
+          }
+        }
+      } catch (e) {
+        this.snackbar = {
+          show: true,
+          text: 'Error al guardar. Intenta nuevamente.',
+          color: 'error',
+          icon: 'mdi-alert-circle',
+        }
+      } finally {
+        this.saving = false
       }
     },
 

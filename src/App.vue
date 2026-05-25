@@ -65,9 +65,18 @@ export default {
       this.$vuetify.theme.global.name = settings.forceDarkMode ? 'dark' : 'light';
     }
   },
-  mounted() {
+  async mounted() {
+    // 1. Aplicar tema inmediato desde cache local (sin latencia)
     this.applyThemeMode();
     window.addEventListener('ad-settings-changed', this.onSettingsChanged);
+
+    // 2. Sincronizar con Supabase en background (actualiza theme si difiere)
+    try {
+      await userSettingsService.loadFromSupabase();
+      this.applyThemeMode();
+    } catch (e) {
+      // Silencioso: cache local ya aplica el tema
+    }
   },
   beforeUnmount() {
     window.removeEventListener('ad-settings-changed', this.onSettingsChanged);
