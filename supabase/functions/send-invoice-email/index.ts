@@ -99,7 +99,7 @@ function buildEmailHtml(payload: {
   <!-- Header -->
   <tr>
     <td style="background:${SECONDARY};padding:28px 32px;text-align:center;">
-      <img src="${LOGO_URL}" alt="AD System" width="48" height="48" style="display:inline-block;vertical-align:middle;margin-right:12px;filter:brightness(0) invert(1);">
+      <img src="${LOGO_URL}" alt="AD System" height="48" style="display:inline-block;vertical-align:middle;margin-right:12px;">
       <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:1px;">AD System</span>
     </td>
   </tr>
