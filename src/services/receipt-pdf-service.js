@@ -320,11 +320,12 @@ function drawDates(doc, invoice, pageWidth, y) {
   doc.setFont('helvetica', 'normal')
   doc.text(fmtDate(invoice.dueDate), MARGIN + thirdWidth + 32, y + 2)
 
-  // Moneda
+  // Moneda (nombre legible)
+  const currencyLabels = { VES: 'Bolivares (VES)', USD: 'Dolar (USD)', EUR: 'Euro (EUR)' }
   doc.setFont('helvetica', 'bold')
   doc.text('Moneda:', MARGIN + thirdWidth * 2 + 5, y + 2)
   doc.setFont('helvetica', 'normal')
-  doc.text(currency, MARGIN + thirdWidth * 2 + 23, y + 2)
+  doc.text(currencyLabels[currency] || currency, MARGIN + thirdWidth * 2 + 23, y + 2)
 
   return y + 18
 }
