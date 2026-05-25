@@ -129,10 +129,21 @@ async function resetSettings() {
   return saveSettings({ ...DEFAULT_SETTINGS })
 }
 
+/**
+ * Limpia la caché local (localStorage) sin afectar Supabase.
+ * Útil para cuando el usuario cierra sesión.
+ */
+function clearLocalCache() {
+  localStorage.removeItem(STORAGE_KEY)
+  // Opcional: emitir evento con defaults para que la UI regrese a modo light inmediatamente
+  window.dispatchEvent(new CustomEvent('ad-settings-changed', { detail: DEFAULT_SETTINGS }))
+}
+
 export default {
   getSettings,
   saveSettings,
   loadFromSupabase,
   resetSettings,
+  clearLocalCache,
   DEFAULT_SETTINGS,
 }
