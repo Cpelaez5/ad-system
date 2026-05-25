@@ -61,7 +61,6 @@
             prepend-icon="mdi-view-list"
             title="Todas"
             value="cliente-facturacion-todas"
-            class="pl-10"
           ></v-list-item>
           
           <v-list-item
@@ -69,7 +68,6 @@
             prepend-icon="mdi-cash-plus"
             title="Ventas"
             value="cliente-ventas"
-            class="pl-10"
           ></v-list-item>
           
           <v-list-item
@@ -77,7 +75,6 @@
             prepend-icon="mdi-cart"
             title="Compras"
             value="cliente-compras"
-            class="pl-10"
           ></v-list-item>
           
           <v-list-item
@@ -85,7 +82,6 @@
             prepend-icon="mdi-cash-minus"
             title="Gastos"
             value="cliente-gastos"
-            class="pl-10"
           ></v-list-item>
         </v-list-group>
 
@@ -481,5 +477,15 @@ export default {
 
 .v-navigation-drawer ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* Identación para sub-ítems solo cuando está expandido */
+:deep(.v-navigation-drawer:not(.v-navigation-drawer--rail)) .v-list-group__items .v-list-item {
+  padding-left: 32px !important;
+}
+
+/* Ocultar el icono de flecha del group en modo rail */
+:deep(.v-navigation-drawer--rail) .v-list-group__header .v-list-item__append {
+  display: none !important;
 }
 </style>
