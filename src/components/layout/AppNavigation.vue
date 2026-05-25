@@ -26,6 +26,7 @@
     <div class="bcv-rate-display mr-4 d-flex align-center ga-2">
       <!-- Chip Dólar -->
       <ExchangeRateChip
+        v-if="showUsdRate"
         currency="USD"
         :rate-value="bcvRate?.dollar"
         :trend="bcvRate?.trend"
@@ -39,7 +40,7 @@
 
       <!-- Chip Euro -->
       <ExchangeRateChip
-        v-if="!bcvLoading && bcvRate?.euro"
+        v-if="showEurRate && !bcvLoading && bcvRate?.euro"
         currency="EUR"
         :rate-value="bcvRate?.euro"
         :trend="bcvRate?.trendEur"
@@ -101,6 +102,7 @@ import Sidebar from './Sidebar.vue';
 import TrialBanner from './TrialBanner.vue';
 import ExchangeRateChip from '@/components/common/ExchangeRateChip.vue';
 import { supabase } from '@/lib/supabaseClient';
+import userSettingsService from '@/services/user-settings-service.js';
 
 export default {
 	name: 'AppNavigation',
@@ -112,7 +114,10 @@ export default {
 			bcvError: false,
 			sidebarExpanded: false,
 			userPlan: null,
-      showTrialBanner: false
+      showTrialBanner: false,
+      // Preferencias de tasas de cambio
+      showUsdRate: true,
+      showEurRate: true,
 		}
 	},
 	computed: {
@@ -132,7 +137,13 @@ export default {
 		this.bcvInterval = setInterval(() => {
 			this.loadBCVRate();
 		}, 10 * 60 * 1000);
-    
+
+		// Cargar preferencias de visualización de tasas
+		this.loadRatePreferences();
+
+		// Escuchar cambios de configuración en tiempo real
+		window.addEventListener('ad-settings-changed', this.onSettingsChanged);
+
 		// Detectar cambios en el sidebar
 		this.setupSidebarObserver();
 	},
@@ -140,6 +151,8 @@ export default {
 		if (this.bcvInterval) {
 			clearInterval(this.bcvInterval);
 		}
+		// Desconectar listeners de configuración
+		window.removeEventListener('ad-settings-changed', this.onSettingsChanged);
 		// Desconectar observers si existen
 		if (this.sidebarObserver && typeof this.sidebarObserver.disconnect === 'function') {
 			try { this.sidebarObserver.disconnect(); } catch (e) { /* ignore */ }
@@ -149,6 +162,20 @@ export default {
 		}
 	},
 	methods: {
+    // Carga las preferencias de tasas desde el servicio de configuración
+    loadRatePreferences() {
+      const settings = userSettingsService.getSettings()
+      this.showUsdRate = settings.showUsdRate
+      this.showEurRate = settings.showEurRate
+    },
+
+    // Responde a cambios de configuración emitidos desde Settings.vue
+    onSettingsChanged(event) {
+      const settings = event.detail
+      this.showUsdRate = settings.showUsdRate
+      this.showEurRate = settings.showEurRate
+    },
+
     handleBannerVisibility(isVisible) {
       this.showTrialBanner = isVisible;
       this.$emit('banner-visibility-change', isVisible);

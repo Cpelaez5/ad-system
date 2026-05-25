@@ -15,6 +15,7 @@ const ClienteGastos = () => import('../views/cliente/Gastos.vue')
 const ClienteVentas = () => import('../views/cliente/Ventas.vue')
 const ClienteArchivo = () => import('../views/cliente/Archivo.vue')
 const ClienteFacturacion = () => import('../views/cliente/Facturacion.vue')
+const Settings = () => import('../views/shared/Settings.vue')
 
 // Vistas para contador y admin
 const ContadorArea = () => import('../views/contador/ContadorArea.vue')
@@ -236,7 +237,7 @@ const routes = [
   {
     path: '/settings',
     name: 'Settings',
-    component: Dashboard, // Temporalmente usar Dashboard
+    component: Settings,
     meta: { requiresAuth: true, title: 'Configuración' }
   },
   {
