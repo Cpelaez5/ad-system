@@ -284,11 +284,14 @@ export default {
 			console.log('🔵 Usuario actual:', this.currentUser)
 		},
     
-		logout() {
+		async logout() {
 			console.log('🔴 Cerrando sesión...')
-			localStorage.removeItem('usuarioAutenticado')
-			localStorage.removeItem('currentUser')
-			localStorage.removeItem('authToken')
+			try {
+				const { default: userService } = await import('@/services/userService')
+				await userService.logout()
+			} catch (error) {
+				console.error('Error al cerrar sesión:', error)
+			}
 			this.$router.push('/login')
 		},
     

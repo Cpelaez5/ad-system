@@ -340,11 +340,7 @@ export default {
       } catch (error) {
         console.error('Error al cerrar sesión:', error);
       }
-      localStorage.removeItem("usuarioAutenticado");
-      localStorage.removeItem("currentUser");
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("current_organization_id");
-      this.$router.push("/login");
+      this.$router.push('/login');
     },
   },
 };
