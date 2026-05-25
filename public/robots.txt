@@ -25,5 +25,5 @@ Disallow: /settings
 # Evitar indexación de recursos API locales o mocks
 Disallow: /api/
 
-# Ruta al sitemap (puedes actualizar el dominio cuando esté en producción)
-Sitemap: https://ad-system.com/sitemap.xml
+# Ruta al sitemap
+Sitemap: https://ad-businessgroup.netlify.app/sitemap.xml
