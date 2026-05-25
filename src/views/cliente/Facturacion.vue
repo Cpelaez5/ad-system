@@ -916,6 +916,7 @@ import CustomDatePicker from '@/components/common/CustomDatePicker.vue'
 import invoiceService from '@/services/invoiceService.js';
 import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
+import emailNotificationService from '@/services/email-notification-service.js';
 import ClientInvoiceForm from '@/components/forms/client/ClientInvoiceForm.vue';
 import SimpleInvoiceForm  from '@/components/forms/client/SimpleInvoiceForm.vue';
 import userService from '@/services/userService.js';
@@ -1502,6 +1503,12 @@ export default {
           savedResult = await invoiceService.updateInvoice(formData.id, formData);
         } else {
           savedResult = await invoiceService.createInvoice(formData);
+        }
+
+        // Enviar notificación por email en background (solo al crear, no al editar)
+        if (savedResult?.success && savedResult?.data && !formData.id) {
+          emailNotificationService.notifyInvoiceCreated(savedResult.data)
+            .catch(err => console.warn('⚠️ Email no enviado:', err))
         }
 
         // Notificar al SimpleInvoiceForm que terminó con éxito
