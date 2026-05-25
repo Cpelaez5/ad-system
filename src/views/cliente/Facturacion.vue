@@ -1117,8 +1117,15 @@ export default {
           query: { ...this.$route.query, tab: this.currentTab } 
         }).catch(() => {});
       }
-    }
-    ,
+    },
+    '$route.query.tab': {
+      handler(newTab) {
+        if (newTab && newTab !== this.currentTab) {
+          this.currentTab = newTab;
+        }
+      },
+      immediate: true
+    },
     currencyDisplay: {
       async handler(newCurrency) {
         this.isChangingCurrency = true;

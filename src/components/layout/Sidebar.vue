@@ -45,21 +45,49 @@
 
 
       
-        <v-list-item
-          v-if="isCliente"
-          :to="{ name: 'ClienteVentas' }"
-          prepend-icon="mdi-receipt"
-          title="Facturación"
-          value="cliente-facturacion"
-        ></v-list-item>
-       
-
-        <!-- <v-list-item
-          :to="{ name: 'ClienteArchivo' }"
-          prepend-icon="mdi-folder-multiple"
-          title="Mis Documentos"
-          value="cliente-archivo"
-        ></v-list-item> -->
+        <v-list-group value="cliente-facturacion-group">
+          <template #activator="{ props }">
+            <v-list-item
+              v-bind="props"
+              prepend-icon="mdi-receipt"
+              title="Facturación"
+              value="cliente-facturacion-activator"
+              @click="$router.push({ name: 'ClienteFacturacion', query: { tab: 'all' } })"
+            ></v-list-item>
+          </template>
+          
+          <v-list-item
+            :to="{ name: 'ClienteFacturacion', query: { tab: 'all' } }"
+            prepend-icon="mdi-view-list"
+            title="Todas"
+            value="cliente-facturacion-todas"
+            class="pl-10"
+          ></v-list-item>
+          
+          <v-list-item
+            :to="{ name: 'ClienteVentas' }"
+            prepend-icon="mdi-cash-plus"
+            title="Ventas"
+            value="cliente-ventas"
+            class="pl-10"
+          ></v-list-item>
+          
+          <v-list-item
+            :to="{ name: 'ClienteCompras' }"
+            prepend-icon="mdi-cart"
+            title="Compras"
+            value="cliente-compras"
+            class="pl-10"
+          ></v-list-item>
+          
+          <v-list-item
+            :to="{ name: 'ClienteGastos' }"
+            prepend-icon="mdi-cash-minus"
+            title="Gastos"
+            value="cliente-gastos"
+            class="pl-10"
+          ></v-list-item>
+        </v-list-group>
 
         <v-list-item
           :to="{ name: 'ClienteFiscal360' }"
