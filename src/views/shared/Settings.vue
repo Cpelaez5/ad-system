@@ -36,7 +36,7 @@
                   <v-icon size="20" color="white">mdi-theme-light-dark</v-icon>
                 </div>
                 <div>
-                  <p class="font-weight-semibold mb-0" style="color:#1F355C;">Modo Oscuro Forzado</p>
+                  <p class="font-weight-semibold mb-0 text-high-emphasis">Modo Oscuro</p>
                   <p class="text-caption text-grey ma-0">Aplica un tema oscuro a toda la aplicación</p>
                 </div>
               </div>
@@ -69,7 +69,7 @@
                   <v-icon size="20" color="white">mdi-currency-usd</v-icon>
                 </div>
                 <div>
-                  <p class="font-weight-semibold mb-0" style="color:#1F355C;">Dólar (USD)</p>
+                  <p class="font-weight-semibold mb-0 text-high-emphasis">Dólar (USD)</p>
                   <p class="text-caption text-grey ma-0">Tasa oficial BCV</p>
                 </div>
               </div>
@@ -83,7 +83,7 @@
                   <v-icon size="20" color="white">mdi-currency-eur</v-icon>
                 </div>
                 <div>
-                  <p class="font-weight-semibold mb-0" style="color:#1F355C;">Euro (EUR)</p>
+                  <p class="font-weight-semibold mb-0 text-high-emphasis">Euro (EUR)</p>
                   <p class="text-caption text-grey ma-0">Tasa oficial BCV</p>
                 </div>
               </div>
@@ -121,7 +121,7 @@
             <div class="primary-email-row mb-5">
               <div class="d-flex align-center ga-2 flex-1">
                 <v-icon color="secondary" size="18">mdi-lock</v-icon>
-                <span class="text-body-2 font-weight-medium" style="color:#1F355C;">
+                <span class="text-body-2 font-weight-medium text-high-emphasis">
                   {{ userEmail || 'Cargando...' }}
                 </span>
               </div>
@@ -148,7 +148,7 @@
                 <div class="d-flex align-center justify-space-between mb-3">
                   <div class="d-flex align-center ga-2">
                     <v-icon color="secondary" size="16">mdi-email</v-icon>
-                    <span class="text-body-2 font-weight-medium" style="color:#1F355C;">
+                    <span class="text-body-2 font-weight-medium text-high-emphasis">
                       {{ entry.email }}
                     </span>
                   </div>
@@ -532,29 +532,29 @@ export default {
   gap: 8px;
   padding: 12px 16px;
   border-radius: 10px;
-  background: #eef2f7;
-  border: 1px dashed #c5d0e0;
+  background: rgba(var(--v-theme-on-surface), 0.05);
+  border: 1px dashed rgba(var(--v-theme-on-surface), 0.15);
 }
 
 /* Tarjeta de cada correo adicional */
 .email-entry-card {
   padding: 14px 16px;
   border-radius: 12px;
-  background: #f8f9fb;
-  border: 1px solid #e8ecf0;
+  background: rgba(var(--v-theme-on-surface), 0.02);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
   transition: border-color 0.2s ease;
 }
 .email-entry-card:hover {
-  border-color: #c5d0e0;
+  border-color: rgba(var(--v-theme-on-surface), 0.2);
 }
 
 /* Estado vacío */
 .empty-emails {
   text-align: center;
   padding: 20px;
-  background: #f8f9fb;
+  background: rgba(var(--v-theme-on-surface), 0.02);
   border-radius: 12px;
-  border: 1px dashed #dde2ea;
+  border: 1px dashed rgba(var(--v-theme-on-surface), 0.15);
 }
 
 /* Chips de flujo clickeables */
@@ -575,11 +575,11 @@ export default {
   justify-content: space-between;
   padding: 12px 16px;
   border-radius: 12px;
-  background: #f8f9fb;
+  background: rgba(var(--v-theme-on-surface), 0.02);
   transition: background 0.2s ease;
 }
 .pref-row:hover {
-  background: #f0f3f8;
+  background: rgba(var(--v-theme-on-surface), 0.06);
 }
 
 .currency-icon-wrap {
@@ -596,8 +596,8 @@ export default {
 
 /* Barra de guardado */
 .save-bar {
-  border: 1px solid #e8ecf0;
-  background: #fff;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  background: rgb(var(--v-theme-surface));
 }
 
 .normal-case { text-transform: none; }
