@@ -16,7 +16,14 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
-      open: true
+      open: true,
+      proxy: {
+        '/api/ai': {
+          target: env.VITE_NVIDIA_PROXY_TARGET || 'https://integrate.api.nvidia.com/v1',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/ai/, '')
+        }
+      }
     },
     css: {
       preprocessorOptions: {

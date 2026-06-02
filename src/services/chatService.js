@@ -11,14 +11,33 @@
  */
 
 import { supabase } from '@/lib/supabaseClient'
+import OpenAI from 'openai'
 
 // ═══════════════════════════════════════════════════
-// CONFIGURACIÓN DE DeepSeek API
+// CONFIGURACIÓN DE IA MULTIPROVEEDOR
 // ═══════════════════════════════════════════════════
 
+const ACTIVE_PROVIDER = import.meta.env.VITE_ACTIVE_AI_PROVIDER || 'deepseek'
+
+// -- Config DeepSeek Original --
 const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY
 const DEEPSEEK_API_URL = import.meta.env.VITE_DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions'
 const DEEPSEEK_MODEL = 'deepseek-chat'
+
+// -- Config Nvidia (Minimax) --
+const NVIDIA_API_KEY = import.meta.env.VITE_NVIDIA_API_KEY
+const NVIDIA_MODEL = import.meta.env.VITE_NVIDIA_MODEL || 'minimaxai/minimax-m2.7'
+let NVIDIA_API_URL = import.meta.env.VITE_NVIDIA_API_URL || '/api/ai'
+
+if (NVIDIA_API_URL && NVIDIA_API_URL.startsWith('/')) {
+  NVIDIA_API_URL = window.location.origin + NVIDIA_API_URL
+}
+
+const nvidiaClient = new OpenAI({
+  apiKey: NVIDIA_API_KEY,
+  baseURL: NVIDIA_API_URL,
+  dangerouslyAllowBrowser: true // Requerido para usar el SDK desde Vue (cliente)
+})
 
 // ═══════════════════════════════════════════════════
 // LÍMITES POR PLAN (Infraestructura lógica)
@@ -306,39 +325,99 @@ class ChatService {
       viewContext.queryParams
     )
 
-    // Construir array de mensajes para la API
+    // Asegurar que no haya roles duplicados consecutivos para no romper modelos estrictos (como Gemma 3)
+    const rawHistory = [...conversationHistory]
+    
+    // Si la vista ya metió el mensaje actual al final del historial, lo quitamos temporalmente
+    if (rawHistory.length > 0 && 
+        rawHistory[rawHistory.length - 1].role === 'user' && 
+        rawHistory[rawHistory.length - 1].content === userMessage) {
+      rawHistory.pop()
+    }
+
+    // Filtrar para asegurar alternancia de roles
+    const safeHistory = []
+    let lastRole = 'system'
+
+    for (const msg of rawHistory.slice(-10)) {
+      if (msg.role !== lastRole) {
+        safeHistory.push(msg)
+        lastRole = msg.role
+      }
+    }
+
+    // Construir array final de mensajes para la API
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...conversationHistory.slice(-10), // Últimos 10 mensajes para contexto (control de tokens)
-      { role: 'user', content: userMessage }
+      ...safeHistory
     ]
+    
+    // Siempre terminar con el mensaje actual del usuario
+    if (lastRole !== 'user') {
+      messages.push({ role: 'user', content: userMessage })
+    } else {
+      // Si el historial sin el mensaje actual terminaba en user, hubo un error de flujo.
+      // Reemplazamos el último mensaje por el actual para forzar la alternancia.
+      messages[messages.length - 1] = { role: 'user', content: userMessage }
+    }
 
     try {
-      const response = await fetch(DEEPSEEK_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: DEEPSEEK_MODEL,
-          messages,
-          temperature: 0.7,
-          max_tokens: 500,
-          top_p: 0.9
+      if (ACTIVE_PROVIDER === 'nvidia') {
+        // ---- FLUJO NVIDIA (Fetch Directo) ----
+        // Evitamos el SDK de OpenAI porque añade metadatos que el modelo Gemma 3 rechaza (HTTP 400)
+        const response = await fetch(`${NVIDIA_API_URL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${NVIDIA_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: NVIDIA_MODEL,
+            messages,
+            temperature: 0.7,
+            top_p: 0.95,
+            max_tokens: 1000,
+            stream: false
+          })
         })
-      })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error?.message || `Error HTTP ${response.status}`)
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error("Nvidia API Error:", errorData)
+          throw new Error(errorData.detail || errorData.error?.message || `Error HTTP ${response.status}`)
+        }
+
+        const data = await response.json()
+        return data.choices[0].message.content
+        
+      } else {
+        // ---- FLUJO DEEPSEEK (Fetch Directo Original) ----
+        const response = await fetch(DEEPSEEK_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: DEEPSEEK_MODEL,
+            messages,
+            temperature: 0.7,
+            max_tokens: 500,
+            top_p: 0.9
+          })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error?.message || `Error HTTP ${response.status}`)
+        }
+
+        const data = await response.json()
+        return data.choices[0].message.content
       }
 
-      const data = await response.json()
-      return data.choices[0].message.content
-
     } catch (error) {
-      console.error('❌ Error comunicándose con DeepSeek:', error)
+      console.error(`❌ Error comunicándose con la IA (${ACTIVE_PROVIDER}):`, error)
 
       // Mensaje de fallback amigable
       if (error.message.includes('401') || error.message.includes('Unauthorized')) {
@@ -504,6 +583,14 @@ class ChatService {
    * @returns {Promise<{allowed: boolean, remaining: number, limit: number, message: string}>}
    */
   async checkDailyLimit(userId, planId) {
+    // ⚠️ MODO DESARROLLO: Límites de IA desactivados temporalmente para pruebas locales
+    return {
+      allowed: true,
+      remaining: 999,
+      limit: 999,
+      message: ''
+    }
+
     const limits = this.getPlanLimits(planId)
 
     // Si el plan no tiene IA habilitada
@@ -531,25 +618,33 @@ class ChatService {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
 
-      const { count, error } = await supabase
-        .from('support_messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('role', 'user')
-        .gte('created_at', today.toISOString())
-        .in('conversation_id',
-          supabase
-            .from('support_conversations')
-            .select('id')
-            .eq('user_id', userId)
-        )
+      // 1. Obtener conversaciones del usuario
+      const { data: convs, error: convError } = await supabase
+        .from('support_conversations')
+        .select('id')
+        .eq('user_id', userId)
 
-      // Si hay error contando, permitir por seguridad (no bloquear al usuario)
-      if (error) {
-        console.warn('⚠️ Error contando mensajes diarios, permitiendo por defecto:', error)
-        return { allowed: true, remaining: limits.dailyLimit, limit: limits.dailyLimit, message: '' }
+      if (convError) throw convError
+
+      const convIds = convs.map(c => c.id)
+      let messagesUsed = 0
+
+      if (convIds.length > 0) {
+        // 2. Contar los mensajes de hoy en esas conversaciones
+        const { count, error } = await supabase
+          .from('support_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'user')
+          .gte('created_at', today.toISOString())
+          .in('conversation_id', convIds)
+
+        // Si hay error contando, permitir por seguridad (no bloquear al usuario)
+        if (error) {
+          console.warn('⚠️ Error contando mensajes diarios, permitiendo por defecto:', error)
+          return { allowed: true, remaining: limits.dailyLimit, limit: limits.dailyLimit, message: '' }
+        }
+        messagesUsed = count || 0
       }
-
-      const messagesUsed = count || 0
       const remaining = Math.max(0, limits.dailyLimit - messagesUsed)
 
       if (remaining <= 0) {
