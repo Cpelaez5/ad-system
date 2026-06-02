@@ -358,6 +358,58 @@ CREATE TABLE user_preferences (
 
 ---
 
+### support_conversations
+Sesiones de chat de soporte IA para clientes.
+
+```sql
+CREATE TABLE support_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'closed', 'waiting_agent')),
+  mode TEXT NOT NULL DEFAULT 'ai'
+    CHECK (mode IN ('ai', 'human')),
+  current_route TEXT,
+  current_route_title TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Campos clave**:
+| Campo | Descripción |
+|-------|-------------|
+| `mode` | `ai` = DeepSeek, `human` = Super Admin (Fase 2) |
+| `status` | `active`, `closed`, `waiting_agent` |
+| `current_route` | Última ruta del usuario en la conversación |
+
+**RLS**: Usuario ve solo sus conversaciones. Super Admin ve todas.
+
+---
+
+### support_messages
+Mensajes individuales dentro de cada conversación.
+
+```sql
+CREATE TABLE support_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'agent', 'system')),
+  content TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Roles de mensaje**: `user` (cliente), `assistant` (IA), `agent` (Super Admin futuro), `system` (sistema).
+
+**RLS**: Usuario ve mensajes de sus conversaciones. Super Admin ve todos.
+
+---
+
 ## Migraciones
 
 Ubicación: `/migrations/`

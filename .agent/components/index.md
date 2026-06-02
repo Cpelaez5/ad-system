@@ -217,9 +217,32 @@ this.$refs.notifications.show({
 
 ---
 
+## Componentes de Soporte
+
+### SupportChat.vue ✅
+**Uso**: Widget flotante de chat de soporte IA (solo visible para `cliente`)
+```vue
+<!-- Se monta en App.vue, no requiere uso manual -->
+<SupportChat v-if="showNavigation" />
+```
+
+**Características**:
+- FAB flotante con animación bounce en esquina inferior derecha
+- Panel de chat con header premium, mensajes con avatares, quick actions
+- Context-aware: detecta la vista actual y ajusta respuestas de IA
+- Indicador de "escribiendo..." con dots animados
+- Infraestructura de límites por plan (basic/professional/enterprise)
+- Persistencia de historial en Supabase (`support_conversations`, `support_messages`)
+- Responsive: modo fullscreen en móvil
+
+**Dependencias**: `chatService.js` (DeepSeek API + Supabase)
+
+---
+
 ## Cómo Agregar Nuevo Componente
 
 1. Crear archivo en `src/components/common/`
 2. Documentar con README si es reutilizable
 3. Agregar a este índice
 4. Seguir patrones de componentes existentes
+

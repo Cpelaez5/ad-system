@@ -20,6 +20,9 @@
       </router-view>
     </v-main>
     
+    <!-- Chat de soporte IA (visible solo para clientes) -->
+    <SupportChat v-if="showNavigation" />
+    
     <!-- Footer -->
     <!-- <AppFooter /> -->
   </v-app>
@@ -30,6 +33,7 @@ import AppNavigation from './components/layout/AppNavigation.vue'
 import AppFooter from './components/layout/AppFooter.vue'
 import NotificationSystem from './components/common/NotificationSystem.vue'
 import PageTransition from './components/common/PageTransition.vue'
+import SupportChat from './components/common/SupportChat.vue'
 import userSettingsService from '@/services/user-settings-service.js'
 // (Se elimina ThemeFavicon para usar solo los <link rel="icon"> de index.html)
 
@@ -39,7 +43,8 @@ export default {
     AppNavigation,
     AppFooter,
     NotificationSystem,
-    PageTransition
+    PageTransition,
+    SupportChat
   },
   data() {
     return {

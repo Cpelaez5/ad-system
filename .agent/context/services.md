@@ -318,7 +318,55 @@ const theme = await preferencesService.getPreference('theme')
 
 ---
 
+---
+
+## chatService
+
+**Archivo**: `src/services/chatService.js`
+
+Motor de soporte IA para clientes usando DeepSeek API.
+
+### Métodos
+
+| Método | Parámetros | Retorna | Descripción |
+|--------|------------|---------|-------------|
+| `sendMessage(msg, history, ctx)` | `string, Array, Object` | `string` | Envía mensaje a DeepSeek con contexto de vista |
+| `getQuickActions(routeName)` | `string` | `Array` | Obtiene acciones rápidas para la vista actual |
+| `getWelcomeMessage(route, title, name)` | `string, string, string` | `string` | Mensaje de bienvenida contextualizado |
+| `buildSystemPrompt(route, title, query)` | `string, string, Object` | `string` | Construye system prompt con contexto |
+| `createConversation(params)` | `Object` | `Object` | Crea conversación en Supabase |
+| `saveMessage(convId, role, content, meta)` | `string, string, string, Object` | `Object` | Guarda mensaje en Supabase |
+| `getConversationHistory(convId)` | `string` | `Array` | Historial de mensajes |
+| `checkDailyLimit(userId, planId)` | `string, string` | `Object` | Verifica límite diario por plan |
+| `getPlanLimits(planId)` | `string` | `Object` | Config de límites por plan |
+
+### Uso
+
+```javascript
+import chatService from '@/services/chatService'
+
+// Enviar mensaje con contexto
+const response = await chatService.sendMessage(
+  '¿Cómo creo una factura?',
+  conversationHistory,
+  { routeName: 'ClienteFacturacion', routeTitle: 'Facturación', queryParams: {} }
+)
+
+// Quick actions para vista actual
+const actions = chatService.getQuickActions('ClienteDashboard')
+
+// Verificar límites
+const limits = await chatService.checkDailyLimit(userId, 'professional')
+```
+
+### Tablas Supabase asociadas
+- `support_conversations` — Sesiones de chat
+- `support_messages` — Mensajes individuales
+
+---
+
 ## Patrones Comunes
+
 
 ### Multi-tenancy en todos los servicios
 
