@@ -142,7 +142,7 @@ class OCRService {
                 apiUrl = `${this.nvidiaApiUrl}/chat/completions`
                 apiKey = this.nvidiaApiKey
                 payload = {
-                    model: 'meta/llama-3.3-70b-instruct', // Modelo rápido y optimizado para texto
+                    model: 'meta/llama-3.1-8b-instruct', // Modelo ultrarrápido garantizado para texto
                     messages: [
                         {
                             role: 'user',
@@ -150,7 +150,8 @@ class OCRService {
                         }
                     ],
                     temperature: 0.1,
-                    max_tokens: 2000,
+                    top_p: 0.95,
+                    max_tokens: 800,
                     stream: false
                 }
             } else {
@@ -355,7 +356,8 @@ class OCRService {
                         }
                     ],
                     temperature: 0.1,
-                    max_tokens: 2000,
+                    top_p: 0.95,
+                    max_tokens: 800,
                     stream: false
                 }
             } else {
