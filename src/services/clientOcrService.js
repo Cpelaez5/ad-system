@@ -9,6 +9,7 @@
  */
 
 import BaseOCRService from './baseOcrService'
+import ocrService from './ocrService'
 
 // Prompt optimizado para extracción precisa de documentos comerciales
 const ENHANCED_EXTRACTION_PROMPT = `Analiza este documento comercial y extrae TODOS los datos con MÁXIMA PRECISIÓN.
@@ -147,8 +148,6 @@ Retorna SOLO el JSON válido, sin explicaciones adicionales.`;
 class ClientOCRService extends BaseOCRService {
   constructor() {
     super()
-    this.apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY
-    this.apiUrl = 'https://api.deepseek.com/chat/completions'
   }
 
   /**
@@ -162,16 +161,35 @@ class ClientOCRService extends BaseOCRService {
     try {
       console.log(`📄 [Cliente] Procesando documento. Contexto:`, userContext);
 
-      // Procesar archivo y obtener texto
-      const text = await this.processFile(file)
-
       // Preparar el prompt con el contexto del usuario (para ayudar a detectar el flujo)
       const prompt = ENHANCED_EXTRACTION_PROMPT
         .replace('{companyName}', userContext?.companyName || 'Desconocido')
         .replace('{rif}', userContext?.rif || 'Desconocido');
 
-      console.log('📝 Analizando texto con DeepSeek (temperatura 0.0)...')
-      const response = await this.analyzeTextWithDeepSeek(text, prompt)
+      let response = null;
+
+      try {
+          // 1. Intentar Visión directamente
+          this.validateFile(file);
+          let imageFile = file;
+          if (file.type === 'application/pdf') {
+              console.log('📑 Convirtiendo PDF a imagen para Vision API...');
+              imageFile = await this.convertPdfToImage(file);
+          }
+          const compressedImage = await this.compressImage(imageFile);
+          const base64Image = await this.fileToBase64(compressedImage);
+
+          console.log(`🤖 Intentando Vision API (${ocrService.activeProvider}) para comprobante...`);
+          response = await ocrService.callVisionAPI(base64Image, prompt);
+          console.log(`✅ Vision API respondió correctamente para comprobante`);
+      } catch (visionError) {
+          console.warn(`⚠️ Vision API falló para comprobante (${visionError.message}), activando fallback OCR Tesseract...`);
+          
+          // 2. Fallback: Procesar con Tesseract localmente y luego API de Texto
+          const text = await this.processFile(file);
+          console.log('📝 Analizando texto extraído del comprobante con API...');
+          response = await ocrService.analyzeTextAPI(text, prompt);
+      }
 
       const rawData = this.parseJSONResponse(response)
       console.log('🤖 Respuesta IA Cruda:', rawData);
@@ -194,45 +212,6 @@ class ClientOCRService extends BaseOCRService {
     } catch (error) {
       console.error('❌ [Cliente] Error en extracción:', error)
       throw new Error(`Error al extraer datos: ${error.message}`)
-    }
-  }
-
-  /**
-   * Analiza texto extraído usando DeepSeek
-   * Usa temperatura 0.0 para máxima precisión (recomendado para Data Analysis)
-   */
-  async analyzeTextWithDeepSeek(text, prompt) {
-    try {
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            {
-              role: 'user',
-              content: `${prompt}\n\nTEXTO DE LA FACTURA:\n${text}`
-            }
-          ],
-          temperature: 0.0, // Máxima precisión para extracción de datos
-          max_tokens: 2000
-        })
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(`API Error: ${error.error?.message || response.statusText}`)
-      }
-
-      const data = await response.json()
-      return data.choices[0].message.content
-
-    } catch (error) {
-      console.error('Error en análisis de texto:', error)
-      throw error
     }
   }
 }

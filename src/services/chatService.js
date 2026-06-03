@@ -24,20 +24,31 @@ const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY
 const DEEPSEEK_API_URL = import.meta.env.VITE_DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions'
 const DEEPSEEK_MODEL = 'deepseek-chat'
 
-// -- Config Nvidia (Minimax) --
+// -- Config Nvidia (Gemma 3) --
 const NVIDIA_API_KEY = import.meta.env.VITE_NVIDIA_API_KEY
-const NVIDIA_MODEL = import.meta.env.VITE_NVIDIA_MODEL || 'minimaxai/minimax-m2.7'
+const NVIDIA_MODEL = import.meta.env.VITE_NVIDIA_MODEL || 'google/gemma-3n-e4b-it'
 let NVIDIA_API_URL = import.meta.env.VITE_NVIDIA_API_URL || '/api/ai'
 
 if (NVIDIA_API_URL && NVIDIA_API_URL.startsWith('/')) {
   NVIDIA_API_URL = window.location.origin + NVIDIA_API_URL
 }
 
-const nvidiaClient = new OpenAI({
-  apiKey: NVIDIA_API_KEY,
-  baseURL: NVIDIA_API_URL,
-  dangerouslyAllowBrowser: true // Requerido para usar el SDK desde Vue (cliente)
-})
+// Solo crear el cliente de OpenAI si la API key de Nvidia está disponible.
+// Sin esta protección, el SDK lanza una excepción fatal al cargarse el módulo
+// cuando no hay clave configurada (ej. en producción sin variables de Nvidia),
+// lo que provoca una página en blanco.
+let nvidiaClient = null
+try {
+  if (NVIDIA_API_KEY) {
+    nvidiaClient = new OpenAI({
+      apiKey: NVIDIA_API_KEY,
+      baseURL: NVIDIA_API_URL,
+      dangerouslyAllowBrowser: true
+    })
+  }
+} catch (err) {
+  console.warn('⚠️ No se pudo crear el cliente de Nvidia OpenAI:', err.message)
+}
 
 // ═══════════════════════════════════════════════════
 // LÍMITES POR PLAN (Infraestructura lógica)

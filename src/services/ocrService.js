@@ -54,8 +54,14 @@ Reglas:
 
 class OCRService {
     constructor() {
-        this.apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY
-        this.apiUrl = 'https://api.deepseek.com/v1/chat/completions'
+        this.activeProvider = import.meta.env.VITE_ACTIVE_AI_PROVIDER || 'deepseek'
+        this.deepseekApiKey = import.meta.env.VITE_DEEPSEEK_API_KEY
+        this.deepseekApiUrl = import.meta.env.VITE_DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions'
+        
+        this.nvidiaApiKey = import.meta.env.VITE_NVIDIA_API_KEY
+        this.nvidiaApiUrl = import.meta.env.VITE_NVIDIA_API_URL || '/api/ai'
+        this.nvidiaModel = import.meta.env.VITE_NVIDIA_MODEL || 'google/gemma-3n-e4b-it'
+        
         this.maxImageSize = 1024 // Max width/height en pixels
     }
 
@@ -86,20 +92,20 @@ class OCRService {
             const base64Image = await this.fileToBase64(compressedImage)
 
             try {
-                // Intentar primero con DeepSeek Vision
-                console.log('🤖 Intentando DeepSeek Vision API...')
-                const response = await this.callDeepSeekVision(base64Image)
-                console.log('✅ DeepSeek Vision respondió correctamente')
+                // Intentar primero con Vision API
+                console.log(`🤖 Intentando Vision API (${this.activeProvider})...`)
+                const response = await this.callVisionAPI(base64Image)
+                console.log(`✅ Vision API (${this.activeProvider}) respondió correctamente`)
                 return this.parseInvoiceResponse(response)
             } catch (apiError) {
-                console.warn('⚠️ DeepSeek Vision falló, intentando fallback con Tesseract:', apiError.message)
+                console.warn(`⚠️ Vision API falló (${apiError.message}), intentando fallback con Tesseract...`)
 
-                // Fallback: Tesseract OCR + DeepSeek Text Analysis
+                // Fallback: Tesseract OCR + Text Analysis
                 console.log('👁️ Ejecutando OCR local con Tesseract...')
                 const text = await this.performLocalOCR(compressedImage)
 
-                console.log('📝 Texto extraído, analizando con DeepSeek...')
-                const analysisResponse = await this.analyzeTextWithDeepSeek(text)
+                console.log('📝 Texto extraído, analizando con API...')
+                const analysisResponse = await this.analyzeTextAPI(text)
 
                 return this.parseInvoiceResponse(analysisResponse)
             }
@@ -124,36 +130,56 @@ class OCRService {
     }
 
     /**
-     * Analiza texto extraído usando DeepSeek (solo texto)
+     * Analiza texto extraído usando API (solo texto)
      */
-    async analyzeTextWithDeepSeek(text) {
+    async analyzeTextAPI(text, customPrompt = INVOICE_EXTRACTION_PROMPT) {
         try {
-            const response = await fetch(this.apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
+            let apiUrl = ''
+            let apiKey = ''
+            let payload = {}
+
+            if (this.activeProvider === 'nvidia') {
+                apiUrl = `${this.nvidiaApiUrl}/chat/completions`
+                apiKey = this.nvidiaApiKey
+                payload = {
+                    model: this.nvidiaModel,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: `Analiza el siguiente texto extraído y obtén los datos en JSON:\n\n${customPrompt}\n\nTEXTO EXTRAÍDO:\n${text}`
+                        }
+                    ],
+                    temperature: 0.1,
+                    max_tokens: 2000,
+                    stream: false
+                }
+            } else {
+                apiUrl = this.deepseekApiUrl
+                apiKey = this.deepseekApiKey
+                payload = {
                     model: 'deepseek-chat',
                     messages: [
                         {
                             role: 'user',
-                            content: `Analiza el siguiente texto extraído de una factura y extrae los datos en JSON:
-                            
-                            ${INVOICE_EXTRACTION_PROMPT}
-                            
-                            TEXTO DE LA FACTURA:
-                            ${text}`
+                            content: `Analiza el siguiente texto extraído y obtén los datos en JSON:\n\n${customPrompt}\n\nTEXTO EXTRAÍDO:\n${text}`
                         }
                     ],
                     temperature: 0.1
-                })
+                }
+            }
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify(payload)
             })
 
             if (!response.ok) {
-                const error = await response.json()
-                throw new Error(`API Error: ${error.error?.message || response.statusText}`)
+                const error = await response.json().catch(() => ({}))
+                throw new Error(`API Error: ${error.detail || error.error?.message || response.statusText}`)
             }
 
             const data = await response.json()
@@ -298,17 +324,33 @@ class OCRService {
     }
 
     /**
-     * Llama a DeepSeek Vision API
+     * Llama a Vision API (Gemma 3 o DeepSeek)
      */
-    async callDeepSeekVision(imageBase64) {
+    async callVisionAPI(imageBase64, customPrompt = INVOICE_EXTRACTION_PROMPT) {
         try {
-            const response = await fetch(this.apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
+            let apiUrl = ''
+            let apiKey = ''
+            let payload = {}
+
+            if (this.activeProvider === 'nvidia') {
+                apiUrl = `${this.nvidiaApiUrl}/chat/completions`
+                apiKey = this.nvidiaApiKey
+                payload = {
+                    model: this.nvidiaModel,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: `${customPrompt}\n\n<img src="data:image/jpeg;base64,${imageBase64}" />`
+                        }
+                    ],
+                    temperature: 0.1,
+                    max_tokens: 2000,
+                    stream: false
+                }
+            } else {
+                apiUrl = this.deepseekApiUrl
+                apiKey = this.deepseekApiKey
+                payload = {
                     model: 'deepseek-chat',
                     messages: [
                         {
@@ -322,26 +364,35 @@ class OCRService {
                                 },
                                 {
                                     type: 'text',
-                                    text: INVOICE_EXTRACTION_PROMPT
+                                    text: customPrompt
                                 }
                             ]
                         }
                     ],
                     temperature: 0.1,
                     max_tokens: 2000
-                })
+                }
+            }
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify(payload)
             })
 
             if (!response.ok) {
-                const error = await response.json()
-                throw new Error(`API Error: ${error.error?.message || response.statusText}`)
+                const error = await response.json().catch(() => ({}))
+                throw new Error(`API Error: ${error.detail || error.error?.message || response.statusText}`)
             }
 
             const data = await response.json()
             return data.choices[0].message.content
 
         } catch (error) {
-            console.error('Error llamando a DeepSeek API:', error)
+            console.error('Error llamando a Vision API:', error)
             throw error
         }
     }

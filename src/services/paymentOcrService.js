@@ -14,6 +14,7 @@
  */
 
 import BaseOCRService from './baseOcrService';
+import ocrService from './ocrService';
 
 // Prompt especializado para comprobantes de pago
 // Prompts especializados por tipo de pago
@@ -148,8 +149,6 @@ const PAYMENT_PROMPTS = {
 class PaymentOCRService extends BaseOCRService {
     constructor() {
         super();
-        this.apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
-        this.apiUrl = 'https://api.deepseek.com/chat/completions';
     }
 
     /**
@@ -161,66 +160,49 @@ class PaymentOCRService extends BaseOCRService {
     async extractPaymentData(file, paymentType = 'default') {
         try {
             console.log(`💳 [Payment OCR] Procesando comprobante (${paymentType})...`);
-
-            // Seleccionar prompt según tipo
             const prompt = PAYMENT_PROMPTS[paymentType] || PAYMENT_PROMPTS.default;
 
-            // Procesar archivo (hereda PDF parse / compresión de imagen)
-            const text = await this.processFile(file);
+            try {
+                // 1. Intentar Visión directamente
+                this.validateFile(file);
+                let imageFile = file;
+                if (file.type === 'application/pdf') {
+                    console.log('📑 Convirtiendo PDF a imagen para Vision API...');
+                    imageFile = await this.convertPdfToImage(file);
+                }
+                const compressedImage = await this.compressImage(imageFile);
+                const base64Image = await this.fileToBase64(compressedImage);
 
-            console.log('📝 Analizando comprobante con DeepSeek (temperatura 0.0)...');
-            const response = await this.analyzeWithDeepSeek(text, prompt);
-
-            const data = this.parseJSONResponse(response);
-            console.log('🤖 Datos extraídos del comprobante:', data);
-
-            // Calcular confianza
-            const requiredFields = ['reference', 'amount'];
-            data.confidence = this.calculateConfidence(data, requiredFields);
-
-            console.log(`✅ [Payment OCR] Extracción completada. Tipo: ${data.type}, Confianza: ${Math.round(data.confidence * 100)}%`);
-
-            return data;
+                console.log(`🤖 Intentando Vision API (${ocrService.activeProvider}) para comprobante...`);
+                const response = await ocrService.callVisionAPI(base64Image, prompt);
+                console.log(`✅ Vision API respondió correctamente para comprobante`);
+                
+                const data = this.parseJSONResponse(response);
+                const requiredFields = ['reference', 'amount'];
+                data.confidence = this.calculateConfidence(data, requiredFields);
+                
+                console.log(`✅ [Payment OCR] Extracción visual completada. Tipo: ${data.type}, Confianza: ${Math.round(data.confidence * 100)}%`);
+                return data;
+                
+            } catch (visionError) {
+                console.warn(`⚠️ Vision API falló para comprobante (${visionError.message}), activando fallback OCR Tesseract...`);
+                
+                // 2. Fallback: Procesar con Tesseract localmente y luego API de Texto
+                const text = await this.processFile(file);
+                
+                console.log('📝 Analizando texto extraído del comprobante con API...');
+                const response = await ocrService.analyzeTextAPI(text, prompt);
+                
+                const data = this.parseJSONResponse(response);
+                const requiredFields = ['reference', 'amount'];
+                data.confidence = this.calculateConfidence(data, requiredFields);
+                
+                console.log(`✅ [Payment OCR] Extracción por texto completada. Tipo: ${data.type}, Confianza: ${Math.round(data.confidence * 100)}%`);
+                return data;
+            }
         } catch (error) {
             console.error('❌ [Payment OCR] Error en extracción:', error);
             throw new Error(`Error al extraer datos del comprobante: ${error.message}`);
-        }
-    }
-
-    /**
-     * Analiza texto con DeepSeek usando temperatura 0.0 (máxima precisión).
-     */
-    async analyzeWithDeepSeek(text, prompt) {
-        try {
-            const response = await fetch(this.apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: `${prompt}\n\nTEXTO DEL COMPROBANTE:\n${text}`
-                        }
-                    ],
-                    temperature: 0.0,
-                    max_tokens: 1500
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(`API Error: ${error.error?.message || response.statusText}`);
-            }
-
-            const data = await response.json();
-            return data.choices[0].message.content;
-        } catch (error) {
-            console.error('Error en análisis DeepSeek:', error);
-            throw error;
         }
     }
 }
