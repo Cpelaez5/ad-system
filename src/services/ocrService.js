@@ -62,7 +62,7 @@ class OCRService {
         this.nvidiaApiUrl = import.meta.env.VITE_NVIDIA_API_URL || '/api/ai'
         this.nvidiaModel = import.meta.env.VITE_NVIDIA_MODEL || 'google/gemma-3n-e4b-it'
         
-        this.maxImageSize = 1024 // Max width/height en pixels
+        this.maxImageSize = 800 // Reducido para acelerar el procesamiento de la IA
     }
 
     /**
@@ -142,7 +142,7 @@ class OCRService {
                 apiUrl = `${this.nvidiaApiUrl}/chat/completions`
                 apiKey = this.nvidiaApiKey
                 payload = {
-                    model: this.nvidiaModel,
+                    model: 'meta/llama-3.3-70b-instruct', // Modelo rápido y optimizado para texto
                     messages: [
                         {
                             role: 'user',
@@ -233,8 +233,8 @@ class OCRService {
             // Obtener primera página
             const page = await pdf.getPage(1)
 
-            // Configurar canvas
-            const viewport = page.getViewport({ scale: 2.0 })
+            // Configurar canvas - Usamos scale 1.0 para que el PDF no sea tan pesado y procese rápido
+            const viewport = page.getViewport({ scale: 1.0 })
             const canvas = document.createElement('canvas')
             const context = canvas.getContext('2d')
             canvas.width = viewport.width
@@ -340,7 +340,18 @@ class OCRService {
                     messages: [
                         {
                             role: 'user',
-                            content: `${customPrompt}\n\n<img src="data:image/jpeg;base64,${imageBase64}" />`
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: customPrompt
+                                },
+                                {
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: `data:image/jpeg;base64,${imageBase64}`
+                                    }
+                                }
+                            ]
                         }
                     ],
                     temperature: 0.1,
