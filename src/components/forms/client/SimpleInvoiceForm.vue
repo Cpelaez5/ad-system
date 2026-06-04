@@ -1458,8 +1458,9 @@ export default {
         this.showSnackbar('Por favor selecciona la fecha', 'error');
         return false;
       }
-      // 4. Total
-      if (this.formData.financial.totalSales <= 0) {
+      // 4. Total — Permitir monto 0 solo si la factura está ANULADA
+      const esAnulada = this.formData.status === 'ANULADA';
+      if (!esAnulada && this.formData.financial.totalSales <= 0) {
         this.showSnackbar('El total de la factura debe ser mayor a 0. Agrega al menos un producto o ajusta los montos.', 'error');
         return false;
       }

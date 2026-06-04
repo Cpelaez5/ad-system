@@ -1313,6 +1313,9 @@ export default {
       sourceData.forEach(inv => {
         this.stats.byStatus[inv.status] = (this.stats.byStatus[inv.status] || 0) + 1;
         
+        // No sumar montos de facturas ANULADAS
+        if (inv.status === 'ANULADA') return;
+
         let amount = inv.financial?.totalSales || 0;
         const currency = inv.financial?.currency || 'VES';
 

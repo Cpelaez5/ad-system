@@ -2,6 +2,10 @@
 # This file tells Netlify to serve index.html for all routes
 # so that Vue Router can handle client-side routing
 
+# Proxy para la API de Nvidia (replica el proxy de Vite en producción)
+# IMPORTANTE: debe ir ANTES del catch-all de SPA
+/api/ai/*  https://integrate.api.nvidia.com/v1/:splat  200
+
 # Redirect all routes to index.html with 200 status
 /*    /index.html   200
 
@@ -10,4 +14,3 @@
 
 # Optional: Handle specific static assets
 # /assets/*  /assets/:splat  200
-

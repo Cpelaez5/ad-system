@@ -385,8 +385,12 @@ class InvoiceService {
       console.log('📄 Factura creada:', newInvoice)
 
       // 2. Procesar Movimientos de Inventario (Salida/Entrada)
+      // No procesar inventario si la factura está ANULADA
       // Esto también actualiza los items con product_id si se crearon productos nuevos
-      const inventoryResult = await this.processInventoryMovements(newInvoice, false)
+      const esAnulada = (newInvoice.status || '').toUpperCase() === 'ANULADA'
+      const inventoryResult = esAnulada
+        ? { success: true, createdProducts: [] }
+        : await this.processInventoryMovements(newInvoice, false)
 
       // 3. Si se crearon productos nuevos, actualizar los items de la factura con los product_id
       if (inventoryResult?.createdProducts && inventoryResult.createdProducts.length > 0) {
@@ -545,7 +549,11 @@ class InvoiceService {
 
       // 2. Actualizar Inventario: Calcular delta entre factura antigua y nueva
       //    Esto es más preciso que revertir + aplicar, especialmente cuando cambian las cantidades
-      const inventoryResult = await this.updateInventoryForInvoiceEdit(oldInvoiceSnapshot, updatedInvoice)
+      //    No procesar inventario si la factura actualizada está ANULADA
+      const esAnuladaUpdate = (updatedInvoice.status || '').toUpperCase() === 'ANULADA'
+      const inventoryResult = esAnuladaUpdate
+        ? { success: true, message: 'Factura ANULADA: inventario no modificado' }
+        : await this.updateInventoryForInvoiceEdit(oldInvoiceSnapshot, updatedInvoice)
 
       if (inventoryResult.success) {
         console.log('✅ Inventario actualizado correctamente:', inventoryResult.message)
@@ -1238,6 +1246,13 @@ class InvoiceService {
 
     try {
       if (!invoice.items || !Array.isArray(invoice.items)) {
+        return result
+      }
+
+      // No procesar inventario si la factura está ANULADA
+      const invoiceStatus = (invoice.status || '').toUpperCase()
+      if (invoiceStatus === 'ANULADA' && !isReversal) {
+        console.log('📦 [INVENTARIO] Factura ANULADA, saltando movimientos de inventario')
         return result
       }
 
