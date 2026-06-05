@@ -354,16 +354,22 @@
         <!-- Columna de total -->
         <template v-slot:item.total="{ item }">
           <div 
-            class="total-amount-display d-flex align-center"
+            class="total-amount-display d-flex flex-column justify-center"
             :class="{ 'amount-changing': isChangingCurrency }"
           >
-            <v-icon
-              :icon="item.flow === 'VENTA' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
-              :color="item.flow === 'VENTA' ? 'success' : 'error'"
-              size="small"
-              class="mr-2"
-            ></v-icon>
-            {{ getFormattedDisplayAmount(item) }}
+            <div class="d-flex align-center">
+              <v-icon
+                :icon="item.flow === 'VENTA' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+                :color="item.flow === 'VENTA' ? 'success' : 'error'"
+                size="small"
+                class="mr-2"
+              ></v-icon>
+              {{ getFormattedDisplayAmount(item) }}
+            </div>
+            <!-- Equivalente en VES si la factura es en USD/EUR y estamos en vista VES -->
+            <div v-if="getEquivalentAmount(item)" class="text-caption text-grey ml-6">
+              ≈ {{ getEquivalentAmount(item) }}
+            </div>
           </div>
         </template>
 
@@ -1313,8 +1319,8 @@ export default {
       sourceData.forEach(inv => {
         this.stats.byStatus[inv.status] = (this.stats.byStatus[inv.status] || 0) + 1;
         
-        // No sumar montos de facturas ANULADAS
-        if (inv.status === 'ANULADA') return;
+        // No sumar montos de facturas ANULADAS ni en BORRADOR
+        if (inv.status === 'ANULADA' || inv.status === 'BORRADOR') return;
 
         let amount = inv.financial?.totalSales || 0;
         const currency = inv.financial?.currency || 'VES';
@@ -1577,6 +1583,20 @@ export default {
         
         return this.formatCurrency(amount, originalCurrency);
     },
+
+    getEquivalentAmount(invoice) {
+        const currency = invoice.financial?.currency || 'VES';
+        const amount = invoice.financial?.totalSales || 0;
+        
+        // Solo mostrar equivalente si la moneda original no es VES 
+        // y la vista actual está en VES, o si es VES y la vista en USD.
+        // Pero para replicar Inventario.vue, mostramos equivalente VES debajo del USD.
+        if (this.currencyDisplay === 'VES' && currency === 'USD' && this.cachedRate) {
+            return this.formatCurrency(amount * this.cachedRate, 'VES');
+        }
+        
+        return null;
+    },
     
     getDisplayAmount(invoice) {
       if (this.currencyDisplay === 'USD') {
@@ -1592,9 +1612,6 @@ export default {
           this.cachedRate = parseFloat(rate.data.dollar);
         }
         const result = (amountInVES || 0) / (this.cachedRate || 1);
-        console.log('>>>>>>>>>>>>>>>>>>.Tasa de cambio: ', this.cachedRate);
-        console.log('Monto en VES (amountInVES):', amountInVES);
-        console.log('Resultado de conversión:', result);
         return result;
       } catch (error) {
         console.error('Error en conversión:', error);

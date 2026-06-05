@@ -385,10 +385,11 @@ class InvoiceService {
       console.log('📄 Factura creada:', newInvoice)
 
       // 2. Procesar Movimientos de Inventario (Salida/Entrada)
-      // No procesar inventario si la factura está ANULADA
+      // No procesar inventario si la factura está en estado sin efecto (ANULADA o BORRADOR)
       // Esto también actualiza los items con product_id si se crearon productos nuevos
-      const esAnulada = (newInvoice.status || '').toUpperCase() === 'ANULADA'
-      const inventoryResult = esAnulada
+      const statusSinEfecto = ['ANULADA', 'BORRADOR']
+      const esInactiva = statusSinEfecto.includes((newInvoice.status || '').toUpperCase())
+      const inventoryResult = esInactiva
         ? { success: true, createdProducts: [] }
         : await this.processInventoryMovements(newInvoice, false)
 
@@ -548,12 +549,27 @@ class InvoiceService {
       console.log('✅ Factura actualizada en Supabase:', updatedInvoice.id)
 
       // 2. Actualizar Inventario: Calcular delta entre factura antigua y nueva
+      // 2. Actualizar Inventario: Calcular delta entre factura antigua y nueva
       //    Esto es más preciso que revertir + aplicar, especialmente cuando cambian las cantidades
-      //    No procesar inventario si la factura actualizada está ANULADA
-      const esAnuladaUpdate = (updatedInvoice.status || '').toUpperCase() === 'ANULADA'
-      const inventoryResult = esAnuladaUpdate
-        ? { success: true, message: 'Factura ANULADA: inventario no modificado' }
-        : await this.updateInventoryForInvoiceEdit(oldInvoiceSnapshot, updatedInvoice)
+      //    También manejamos transiciones de estado (ej: BORRADOR -> EMITIDA, EMITIDA -> ANULADA)
+      const statusSinEfecto = ['ANULADA', 'BORRADOR']
+      const esInactivaUpdate = statusSinEfecto.includes((updatedInvoice.status || '').toUpperCase())
+      const esInactivaOld = statusSinEfecto.includes((oldInvoiceSnapshot.status || '').toUpperCase())
+      
+      let inventoryResult = { success: true, message: 'No se requiere actualización de inventario' }
+      
+      if (esInactivaUpdate && esInactivaOld) {
+        inventoryResult.message = 'Factura en estado sin efecto (Borrador/Anulada): inventario no modificado'
+      } else if (esInactivaUpdate && !esInactivaOld) {
+        // Transición: Válida -> Sin Efecto (ej: Emitida -> Anulada). Revertir inventario.
+        inventoryResult = await this.processInventoryMovements(oldInvoiceSnapshot, true)
+      } else if (!esInactivaUpdate && esInactivaOld) {
+        // Transición: Sin Efecto -> Válida (ej: Borrador -> Emitida). Aplicar inventario.
+        inventoryResult = await this.processInventoryMovements(updatedInvoice, false)
+      } else {
+        // Transición: Válida -> Válida (ej: Emitida -> Pagada o edición de items). Calcular delta.
+        inventoryResult = await this.updateInventoryForInvoiceEdit(oldInvoiceSnapshot, updatedInvoice)
+      }
 
       if (inventoryResult.success) {
         console.log('✅ Inventario actualizado correctamente:', inventoryResult.message)
@@ -1249,10 +1265,11 @@ class InvoiceService {
         return result
       }
 
-      // No procesar inventario si la factura está ANULADA
+      // No procesar inventario si la factura está en un estado sin efecto (a menos que sea reversión)
       const invoiceStatus = (invoice.status || '').toUpperCase()
-      if (invoiceStatus === 'ANULADA' && !isReversal) {
-        console.log('📦 [INVENTARIO] Factura ANULADA, saltando movimientos de inventario')
+      const statusSinEfecto = ['ANULADA', 'BORRADOR']
+      if (statusSinEfecto.includes(invoiceStatus) && !isReversal) {
+        console.log('📦 [INVENTARIO] Factura en estado sin efecto (Borrador/Anulada), saltando movimientos de inventario')
         return result
       }
 

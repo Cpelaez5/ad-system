@@ -855,10 +855,18 @@ export default {
     },
     manualMode(val) {
       if (!val) {
-        // Al salir del modo manual, recalcular todo autmáticamente
+        // Al salir del modo manual, recalcular todo automáticamente
         this.calculateFromBase();
       } else {
+        // Congelar el total actual para que los watchers no lo sobreescriban
+        this._manualTotalSnapshot = this.formData.financial.totalSales;
         this.showSnackbar('Modo manual: Ahora puedes editar los totales directamente.', 'info');
+        // Restaurar el total después de un tick (por si un watcher encadenado lo cambió)
+        this.$nextTick(() => {
+          if (this.manualMode && this._manualTotalSnapshot !== undefined) {
+            this.formData.financial.totalSales = this._manualTotalSnapshot;
+          }
+        });
       }
     },
     invoice: {
@@ -868,7 +876,15 @@ export default {
           this.formData = {
             ...inv,
             expense_type: inv.expense_type || (inv.flow === 'COMPRA' ? 'COMPRA' : null),
-            items: (inv.items || []).map(it => ({ ...it, _key: ++_itemKey }))
+            items: (inv.items || []).map(it => ({
+              ...it,
+              _key: ++_itemKey,
+              // Reconstruir el objeto product para que el combobox lo muestre correctamente
+              // en modo edición. Solo necesitamos los campos mínimos que usa ProductAutocomplete.
+              product: it.product_id
+                ? { id: it.product_id, name: it.description, code: it.code, unit: it.unit, stock: it.product?.stock ?? 0 }
+                : (typeof it.product === 'string' ? it.product : null)
+            }))
           };
         }
       }
@@ -1362,6 +1378,7 @@ export default {
           }
 
           this.formData.items = mappedItems;
+          this.syncItemsInventoryMode(); // Asegurar isInventory según el flujo detectado
           this.calculateFromItems();
 
           this._ocrMatchedCount = matchedCount;
@@ -1486,8 +1503,14 @@ export default {
         // Clonar para no mutar el original en caso de error
         const payload = JSON.parse(JSON.stringify(this.formData));
 
-        // Limpiar _key interno (no persistir)
-        payload.items = payload.items.map(({ _key, ...rest }) => rest);
+        // Limpiar campos internos que no deben persistirse en la BD.
+        // - _key: identificador temporal para v-for
+        // - product: objeto completo del inventario (datos potencialmente obsoletos)
+        //   Solo conservamos product_id como referencia limpia.
+        payload.items = payload.items.map(({ _key, product, ...rest }) => ({
+          ...rest,
+          product_id: rest.product_id || (product?.id ?? null),
+        }));
 
         // Subir archivo adjunto si existe
         if (this.uploadedFile) {

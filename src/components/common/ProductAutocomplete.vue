@@ -111,8 +111,18 @@ export default {
     }
   },
   mounted() {
-      // Cargar iniciales?
+      // Cargar iniciales
       this.querySelections('')
+      
+      // Si hay un valor inicial (ej. en modo edición), asegurarse de que esté en la lista
+      // para que el v-combobox pueda resolver y mostrar el item-title correctamente
+      if (this.modelValue && typeof this.modelValue === 'object' && this.modelValue.id) {
+        this.$nextTick(() => {
+          if (!this.items.find(i => i.id === this.modelValue.id)) {
+            this.items.unshift(this.modelValue);
+          }
+        });
+      }
   },
   methods: {
     async querySelections(v) {
