@@ -520,6 +520,80 @@ function drawFinancialSummary(doc, invoice, pageWidth, y) {
   return y + 18
 }
 
+/** Dibuja el detalle del pago a crédito (Cashea) */
+function drawCreditDetails(doc, invoice, pageWidth, y) {
+  if (invoice.financial?.paymentMethod !== 'CASHEA' || !invoice.financial?.credit) return y
+
+  const credit = invoice.financial.credit
+  const currency = invoice.financial.currency || 'VES'
+  
+  y = checkPage(doc, y, 220)
+
+  // Título de la sección
+  doc.setFillColor(...COLORS.primary)
+  doc.rect(MARGIN, y - 3, 3, 3, 'F')
+  doc.setFontSize(8)
+  doc.setTextColor(...COLORS.secondary)
+  doc.setFont('helvetica', 'bold')
+  doc.text('DETALLE DE PAGO CASHEA (CRÉDITO)', MARGIN + 5, y)
+  y += 3
+
+  drawDivider(doc, pageWidth, y, COLORS.lightGrey, 0.2)
+  y += 6
+
+  // Info inicial
+  doc.setFontSize(8.5)
+  doc.setTextColor(...COLORS.black)
+  doc.setFont('helvetica', 'normal')
+  
+  doc.text('Inicial Pagada:', MARGIN, y)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...COLORS.success)
+  doc.text(`${fmtCurrency(credit.initialAmount, currency)} (${credit.initialPercentage}%)`, MARGIN + 25, y)
+  
+  y += 8
+  
+  // Tabla de cuotas
+  const items = credit.installments || []
+  if (items.length > 0) {
+    const tableWidth = pageWidth - MARGIN * 2
+    
+    doc.setFillColor(...COLORS.tableAlt)
+    doc.roundedRect(MARGIN, y - 5, tableWidth, 7, 1.5, 1.5, 'F')
+    
+    doc.setFontSize(8)
+    doc.setTextColor(...COLORS.secondary)
+    doc.setFont('helvetica', 'bold')
+    
+    doc.text('Fecha de Pago', MARGIN + 5, y)
+    doc.text('Monto', MARGIN + tableWidth / 2, y, { align: 'center' })
+    doc.text('Estado', MARGIN + tableWidth - 5, y, { align: 'right' })
+    
+    y += 6
+    
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    
+    items.forEach((inst, idx) => {
+      y = checkPage(doc, y, 260)
+      doc.setTextColor(...COLORS.black)
+      
+      doc.text(fmtDate(inst.date), MARGIN + 5, y)
+      doc.text(fmtCurrency(inst.amount, currency), MARGIN + tableWidth / 2, y, { align: 'center' })
+      
+      const statusColor = inst.status === 'PAGADA' ? COLORS.success : COLORS.warning
+      doc.setTextColor(...statusColor)
+      doc.setFont('helvetica', 'bold')
+      doc.text(inst.status === 'PAGADA' ? 'Pagada' : 'Por Cobrar', MARGIN + tableWidth - 5, y, { align: 'right' })
+      doc.setFont('helvetica', 'normal')
+      
+      y += 5
+    })
+  }
+
+  return y + 4
+}
+
 /** Dibuja la sección de notas (si existen) */
 function drawNotes(doc, invoice, pageWidth, y) {
   if (!invoice.notes) return y
@@ -609,6 +683,9 @@ export async function generateReceiptPdf(invoice) {
 
   // 6. Resumen financiero
   y = drawFinancialSummary(doc, invoice, pageWidth, y)
+
+  // 6.5 Detalle de crédito (Cashea)
+  y = drawCreditDetails(doc, invoice, pageWidth, y)
 
   // 7. Notas
   y = drawNotes(doc, invoice, pageWidth, y)

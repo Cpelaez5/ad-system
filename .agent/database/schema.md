@@ -92,7 +92,7 @@ CREATE TABLE invoices (
   invoice_number TEXT NOT NULL,
   invoice_type TEXT CHECK (invoice_type IN ('FACTURA', 'NOTA_CREDITO', 'NOTA_DEBITO')),
   flow TEXT CHECK (flow IN ('VENTA', 'COMPRA')),
-  status TEXT DEFAULT 'BORRADOR',
+  status TEXT DEFAULT 'BORRADOR' CHECK (status IN ('BORRADOR', 'EMITIDA', 'ENVIADA', 'PAGADA', 'VENCIDA', 'ANULADA', 'CRÉDITO')),
   
   -- Fechas
   issue_date DATE NOT NULL,

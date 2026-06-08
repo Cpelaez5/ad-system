@@ -238,9 +238,147 @@
               variant="outlined"
               density="comfortable"
               hide-details
+              class="mb-2"
+            />
+          </v-col>
+
+          <!-- Método de pago -->
+          <v-col cols="12" sm="6" md="3">
+            <v-select
+              v-model="formData.financial.paymentMethod"
+              :items="paymentMethods"
+              label="Método de pago (Opc.)"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              clearable
+              class="mb-2"
+            >
+              <template v-slot:item="{ props, item }">
+                <v-list-item v-bind="props">
+                  <template v-slot:prepend>
+                    <img v-if="item.raw.customIcon" :src="item.raw.customIcon" width="18" height="18" class="mr-3" />
+                    <v-icon v-else :color="item.raw.color" size="small" class="mr-2">{{ item.raw.icon }}</v-icon>
+                  </template>
+                </v-list-item>
+              </template>
+              <template v-slot:selection="{ item }">
+                <div class="d-flex align-center">
+                  <v-chip v-if="item.raw.value === 'CASHEA'" color="#000000" style="background-color: #fdfa3d;" size="small" class="font-weight-bold px-2 py-0">
+                    <img :src="item.raw.customIcon" width="14" height="14" class="mr-1" />
+                    Cashea
+                  </v-chip>
+                  <template v-else>
+                    <v-icon :color="item.raw.color" size="small" class="mr-2">{{ item.raw.icon }}</v-icon>
+                    <span>{{ item.title }}</span>
+                  </template>
+                </div>
+              </template>
+            </v-select>
+          </v-col>
+
+        <!-- Referencia -->
+          <v-col cols="12" sm="6" md="3" v-if="formData.financial.paymentMethod">
+            <v-text-field
+              v-model="formData.financial.paymentReference"
+              :label="formData.financial.paymentMethod === 'CASHEA' ? 'Referencia Cashea' : 'Referencia (Opc.)'"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              class="mb-2"
             />
           </v-col>
         </v-row>
+
+        <!-- Panel de Crédito / Cashea -->
+        <v-expand-transition>
+          <div v-if="formData.financial.paymentMethod === 'CASHEA'" class="mt-4 px-4 py-3 bg-grey-lighten-4 rounded-lg border">
+            <div class="text-subtitle-2 font-weight-bold mb-3 d-flex align-center">
+              <v-icon color="black" class="mr-2">mdi-calendar-month</v-icon>
+              Cronograma de Pagos Cashea
+            </div>
+            
+            <v-row dense>
+              <v-col cols="12" sm="4">
+                <v-text-field
+                  v-model.number="formData.financial.credit.initialPercentage"
+                  label="% Inicial"
+                  type="number"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  @input="onInitialPercentageChange"
+                  suffix="%"
+                />
+              </v-col>
+              <v-col cols="12" sm="4">
+                <v-text-field
+                  v-model.number="formData.financial.credit.initialAmount"
+                  label="Monto Inicial"
+                  type="number"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  @input="onInitialAmountChange"
+                  :prefix="formData.financial.currency === 'USD' ? '$' : 'Bs'"
+                />
+              </v-col>
+              <v-col cols="12" sm="4">
+                <v-select
+                  v-model.number="formData.financial.credit.installmentsCount"
+                  :items="[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]"
+                  label="Cant. Cuotas"
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  @update:modelValue="generateInstallments"
+                />
+              </v-col>
+            </v-row>
+
+            <div class="mt-4" v-if="formData.financial.credit && formData.financial.credit.installments && formData.financial.credit.installments.length">
+              <div class="text-caption text-grey-darken-1 mb-2">Detalle de cuotas:</div>
+              <v-table density="compact" class="bg-transparent">
+                <thead>
+                  <tr>
+                    <th class="text-left" style="width: 50px">#</th>
+                    <th class="text-left">Fecha</th>
+                    <th class="text-right">Monto</th>
+                    <th class="text-center" style="width: 140px">Estatus</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(inst, idx) in formData.financial.credit.installments" :key="inst.id">
+                    <td>{{ idx + 1 }}</td>
+                    <td>
+                      <input type="date" v-model="inst.date" class="date-input-naked" />
+                    </td>
+                    <td class="text-right font-weight-medium">
+                      {{ formatNumber(inst.amount) }} {{ formData.financial.currency }}
+                    </td>
+                    <td class="text-center">
+                      <v-select
+                        v-model="inst.status"
+                        :items="['POR_COBRAR', 'PAGADA']"
+                        density="compact"
+                        variant="underlined"
+                        hide-details
+                        @update:modelValue="checkAllInstallmentsPaid"
+                        class="status-select-naked"
+                      >
+                        <template v-slot:selection="{ item }">
+                          <v-chip size="x-small" :color="item.value === 'PAGADA' ? 'success' : 'error'" class="font-weight-bold">
+                            {{ item.value === 'PAGADA' ? 'Pagada' : 'Por Cobrar' }}
+                          </v-chip>
+                        </template>
+                      </v-select>
+                    </td>
+                  </tr>
+                </tbody>
+              </v-table>
+            </div>
+          </div>
+        </v-expand-transition>
       </div>
 
       <!-- ══════════════════════════════════════════════════════
@@ -716,8 +854,17 @@ export default {
 
       // Catálogos
       documentTypes: [],
-      invoiceStatuses: ['BORRADOR','EMITIDA','PAGADA','ANULADA'],
+      invoiceStatuses: ['BORRADOR','EMITIDA','CRÉDITO','PAGADA','ANULADA'],
       currencies: ['VES','USD','EUR'],
+      paymentMethods: [
+        { title: 'Efectivo', value: 'EFECTIVO', icon: 'mdi-cash', color: 'green' },
+        { title: 'Pago Móvil', value: 'PAGO_MOVIL', icon: 'mdi-cellphone', color: 'blue' },
+        { title: 'Transferencia', value: 'TRANSFERENCIA', icon: 'mdi-bank', color: 'indigo' },
+        { title: 'Zelle', value: 'ZELLE', icon: 'mdi-alpha-z-box', color: 'deep-purple' },
+        { title: 'Punto de Venta', value: 'PUNTO_VENTA', icon: 'mdi-credit-card', color: 'orange' },
+        { title: 'Cashea', value: 'CASHEA', customIcon: '/Cashea-black-icon.svg', color: '#000000', bg: '#fdfa3d' },
+        { title: 'Otro', value: 'OTRO', icon: 'mdi-wallet', color: 'grey' }
+      ],
 
       // ──── Datos del formulario ────────────────────────────────────────────────
       formData: {
@@ -738,7 +885,9 @@ export default {
           totalSales: 0, nonTaxableSales: 0, taxableSales: 0,
           taxDebit: 0, ivaRetention: 0, islrRetention: 0,
           municipalRetention: 0, igtf: 0,
-          currency: 'VES', exchangeRate: 1, exchangeRateEur: null
+          currency: 'VES', exchangeRate: 1, exchangeRateEur: null,
+          paymentMethod: null, paymentReference: '',
+          credit: null
         },
 
         items: [ this.newItem() ],
@@ -844,6 +993,33 @@ export default {
     'formData.documentType'(t) {
       this.formData.documentCategory = t === 'RECIBO' ? 'RECIBO' : 'FACTURA';
     },
+    'formData.financial.paymentMethod'(method) {
+      if (method === 'CASHEA') {
+        if (this.formData.status !== 'PAGADA') {
+            this.formData.status = 'CRÉDITO';
+        }
+        if (!this.formData.financial.credit) {
+          this.formData.financial.credit = {
+            initialAmount: 0,
+            initialPercentage: 40,
+            installmentsCount: 3,
+            installments: []
+          };
+          if (this.formData.financial.totalSales > 0) {
+            this.onInitialPercentageChange();
+          }
+        }
+      } else {
+        if (this.formData.status === 'CRÉDITO') {
+            this.formData.status = 'EMITIDA';
+        }
+      }
+    },
+    'formData.financial.totalSales'(newTotal) {
+      if (this.formData.financial.paymentMethod === 'CASHEA' && this.formData.financial.credit) {
+        this.onInitialPercentageChange();
+      }
+    },
     'formData.financial.taxableSales'() {
       if (!this.manualMode && !this.isMappingOcr) this.calculateFromBase();
     },
@@ -923,6 +1099,79 @@ export default {
     formatNumber(n) {
       if (n == null || isNaN(n)) return '0,00';
       return Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+
+    // ── Cashea y Cuotas ────────────────────────────────────────────────────────
+    onInitialPercentageChange() {
+      const total = this.formData.financial.totalSales || 0;
+      const perc = this.formData.financial.credit?.initialPercentage || 0;
+      if (this.formData.financial.credit) {
+        this.formData.financial.credit.initialAmount = parseFloat((total * (perc / 100)).toFixed(2));
+        this.generateInstallments();
+      }
+    },
+
+    onInitialAmountChange() {
+      const total = this.formData.financial.totalSales || 0;
+      const amt = this.formData.financial.credit?.initialAmount || 0;
+      if (this.formData.financial.credit && total > 0) {
+        this.formData.financial.credit.initialPercentage = parseFloat(((amt / total) * 100).toFixed(2));
+        this.generateInstallments();
+      }
+    },
+
+    generateInstallments() {
+      if (!this.formData.financial.credit) return;
+      const total = this.formData.financial.totalSales || 0;
+      const initial = this.formData.financial.credit.initialAmount || 0;
+      const count = this.formData.financial.credit.installmentsCount || 3;
+      
+      const remaining = total - initial;
+      if (remaining < 0) return;
+      
+      const amountPerInst = parseFloat((remaining / count).toFixed(2));
+      const issueDate = new Date(this.formData.issueDate || new Date().toISOString().split('T')[0]);
+      
+      const oldInstallments = this.formData.financial.credit.installments || [];
+      const newInstallments = [];
+      
+      for (let i = 0; i < count; i++) {
+        const instDate = new Date(issueDate);
+        instDate.setDate(instDate.getDate() + (14 * (i + 1)));
+        
+        let status = 'POR_COBRAR';
+        if (oldInstallments[i] && oldInstallments[i].status) {
+            status = oldInstallments[i].status;
+        }
+
+        newInstallments.push({
+          id: i + 1,
+          date: instDate.toISOString().split('T')[0],
+          amount: amountPerInst,
+          status: status
+        });
+      }
+      
+      const totalInstallments = newInstallments.reduce((sum, inst) => sum + inst.amount, 0);
+      if (totalInstallments !== remaining && newInstallments.length > 0) {
+        const diff = remaining - totalInstallments;
+        newInstallments[newInstallments.length - 1].amount = parseFloat((newInstallments[newInstallments.length - 1].amount + diff).toFixed(2));
+      }
+      
+      this.formData.financial.credit.installments = newInstallments;
+      this.checkAllInstallmentsPaid();
+    },
+
+    checkAllInstallmentsPaid() {
+      if (this.formData.financial.paymentMethod === 'CASHEA' && this.formData.financial.credit) {
+        const allPaid = this.formData.financial.credit.installments.every(inst => inst.status === 'PAGADA');
+        if (allPaid && this.formData.status === 'CRÉDITO') {
+          this.formData.status = 'PAGADA';
+          this.showSnackbar('Todas las cuotas pagadas. Estatus general cambiado a PAGADA', 'success');
+        } else if (!allPaid && this.formData.status === 'PAGADA') {
+          this.formData.status = 'CRÉDITO';
+        }
+      }
     },
 
     isFlowActive(opt) {
@@ -1579,6 +1828,21 @@ export default {
 
 
 /* ─── Secciones ──────────────────────────────────────────── */
+.date-input-naked {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.875rem;
+  width: 110px;
+}
+:deep(.status-select-naked .v-field__input) {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  min-height: 24px !important;
+}
+
 .sif-section {
   padding: 16px 20px;
   border-bottom: 1px solid #f0f0f0;

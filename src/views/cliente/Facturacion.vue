@@ -120,34 +120,65 @@
 
       <!-- Estadísticas rápidas -->
       <v-row class="mb-6 animate-section" style="animation-delay: 0.2s">
-        <v-col cols="12" sm="6" md="3">
+        <!-- Tarjeta de Totales -->
+        <v-col cols="12" md="2">
           <StatsCard
-            title="Total de documentos"
+            title="Total documentos"
             :value="stats.total"
             bg-color="#02254d"
             text-color="white"
           />
         </v-col>
 
-        <v-col cols="12" sm="6" md="3">
-          <StatsCard
-            title="Emitidas"
-            :value="stats.byStatus?.EMITIDA || 0"
-            bg-color="#961112"
-            text-color="white"
+        <!-- Tarjeta Agrupada de Estatus -->
+        <v-col cols="12" md="4">
+          <v-card
+            class="pa-4 stats-card d-flex flex-column justify-center"
+            height="120"
+            style="border-radius: 20px !important; box-shadow: none !important; border: 1px solid #e0e0e0;"
+          >
+            <div class="text-body-2 mb-2 text-grey-darken-1 font-weight-medium">
+              Estatus de Documentos
+            </div>
+            <div class="d-flex justify-space-around align-center">
+              <div class="text-center px-2">
+                <div class="text-h5 font-weight-bold" style="color: #961112;">
+                  {{ stats.byStatus?.EMITIDA || 0 }}
+                </div>
+                <div class="text-caption text-grey-darken-1 font-weight-medium">Emitidas</div>
+              </div>
+              <v-divider vertical class="my-2"></v-divider>
+              <div class="text-center px-2">
+                <div class="text-h5 font-weight-bold" style="color: #5c6bc0;">
+                  {{ stats.byStatus?.CRÉDITO || 0 }}
+                </div>
+                <div class="text-caption text-grey-darken-1 font-weight-medium">Crédito</div>
+              </div>
+              <v-divider vertical class="my-2"></v-divider>
+              <div class="text-center px-2">
+                <div class="text-h5 font-weight-bold" style="color: #f2b648;">
+                  {{ stats.byStatus?.PAGADA || 0 }}
+                </div>
+                <div class="text-caption text-grey-darken-1 font-weight-medium">Pagadas</div>
+              </div>
+            </div>
+          </v-card>
+        </v-col>
+
+        <!-- Cashea -->
+        <v-col cols="12" md="3">
+          <CurrencyStatsCard
+            title="Cashea por Cobrar"
+            :value="convertedStatsCashea"
+            bg-color="#000000"
+            text-color="#fdfa3d"
+            :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
+            @toggle-currency="toggleCurrency"
           />
         </v-col>
 
-        <v-col cols="12" sm="6" md="3">
-          <StatsCard
-            title="Pagadas"
-            :value="stats.byStatus?.PAGADA || 0"
-            bg-color="#f2b648"
-            text-color="#010101"
-          />
-        </v-col>
-
-        <v-col cols="12" sm="6" md="3">
+        <!-- Rentabilidad -->
+        <v-col cols="12" md="3">
           <CurrencyStatsCard
             :title="currentTab === 'all' ? 'Rentabilidad' : 'Monto Total'"
             :value="convertedStatsTotal"
@@ -347,6 +378,32 @@
         <!-- Columna de fecha -->
         <template v-slot:item.issueDate="{ item }">
           {{ formatDate(item.issueDate) }}
+        </template>
+
+        <!-- Columna de método de pago -->
+        <template v-slot:item.paymentMethod="{ item }">
+          <div v-if="item.financial?.paymentMethod">
+            <v-chip
+              v-if="item.financial.paymentMethod === 'CASHEA'"
+              color="#000000"
+              style="background-color: #fdfa3d;"
+              size="small"
+              class="font-weight-bold"
+            >
+              <img src="/Cashea-black-icon.svg" alt="Cashea" width="14" height="14" class="mr-1" />
+              Cashea
+            </v-chip>
+            <v-chip
+              v-else
+              :color="getPaymentMethodColor(item.financial.paymentMethod)"
+              variant="outlined"
+              size="small"
+              class="font-weight-medium"
+            >
+              {{ formatPaymentMethod(item.financial.paymentMethod) }}
+            </v-chip>
+          </div>
+          <span v-else class="text-caption text-grey">-</span>
         </template>
 
 
@@ -562,6 +619,61 @@
                       <div class="text-caption text-primary font-weight-bold mb-1">Monto Total</div>
                       <div class="text-h6 font-weight-bold text-success">{{ formatCurrency(viewingInvoice.financial.totalSales, viewingInvoice.financial.currency) }}</div>
                     </div>
+                  </div>
+                  
+                  <div v-if="viewingInvoice.financial?.paymentMethod" class="info-item mt-2 pt-2 border-t">
+                    <div class="d-flex justify-space-between align-center">
+                      <div>
+                        <div class="text-caption text-grey-darken-1 mb-1">Método de Pago</div>
+                        <v-chip v-if="viewingInvoice.financial.paymentMethod === 'CASHEA'" color="#000000" style="background-color: #fdfa3d;" size="small" class="font-weight-bold">
+                          <img src="/Cashea-black-icon.svg" alt="Cashea" width="14" height="14" class="mr-1" />
+                          Cashea
+                        </v-chip>
+                        <v-chip v-else :color="getPaymentMethodColor(viewingInvoice.financial.paymentMethod)" size="small" variant="tonal" class="font-weight-bold">
+                          {{ formatPaymentMethod(viewingInvoice.financial.paymentMethod) }}
+                        </v-chip>
+                      </div>
+                      <div class="text-right" v-if="viewingInvoice.financial?.paymentReference">
+                        <div class="text-caption text-grey-darken-1 mb-1">Referencia</div>
+                        <div class="text-body-2 font-weight-medium">{{ viewingInvoice.financial.paymentReference }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="viewingInvoice.financial?.credit" class="info-item mt-3 pt-3 border-t">
+                    <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center">
+                      <v-icon size="small" class="mr-1">mdi-calendar-month</v-icon>
+                      Detalle de Cuotas (Cashea / Crédito)
+                    </div>
+                    <v-row dense class="mb-2">
+                      <v-col cols="12">
+                        <div class="text-caption text-grey-darken-1">Inicial pagada</div>
+                        <div class="text-body-2 font-weight-bold text-success">
+                          {{ formatCurrency(viewingInvoice.financial.credit.initialAmount, viewingInvoice.financial.currency) }} 
+                          ({{ viewingInvoice.financial.credit.initialPercentage }}%)
+                        </div>
+                      </v-col>
+                    </v-row>
+                    <v-table density="compact" class="bg-transparent text-caption border rounded">
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th class="text-right">Monto</th>
+                          <th class="text-center">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="inst in viewingInvoice.financial.credit.installments" :key="inst.id">
+                          <td>{{ formatDate(inst.date) }}</td>
+                          <td class="text-right font-weight-medium">{{ formatCurrency(inst.amount, viewingInvoice.financial.currency) }}</td>
+                          <td class="text-center">
+                            <v-chip size="x-small" :color="inst.status === 'PAGADA' ? 'success' : 'error'" class="font-weight-bold" variant="flat">
+                              {{ inst.status === 'PAGADA' ? 'Pagada' : 'Por Cobrar' }}
+                            </v-chip>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </v-table>
                   </div>
                   
                   <div v-if="viewingInvoice.notes" class="info-item mt-2">
@@ -955,6 +1067,7 @@ export default {
       isChangingCurrency: false,
       // Conversiones y cacheo
       convertedStatsTotal: 0,
+      convertedStatsCashea: 0,
       convertedAmounts: {},
       cachedRate: null,
       
@@ -1014,6 +1127,7 @@ export default {
 
         { title: 'Cliente/Proveedor', key: 'client', sortable: true },
         { title: 'Fecha', key: 'issueDate', sortable: true },
+        { title: 'Método', key: 'paymentMethod', sortable: true },
         { title: 'Total', key: 'total', sortable: true },
         { title: 'Estado', key: 'status', sortable: true },
         { title: 'Acciones', key: 'actions', sortable: false }
@@ -1022,6 +1136,7 @@ export default {
       invoiceStatuses: [
         'BORRADOR',
         'EMITIDA',
+        'CRÉDITO',
         'ENVIADA',
         'PAGADA',
         'VENCIDA',
@@ -1033,6 +1148,7 @@ export default {
         { text: 'Todos', value: 'all' },
         { text: 'Borrador', value: 'BORRADOR' },
         { text: 'Emitida', value: 'EMITIDA' },
+        { text: 'Crédito', value: 'CRÉDITO' },
         { text: 'Enviada', value: 'ENVIADA' },
         { text: 'Pagada', value: 'PAGADA' },
         { text: 'Vencida', value: 'VENCIDA' },
@@ -1157,6 +1273,7 @@ export default {
 
           // 2) Calcular total de stats SÍNCRONAMENTE
           this.convertedStatsTotal = (this.stats.totalAmount || 0) / (this.cachedRate || 1);
+          this.convertedStatsCashea = (this.stats.casheaPendingAmount || 0) / (this.cachedRate || 1);
 
           // 3) Calcular todos los montos de la tabla en un loop síncrono
           const map = {};
@@ -1169,6 +1286,7 @@ export default {
         } else {
           // Resetea a VES
           this.convertedStatsTotal = this.stats.totalAmount;
+          this.convertedStatsCashea = this.stats.casheaPendingAmount || 0;
           this.convertedAmounts = {};
           this.cachedRate = null; // opcional: limpia cache para refrescar en el próximo cambio
         }
@@ -1313,7 +1431,8 @@ export default {
       this.stats = {
         total: sourceData.length,
         byStatus: {},
-        totalAmount: 0
+        totalAmount: 0,
+        casheaPendingAmount: 0
       };
       
       sourceData.forEach(inv => {
@@ -1333,20 +1452,34 @@ export default {
         // else if (currency === 'EUR') { ... }
 
         // LOGICA DE NETEO (Solo para vista global 'all')
-        // Si estamos viendo "Todas", restamos los egresos (Compras/Gastos)
-        // Si estamos viendo pestañas específicas, sumamos el valor absoluto (Total de Compras, Total de Ventas)
         if (this.currentTab === 'all' && inv.flow === 'COMPRA') {
             this.stats.totalAmount -= amount;
         } else {
             this.stats.totalAmount += amount;
+        }
+
+        // CALCULO DE CASHEA PENDIENTE (Solo para ventas)
+        if (inv.flow === 'VENTA' && inv.financial?.paymentMethod === 'CASHEA' && inv.financial?.credit?.installments) {
+            let pendingVES = 0;
+            inv.financial.credit.installments.forEach(inst => {
+                if (inst.status === 'POR_COBRAR') {
+                    pendingVES += inst.amount;
+                }
+            });
+            if (currency === 'USD') {
+                pendingVES = pendingVES * currentRate;
+            }
+            this.stats.casheaPendingAmount += pendingVES;
         }
       });
       
       // Actualizar el total visual convertido
       if (this.currencyDisplay === 'USD' && currentRate) {
          this.convertedStatsTotal = this.stats.totalAmount / currentRate;
+         this.convertedStatsCashea = this.stats.casheaPendingAmount / currentRate;
       } else {
          this.convertedStatsTotal = this.stats.totalAmount;
+         this.convertedStatsCashea = this.stats.casheaPendingAmount;
       }
     },
     
@@ -1514,8 +1647,12 @@ export default {
           savedResult = await invoiceService.createInvoice(formData);
         }
 
+        if (!savedResult || !savedResult.success) {
+           throw new Error(savedResult?.message || 'Error desconocido al guardar factura en base de datos');
+        }
+
         // Enviar notificación por email en background (solo al crear, no al editar)
-        if (savedResult?.success && savedResult?.data && !formData.id) {
+        if (savedResult?.data && !formData.id) {
           emailNotificationService.notifyInvoiceCreated(savedResult.data)
             .catch(err => console.warn('⚠️ Email no enviado:', err))
         }
@@ -1560,7 +1697,8 @@ export default {
         'ENVIADA': 'info',
         'PAGADA': 'success',
         'VENCIDA': 'error',
-        'ANULADA': 'grey-darken-3'
+        'ANULADA': 'grey-darken-3',
+        'CRÉDITO': 'warning'
       };
       return colors[status] || 'grey';
     },
@@ -1582,6 +1720,26 @@ export default {
         const amount = invoice.financial?.totalSales || 0;
         
         return this.formatCurrency(amount, originalCurrency);
+    },
+
+    getPaymentMethodColor(method) {
+      const colors = {
+        'EFECTIVO': 'green',
+        'PAGO_MOVIL': 'blue',
+        'TRANSFERENCIA': 'indigo',
+        'ZELLE': 'deep-purple',
+        'PUNTO_VENTA': 'orange',
+        'CASHEA': 'red-darken-2',
+        'OTRO': 'grey'
+      };
+      return colors[method] || 'grey';
+    },
+
+    formatPaymentMethod(method) {
+      if (method === 'PAGO_MOVIL') return 'Pago Móvil';
+      if (method === 'PUNTO_VENTA') return 'Punto de Venta';
+      if (!method) return '';
+      return method.charAt(0).toUpperCase() + method.slice(1).toLowerCase();
     },
 
     getEquivalentAmount(invoice) {
