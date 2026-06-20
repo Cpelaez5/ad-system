@@ -1002,6 +1002,7 @@ export default {
           this.formData.financial.credit = {
             initialAmount: 0,
             initialPercentage: 40,
+            initialStatus: 'POR_COBRAR', // Fix inconsistencia #4: la inicial también se rastrea
             installmentsCount: 3,
             installments: []
           };

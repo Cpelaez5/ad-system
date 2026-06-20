@@ -444,7 +444,23 @@
 
         <template v-slot:item.actions="{ item }">
           <!-- Acciones para items NORMALES -->
-          <div v-if="currentTab !== 'trash'" class="d-flex">
+          <div v-if="currentTab !== 'trash'" class="d-flex align-center">
+            <!-- Botón rápido de cuotas Cashea (solo para facturas con Cashea) -->
+            <v-tooltip text="Gestionar cuotas Cashea" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  v-if="item.financial?.paymentMethod === 'CASHEA'"
+                  v-bind="props"
+                  size="small"
+                  variant="tonal"
+                  style="background-color: #fdfa3d; color: #000; min-width: 28px; height: 28px; padding: 0 6px;"
+                  class="mr-1"
+                  @click="openCasheaDialog(item)"
+                >
+                  <img src="/Cashea-black-icon.svg" alt="Cashea" width="13" height="13" />
+                </v-btn>
+              </template>
+            </v-tooltip>
             <v-btn
               icon="mdi-eye"
               size="small"
@@ -1022,9 +1038,18 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- ── Modal rápido de cuotas Cashea ──────────────────────── -->
+    <CasheaInstallmentsModal
+      v-model="casheaDialog"
+      :invoice="casheaInvoice"
+      @saved="onCasheaSaved"
+    />
+
     </template>
   </v-container>
 </template>
+
 
 <script>
 import StatsCard from '@/components/common/StatsCard.vue'
@@ -1037,6 +1062,7 @@ import exportService from '@/services/exportService.js';
 import emailNotificationService from '@/services/email-notification-service.js';
 import ClientInvoiceForm from '@/components/forms/client/ClientInvoiceForm.vue';
 import SimpleInvoiceForm  from '@/components/forms/client/SimpleInvoiceForm.vue';
+import CasheaInstallmentsModal from '@/components/forms/client/CasheaInstallmentsModal.vue';
 import userService from '@/services/userService.js';
 import { generateReceiptPdf } from '@/services/receipt-pdf-service.js';
 import dayjs from 'dayjs';
@@ -1046,6 +1072,7 @@ export default {
   components: {
     ClientInvoiceForm,
     SimpleInvoiceForm,
+    CasheaInstallmentsModal,
     AnimatedNumber,
     StatsCard,
     CurrencyStatsCard,
@@ -1092,6 +1119,9 @@ export default {
       deleteDialog: false,
       viewDialog: false,
       showExportDialog: false,
+      // Modal rápido de cuotas Cashea
+      casheaDialog: false,
+      casheaInvoice: null,
       
       // Datos para edición/eliminación
       editingInvoice: null,
@@ -1458,14 +1488,27 @@ export default {
             this.stats.totalAmount += amount;
         }
 
-        // CALCULO DE CASHEA PENDIENTE (Solo para ventas)
-        if (inv.flow === 'VENTA' && inv.financial?.paymentMethod === 'CASHEA' && inv.financial?.credit?.installments) {
+        // CALCULO DE CASHEA PENDIENTE (Solo para ventas) — FIX inconsistencia #4
+        if (inv.flow === 'VENTA' && inv.financial?.paymentMethod === 'CASHEA' && inv.financial?.credit) {
             let pendingVES = 0;
-            inv.financial.credit.installments.forEach(inst => {
-                if (inst.status === 'POR_COBRAR') {
-                    pendingVES += inst.amount;
-                }
-            });
+            const credit = inv.financial.credit;
+
+            // Incluir inicial si aún no ha sido cobrada
+            // Si no existe initialStatus, asumimos PAGADA para compatibilidad con facturas previas
+            if (credit.initialStatus === 'POR_COBRAR') {
+                pendingVES += credit.initialAmount || 0;
+            }
+
+            // Sumar cuotas pendientes
+            if (credit.installments) {
+                credit.installments.forEach(inst => {
+                    if (inst.status === 'POR_COBRAR') {
+                        pendingVES += inst.amount;
+                    }
+                });
+            }
+
+            // Normalizar a VES si la factura es en USD
             if (currency === 'USD') {
                 pendingVES = pendingVES * currentRate;
             }
@@ -1593,6 +1636,35 @@ export default {
     deleteInvoice(invoice) {
       this.invoiceToDelete = invoice;
       this.deleteDialog = true;
+    },
+
+    /** Abre el modal rápido de cuotas Cashea */
+    openCasheaDialog(invoice) {
+      // Clonar para evitar mutaciones directas antes de guardar
+      this.casheaInvoice = JSON.parse(JSON.stringify(invoice));
+      this.casheaDialog = true;
+    },
+
+    /**
+     * Callback cuando el modal de cuotas Cashea guarda exitosamente.
+     * Actualiza la factura en el array local sin recargar todo desde la BD.
+     */
+    onCasheaSaved(updatedInvoice) {
+      // Actualizar en el array principal
+      const idx = this.invoices.findIndex(inv => inv.id === updatedInvoice.id);
+      if (idx !== -1) {
+        this.invoices[idx] = { ...this.invoices[idx], ...updatedInvoice };
+      }
+      // Reflejar cambios en filteredInvoices también
+      const fidx = this.filteredInvoices.findIndex(inv => inv.id === updatedInvoice.id);
+      if (fidx !== -1) {
+        this.filteredInvoices[fidx] = { ...this.filteredInvoices[fidx], ...updatedInvoice };
+      }
+      // Recalcular estadísticas (la tarjeta "Cashea por Cobrar" se actualiza)
+      this.calculateStats();
+      // Forzar re-render reactivo
+      this.invoices = [...this.invoices];
+      this.filteredInvoices = [...this.filteredInvoices];
     },
     
     async confirmDelete() {
