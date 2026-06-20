@@ -1,150 +1,151 @@
 <template>
-  <!-- ════════════════════════════════════════════════════════════════
-       Modal Rápido de Cuotas Cashea
-       Permite actualizar el estado de la inicial y cada cuota sin
-       abrir el formulario de factura completo.
-  ════════════════════════════════════════════════════════════════ -->
-  <v-dialog :model-value="modelValue" @update:modelValue="$emit('update:modelValue', $event)" max-width="480px" persistent @keydown.esc="cancel">
-    <v-card class="cashea-modal rounded-xl elevation-10" style="overflow: hidden;">
+  <!-- Modal Rápido de Cuotas Cashea -->
+  <v-dialog
+    :model-value="modelValue"
+    @update:modelValue="$emit('update:modelValue', $event)"
+    max-width="480px"
+    persistent
+    @keydown.esc="cancel"
+  >
+    <v-card class="cashea-modal rounded-xl" style="overflow: hidden;">
 
-      <!-- ── Header con branding Cashea ──────────────────────────── -->
-      <div class="cashea-modal__header px-5 py-4 d-flex align-center justify-space-between">
-        <div class="d-flex align-center gap-3">
-          <div class="cashea-logo-badge">
-            <img src="/Cashea-black-icon.svg" alt="Cashea" width="20" height="20" />
-          </div>
-          <div>
-            <div class="text-subtitle-1 font-weight-bold text-black">Cuotas Cashea</div>
-            <div class="text-caption text-black" style="opacity: 0.6;">
-              {{ invoice?.invoiceNumber }} · {{ invoice?.client?.companyName || invoice?.issuer?.companyName || '—' }}
-            </div>
+      <!-- ── Header ─────────────────────────────────────────────── -->
+      <div class="cashea-header d-flex align-center px-4 py-4">
+        <!-- Badge con ícono Cashea (amarillo sobre azul) -->
+        <div class="cashea-icon-badge flex-shrink-0">
+          <img src="/Cashea-black-icon.svg" alt="Cashea" width="20" height="20" />
+        </div>
+        <!-- Título y subtítulo -->
+        <div class="ml-3 flex-grow-1" style="min-width: 0;">
+          <div class="cashea-header-title">Gestión de Cuotas Cashea</div>
+          <div class="cashea-header-sub text-truncate">
+            {{ invoice?.invoiceNumber }} &middot; {{ invoice?.client?.companyName || invoice?.issuer?.companyName || '—' }}
           </div>
         </div>
-        <v-btn icon="mdi-close" variant="text" size="small" color="black" @click="cancel" />
+        <!-- Botón cerrar (blanco sobre azul) -->
+        <v-btn icon="mdi-close" variant="text" size="small" color="white" style="opacity: 0.7;" class="ml-2 flex-shrink-0" @click="cancel" />
       </div>
+      <v-divider style="border-color: rgba(255,255,255,0.15);" />
 
       <!-- ── Body ────────────────────────────────────────────────── -->
-      <v-card-text class="px-5 py-4">
+      <v-card-text class="px-4 pb-4 pt-3" style="max-height: 68vh; overflow-y: auto;">
 
-        <!-- Resumen de la factura -->
-        <div class="cashea-summary mb-4 pa-3 rounded-lg d-flex justify-space-between align-center">
+        <!-- Resumen -->
+        <div class="cashea-summary-row mb-4 pa-3 rounded-lg d-flex justify-space-between align-center">
           <div>
-            <div class="text-caption text-grey-darken-1">Total de la venta</div>
-            <div class="text-h6 font-weight-bold">
+            <div class="text-caption text-grey mb-1">Total de la venta</div>
+            <div class="text-h6 font-weight-bold text-grey-darken-3">
               {{ formatCurrency(credit.totalSales, credit.currency) }}
             </div>
           </div>
           <div class="text-right">
-            <div class="text-caption text-grey-darken-1">Estado general</div>
+            <div class="text-caption text-grey mb-1">Estado general</div>
             <v-chip :color="statusChipColor" size="small" variant="tonal" class="font-weight-bold">
               {{ localStatus }}
             </v-chip>
           </div>
         </div>
 
-        <!-- Fila: Inicial ──────────────────────────────────────── -->
-        <div class="text-caption font-weight-bold text-grey-darken-2 text-uppercase mb-2" style="letter-spacing: .06em;">
-          Pago Inicial
-        </div>
-        <div class="cashea-row pa-3 rounded-lg mb-3 d-flex align-center justify-space-between">
-          <div>
-            <div class="text-body-2 font-weight-medium">
+        <!-- Pago Inicial -->
+        <div class="cashea-section-label mb-2">Pago Inicial</div>
+        <div class="cashea-installment-row rounded-lg mb-4 px-3 py-2 d-flex align-center justify-space-between"
+             :class="{ 'cashea-installment-row--paid': localInitialStatus === 'PAGADA' }">
+          <div style="min-width: 0;">
+            <div class="text-body-2 font-weight-bold text-grey-darken-3">
               {{ formatCurrency(credit.initialAmount, credit.currency) }}
-              <span class="text-caption text-grey">({{ credit.initialPercentage }}%)</span>
+              <span class="text-caption text-grey ml-1">{{ credit.initialPercentage }}%</span>
             </div>
-            <div class="text-caption text-grey-darken-1">Pago inicial</div>
+            <div class="text-caption text-grey">Al momento de la venta</div>
           </div>
           <v-btn-toggle
             v-model="localInitialStatus"
             mandatory
             density="compact"
-            color="success"
             rounded="lg"
-            class="cashea-toggle"
+            :color="localInitialStatus === 'PAGADA' ? 'success' : 'warning'"
+            class="cashea-toggle flex-shrink-0 ml-3"
             @update:modelValue="syncOverallStatus"
           >
-            <v-btn value="POR_COBRAR" size="small" style="font-size: 0.7rem; min-width: 80px;">
-              <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+            <v-btn value="POR_COBRAR" size="x-small" class="cashea-toggle-btn">
+              <v-icon size="11" class="mr-1">mdi-clock-outline</v-icon>
               Por Cobrar
             </v-btn>
-            <v-btn value="PAGADA" size="small" style="font-size: 0.7rem; min-width: 80px;">
-              <v-icon size="14" class="mr-1">mdi-check-circle</v-icon>
+            <v-btn value="PAGADA" size="x-small" class="cashea-toggle-btn">
+              <v-icon size="11" class="mr-1">mdi-check-circle</v-icon>
               Pagada
             </v-btn>
           </v-btn-toggle>
         </div>
 
-        <!-- Cuotas ─────────────────────────────────────────────── -->
-        <div class="text-caption font-weight-bold text-grey-darken-2 text-uppercase mb-2" style="letter-spacing: .06em;">
-          Cuotas ({{ localInstallments.length }})
-        </div>
-
+        <!-- Cuotas -->
+        <div class="cashea-section-label mb-2">Cuotas ({{ localInstallments.length }})</div>
         <div
           v-for="(inst, idx) in localInstallments"
           :key="inst.id"
-          class="cashea-row pa-3 rounded-lg mb-2 d-flex align-center justify-space-between"
-          :class="{ 'cashea-row--paid': inst.status === 'PAGADA' }"
+          class="cashea-installment-row rounded-lg mb-2 px-3 py-2 d-flex align-center justify-space-between"
+          :class="{ 'cashea-installment-row--paid': inst.status === 'PAGADA' }"
         >
-          <div>
-            <div class="text-body-2 font-weight-medium">
+          <div style="min-width: 0;">
+            <div class="text-body-2 font-weight-bold text-grey-darken-3">
               Cuota {{ idx + 1 }}
-              <span class="text-caption text-grey ml-1">· {{ formatCurrency(inst.amount, credit.currency) }}</span>
+              <span class="text-caption text-grey ml-1">{{ formatCurrency(inst.amount, credit.currency) }}</span>
             </div>
-            <div class="text-caption text-grey-darken-1">{{ formatDate(inst.date) }}</div>
+            <div class="text-caption text-grey">{{ formatFriendlyDate(inst.date) }}</div>
           </div>
           <v-btn-toggle
             v-model="inst.status"
             mandatory
             density="compact"
-            color="success"
             rounded="lg"
-            class="cashea-toggle"
+            :color="inst.status === 'PAGADA' ? 'success' : 'warning'"
+            class="cashea-toggle flex-shrink-0 ml-3"
             @update:modelValue="syncOverallStatus"
           >
-            <v-btn value="POR_COBRAR" size="small" style="font-size: 0.7rem; min-width: 80px;">
-              <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+            <v-btn value="POR_COBRAR" size="x-small" class="cashea-toggle-btn">
+              <v-icon size="11" class="mr-1">mdi-clock-outline</v-icon>
               Por Cobrar
             </v-btn>
-            <v-btn value="PAGADA" size="small" style="font-size: 0.7rem; min-width: 80px;">
-              <v-icon size="14" class="mr-1">mdi-check-circle</v-icon>
+            <v-btn value="PAGADA" size="x-small" class="cashea-toggle-btn">
+              <v-icon size="11" class="mr-1">mdi-check-circle</v-icon>
               Pagada
             </v-btn>
           </v-btn-toggle>
         </div>
 
-        <!-- Resumen pendiente -->
-        <div class="cashea-pending-row mt-4 pa-3 rounded-lg d-flex justify-space-between align-center">
-          <div class="d-flex align-center gap-2">
-            <v-icon size="16" color="warning">mdi-currency-usd-off</v-icon>
-            <span class="text-caption font-weight-bold text-warning-darken-2">Por Cobrar</span>
+        <!-- Resumen financiero -->
+        <div class="cashea-financial mt-5 rounded-lg overflow-hidden d-flex flex-column gap-1">
+          <div class="d-flex justify-space-between align-center px-4 py-2 rounded-t-lg" style="background-color: #fffbeb;">
+            <div class="d-flex align-center gap-2">
+              <v-icon size="16" color="#d97706">mdi-clock-outline</v-icon>
+              <span class="text-caption font-weight-bold" style="color: #b45309;">Pendiente por Cobrar</span>
+            </div>
+            <span class="text-body-2 font-weight-bold" style="color: #b45309;">{{ formatCurrency(pendingAmount, credit.currency) }}</span>
           </div>
-          <span class="text-body-2 font-weight-bold">{{ formatCurrency(pendingAmount, credit.currency) }}</span>
-        </div>
-        <div class="cashea-collected-row mt-1 pa-3 rounded-lg d-flex justify-space-between align-center">
-          <div class="d-flex align-center gap-2">
-            <v-icon size="16" color="success">mdi-check-all</v-icon>
-            <span class="text-caption font-weight-bold text-success">Cobrado</span>
+          <div class="d-flex justify-space-between align-center px-4 py-2 rounded-b-lg" style="background-color: #f0fdf4;">
+            <div class="d-flex align-center gap-2">
+              <v-icon size="16" color="#16a34a">mdi-check-circle</v-icon>
+              <span class="text-caption font-weight-bold text-success">Total Cobrado</span>
+            </div>
+            <span class="text-body-2 font-weight-bold text-success">{{ formatCurrency(collectedAmount, credit.currency) }}</span>
           </div>
-          <span class="text-body-2 font-weight-bold text-success">{{ formatCurrency(collectedAmount, credit.currency) }}</span>
         </div>
 
       </v-card-text>
 
       <!-- ── Footer ──────────────────────────────────────────────── -->
       <v-divider />
-      <v-card-actions class="pa-4">
-        <v-btn variant="text" color="grey-darken-1" @click="cancel">Cancelar</v-btn>
+      <v-card-actions class="px-4 py-3">
+        <v-btn variant="text" color="grey" size="small" @click="cancel">Cancelar</v-btn>
         <v-spacer />
         <v-btn
-          color="black"
-          style="background-color: #fdfa3d; color: #000;"
           variant="flat"
+          size="small"
           :loading="saving"
           :disabled="!hasChanges"
-          class="font-weight-bold px-6"
+          class="cashea-save-btn px-4"
           @click="save"
         >
-          <img src="/Cashea-black-icon.svg" alt="" width="14" height="14" class="mr-2" />
+          <img src="/Cashea-black-icon.svg" alt="" width="12" height="12" class="mr-1" />
           Guardar Cambios
         </v-btn>
       </v-card-actions>
@@ -152,6 +153,8 @@
     </v-card>
   </v-dialog>
 </template>
+
+
 
 <script>
 import invoiceService from '@/services/invoiceService.js';
@@ -327,11 +330,15 @@ export default {
       return currency === 'USD' ? `$ ${formatted}` : `Bs ${formatted}`;
     },
 
-    /** Formatea fecha ISO a formato legible */
-    formatDate(dateStr) {
+    /** Formatea fecha ISO a un formato más amigable (Ej: 15 Jun 2026) */
+    formatFriendlyDate(dateStr) {
       if (!dateStr) return '—';
-      const [year, month, day] = dateStr.split('-');
-      return `${day}/${month}/${year}`;
+      const date = new Date(dateStr + 'T00:00:00'); // Evitar timezone issues
+      return date.toLocaleDateString('es-VE', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      }).replace('.', ''); // quitar punto del mes abreviado si lo hay
     }
   }
 };
@@ -339,58 +346,90 @@ export default {
 
 <style scoped>
 /* ── Header ──────────────────────────────────────────────────── */
-.cashea-modal__header {
-  background: #fdfa3d;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+.cashea-header {
+  background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);
 }
 
-.cashea-logo-badge {
-  width: 36px;
-  height: 36px;
-  background: #000;
-  border-radius: 8px;
+.cashea-icon-badge {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  background: #fdfa3d;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* ── Filas de cuota ──────────────────────────────────────────── */
-.cashea-summary {
-  background: #f8f9ff;
-  border: 1px solid #e8eaf6;
+.cashea-header-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.3;
 }
 
-.cashea-row {
+.cashea-header-sub {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 1px;
+}
+
+/* ── Etiqueta de sección ─────────────────────────────────────── */
+.cashea-section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #9e9e9e;
+}
+
+/* ── Resumen de totales ──────────────────────────────────────── */
+.cashea-summary-row {
+  background: #f8f9ff;
+  border: 1px solid #e8eaf6;
+  border-radius: 10px;
+}
+
+/* ── Filas de cuota ──────────────────────────────────────────── */
+.cashea-installment-row {
   background: #fafafa;
   border: 1px solid #eeeeee;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.cashea-row--paid {
+.cashea-installment-row--paid {
   background: #f1faf5;
   border-color: #c8e6c9;
 }
 
-.cashea-pending-row {
-  background: #fff8e1;
-  border: 1px solid #ffe082;
-}
-
-.cashea-collected-row {
-  background: #f1faf5;
-  border: 1px solid #c8e6c9;
-}
-
 /* ── Toggle de estado ────────────────────────────────────────── */
 .cashea-toggle {
-  border: 1px solid #e0e0e0;
+  border: 1px solid #e0e0e0!important;
+  background: #fff;
 }
 
-.cashea-toggle :deep(.v-btn) {
-  height: 30px !important;
+.cashea-toggle-btn {
+  font-size: 0.68rem !important;
+  letter-spacing: 0 !important;
+  min-width: 78px !important;
+  height: 28px !important;
 }
 
-.cashea-toggle :deep(.v-btn--active) {
-  font-weight: 600;
+/* ── Resumen financiero (eliminamos bordes del CSS para usar el inline) ── */
+.cashea-financial {
+  border: none;
+}
+
+
+/* ── Botón guardar ───────────────────────────────────────────── */
+.cashea-save-btn {
+  background-color: #fdfa3d !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+}
+.cashea-save-btn:disabled {
+  background-color: #f5f5f5 !important;
+  color: #bdbdbd !important;
 }
 </style>
