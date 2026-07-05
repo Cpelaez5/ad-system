@@ -198,6 +198,27 @@
                 </v-radio-group>
               </v-sheet>
 
+              <!-- Categoría del Gasto -->
+              <v-sheet 
+                v-if="formData.flow === 'COMPRA' && formData.expense_type === 'GASTO'" 
+                variant="outlined" 
+                class="mb-6 rounded-lg border-2 pa-4"
+                style="border-color: #e65100 !important;"
+              >
+                <div class="d-flex align-center mb-4">
+                  <v-icon color="orange-darken-3" size="24" class="mr-2">mdi-shape-outline</v-icon>
+                  <span class="text-h6 font-weight-medium">Categoría del Gasto</span>
+                  <v-chip size="small" color="orange-darken-3" variant="tonal" class="ml-2">Requerido</v-chip>
+                </div>
+                
+                <ExpenseCategorySelector
+                  v-model="formData.expense_category_id"
+                  :client-id="selectedClientId"
+                  label="Selecciona o crea una categoría"
+                  :rules="[v => !!v || 'Debe seleccionar una categoría para el gasto']"
+                />
+              </v-sheet>
+
               <!-- Estado de la Factura -->
               <v-select
                 v-model="formData.status"
@@ -846,14 +867,14 @@ import clientService from '@/services/clientService.js';
 import userService from '@/services/userService.js';
 import adminOcrService from '@/services/adminOcrService.js';
 import bcvService from '@/services/bcvService.js';
-import InvoiceForm from '@/components/forms/InvoiceForm.vue';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue';
+import ExpenseCategorySelector from '@/components/common/ExpenseCategorySelector.vue';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
 
 export default {
   name: 'InvoiceForm',
-  components: { FileUploadZone, ProductAutocomplete, AppSnackbar },
+  components: { FileUploadZone, ProductAutocomplete, ExpenseCategorySelector, AppSnackbar },
   props: {
     invoice: {
       type: Object,
@@ -910,6 +931,7 @@ export default {
         documentCategory: 'FACTURA', // FACTURA (fiscal) or RECIBO (delivery note)
         flow: 'VENTA', // Tipo de flujo: VENTA o COMPRA
         expense_type: 'COMPRA', // Tipo de egreso: COMPRA o GASTO (solo para flow=COMPRA)
+        expense_category_id: null,
         issueDate: new Date().toISOString().split('T')[0],
         dueDate: '',
         status: 'BORRADOR',
@@ -1010,7 +1032,11 @@ export default {
     invoice: {
       handler(newInvoice) {
         if (newInvoice) {
-          this.formData = { ...newInvoice };
+          this.formData = { 
+            ...newInvoice,
+            expense_type: newInvoice.expense_type || (newInvoice.flow === 'COMPRA' ? 'COMPRA' : null),
+            expense_category_id: newInvoice.expense_category_id || null
+          };
           // Si es una factura existente, establecer el cliente seleccionado
           if (newInvoice.clientId) {
             this.selectedClientId = newInvoice.clientId;

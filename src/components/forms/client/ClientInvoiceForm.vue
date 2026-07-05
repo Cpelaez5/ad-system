@@ -266,6 +266,23 @@
                 </v-card-text>
               </v-card>
 
+              <!-- Categoría del Gasto -->
+              <v-card 
+                v-if="formData.flow === 'COMPRA' && formData.expense_type === 'GASTO'" 
+                variant="outlined" 
+                class="mb-4" 
+                style="border: 2px solid #e65100; border-radius: 12px;"
+              >
+                <v-card-text class="pa-4">
+                  <ExpenseCategorySelector
+                    v-model="formData.expense_category_id"
+                    :client-id="currentUser?.client?.id"
+                    label="Categoría del Gasto"
+                    :rules="[v => !!v || 'Debe seleccionar una categoría para el gasto']"
+                  />
+                </v-card-text>
+              </v-card>
+
               <!-- Información básica de la factura -->
               <v-row>
                 <v-col cols="12" md="6">
@@ -929,6 +946,7 @@ import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue';
+import ExpenseCategorySelector from '@/components/common/ExpenseCategorySelector.vue';
 
 import { supabase } from '@/lib/supabaseClient';
 
@@ -938,7 +956,8 @@ export default {
     AppSnackbar,
     FileUploadZone,
     CustomDatePicker,
-    ProductAutocomplete
+    ProductAutocomplete,
+    ExpenseCategorySelector
   },
   props: {
     invoice: {
@@ -1007,6 +1026,7 @@ export default {
         documentCategory: 'FACTURA', // FACTURA (fiscal) or RECIBO (delivery note)
         flow: 'VENTA',
         expense_type: 'COMPRA',
+        expense_category_id: null,
         issueDate: new Date().toISOString().split('T')[0],
         dueDate: '',
         status: 'BORRADOR',
@@ -1194,7 +1214,8 @@ export default {
           this.formData = { 
             ...newInvoice,
             // Asegurar que expense_type se cargue (si es compra antigua sin campo, default a COMPRA)
-            expense_type: newInvoice.expense_type || (newInvoice.flow === 'COMPRA' ? 'COMPRA' : null)
+            expense_type: newInvoice.expense_type || (newInvoice.flow === 'COMPRA' ? 'COMPRA' : null),
+            expense_category_id: newInvoice.expense_category_id || null
           };
         }
       },

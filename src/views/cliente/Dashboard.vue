@@ -68,16 +68,38 @@
               <v-btn value="VES" size="small">VES</v-btn>
             </v-btn-toggle>
 
-            <!-- Filtro de período -->
-            <v-select
-              v-model="periodoSeleccionado"
-              :items="opcionesPeriodo"
-              variant="outlined"
-              density="compact"
-              hide-details
-              class="filtro-periodo"
-              prepend-inner-icon="mdi-calendar-range"
-            />
+            <!-- Filtro de período y switch -->
+            <div class="d-flex align-center gap-2 flex-wrap justify-end">
+              <!-- Switch de Porcentajes -->
+              <v-switch
+                v-model="vistaPorcentaje"
+                color="primary"
+                label="Mostrar en %"
+                hide-details
+                density="compact"
+                class="mb-0 mr-2"
+              ></v-switch>
+              
+              <v-select
+                v-model="periodoSeleccionado"
+                :items="opcionesPeriodo"
+                variant="outlined"
+                density="compact"
+                hide-details
+                class="filtro-periodo"
+                prepend-inner-icon="mdi-calendar-range"
+              />
+              <Datepicker 
+                v-if="periodoSeleccionado === 'personalizado'"
+                v-model="fechaFiltro" 
+                range 
+                auto-apply
+                :enable-time-picker="false"
+                format="dd/MM/yyyy"
+                placeholder="Seleccione rango"
+                class="custom-datepicker"
+              />
+            </div>
           </v-col>
         </v-row>
       </div>
@@ -136,14 +158,17 @@
         </v-col>
       </v-row>
 
-      <!-- ─── GRÁFICOS PRINCIPALES ─── -->
-      <v-row class="mb-6">
-        <!-- Gráfico de evolución: Ingresos vs Egresos + Línea de Margen -->
-        <v-col cols="12" md="8" class="animate-section" style="animation-delay: 0.4s">
+      <!-- ─── CONTENIDO PRINCIPAL (Desktop: 1 Columna Fluida) ─── -->
+      <!-- FILA 1: Gráficos Principales -->
+      <v-row class="mb-4">
+        <!-- Gráfico de evolución: Ingresos vs Egresos (50% en Desktop) -->
+        <v-col cols="12" lg="6" class="animate-section" style="animation-delay: 0.4s">
           <v-card class="dashboard-card chart-card">
             <v-card-title class="card-title-row">
-              <v-icon class="mr-2" color="secondary" size="20">mdi-chart-timeline-variant-shimmer</v-icon>
-              <span>Evolución de Rendimiento</span>
+              <div class="d-flex align-center">
+                <v-icon class="mr-2" color="secondary" size="20">mdi-chart-timeline-variant-shimmer</v-icon>
+                <span>Evolución de Rendimiento</span>
+              </div>
             </v-card-title>
             <v-card-text class="pt-0 chart-body">
               <BarChart
@@ -151,7 +176,7 @@
                 :key="'bar-' + chartKey"
                 :data="chartEvolucionData"
                 :options="chartEvolucionOptions"
-                :height="340"
+                :height="260"
               />
               <div v-else class="empty-state">
                 <v-icon size="56" color="#ccc">mdi-chart-bar</v-icon>
@@ -161,241 +186,283 @@
           </v-card>
         </v-col>
 
-        <!-- Gráfico de distribución de gastos (Pie) -->
-        <v-col cols="12" md="4" class="animate-section" style="animation-delay: 0.5s">
-          <v-card class="dashboard-card chart-card">
+        <!-- Gráfico de distribución de ingresos (25% en Desktop) -->
+        <v-col cols="12" md="6" lg="3" class="animate-section" style="animation-delay: 0.5s">
+          <v-card class="dashboard-card chart-card full-height">
             <v-card-title class="card-title-row">
-              <v-icon class="mr-2" color="#E0B04F" size="20">mdi-chart-donut</v-icon>
-              <span>Distribución de Gastos</span>
+              <div class="d-flex align-center">
+                <v-icon class="mr-2" color="#E0B04F" size="20">mdi-chart-donut</v-icon>
+                <span>Ingresos por Método</span>
+              </div>
             </v-card-title>
             <v-card-text class="pt-0 chart-body">
               <PieChart
-                v-if="chartGastosData.labels && chartGastosData.labels.length > 0"
+                v-if="chartMetodosPagoData.labels && chartMetodosPagoData.labels.length > 0"
                 :key="'pie-' + chartKey"
-                :data="chartGastosData"
-                :options="chartGastosOptions"
-                :height="300"
+                :data="chartMetodosPagoData"
+                :options="chartMetodosPagoOptions"
+                :height="260"
               />
               <div v-else class="empty-state">
                 <v-icon size="56" color="#ccc">mdi-chart-pie</v-icon>
-                <p class="mt-3">Sin datos de compras en este período</p>
+                <p class="mt-3">Sin datos de ventas</p>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <!-- Gráfico de distribución de egresos (25% en Desktop) -->
+        <v-col cols="12" md="6" lg="3" class="animate-section" style="animation-delay: 0.55s">
+          <v-card class="dashboard-card chart-card full-height">
+            <v-card-title class="card-title-row">
+              <div class="d-flex align-center">
+                <v-icon class="mr-2" color="#961112" size="20">mdi-chart-arc</v-icon>
+                <span>Gastos por Categoría</span>
+              </div>
+            </v-card-title>
+            <v-card-text class="pt-0 chart-body">
+              <PieChart
+                v-if="chartGastosCategoriaData.labels && chartGastosCategoriaData.labels.length > 0"
+                :key="'doughnut-' + chartKey"
+                :data="chartGastosCategoriaData"
+                :options="chartGastosCategoriaOptions"
+                :height="260"
+              />
+              <div v-else class="empty-state">
+                <v-icon size="56" color="#ccc">mdi-receipt-text-outline</v-icon>
+                <p class="mt-3">Sin gastos registrados</p>
               </div>
             </v-card-text>
           </v-card>
         </v-col>
       </v-row>
 
-      <!-- ─── SECCIÓN INFERIOR: SWAPY GRID ─── -->
-      <div ref="swapyContainer" class="swapy-grid">
-
-        <!-- SLOT: Insights Automáticos -->
-        <div data-swapy-slot="insights" class="swapy-slot animate-section" style="animation-delay: 0.6s">
-          <div data-swapy-item="insights">
-            <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row">
-                <v-icon class="mr-2" color="#A81C22" size="20">mdi-lightbulb-on-outline</v-icon>
-                <span>Insights</span>
-                <v-spacer />
-                <v-icon size="18" color="#bbb" class="drag-handle-icon">mdi-drag</v-icon>
-              </v-card-title>
-              <v-card-text>
-                <!-- Sin insights -->
-                <div v-if="insightsCalculados.length === 0" class="empty-state compact">
-                  <v-icon size="40" color="#ccc">mdi-robot-happy-outline</v-icon>
-                  <p class="mt-2">¡Todo se ve bien! Sin alertas por ahora.</p>
-                </div>
-                <!-- Lista de insights -->
-                <div v-else class="insights-list">
-                  <div
-                    v-for="(insight, i) in insightsCalculados"
-                    :key="'insight-' + i"
-                    class="insight-item"
-                    :class="{ 'clickable': !!insight.action }"
-                    @click="insight.action ? $router.push(insight.action.path) : null"
-                  >
-                    <div class="insight-icon" :style="{ backgroundColor: insight.color + '15' }">
-                      <v-icon :color="insight.color" size="20">{{ insight.icon }}</v-icon>
-                    </div>
-                    <div class="insight-content">
-                      <p class="insight-text">{{ insight.text }}</p>
-                      <v-chip
-                        v-if="insight.action"
-                        size="x-small"
-                        variant="text"
-                        :color="insight.color"
-                        class="insight-link pa-0 mt-1"
-                      >
-                        {{ insight.action.label }} →
-                      </v-chip>
-                    </div>
-                  </div>
-                </div>
-              </v-card-text>
-            </v-card>
-          </div>
-        </div>
-
-        <!-- SLOT: Actividad Reciente -->
-        <div data-swapy-slot="actividad" class="swapy-slot animate-section" style="animation-delay: 0.7s">
-          <div data-swapy-item="actividad">
-            <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row">
-                <v-icon class="mr-2" color="secondary" size="20">mdi-history</v-icon>
-                <span>Actividad Reciente</span>
-                <v-spacer />
-                <v-icon size="18" color="#bbb" class="drag-handle-icon">mdi-drag</v-icon>
-              </v-card-title>
-              <v-card-text>
-                <!-- Sin actividad -->
-                <div v-if="actividadesRecientes.length === 0" class="empty-state compact">
-                  <v-icon size="40" color="#ccc">mdi-clock-outline</v-icon>
-                  <p class="mt-2">Sin actividad reciente</p>
-                </div>
-                <!-- Timeline de actividad -->
-                <div v-else class="activity-timeline">
-                  <div
-                    v-for="act in actividadesRecientes"
-                    :key="act.id"
-                    class="activity-item"
-                  >
-                    <div class="activity-dot" :style="{ backgroundColor: act.color }"></div>
-                    <div class="activity-body">
-                      <p class="activity-desc">{{ act.descripcion }}</p>
-                      <span class="activity-time">{{ act.fecha }}</span>
-                    </div>
-                    <v-icon size="16" color="#bbb">{{ act.icono }}</v-icon>
-                  </div>
-                </div>
-              </v-card-text>
-            </v-card>
-          </div>
-        </div>
-
-        <!-- SLOT: Top Productos -->
-        <div data-swapy-slot="top-productos" class="swapy-slot animate-section" style="animation-delay: 0.8s">
-          <div data-swapy-item="top-productos">
-            <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row">
-                <v-icon class="mr-2" color="#f2b648" size="20">mdi-trophy-outline</v-icon>
-                <span>Top Productos</span>
-                <v-spacer />
-                <v-icon size="18" color="#bbb" class="drag-handle-icon">mdi-drag</v-icon>
-              </v-card-title>
-              <v-card-text>
-                <!-- Sin productos -->
-                <div v-if="topProducts.length === 0" class="empty-state compact">
-                  <v-icon size="40" color="#ccc">mdi-package-variant</v-icon>
-                  <p class="mt-2">Sin datos de productos vendidos</p>
-                </div>
-                <!-- Ranking de productos -->
-                <div v-else class="top-products-list">
-                  <div
-                    v-for="(prod, i) in topProducts.slice(0, 5)"
-                    :key="'prod-' + i"
-                    class="product-rank-item"
-                  >
-                    <div class="rank-badge" :class="'rank-' + (i + 1)">{{ i + 1 }}</div>
-                    <div class="product-info">
-                      <p class="product-name">{{ prod.name || prod.product_name || 'Producto' }}</p>
-                      <p class="product-stats">
-                        {{ prod.total_sold || prod.totalSold || 0 }}
-                        {{ prod.unit || 'uds' }} vendidos
-                      </p>
-                    </div>
-                    <div class="product-revenue">
-                      ${{ formatMonto(prod.total_revenue || prod.totalRevenue || 0) }}
-                    </div>
-                  </div>
-                </div>
-              </v-card-text>
-            </v-card>
-          </div>
-        </div>
-
-        <!-- SLOT: Estado Fiscal -->
-        <div data-swapy-slot="fiscal" class="swapy-slot animate-section" style="animation-delay: 0.9s">
-          <div data-swapy-item="fiscal">
-            <v-card class="dashboard-card full-height">
-              <v-card-title class="card-title-row justify-space-between">
-                <div class="d-flex align-center">
-                  <v-icon class="mr-2" color="#A81C22" size="20">mdi-shield-check-outline</v-icon>
-                  <span>Expediente Fiscal</span>
-                </div>
-                <div class="d-flex align-center gap-2">
-                  <v-btn
-                    variant="text"
-                    size="small"
-                    color="secondary"
-                    @click="$router.push('/cliente/fiscal-360')"
-                  >
-                    Ver todo
-                  </v-btn>
-                  <v-icon size="18" color="#bbb" class="drag-handle-icon">mdi-drag</v-icon>
-                </div>
-              </v-card-title>
-              <v-card-text>
-                <!-- Tres mini KPIs fiscales -->
-                <v-row dense class="mb-3">
-                  <v-col cols="4" class="text-center">
-                    <div class="fiscal-stat">
-                      <div class="fiscal-number text-success">
-                        <AnimatedNumber :value="fiscalStats.vigente" :minimum-fraction-digits="0" :maximum-fraction-digits="0" />
-                      </div>
-                      <div class="fiscal-label">Vigentes</div>
-                    </div>
-                  </v-col>
-                  <v-col cols="4" class="text-center">
-                    <div class="fiscal-stat">
-                      <div class="fiscal-number text-warning">
-                        <AnimatedNumber :value="fiscalStats.tramite" :minimum-fraction-digits="0" :maximum-fraction-digits="0" />
-                      </div>
-                      <div class="fiscal-label">En Trámite</div>
-                    </div>
-                  </v-col>
-                  <v-col cols="4" class="text-center">
-                    <div class="fiscal-stat">
-                      <div class="fiscal-number text-error">
-                        <AnimatedNumber :value="fiscalStats.porVencer" :minimum-fraction-digits="0" :maximum-fraction-digits="0" />
-                      </div>
-                      <div class="fiscal-label">Por Vencer</div>
-                    </div>
-                  </v-col>
-                </v-row>
-
-                <!-- Barra de progreso: estado general -->
-                <div class="mt-2">
-                  <div class="d-flex justify-space-between text-caption mb-1">
-                    <span style="color: #888">Estado general</span>
-                    <span style="color: #666; font-weight: 500">
-                      {{ fiscalStats.vigente }}/{{ fiscalStats.total }} vigentes
-                    </span>
-                  </div>
-                  <v-progress-linear
-                    :model-value="fiscalStats.total > 0 ? (fiscalStats.vigente / fiscalStats.total * 100) : 0"
-                    color="#4CAF50"
-                    bg-color="#E8F5E9"
-                    height="8"
-                    rounded
-                  />
-                </div>
-
-                <!-- Alerta de documentos vencidos -->
-                <v-alert
-                  v-if="fiscalStats.vencido > 0"
-                  type="error"
-                  variant="tonal"
-                  density="compact"
-                  class="mt-3"
-                  icon="mdi-alert-circle"
+      <!-- FILA 2: Métricas Secundarias -->
+      <v-row class="mb-4">
+        <!-- Insights Automáticos -->
+        <v-col cols="12" sm="6" lg="3" class="animate-section" style="animation-delay: 0.6s">
+          <v-card class="dashboard-card full-height">
+            <v-card-title class="card-title-row">
+              <v-icon class="mr-2" color="#A81C22" size="20">mdi-lightbulb-on-outline</v-icon>
+              <span>Insights</span>
+            </v-card-title>
+            <v-card-text>
+              <!-- Sin insights -->
+              <div v-if="insightsCalculados.length === 0" class="empty-state compact">
+                <v-icon size="40" color="#ccc">mdi-robot-happy-outline</v-icon>
+                <p class="mt-2">¡Todo se ve bien! Sin alertas por ahora.</p>
+              </div>
+              <!-- Lista de insights -->
+              <div v-else class="insights-list">
+                <div
+                  v-for="(insight, i) in insightsCalculados"
+                  :key="'insight-' + i"
+                  class="insight-item"
+                  :class="{ 'clickable': !!insight.action }"
+                  @click="insight.action ? $router.push(insight.action.path) : null"
                 >
-                  {{ fiscalStats.vencido }} documento(s) vencido(s)
-                </v-alert>
-              </v-card-text>
-            </v-card>
-          </div>
-        </div>
+                  <div class="insight-icon" :style="{ backgroundColor: insight.color + '15' }">
+                    <v-icon :color="insight.color" size="20">{{ insight.icon }}</v-icon>
+                  </div>
+                  <div class="insight-content">
+                    <p class="insight-text">{{ insight.text }}</p>
+                    <v-chip
+                      v-if="insight.action"
+                      size="x-small"
+                      variant="text"
+                      :color="insight.color"
+                      class="insight-link pa-0 mt-1"
+                    >
+                      {{ insight.action.label }} →
+                    </v-chip>
+                  </div>
+                </div>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
 
-      </div><!-- /.swapy-grid -->
+        <!-- Actividad Reciente -->
+        <v-col cols="12" sm="6" lg="3" class="animate-section" style="animation-delay: 0.7s">
+          <v-card class="dashboard-card full-height">
+            <v-card-title class="card-title-row">
+              <v-icon class="mr-2" color="secondary" size="20">mdi-history</v-icon>
+              <span>Actividad Reciente</span>
+            </v-card-title>
+            <v-card-text>
+              <!-- Sin actividad -->
+              <div v-if="actividadesRecientes.length === 0" class="empty-state compact">
+                <v-icon size="40" color="#ccc">mdi-clock-outline</v-icon>
+                <p class="mt-2">Sin actividad reciente</p>
+              </div>
+              <!-- Timeline de actividad -->
+              <div v-else class="activity-timeline">
+                <div
+                  v-for="act in actividadesRecientes"
+                  :key="act.id"
+                  class="activity-item"
+                >
+                  <div class="activity-dot" :style="{ backgroundColor: act.color }"></div>
+                  <div class="activity-body">
+                    <p class="activity-desc">{{ act.descripcion }}</p>
+                    <span class="activity-time">{{ act.fecha }}</span>
+                  </div>
+                  <v-icon size="16" color="#bbb">{{ act.icono }}</v-icon>
+                </div>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        
+        <!-- Cuentas por Cobrar Cashea -->
+        <v-col cols="12" sm="6" lg="3" class="animate-section" style="animation-delay: 1.0s">
+          <v-card class="dashboard-card full-height" style="border-top: 4px solid #fdfa3d;">
+            <v-card-title class="card-title-row">
+              <img src="/Cashea-black-icon.svg" alt="Cashea" width="18" height="18" class="mr-2" />
+              <span>Cashea por Cobrar</span>
+            </v-card-title>
+            <v-card-text class="d-flex flex-column align-center justify-center">
+              <div class="text-h3 font-weight-bold mb-1 mt-4" style="color: #000">
+                <span class="text-h5 mr-1" style="color: #666">{{ monedaActual === 'VES' ? 'Bs' : '$' }}</span>
+                <AnimatedNumber :value="casheaPorCobrar * (monedaActual === 'VES' ? factorConversion : 1)" :formatter="v => formatMonto(v)" />
+              </div>
+              <div class="text-caption text-grey mb-6">Total en cuotas pendientes</div>
+              
+              <v-btn 
+                variant="tonal" 
+                color="black" 
+                size="small" 
+                class="text-none px-4"
+                rounded="pill"
+                style="background-color: #fdfa3d;"
+                @click="$router.push('/cliente/facturacion')"
+              >
+                Gestionar cuotas
+              </v-btn>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
+        <!-- Top Productos -->
+        <v-col cols="12" sm="6" lg="3" class="animate-section" style="animation-delay: 0.8s">
+          <v-card class="dashboard-card full-height">
+            <v-card-title class="card-title-row">
+              <v-icon class="mr-2" color="#f2b648" size="20">mdi-trophy-outline</v-icon>
+              <span>Top Productos</span>
+            </v-card-title>
+            <v-card-text>
+              <!-- Sin productos -->
+              <div v-if="topProducts.length === 0" class="empty-state compact">
+                <v-icon size="40" color="#ccc">mdi-package-variant</v-icon>
+                <p class="mt-2">Sin datos de productos</p>
+              </div>
+              <!-- Ranking de productos -->
+              <div v-else class="top-products-list">
+                <div
+                  v-for="(prod, i) in topProducts.slice(0, 5)"
+                  :key="'prod-' + i"
+                  class="product-rank-item"
+                >
+                  <div class="rank-badge" :class="'rank-' + (i + 1)">{{ i + 1 }}</div>
+                  <div class="product-info">
+                    <p class="product-name">{{ prod.name || prod.product_name || 'Producto' }}</p>
+                    <p class="product-stats">
+                      {{ prod.total_sold || prod.totalSold || 0 }}
+                      {{ prod.unit || 'uds' }} vendidos
+                    </p>
+                  </div>
+                  <div class="product-revenue">
+                    ${{ formatMonto(prod.total_revenue || prod.totalRevenue || 0) }}
+                  </div>
+                </div>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+
+      <!-- FILA 3: Estado Fiscal -->
+      <v-row>
+        <!-- Estado Fiscal -->
+        <v-col cols="12" md="6" class="animate-section" style="animation-delay: 0.9s">
+          <v-card class="dashboard-card full-height">
+            <v-card-title class="card-title-row justify-space-between">
+              <div class="d-flex align-center">
+                <v-icon class="mr-2" color="#A81C22" size="20">mdi-shield-check-outline</v-icon>
+                <span>Expediente Fiscal</span>
+              </div>
+              <div class="d-flex align-center gap-2">
+                <v-btn
+                  variant="text"
+                  size="small"
+                  color="secondary"
+                  @click="$router.push('/cliente/fiscal-360')"
+                >
+                  Ver todo
+                </v-btn>
+              </div>
+            </v-card-title>
+            <v-card-text>
+              <!-- Tres mini KPIs fiscales -->
+              <v-row dense class="mb-3">
+                <v-col cols="4" class="text-center">
+                  <div class="fiscal-stat">
+                    <div class="fiscal-number text-success">
+                      <AnimatedNumber :value="fiscalStats.vigente" :minimum-fraction-digits="0" :maximum-fraction-digits="0" />
+                    </div>
+                    <div class="fiscal-label">Vigentes</div>
+                  </div>
+                </v-col>
+                <v-col cols="4" class="text-center">
+                  <div class="fiscal-stat">
+                    <div class="fiscal-number text-warning">
+                      <AnimatedNumber :value="fiscalStats.tramite" :minimum-fraction-digits="0" :maximum-fraction-digits="0" />
+                    </div>
+                    <div class="fiscal-label">Trámite</div>
+                  </div>
+                </v-col>
+                <v-col cols="4" class="text-center">
+                  <div class="fiscal-stat">
+                    <div class="fiscal-number text-error">
+                      <AnimatedNumber :value="fiscalStats.porVencer" :minimum-fraction-digits="0" :maximum-fraction-digits="0" />
+                    </div>
+                    <div class="fiscal-label">Vencer</div>
+                  </div>
+                </v-col>
+              </v-row>
+
+              <!-- Barra de progreso: estado general -->
+              <div class="mt-2">
+                <div class="d-flex justify-space-between text-caption mb-1">
+                  <span style="color: #888">Estado general</span>
+                  <span style="color: #666; font-weight: 500">
+                    {{ fiscalStats.vigente }}/{{ fiscalStats.total }} vigentes
+                  </span>
+                </div>
+                <v-progress-linear
+                  :model-value="fiscalStats.total > 0 ? (fiscalStats.vigente / fiscalStats.total * 100) : 0"
+                  color="#4CAF50"
+                  bg-color="#E8F5E9"
+                  height="8"
+                  rounded
+                />
+              </div>
+
+              <!-- Alerta de documentos vencidos -->
+              <v-alert
+                v-if="fiscalStats.vencido > 0"
+                type="error"
+                variant="tonal"
+                density="compact"
+                class="mt-3"
+                icon="mdi-alert-circle"
+              >
+                {{ fiscalStats.vencido }} documento(s) vencido(s)
+              </v-alert>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
 
     </template>
   </v-container>
@@ -412,6 +479,8 @@
 // --- Componentes ---
 import BarChart from '@/components/chart/BarChart.vue'
 import PieChart from '@/components/chart/PieChart.vue'
+import Datepicker from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 import StatsCard from '@/components/common/StatsCard.vue'
 import CurrencyStatsCard from '@/components/common/CurrencyStatsCard.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
@@ -424,9 +493,7 @@ import fiscalService from '@/services/fiscalService'
 import bcvService from '@/services/bcvService'
 import userService from '@/services/userService'
 import preferencesService from '@/services/preferencesService'
-
-// --- Swapy (Drag-to-Swap) ---
-import { createSwapy } from 'swapy'
+// --- Servicios ---
 
 export default {
   name: 'ClienteDashboardEjecutivo',
@@ -436,7 +503,8 @@ export default {
     PieChart,
     StatsCard,
     CurrencyStatsCard,
-    AnimatedNumber
+    AnimatedNumber,
+    Datepicker
   },
 
   data() {
@@ -459,11 +527,16 @@ export default {
         { title: 'Mes Anterior', value: 'mes_anterior' },
         { title: 'Último Trimestre', value: 'ultimo_trimestre' },
         { title: 'Este Año', value: 'este_ano' },
-        { title: 'Todo', value: 'todo' }
+        { title: 'Todo', value: 'todo' },
+        { title: 'Personalizado', value: 'personalizado' }
       ],
+      fechaFiltro: null,
 
       // Moneda de visualización activa
       monedaActual: 'USD',
+      
+      // Toggle para mostrar gráficos de distribución en % o en $
+      vistaPorcentaje: false,
 
       // ── Datos crudos (se cargan UNA vez, se filtran vía computed) ──
       ventas: [],
@@ -477,30 +550,7 @@ export default {
       lowStockProducts: [],
       documentos: [],
       fiscalStats: { total: 0, vigente: 0, tramite: 0, vencido: 0, porVencer: 0, trash: 0 },
-      tasaBCV: null,
-
-      // Swapy
-      swapyInstance: null
-    }
-  },
-
-  watch: {
-    /**
-     * Inicializar Swapy en cuanto loading pasa a false.
-     * El v-else (con el swapyContainer y los data-swapy-slot) solo existe en el DOM
-     * cuando loading = false. Por eso NO se puede inicializar en mounted() ni con setTimeout
-     * fijo — hay que esperar a que Vue renderice el v-else.
-     */
-    loading(nuevoValor) {
-      if (nuevoValor === false) {
-        // $nextTick: Vue ha actualizado el DOM virtual
-        // requestAnimationFrame: el navegador ha pintado los elementos de Vuetify
-        this.$nextTick(() => {
-          requestAnimationFrame(() => {
-            this.inicializarSwapy()
-          })
-        })
-      }
+      tasaBCV: null
     }
   },
 
@@ -570,6 +620,26 @@ export default {
           finAnterior = new Date(ahora.getFullYear() - 1, 11, 31)
           break
         case 'todo':
+          inicio = new Date(2000, 0, 1)
+          fin = ahora
+          inicioAnterior = null
+          finAnterior = null
+          break
+        case 'personalizado':
+          if (this.fechaFiltro && this.fechaFiltro.length === 2 && this.fechaFiltro[0] && this.fechaFiltro[1]) {
+            inicio = this.fechaFiltro[0];
+            fin = this.fechaFiltro[1];
+            fin.setHours(23, 59, 59, 999);
+            const diffTime = fin.getTime() - inicio.getTime();
+            inicioAnterior = new Date(inicio.getTime() - diffTime - 1);
+            finAnterior = new Date(fin.getTime() - diffTime - 1);
+          } else {
+            inicio = new Date(2000, 0, 1)
+            fin = ahora
+            inicioAnterior = null
+            finAnterior = null
+          }
+          break
         default:
           inicio = new Date(2000, 0, 1)
           fin = ahora
@@ -730,9 +800,11 @@ export default {
         const ingresos = this.sumarMontos(ventasMes)
         const egresos = this.sumarMontos(comprasMes)
 
-        ingresosPorMes.push(ingresos)
-        egresosPorMes.push(egresos)
-        margenPorMes.push(ingresos - egresos)
+        const factor = this.monedaActual === 'VES' ? this.factorConversion : 1;
+        
+        ingresosPorMes.push(ingresos * factor)
+        egresosPorMes.push(egresos * factor)
+        margenPorMes.push((ingresos - egresos) * factor)
       }
 
       return {
@@ -805,7 +877,8 @@ export default {
             callbacks: {
               label: (ctx) => {
                 const val = ctx.parsed.y || 0
-                return ` ${ctx.dataset.label}: $${val.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                const sim = this.monedaActual === 'VES' ? 'Bs ' : '$';
+                return ` ${ctx.dataset.label}: ${sim}${val.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
               }
             }
           }
@@ -820,7 +893,10 @@ export default {
             grid: { color: 'rgba(0,0,0,0.04)', drawBorder: false },
             ticks: {
               font: { family: 'Montserrat', size: 11 },
-              callback: (v) => '$' + v.toLocaleString()
+              callback: (v) => {
+                const sim = this.monedaActual === 'VES' ? 'Bs ' : '$';
+                return sim + v.toLocaleString()
+              }
             }
           }
         }
@@ -828,47 +904,103 @@ export default {
     },
 
     // ═══════════════════════════════════════════
-    // GRÁFICO: Distribución de Gastos (Pie)
+    // CASHEA Y GRÁFICO DE MÉTODOS DE PAGO
     // ═══════════════════════════════════════════
 
-    /** Data para gráfico pie: top 5 categorías de compras */
-    chartGastosData() {
-      // Agrupar compras filtradas por categoría (usar primer ítem o emisor)
-      const categorias = {}
-      this.comprasFiltradas.forEach(inv => {
-        // Intentar obtener una categoría significativa
-        const cat = inv.issuer?.name
-          || inv.items?.[0]?.description
-          || inv.client?.name
-          || 'Otros'
-        const monto = parseFloat(inv.financial?.totalSales) || 0
-        categorias[cat] = (categorias[cat] || 0) + monto
+    casheaPorCobrar() {
+      const bcvRate = this.tasaBCV?.dollar || 1;
+      const bcvEur = this.tasaBCV?.euro || 1;
+      
+      let totalUSD = 0;
+      this.ventasFiltradas.forEach(inv => {
+        if (inv.financial?.paymentMethod === 'CASHEA' && inv.financial?.credit?.installments) {
+          const currency = inv.financial?.currency || 'VES';
+          inv.financial.credit.installments.forEach(inst => {
+            if (inst.status === 'POR_COBRAR') {
+              const amount = parseFloat(inst.amount) || 0;
+              let amountUSD = amount;
+              if (currency === 'VES') amountUSD = bcvRate > 0 ? amount / bcvRate : amount;
+              else if (currency === 'EUR') amountUSD = (bcvEur > 0 && bcvRate > 0) ? (amount * bcvEur) / bcvRate : amount;
+              totalUSD += amountUSD;
+            }
+          });
+        }
+      });
+      return totalUSD;
+    },
+
+    /** Data para gráfico pie: Ingresos por método de pago */
+    chartMetodosPagoData() {
+      const metodos = {}
+      const bcvRate = this.tasaBCV?.dollar || 1;
+      const bcvEur = this.tasaBCV?.euro || 1;
+      const factor = this.monedaActual === 'VES' ? bcvRate : 1;
+
+      this.ventasFiltradas.forEach(inv => {
+        const method = inv.financial?.paymentMethod || 'OTRO'
+        const currency = inv.financial?.currency || 'VES';
+        const amount = parseFloat(inv.financial?.totalSales) || 0;
+        
+        let amountUSD = amount;
+        if (currency === 'VES') amountUSD = bcvRate > 0 ? amount / bcvRate : amount;
+        else if (currency === 'EUR') amountUSD = (bcvEur > 0 && bcvRate > 0) ? (amount * bcvEur) / bcvRate : amount;
+        
+        metodos[method] = (metodos[method] || 0) + (amountUSD * factor);
       })
 
-      // Ordenar por monto y tomar top 5
-      const sorted = Object.entries(categorias)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
+      const labelsMap = {
+        'EFECTIVO': 'Efectivo',
+        'ZELLE': 'Zelle',
+        'PAGO_MOVIL': 'Pago Móvil',
+        'TRANSFERENCIA': 'Transferencia',
+        'PUNTO': 'Punto de Venta',
+        'CASHEA': 'Cashea',
+        'OTRO': 'Otros'
+      }
+      
+      // Ordenar por monto descendente
+      const sorted = Object.entries(metodos).sort((a, b) => b[1] - a[1]);
+      if (sorted.length === 0) return { labels: [], datasets: [] };
 
-      if (sorted.length === 0) return { labels: [], datasets: [] }
-
-      const coloresPie = ['#02254d', '#961112', '#f2b648', '#1F355C', '#f0d29b']
+      const data = sorted.map(([, v]) => v)
+      const total = data.reduce((a, b) => a + b, 0);
+      
+      const labels = sorted.map(([k, v]) => {
+        let labelName = labelsMap[k] || k;
+        if (this.vistaPorcentaje && total > 0) {
+          const perc = ((v / total) * 100).toFixed(1);
+          return `${labelName} (${perc}%)`;
+        }
+        return labelName;
+      });
+      
+      const coloresMap = {
+        'EFECTIVO': '#4CAF50',
+        'ZELLE': '#673AB7',
+        'PAGO_MOVIL': '#f2b648',
+        'TRANSFERENCIA': '#1F355C',
+        'PUNTO': '#02254d',
+        'CASHEA': '#fdfa3d', // Amarillo Cashea
+        'OTRO': '#9e9e9e'
+      }
+      const bgColors = sorted.map(([k]) => coloresMap[k] || '#cccccc')
 
       return {
-        labels: sorted.map(([cat]) => cat.length > 30 ? cat.substring(0, 30) + '…' : cat),
+        labels,
         datasets: [{
-          data: sorted.map(([, monto]) => monto),
-          backgroundColor: coloresPie,
-          borderWidth: 3,
+          data,
+          backgroundColor: bgColors,
+          borderWidth: 2,
           borderColor: '#FFFFFF',
-          hoverBorderWidth: 4,
+          hoverBorderWidth: 3,
           hoverOffset: 6
         }]
       }
     },
 
-    /** Opciones del gráfico pie */
-    chartGastosOptions() {
+    /** Opciones del gráfico pie (Ingresos) */
+    chartMetodosPagoOptions() {
+      const simbolo = this.monedaActual === 'VES' ? 'Bs ' : '$';
       return {
         responsive: true,
         maintainAspectRatio: false,
@@ -893,8 +1025,111 @@ export default {
             bodyFont: { family: 'Montserrat' },
             callbacks: {
               label: (ctx) => {
-                const val = ctx.parsed || 0
-                return ` $${val.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
+                const val = ctx.parsed || 0;
+                if (this.vistaPorcentaje) {
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                  const perc = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                  return ` ${perc}%`;
+                }
+                return ` ${simbolo}${val.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+              }
+            }
+          }
+        }
+      }
+    },
+
+    // ═══════════════════════════════════════════
+    // GRÁFICO DE GASTOS POR CATEGORÍA
+    // ═══════════════════════════════════════════
+
+    /** Data para gráfico Doughnut: Gastos por categoría */
+    chartGastosCategoriaData() {
+      const categorias = {}
+      const bcvRate = this.tasaBCV?.dollar || 1;
+      const bcvEur = this.tasaBCV?.euro || 1;
+      const factor = this.monedaActual === 'VES' ? bcvRate : 1;
+
+      this.comprasFiltradas.forEach(inv => {
+        // Utilizamos el nombre real si viene desde la relación expense_categories, o el expense_type como fallback
+        const catName = inv.expenseCategory?.name || inv.expense_type || 'Otros Gastos';
+        const currency = inv.financial?.currency || 'VES';
+        const amount = parseFloat(inv.financial?.totalSales || inv.financial?.total) || 0;
+        
+        let amountUSD = amount;
+        if (currency === 'VES') amountUSD = bcvRate > 0 ? amount / bcvRate : amount;
+        else if (currency === 'EUR') amountUSD = (bcvEur > 0 && bcvRate > 0) ? (amount * bcvEur) / bcvRate : amount;
+        
+        categorias[catName] = (categorias[catName] || 0) + (amountUSD * factor);
+      });
+
+      // Ordenar por monto descendente
+      const sorted = Object.entries(categorias).sort((a, b) => b[1] - a[1]);
+      if (sorted.length === 0) return { labels: [], datasets: [] };
+
+      const data = sorted.map(([, v]) => v);
+      const total = data.reduce((a, b) => a + b, 0);
+      
+      const labels = sorted.map(([k, v]) => {
+        if (this.vistaPorcentaje && total > 0) {
+          const perc = ((v / total) * 100).toFixed(1);
+          return `${k} (${perc}%)`;
+        }
+        return k;
+      });
+      
+      // Paleta de colores para Gastos (Rojos, Naranjas, Cálidos)
+      const colorPalette = ['#961112', '#C62828', '#E53935', '#F44336', '#FF5722', '#FF9800', '#FFB74D', '#B0BEC5'];
+      const bgColors = labels.map((_, i) => colorPalette[i % colorPalette.length]);
+
+      return {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: bgColors,
+          borderWidth: 2,
+          borderColor: '#FFFFFF',
+          hoverBorderWidth: 3,
+          hoverOffset: 6
+        }]
+      }
+    },
+
+    /** Opciones del gráfico Doughnut (Gastos) */
+    chartGastosCategoriaOptions() {
+      const simbolo = this.monedaActual === 'VES' ? 'Bs ' : '$';
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%', // Hace que sea un Doughnut
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              usePointStyle: true,
+              padding: 12,
+              font: { family: 'Montserrat', size: 11 },
+              boxWidth: 12
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(2, 37, 77, 0.95)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            borderColor: '#961112', // Rojo
+            borderWidth: 1,
+            cornerRadius: 12,
+            titleFont: { family: 'Montserrat' },
+            bodyFont: { family: 'Montserrat' },
+            callbacks: {
+              label: (ctx) => {
+                const val = ctx.parsed || 0;
+                if (this.vistaPorcentaje) {
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                  const perc = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                  return ` ${perc}%`;
+                }
+                return ` ${simbolo}${val.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
               }
             }
           }
@@ -1247,101 +1482,6 @@ export default {
     },
 
     // ═══════════════════════════════════════════
-    // SWAPY (Drag-to-Swap)
-    // ═══════════════════════════════════════════
-
-    /** Inicializa Swapy en el contenedor inferior del dashboard */
-    async inicializarSwapy() {
-      if (!this.$refs.swapyContainer) return
-
-      try {
-        this.swapyInstance = createSwapy(this.$refs.swapyContainer, {
-          // animation: 'none' evita el FLIP animation bug de Swapy:
-          // con 'dynamic', si el nodo es movido en el DOM durante el swap,
-          // el callback de fin de animación nunca llega y el transform queda
-          // residual en position:relative, causando el efecto "sticky".
-          // Con 'none', clearTransform() es inmediato y no puede quedar colgado.
-          animation: 'dynamic',
-          enabled: true,
-          swapMode: 'hover',
-          autoScrollOnDrag: true
-        })
-
-        // Guardar layout al soltar una card (Supabase + localStorage fallback)
-        this.swapyInstance.onSwap(event => {
-          console.log('🔄 Layout actualizado')
-          this.guardarLayout(event.data.object)
-        })
-
-        // Restaurar layout guardado previamente (Supabase → localStorage → default)
-        await this.cargarLayout()
-
-      } catch (error) {
-        console.warn('⚠️ Error inicializando Swapy:', error)
-      }
-    },
-
-    /**
-     * Guarda el layout en Supabase (persistencia entre dispositivos)
-     * y en localStorage como fallback rápido.
-     */
-    async guardarLayout(layout) {
-      // 1. Guardar en localStorage (inmediato, sin latencia)
-      const key = `dashboard_layout_${this.usuario?.id || 'default'}`
-      try {
-        localStorage.setItem(key, JSON.stringify(layout))
-      } catch (e) {
-        console.warn('⚠️ Error guardando layout en localStorage:', e)
-      }
-
-      // 2. Guardar en Supabase (persistencia entre dispositivos)
-      try {
-        const result = await preferencesService.saveDashboardLayout(layout)
-        if (result.success) {
-          console.log('☁️ Layout sincronizado con Supabase')
-        } else {
-          console.warn('⚠️ No se pudo sincronizar layout con Supabase:', result.message)
-        }
-      } catch (e) {
-        console.warn('⚠️ Error sincronizando layout con Supabase:', e)
-      }
-    },
-
-    /**
-     * Carga el layout guardado: intenta primero desde Supabase,
-     * luego fallback a localStorage.
-     */
-    async cargarLayout() {
-      if (!this.swapyInstance) return
-
-      try {
-        // 1. Intentar cargar desde Supabase (fuente de verdad)
-        const layoutSupabase = await preferencesService.getDashboardLayout()
-        if (layoutSupabase) {
-          console.log('☁️ Layout restaurado desde Supabase')
-          this.swapyInstance.setData(layoutSupabase)
-          // Sincronizar localStorage con la fuente de verdad
-          const key = `dashboard_layout_${this.usuario?.id || 'default'}`
-          localStorage.setItem(key, JSON.stringify(layoutSupabase))
-          return
-        }
-
-        // 2. Fallback: cargar desde localStorage
-        const key = `dashboard_layout_${this.usuario?.id || 'default'}`
-        const saved = localStorage.getItem(key)
-        if (saved) {
-          const layout = JSON.parse(saved)
-          this.swapyInstance.setData(layout)
-          console.log('💾 Layout restaurado desde localStorage')
-          // Migrar a Supabase para futuras sesiones
-          preferencesService.saveDashboardLayout(layout)
-        }
-      } catch (e) {
-        console.warn('⚠️ Error cargando layout guardado:', e)
-      }
-    },
-
-    // ═══════════════════════════════════════════
     // HELPERS DE FILTRADO Y CÁLCULO
     // ═══════════════════════════════════════════
 
@@ -1354,10 +1494,23 @@ export default {
       })
     },
 
-    /** Suma los montos (financial.totalSales) de un array de facturas */
+    /** Suma los montos (financial.totalSales) de un array de facturas, estandarizando a USD */
     sumarMontos(facturas) {
+      const bcvRate = this.tasaBCV?.dollar || 1;
+      const bcvEur = this.tasaBCV?.euro || 1;
+      
       return (facturas || []).reduce((sum, inv) => {
-        return sum + (parseFloat(inv.financial?.totalSales) || 0)
+        const amount = parseFloat(inv.financial?.totalSales) || 0;
+        const currency = inv.financial?.currency || 'VES';
+        
+        let amountUSD = amount;
+        if (currency === 'VES') {
+          amountUSD = bcvRate > 0 ? amount / bcvRate : amount; 
+        } else if (currency === 'EUR') {
+          amountUSD = (bcvEur > 0 && bcvRate > 0) ? (amount * bcvEur) / bcvRate : amount;
+        }
+        
+        return sum + amountUSD;
       }, 0)
     },
 
@@ -1404,15 +1557,6 @@ export default {
 
   async mounted() {
     await this.cargarDatos()
-    // Swapy se inicializa dentro de cargarDatos() tras el primer paint.
-    // Ver: this.$nextTick → requestAnimationFrame → requestAnimationFrame → inicializarSwapy()
-  },
-
-  beforeUnmount() {
-    // Limpiar instancia de Swapy al destruir el componente
-    if (this.swapyInstance) {
-      this.swapyInstance.destroy()
-    }
   }
 }
 </script>
@@ -1431,6 +1575,8 @@ export default {
 /* ── Header ── */
 .dashboard-header {
   padding: 8px 4px;
+  position: relative;
+  z-index: 100;
 }
 
 .dashboard-greeting {
@@ -1518,12 +1664,12 @@ export default {
 
 /* ── Chart cards ── */
 .chart-card {
-  min-height: 400px;
+  /* Eliminado min-height fijo para permitir un diseño más compacto */
 }
 
 .chart-body {
   height: 100%;
-  min-height: 340px;
+  min-height: 200px;
 }
 
 /* ── Full height cards (swapy) ── */
@@ -1543,7 +1689,7 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 260px;
+  min-height: 200px;
   opacity: 0.5;
 }
 
@@ -1561,77 +1707,21 @@ export default {
 /* SWAPY GRID                                              */
 /* ═══════════════════════════════════════════════════════ */
 
-.swapy-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+.dashboard-grid {
+  /* Espaciado del grid nativo ya manejado por vuetify y mb-6 */
 }
 
-/* El slot ocupa todo el espacio disponible en el grid */
-.swapy-slot {
-  min-height: 280px;
-  height: 100%;
-  width: 100%;
-  display: flex;
-  flex: 1;
-  /* Sin overflow:hidden para que el ghost de Swapy pueda flotar fuera */
-  overflow: visible;
+.custom-datepicker {
+  width: 240px;
+  /* IMPORTANTE: Soluciona el z-index que quedaba detrás de las cards */
+  z-index: 1000;
 }
 
-/* El item (div interno del slot) también llena el espacio */
-.swapy-slot > div {
-  height: 100%;
-  width: 100%;
-  min-width: 100%;
-  flex: 1;
-}
-
-/* La card dentro del item también llena el espacio */
-.swapy-slot .dashboard-card,
-.swapy-slot .v-card {
-  height: 100%;
-  width: 100%;
-  min-width: 100%;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  /* Quitar overflow:hidden en slots Swapy — necesario para el ghost del drag.
-     Sin esto, el ghost queda "atrapado" y aparece sticky al hacer scroll. */
-  overflow: visible !important;
-}
-
-/* BUG FIX: Durante el drag, deshabilitar el transform hover de .dashboard-card.
-   El transform: translateY() activo en cualquier ancestro convierte ese elemento
-   en un "containing block" para position:fixed, rompiendo el ghost de Swapy
-   y dejando el item pegado (sticky) después del drop. */
-.swapy-grid [data-swapy-item] .dashboard-card:hover {
-  transform: none !important;
-}
-
-/* Feedback visual durante el drag */
-[data-swapy-item] {
-  transition: opacity 0.2s ease;
-}
-
-[data-swapy-item][data-swapy-dragging] {
-  opacity: 0.6 !important;
-  border-radius: 20px !important;
-}
-
-/* Durante drag activo, neutralizar transform en TODAS las cards del grid */
-.swapy-grid:has([data-swapy-dragging]) .dashboard-card {
-  transform: none !important;
-  transition: none !important;
-}
-
-[data-swapy-slot] {
-  border-radius: 20px !important;
-  transition: background 0.2s ease;
-}
-
-[data-swapy-slot][data-swapy-highlighted] {
-  background: rgba(168, 28, 34, 0.08);
-  transition: background 0.2s ease;
+@media (max-width: 600px) {
+  .filtro-periodo, .custom-datepicker {
+    width: 100%;
+    max-width: none;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════ */
@@ -1856,10 +1946,6 @@ export default {
     font-size: 1.35rem;
   }
 
-  .swapy-grid {
-    grid-template-columns: 1fr;
-  }
-
   .filtro-periodo {
     max-width: 100%;
     min-width: 0;
@@ -1884,44 +1970,8 @@ export default {
     font-size: 1.5rem;
   }
 
-  .swapy-grid {
-    gap: 16px;
-  }
-
   .chart-body {
     min-height: 260px;
   }
-}
-</style>
-
-<!-- Estilos globales para Swapy: los atributos data-swapy-* son inyectados
-     por la librería directamente en el DOM (sin pasar por Vue scoped),
-     por lo que deben estar en un bloque <style> sin scoped. -->
-<style>
-/* Ghost del drag: Swapy usa position:fixed internamente.
-   Para que este fixed sea relativo al viewport (y no quede sticky),
-   ningún ancestro del container debe tener transform activo. */
-[data-swapy-item][data-swapy-dragging] {
-  opacity: 0.5 !important;
-}
-
-/* Highlight del slot de destino */
-[data-swapy-slot][data-swapy-highlighted] {
-  background: rgba(168, 28, 34, 0.08) !important;
-  border-radius: 20px !important;
-  transition: background 0.2s ease;
-}
-
-/* Durante drag activo en el grid, bloquear el transform hover
-   para evitar que se cree un nuevo "containing block" para position:fixed */
-.swapy-grid:has([data-swapy-dragging]) .dashboard-card {
-  transform: none !important;
-  transition: none !important;
-}
-
-/* El contenido de los cards Swapy no debe recortar el ghost */
-.swapy-slot .dashboard-card,
-.swapy-slot .v-card {
-  overflow: visible !important;
 }
 </style>

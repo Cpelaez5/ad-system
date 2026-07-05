@@ -59,6 +59,11 @@ class InvoiceService {
           document_type,
           flow,
           expense_type,
+          expense_category_id,
+          expense_categories(
+            id,
+            name
+          ),
           issue_date,
           due_date,
           status,
@@ -128,6 +133,7 @@ class InvoiceService {
         documentType: invoice.document_type,
         flow: invoice.flow || 'VENTA',
         expense_type: invoice.expense_type,
+        expenseCategory: invoice.expense_categories || null,
         issueDate: invoice.issue_date,
         dueDate: invoice.due_date,
         status: invoice.status,
@@ -177,6 +183,11 @@ class InvoiceService {
           document_type,
           flow,
           expense_type,
+          expense_category_id,
+          expense_categories(
+            id,
+            name
+          ),
           issue_date,
           due_date,
           status,
@@ -215,6 +226,7 @@ class InvoiceService {
         documentType: invoice.document_type,
         flow: invoice.flow || 'VENTA',
         expense_type: invoice.expense_type,
+        expenseCategory: invoice.expense_categories || null,
         issueDate: invoice.issue_date,
         dueDate: invoice.due_date,
         status: invoice.status,
@@ -273,6 +285,7 @@ class InvoiceService {
         document_type: invoiceData.documentType || 'FACTURA',
         flow: effectiveFlow,
         expense_type: invoiceData.expense_type,
+        expense_category_id: invoiceData.expense_category_id || null,
         issue_date: invoiceData.issueDate,
         due_date: invoiceData.dueDate || null,
         status: invoiceData.status || 'BORRADOR',
@@ -429,6 +442,7 @@ class InvoiceService {
         documentType: newInvoice.document_type,
         flow: newInvoice.flow || 'VENTA',
         expense_type: newInvoice.expense_type,
+        expense_category_id: newInvoice.expense_category_id,
         issueDate: newInvoice.issue_date,
         dueDate: newInvoice.due_date,
         status: newInvoice.status,
@@ -472,7 +486,7 @@ class InvoiceService {
       //    duplicará el inventario en vez de revertirlo.
       const { data: oldInvoiceRaw, error: fetchError } = await supabase
         .from('invoices')
-        .select('items, flow, expense_type, invoice_number, id, status')
+        .select('items, flow, expense_type, expense_category_id, invoice_number, id, status')
         .eq('id', id)
         .eq('organization_id', organizationId)
         .single()
@@ -507,6 +521,7 @@ class InvoiceService {
         document_type: invoiceData.documentType,
         flow: invoiceData.flow || 'VENTA',
         expense_type: invoiceData.expense_type,
+        expense_category_id: invoiceData.expense_category_id || null,
         issue_date: invoiceData.issueDate,
         due_date: invoiceData.dueDate || null,
         status: invoiceData.status,
@@ -585,6 +600,7 @@ class InvoiceService {
         documentType: updatedInvoice.document_type,
         flow: updatedInvoice.flow || 'VENTA',
         expense_type: updatedInvoice.expense_type,
+        expense_category_id: updatedInvoice.expense_category_id,
         issueDate: updatedInvoice.issue_date,
         dueDate: updatedInvoice.due_date,
         status: updatedInvoice.status,
@@ -816,7 +832,7 @@ class InvoiceService {
       // 1. Obtener la factura para ver si tiene adjuntos
       const { data: invoiceToDelete, error: fetchError } = await supabase
         .from('invoices')
-        .select('attachments, deleted_at, items, flow, expense_type, invoice_number')
+        .select('attachments, deleted_at, items, flow, expense_type, expense_category_id, invoice_number')
         .eq('id', id)
         .eq('organization_id', organizationId)
         .single();

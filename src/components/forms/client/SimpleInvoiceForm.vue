@@ -216,6 +216,17 @@
             </v-select>
           </v-col>
 
+          <!-- Categoría del Gasto -->
+          <v-col cols="12" sm="6" v-if="formData.flow === 'COMPRA' && formData.expense_type === 'GASTO'">
+            <ExpenseCategorySelector
+              v-model="formData.expense_category_id"
+              :client-id="currentUser?.client?.id"
+              label="Categoría del Gasto"
+              class="mb-2"
+              :rules="[v => !!v || 'La categoría es requerida']"
+            />
+          </v-col>
+
           <!-- Estado -->
           <v-col cols="12" sm="3">
             <v-select
@@ -783,13 +794,14 @@ import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue';
+import ExpenseCategorySelector from '@/components/common/ExpenseCategorySelector.vue';
 import { supabase } from '@/lib/supabaseClient';
 
 let _itemKey = 0;
 
 export default {
   name: 'SimpleInvoiceForm',
-  components: { AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete },
+  components: { AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete, ExpenseCategorySelector },
 
   props: {
     invoice: { type: Object, default: null },
@@ -874,6 +886,7 @@ export default {
         documentCategory:'FACTURA',
         flow:            'VENTA',
         expense_type:    null,
+        expense_category_id: null,
         issueDate:       new Date().toISOString().split('T')[0],
         dueDate:         '',
         status:          'BORRADOR',
@@ -1053,6 +1066,7 @@ export default {
           this.formData = {
             ...inv,
             expense_type: inv.expense_type || (inv.flow === 'COMPRA' ? 'COMPRA' : null),
+            expense_category_id: inv.expense_category_id || null,
             items: (inv.items || []).map(it => ({
               ...it,
               _key: ++_itemKey,
