@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pa-4">
+  <v-container fluid class="pa-4 pa-md-6">
     <!-- ═══════════════════════════════════════════════ -->
     <!-- SKELETON LOADING                                -->
     <!-- ═══════════════════════════════════════════════ -->
@@ -414,7 +414,7 @@
     </v-window>
 
     <!-- Dialogo Producto -->
-    <v-dialog v-model="productDialog" max-width="600px">
+    <v-dialog v-model="productDialog" max-width="600px" :fullscreen="$vuetify.display.smAndDown">
       <v-card>
         <v-card-title>{{ editingProduct ? 'Editar Producto' : 'Nuevo Producto' }}</v-card-title>
         <v-card-text>

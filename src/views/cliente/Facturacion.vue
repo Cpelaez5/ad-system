@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pa-6">
+  <v-container fluid class="pa-4 pa-md-6">
     <!-- ═══════════════════════════════════════════════ -->
     <!-- SKELETON LOADING                                -->
     <!-- ═══════════════════════════════════════════════ -->
@@ -43,13 +43,13 @@
         <v-col cols="12" md="8">
           
         </v-col>
-        <v-col cols="12" md="4" class="d-flex align-center justify-end">
+        <v-col cols="12" md="4" class="d-flex flex-wrap align-center justify-md-end justify-start ga-2 mt-4 mt-md-0">
           <v-btn
             color="primary"
             size="large"
             prepend-icon="mdi-plus"
             @click="openNewInvoiceDialog"
-            class="mr-2"
+            :block="$vuetify.display.smAndDown"
           >
             Nuevo Registro
           </v-btn>
@@ -62,6 +62,7 @@
                 prepend-icon="mdi-download"
                 v-bind="props"
                 :disabled="filteredInvoices.length === 0"
+                :block="$vuetify.display.smAndDown"
               >
                 Exportar
                 <v-icon>mdi-chevron-down</v-icon>
@@ -570,10 +571,10 @@
     </v-dialog>
 
     <!-- Diálogo de vista de factura -->
-    <v-dialog v-model="viewDialog" max-width="900px" scrollable>
+    <v-dialog v-model="viewDialog" max-width="900px" scrollable :fullscreen="$vuetify.display.smAndDown">
       <v-card v-if="viewingInvoice" class="rounded-xl elevation-0" style="border-radius: 20px !important;">
         <!-- Header con gradiente sutil -->
-        <div class="pa-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
+        <div class="pa-4 pa-md-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
             <div class="d-flex align-center">
                 <v-avatar color="white" size="48" class="mr-4">
                     <v-icon icon="mdi-receipt-long" color="secondary" size="24"></v-icon>

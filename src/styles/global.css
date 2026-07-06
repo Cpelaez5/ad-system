@@ -3,6 +3,11 @@
 /* Importar animaciones */
 @import './animations.css';
 
+html, body {
+  overflow-x: hidden !important;
+  max-width: 100vw;
+}
+
 /* Variables CSS para la paleta de colores - Basada en la identidad visual */
 :root {
   /* Colores principales - Paleta del sistema */

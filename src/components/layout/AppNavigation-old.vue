@@ -11,12 +11,6 @@
     elevation="0"
     class="app-bar border-b"
   >
-    <!-- Menú Hamburguesa (Solo Móvil) -->
-    <v-app-bar-nav-icon 
-      class="d-lg-none" 
-      @click="drawer = !drawer"
-    ></v-app-bar-nav-icon>
-
     <!-- Logo y título -->
     <v-toolbar-title
       :class="['text-h5', 'font-weight-bold', 'animate-fade-in', 'animate-delay-200', { 'title-adjusted': sidebarExpanded }]"
@@ -98,7 +92,7 @@
   </v-app-bar>
 
   <!-- Navegación lateral (extraída a componente Sidebar.vue) -->
-  <Sidebar v-model="drawer" />
+  <Sidebar />
 </template>
 
 <script>
@@ -115,7 +109,6 @@ export default {
 	emits: ['banner-visibility-change'],
 	data() {
 		return {
-			drawer: null, // Controla el sidebar en mobile
 			bcvRate: null,
 			bcvLoading: false,
 			bcvError: false,
@@ -267,7 +260,7 @@ export default {
 					this.sidebarResizeObserver = new ResizeObserver((entries) => {
 						for (const entry of entries) {
 							const width = entry.contentRect?.width || entry.target.offsetWidth;
-							this.sidebarExpanded = (width > THRESHOLD || sidebar.classList.contains('v-navigation-drawer--is-hovering')) && this.$vuetify.display.lgAndUp;
+							this.sidebarExpanded = width > THRESHOLD || sidebar.classList.contains('v-navigation-drawer--is-hovering');
 						}
 					});
 					try { this.sidebarResizeObserver.observe(sidebar); } catch (e) { /* ignore */ }
@@ -278,7 +271,7 @@ export default {
 						if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
 							const isHovering = sidebar.classList.contains('v-navigation-drawer--is-hovering');
 							const isWide = sidebar.offsetWidth > THRESHOLD;
-							this.sidebarExpanded = (isHovering || isWide) && this.$vuetify.display.lgAndUp;
+							this.sidebarExpanded = isHovering || isWide;
 						}
 					});
 				});
@@ -402,18 +395,14 @@ export default {
 .app-bar .bcv-rate-display { margin-right: 16px; }
 .app-bar .bcv-rate-display .v-chip { font-size: 0.875rem; }
 
-@media (max-width: 1279px) {
-	.app-bar .v-toolbar-title { margin-left: 0 !important; }
-}
-
 @media (max-width: 768px) {
-	.app-bar .v-toolbar-title { font-size: 1.25rem !important; margin-left: 0 !important; }
+	.app-bar .v-toolbar-title { font-size: 1.25rem !important; margin-left: 70px !important; }
 	.app-bar .bcv-rate-display { margin-right: 12px; }
 	.app-bar .bcv-rate-display .v-chip { font-size: 0.8rem; }
 }
 
 @media (max-width: 480px) {
-	.app-bar .v-toolbar-title { font-size: 1.125rem !important; margin-left: 0 !important; }
+	.app-bar .v-toolbar-title { font-size: 1.125rem !important; margin-left: 70px !important; }
 	.app-bar .bcv-rate-display { margin-right: 8px; }
 	.app-bar .bcv-rate-display .v-chip { font-size: 0.75rem; padding: 4px 8px; }
 	.app-bar .v-btn { min-width: 40px !important; padding: 0 8px !important; }

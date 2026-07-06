@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pa-6">
+  <v-container fluid class="pa-4 pa-md-6">
     <div class="mb-6">
       <h1 class="text-h4 font-weight-bold">Mi Perfil</h1>
       <p class="text-body-1 text-medium-emphasis">Administra tu información personal y los datos de tu empresa</p>

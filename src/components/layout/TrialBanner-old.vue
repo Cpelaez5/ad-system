@@ -8,8 +8,11 @@
     style="z-index: 1200;"
   >
     <div 
-      class="d-flex align-center justify-center w-100 h-100 trial-banner-content"
-      :class="{ 'expanded': sidebarExpanded }"
+      class="d-flex align-center justify-center w-100 h-100"
+      :style="{ 
+        'padding-left': sidebarExpanded ? '270px' : '70px',
+        'transition': 'padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }"
     >
       <v-icon size="20" class="mr-2" color="white">mdi-clock-alert-outline</v-icon>
       <span class="text-body-2 font-weight-bold text-white text-truncate">
@@ -123,19 +126,5 @@ export default {
   background-color: rgba(255, 255, 255, 0.2) !important;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.trial-banner-content {
-  padding-left: 0;
-  transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@media (min-width: 1280px) {
-  .trial-banner-content {
-    padding-left: 70px;
-  }
-  .trial-banner-content.expanded {
-    padding-left: 270px;
-  }
 }
 </style>

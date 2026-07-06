@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pa-4">
+  <v-container fluid class="pa-4 pa-md-6">
     <v-row class="mb-6">
       <v-col cols="12" sm="6" md="3">
         <v-card class="pa-6 stats-card" height="120" style="background-color: #02254d;">
@@ -57,8 +57,8 @@
           @input="applyFilters"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="6" class="text-right">
-        <v-btn color="primary" size="large" prepend-icon="mdi-plus" @click="openNewInvoiceDialog">
+      <v-col cols="12" md="6" class="text-left text-md-right mt-2 mt-md-0">
+        <v-btn color="primary" size="large" prepend-icon="mdi-plus" @click="openNewInvoiceDialog" :block="$vuetify.display.smAndDown">
           Nuevo Gasto
         </v-btn>
       </v-col>
@@ -92,7 +92,7 @@
       </v-data-table>
     </v-card>
 
-    <v-dialog v-model="invoiceDialog" max-width="1200px" scrollable>
+    <v-dialog v-model="invoiceDialog" max-width="1200px" scrollable :fullscreen="$vuetify.display.smAndDown">
       <InvoiceForm :invoice="editingInvoice" :flow="'VENTA'" :auto-party-mode="true" @submit="handleInvoiceSubmit" @cancel="closeInvoiceDialog" />
     </v-dialog>
 

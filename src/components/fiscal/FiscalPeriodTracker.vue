@@ -76,7 +76,7 @@
             </v-list-item-subtitle>
 
             <template #append>
-              <div class="d-flex align-center" style="gap: 2px">
+              <div class="d-flex align-center flex-wrap justify-end" style="gap: 2px; max-width: 100px;">
                 <v-btn icon size="x-small" variant="text" color="info" v-tooltip="'Ver detalle'" @click.stop="$emit('open-preview', doc)">
                   <v-icon size="16">mdi-eye</v-icon>
                 </v-btn>
@@ -175,7 +175,7 @@
 
             <!-- Acciones (lado derecho) -->
             <template #append>
-              <div class="d-flex align-center" style="gap: 2px">
+              <div class="d-flex align-center flex-wrap justify-end" style="gap: 2px; max-width: 100px;">
                 <!-- Período con documento cargado -->
                 <template v-if="period.doc">
                   <!-- Ver archivo -->

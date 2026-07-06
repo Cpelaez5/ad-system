@@ -1,12 +1,12 @@
 <template>
-  <v-container fluid class="fill-height align-start pa-0 bg-background">
+  <v-container fluid class="fill-height align-start pa-4 pa-md-6 bg-background">
     
     <!-- ═══════════════════════════════════════════════ -->
     <!-- SKELETON LOADING                                -->
     <!-- ═══════════════════════════════════════════════ -->
     <template v-if="initialLoading">
       <!-- Skeleton Header -->
-      <v-row no-gutters class="pa-6 pb-2">
+      <v-row no-gutters class="pb-2">
         <v-col cols="12" md="8">
           <v-skeleton-loader type="heading" width="300" class="mb-2" />
           <v-skeleton-loader type="text" width="400" />
@@ -18,7 +18,7 @@
       </v-row>
 
       <!-- Skeleton Dashboard -->
-      <v-row class="px-6 mb-6">
+      <v-row class="mb-6">
         <v-col cols="12" md="4" lg="3">
           <v-skeleton-loader type="card" height="250" class="rounded-xl" />
         </v-col>
@@ -35,7 +35,7 @@
       </v-row>
 
       <!-- Skeleton Content -->
-      <v-row class="px-6">
+      <v-row>
         <v-col cols="12">
           <v-skeleton-loader type="table-thead, table-tbody" class="rounded-xl" />
         </v-col>
@@ -47,7 +47,7 @@
     <!-- ═══════════════════════════════════════════════ -->
     <template v-else>
       <!-- HEADER -->
-      <v-row no-gutters class="pa-6 pb-2">
+      <v-row no-gutters class="pb-2">
         <v-col cols="12" md="8">
           <h1 class="text-h4 text-md-h4 text-h5 font-weight-bold text-secondary mb-1">
             Expediente Fiscal 360
@@ -61,8 +61,9 @@
             color="secondary"
             prepend-icon="mdi-file-pdf-box"
             variant="outlined"
-            class="text-none px-4 mr-3"
             rounded="lg"
+            class="mb-2 mb-sm-0 mr-0 mr-sm-2"
+            :block="$vuetify.display.smAndDown"
             @click="exportToPDF"
             :loading="exporting"
           >
@@ -74,6 +75,7 @@
             elevation="2"
             class="text-none px-4"
             rounded="lg"
+            :block="$vuetify.display.smAndDown"
             @click="openDialog()"
           >
             <span class="d-none d-sm-inline mr-1">Nuevo</span> Documento
@@ -82,7 +84,7 @@
       </v-row>
 
       <!-- DASHBOARD -->
-      <v-row class="px-6 mb-6 animate-section" style="animation-delay: 0.1s">
+      <v-row class="mb-6 animate-section" style="animation-delay: 0.1s">
         
         <!-- Chart -->
         <v-col cols="12" md="4" lg="3">
@@ -161,7 +163,7 @@
                 <v-tooltip activator="parent" location="top">
                   Completados: {{ complianceDetail.total.covered }} / {{ complianceDetail.total.required }}
                 </v-tooltip>
-                <div class="d-flex mt-2 gap-2 overflow-x-auto py-2">
+                <div class="d-flex mt-2 gap-2 overflow-x-auto py-2" style="max-width: 100%;">
                    <v-chip 
                       v-for="cat in categories" 
                       :key="cat.value"
@@ -184,7 +186,7 @@
       </v-row>
 
     <!-- CONTENT (LIST) -->
-    <v-row class="px-6 pb-10">
+    <v-row class="pb-10">
       <v-col cols="12">
         
         <!-- Tabs de navegación por categoría -->
@@ -280,6 +282,7 @@
                 :items-per-page="10"
                 class="bg-transparent"
                 hover
+                mobile-breakpoint="sm"
               >
                 <template v-slot:item.category="{ item }">
                   <v-chip size="small" :color="getCategoryChipColor(item.category)" variant="tonal">
@@ -398,7 +401,7 @@
                           </v-list-item-subtitle>
 
                           <template v-slot:append>
-                            <div class="d-flex align-center">
+                            <div class="d-flex align-center flex-wrap justify-end" style="max-width: 120px;">
                               <template v-if="currentTab !== 'trash'">
                                 <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(doc)" v-tooltip="'Ver detalle'" class="mr-1" />
                                 <v-btn v-if="doc.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="doc.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" class="mr-1" />
@@ -504,10 +507,10 @@
                               Completar fechas
                           </v-chip>
                       </template>
-                    </v-list-item-subtitle>
-
+                      </v-list-item-subtitle>
+  
                     <template v-slot:append>
-                      <div class="d-flex align-center">
+                      <div class="d-flex align-center flex-wrap justify-end" style="max-width: 120px;">
                         <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(doc)" v-tooltip="'Ver detalle'" class="mr-1" />
                         <v-btn v-if="doc.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="doc.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" class="mr-1" />
                         <v-btn icon="mdi-pencil" variant="text" size="small" color="grey" @click.stop="openDialog(doc)" v-tooltip="'Editar'" class="mr-1" />
@@ -612,7 +615,7 @@
     </v-dialog>
 
     <!-- Preview Dialog -->
-    <v-dialog v-model="previewDialog" max-width="900" scrollable>
+    <v-dialog v-model="previewDialog" max-width="900" scrollable :fullscreen="$vuetify.display.smAndDown">
         <v-card v-if="previewItem" class="rounded-xl elevation-0" style="border-radius: 20px !important;">
             <!-- Header con gradiente sutil -->
             <div class="preview-header pa-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">

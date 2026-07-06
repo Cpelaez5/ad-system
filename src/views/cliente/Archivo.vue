@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="pa-4">
+  <v-container fluid class="pa-4 pa-md-6">
     <!-- Tarjetas de resumen -->
     <v-row class="mb-6">
       <v-col cols="12" sm="6" md="3">
@@ -117,12 +117,13 @@
           hide-details
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="6" class="text-right">
+      <v-col cols="12" md="6" class="text-left text-md-right mt-2 mt-md-0">
         <v-btn
           color="primary"
           size="large"
           prepend-icon="mdi-upload"
           @click="abrirDialogoSubida"
+          :block="$vuetify.display.smAndDown"
         >
           Subir Documentos
         </v-btn>
@@ -279,7 +280,7 @@
     </v-row>
 
     <!-- Diálogo para subir documentos -->
-    <v-dialog v-model="dialogoSubida" max-width="600px">
+    <v-dialog v-model="dialogoSubida" max-width="600px" :fullscreen="$vuetify.display.smAndDown">
       <v-card>
         <v-card-title>
           <span class="text-h5">Subir Documentos</span>

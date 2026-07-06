@@ -1,9 +1,8 @@
 <template>
   <v-navigation-drawer
-    v-model="drawer"
-    :expand-on-hover="$vuetify.display.lgAndUp"
-    :rail="$vuetify.display.lgAndUp"
-    :temporary="$vuetify.display.mdAndDown"
+    expand-on-hover
+    permanent
+    rail
     color="#010101"
     class="animate-slide-in-left"
     theme="dark"
@@ -241,13 +240,6 @@
 <script>
 export default {
   name: "Sidebar",
-  props: {
-    modelValue: {
-      type: Boolean,
-      default: null
-    }
-  },
-  emits: ['update:modelValue'],
   data() {
     return {
       currentUserData: null, // Almacenar usuario en data para reactividad
@@ -255,14 +247,6 @@ export default {
     };
   },
   computed: {
-    drawer: {
-      get() {
-        return this.modelValue;
-      },
-      set(val) {
-        this.$emit('update:modelValue', val);
-      }
-    },
     currentUser() {
       // Usar data reactivo en lugar de leer directamente de localStorage
       if (this.currentUserData) {
