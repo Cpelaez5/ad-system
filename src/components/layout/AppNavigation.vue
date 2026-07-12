@@ -27,41 +27,6 @@
 
     <v-spacer />
 
-    <!-- Tasa del BCV — Responsive -->
-    <!-- Versión móvil XS (<600px): chip compacto solo USD -->
-    <div class="d-flex d-sm-none align-center mr-1">
-      <v-tooltip location="bottom">
-        <template v-slot:activator="{ props }">
-          <v-chip
-            v-bind="props"
-            v-if="showUsdRate && bcvRate?.dollar"
-            color="secondary"
-            variant="flat"
-            size="small"
-            class="bcv-chip-compact cursor-pointer"
-            @click="refreshBCVRate"
-          >
-            <span class="font-weight-bold text-caption" style="color: white; font-family: 'Roboto Mono', monospace;">
-              ${{ bcvRate?.dollar }}
-            </span>
-          </v-chip>
-          <v-btn
-            v-else-if="bcvLoading"
-            icon
-            size="x-small"
-            variant="text"
-            loading
-          ></v-btn>
-        </template>
-        <div class="text-center">
-          <div class="font-weight-bold">Tasa BCV</div>
-          <div v-if="bcvRate?.dollar">USD: {{ bcvRate.dollar }}</div>
-          <div v-if="bcvRate?.euro">EUR: {{ bcvRate.euro }}</div>
-          <div class="text-caption text-grey-lighten-2 mt-1">Tap para actualizar</div>
-        </div>
-      </v-tooltip>
-    </div>
-
     <!-- Versión tablet/desktop SM+ (≥600px): chips completos -->
     <div class="bcv-rate-display mr-4 d-none d-sm-flex align-center ga-2">
       <!-- Chip Dólar -->
@@ -73,7 +38,7 @@
         :previous-rate="bcvRate?.previousRate"
         :loading="bcvLoading"
         :error="bcvError"
-        color="secondary"
+        color="#1F355C"
         variant="flat"
         @click="refreshBCVRate"
       />
@@ -87,7 +52,7 @@
         :previous-rate="bcvRate?.previousRateEur"
         :loading="bcvLoading"
         :error="bcvError"
-        color="#02254d"
+        color="#1F355C"
         variant="flat"
         class="d-none d-md-inline-flex"
         @click="refreshBCVRate"

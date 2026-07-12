@@ -225,8 +225,44 @@
       ></v-list-item>
     </v-list>
 
-    <!-- Logout Button -->
+    <!-- Logout Button & BCV (Mobile) -->
     <template v-slot:append>
+      <!-- Tasa del BCV (Móvil) -->
+      <div class="d-flex d-md-none justify-center align-center pb-2 pt-1 ga-2 flex-wrap">
+        <v-chip
+          v-if="showUsdRate && bcvRate?.dollar"
+          color="#1F355C"
+          variant="flat"
+          size="small"
+          class="cursor-pointer font-weight-bold px-3"
+          @click="refreshBCVRate"
+        >
+          <span style="color: white; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
+            USD: ${{ Number(bcvRate?.dollar).toFixed(2) }}
+          </span>
+        </v-chip>
+        <v-chip
+          v-if="showEurRate && bcvRate?.euro"
+          color="#1F355C"
+          variant="flat"
+          size="small"
+          class="cursor-pointer font-weight-bold px-3"
+          @click="refreshBCVRate"
+        >
+          <span style="color: white; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
+            EUR: €{{ Number(bcvRate?.euro).toFixed(2) }}
+          </span>
+        </v-chip>
+        <v-btn
+          v-if="bcvLoading"
+          icon
+          size="small"
+          variant="text"
+          loading
+        ></v-btn>
+      </div>
+
+      <v-divider class="d-md-none mb-1"></v-divider>
       <v-list density="compact" nav>
         <v-list-item
           @click="logout"
@@ -240,6 +276,9 @@
 </template>
 
 <script>
+import bcvService from '@/services/bcvService.js';
+import userSettingsService from '@/services/user-settings-service.js';
+
 export default {
   name: "Sidebar",
   props: {
@@ -253,6 +292,12 @@ export default {
     return {
       currentUserData: null, // Almacenar usuario en data para reactividad
       isExpanded: false,     // Controla si el sidebar está hovereado/expandido
+      bcvRate: null,
+      bcvLoading: false,
+      bcvError: false,
+      bcvInterval: null,
+      showUsdRate: true,
+      showEurRate: true,
     };
   },
   computed: {
@@ -300,19 +345,71 @@ export default {
   mounted() {
     // Cargar usuario inicial
     this.loadUser();
+    this.loadBCVRate();
+    this.loadRatePreferences();
+
+    // Actualizar tasa cada 10 minutos (600000 ms) como en el header
+    this.bcvInterval = setInterval(() => {
+      this.loadBCVRate();
+    }, 600000);
     
     // Escuchar cambios en localStorage (cuando se guarda el usuario después del login)
     window.addEventListener('storage', this.handleStorageChange);
-    
-    // También escuchar eventos personalizados si el login se hace en la misma ventana
     window.addEventListener('userUpdated', this.loadUser);
+    
+    // Escuchar cambios de configuración de tasas
+    window.addEventListener('ad-settings-changed', this.onSettingsChanged);
   },
   beforeUnmount() {
     // Limpiar listeners
     window.removeEventListener('storage', this.handleStorageChange);
     window.removeEventListener('userUpdated', this.loadUser);
+    window.removeEventListener('ad-settings-changed', this.onSettingsChanged);
+    
+    if (this.bcvInterval) {
+      clearInterval(this.bcvInterval);
+    }
   },
   methods: {
+    loadRatePreferences() {
+      try {
+        const settings = userSettingsService.getSettings();
+        this.showUsdRate = settings.showUsdRate;
+        this.showEurRate = settings.showEurRate;
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    },
+    onSettingsChanged(event) {
+      if (event && event.detail) {
+        const settings = event.detail;
+        this.showUsdRate = settings.showUsdRate;
+        this.showEurRate = settings.showEurRate;
+      }
+    },
+    async loadBCVRate() {
+      try {
+        this.bcvLoading = true;
+        this.bcvError = false;
+        const response = await bcvService.getCurrentRate();
+        if (response.success && response.data) {
+          this.bcvRate = response.data;
+        } else {
+          this.bcvError = true;
+          this.bcvRate = null;
+        }
+      } catch (error) {
+        console.error('Error al cargar tasa del BCV en Sidebar:', error);
+        this.bcvError = true;
+        this.bcvRate = null;
+      } finally {
+        this.bcvLoading = false;
+      }
+    },
+    async refreshBCVRate() {
+      bcvService.clearCache();
+      await this.loadBCVRate();
+    },
     loadUser() {
       try {
         const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
