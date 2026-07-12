@@ -4,7 +4,7 @@
     <div class="d-flex flex-column flex-md-row align-center justify-space-between mb-6">
       <div class="mb-4 mb-md-0">
         <h1 class="text-h4 font-weight-bold text-secondary">
-          Planes y Precios
+          Mi Suscripción
         </h1>
         <p class="text-body-2 text-medium-emphasis mb-0">
           Escala tus operaciones con el plan ideal para tu negocio.
@@ -120,8 +120,8 @@ export default {
     },
     async handleSelectPlan(plan) {
       if (this.isCurrentPlan(plan)) return;
-      if (plan.name === 'Empresarial') {
-        window.open('mailto:ventas@sistema.com?subject=Interés en Plan Empresarial', '_blank');
+      if (plan.name === 'AD Corporate Nexus') {
+        window.open('mailto:ventas@sistema.com?subject=Interés en Plan Corporate Nexus', '_blank');
         return;
       }
       if (!confirm(`¿Deseas cambiar al plan ${plan.name}?`)) return;

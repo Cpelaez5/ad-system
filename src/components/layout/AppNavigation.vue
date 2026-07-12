@@ -27,8 +27,43 @@
 
     <v-spacer />
 
-    <!-- Tasa del BCV (Rediseñado con Componente) -->
-    <div class="bcv-rate-display mr-4 d-flex align-center ga-2">
+    <!-- Tasa del BCV — Responsive -->
+    <!-- Versión móvil XS (<600px): chip compacto solo USD -->
+    <div class="d-flex d-sm-none align-center mr-1">
+      <v-tooltip location="bottom">
+        <template v-slot:activator="{ props }">
+          <v-chip
+            v-bind="props"
+            v-if="showUsdRate && bcvRate?.dollar"
+            color="secondary"
+            variant="flat"
+            size="small"
+            class="bcv-chip-compact cursor-pointer"
+            @click="refreshBCVRate"
+          >
+            <span class="font-weight-bold text-caption" style="color: white; font-family: 'Roboto Mono', monospace;">
+              ${{ bcvRate?.dollar }}
+            </span>
+          </v-chip>
+          <v-btn
+            v-else-if="bcvLoading"
+            icon
+            size="x-small"
+            variant="text"
+            loading
+          ></v-btn>
+        </template>
+        <div class="text-center">
+          <div class="font-weight-bold">Tasa BCV</div>
+          <div v-if="bcvRate?.dollar">USD: {{ bcvRate.dollar }}</div>
+          <div v-if="bcvRate?.euro">EUR: {{ bcvRate.euro }}</div>
+          <div class="text-caption text-grey-lighten-2 mt-1">Tap para actualizar</div>
+        </div>
+      </v-tooltip>
+    </div>
+
+    <!-- Versión tablet/desktop SM+ (≥600px): chips completos -->
+    <div class="bcv-rate-display mr-4 d-none d-sm-flex align-center ga-2">
       <!-- Chip Dólar -->
       <ExchangeRateChip
         v-if="showUsdRate"
@@ -43,7 +78,7 @@
         @click="refreshBCVRate"
       />
 
-      <!-- Chip Euro -->
+      <!-- Chip Euro (solo MD+) -->
       <ExchangeRateChip
         v-if="showEurRate && !bcvLoading && bcvRate?.euro"
         currency="EUR"
@@ -54,13 +89,13 @@
         :error="bcvError"
         color="#02254d"
         variant="flat"
-        class="d-none d-sm-inline-flex"
+        class="d-none d-md-inline-flex"
         @click="refreshBCVRate"
       />
     </div>
 
-    <!-- Menú de usuario -->
-    <v-btn id="user-menu-btn" color="primary" variant="text" @click="handleUserButtonClick">
+    <!-- Menú de usuario (siempre visible, flex-shrink: 0) -->
+    <v-btn id="user-menu-btn" color="primary" variant="text" @click="handleUserButtonClick" style="flex-shrink: 0;">
       <v-icon>mdi-account-circle</v-icon>
       <span class="ml-2 d-none d-md-inline">{{ currentUser?.firstName || 'Usuario' }}</span>
     </v-btn>
@@ -78,7 +113,7 @@
         </v-list-item>
         <v-divider />
         <v-list-item @click="goToPlans">
-          <v-list-item-title>Planes</v-list-item-title>
+          <v-list-item-title>Mi Suscripción</v-list-item-title>
         </v-list-item>
         <v-list-item @click="goToBilling">
           <v-list-item-title>Facturación</v-list-item-title>
@@ -408,15 +443,19 @@ export default {
 
 @media (max-width: 768px) {
 	.app-bar .v-toolbar-title { font-size: 1.25rem !important; margin-left: 0 !important; }
-	.app-bar .bcv-rate-display { margin-right: 12px; }
+	.app-bar .bcv-rate-display { margin-right: 8px; }
 	.app-bar .bcv-rate-display .v-chip { font-size: 0.8rem; }
 }
 
-@media (max-width: 480px) {
-	.app-bar .v-toolbar-title { font-size: 1.125rem !important; margin-left: 0 !important; }
-	.app-bar .bcv-rate-display { margin-right: 8px; }
-	.app-bar .bcv-rate-display .v-chip { font-size: 0.75rem; padding: 4px 8px; }
-	.app-bar .v-btn { min-width: 40px !important; padding: 0 8px !important; }
+@media (max-width: 599px) {
+	.app-bar .v-toolbar-title { font-size: 1.1rem !important; margin-left: 0 !important; }
+}
+
+/* Chip compacto para móvil XS */
+.bcv-chip-compact {
+	padding: 2px 8px !important;
+	height: 28px !important;
+	min-width: auto !important;
 }
 
 .bcv-rate-display { display: flex; align-items: center; }

@@ -4,8 +4,7 @@
     <div class="login-visual animate-fade-in">
       <div class="visual-content">
         <div class="brand-badge animate-slide-in-down">
-          <img src="@/assets/icon-adaptableV2.svg" alt="Logo" class="brand-logo" />
-          <span class="brand-text">System</span>
+          <img src="/ADSystem/logo.png" alt="AD System" class="brand-logo-full" />
         </div>
         <h1 class="visual-title animate-slide-in-up animate-delay-200">
           Bienvenido de nuevo
@@ -24,8 +23,7 @@
     <div class="login-form-wrapper animate-slide-in-right">
       <div class="form-content">
         <div class="mobile-brand d-md-none mb-8 text-center">
-           <img src="@/assets/icon-adaptableV2.svg" alt="Logo" style="width: 48px;" />
-           <h2 class="mt-2 text-h5 font-weight-bold">System</h2>
+           <img src="/ADSystem/logo.png" alt="AD System" style="max-width: 200px; height: auto;" />
         </div>
 
         <div class="form-header">
@@ -324,15 +322,10 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.brand-logo {
-  width: 32px;
-  height: 32px;
-}
-
-.brand-text {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+.brand-logo-full {
+  height: 36px;
+  width: auto;
+  filter: brightness(0) invert(1); /* Logo blanco sobre fondo oscuro */
 }
 
 .visual-title {

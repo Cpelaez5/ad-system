@@ -15,7 +15,7 @@
       <div class="sidebar-header">
         <div class="logo-container">
           <img
-            src="@/assets/icon-adaptableV2.svg"
+            src="/ADSystem/png/icono.png"
             alt="Logo"
             class="logo-icon animate-micro-rotate"
           />

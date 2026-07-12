@@ -85,10 +85,10 @@ export default {
   emits: ['select'],
   computed: {
     isFeatured() {
-      return this.plan.name === 'Profesional';
+      return this.plan.name === 'AD Visionary';
     },
     isEnterprise() {
-      return this.plan.name === 'Empresarial';
+      return this.plan.name === 'AD Corporate Nexus';
     },
     currentPrice() {
       return this.billingPeriod === 'annual' ? this.plan.price_annual : this.plan.price_monthly;

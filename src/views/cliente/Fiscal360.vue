@@ -234,13 +234,13 @@
                   density="compact"
                   variant="outlined"
                   hide-details
-                  style="width: 130px"
+                  class="fiscal-select-year"
                   bg-color="white"
                   label="Año Fiscal"
                   prepend-inner-icon="mdi-calendar"
                 />
 
-                <v-spacer />
+                <v-spacer class="d-none d-sm-block" />
 
                 <!-- Filtro de estado -->
                 <v-select
@@ -251,7 +251,7 @@
                   density="compact"
                   variant="outlined"
                   hide-details
-                  style="max-width: 180px"
+                  class="fiscal-select-status"
                   bg-color="white"
                   prepend-inner-icon="mdi-filter-variant"
                   label="Estado"
@@ -790,7 +790,7 @@ import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
 import FiscalPeriodTracker from '@/components/fiscal/FiscalPeriodTracker.vue'
 import fiscalService from '@/services/fiscalService'
 import userService from '@/services/userService'
-import systemLogo from '@/assets/icon.png'
+import systemLogo from '/ADSystem/logo.png'
 import { FISCAL_TYPES, MONTHS, isRecurringFrequency, getExpirationInfo } from '@/constants/fiscalDocuments'
 
 // Data
@@ -1897,5 +1897,26 @@ onMounted(async () => {
 
 .hover-bg:hover {
     background-color: #f5f5f5;
+}
+
+/* Selectores de período — Responsive */
+.fiscal-select-year {
+    width: 130px;
+    flex-shrink: 0;
+}
+
+.fiscal-select-status {
+    max-width: 180px;
+    flex-shrink: 0;
+}
+
+/* En móvil XS: selectores toman ancho completo */
+@media (max-width: 599px) {
+    .fiscal-select-year,
+    .fiscal-select-status {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100%;
+    }
 }
 </style>

@@ -249,6 +249,12 @@ const routes = [
       title: 'Planes y Precios Competitivos | AD SYSTEM',
       description: 'Conoce nuestros planes de suscripción mensuales y anuales adaptados a tu negocio. Transparencia sin cargos ocultos.'
     }
+  },
+  {
+    path: '/trial-expired',
+    name: 'TrialExpired',
+    component: () => import('../views/shared/TrialExpired.vue'),
+    meta: { requiresAuth: true, title: 'Prueba Expirada' }
   }
 ]
 
@@ -330,6 +336,18 @@ router.beforeEach(async (to, from, next) => {
             console.log('🔄 Redirigiendo a Welcome (Onboarding)');
             next('/welcome');
             return;
+          }
+
+          // Verificar si el periodo de prueba ha expirado
+          if (userRole === 'cliente' && currentUser.plan_id === 'free_trial' && currentUser.trial_end) {
+            const trialEnd = new Date(currentUser.trial_end);
+            const now = new Date();
+            // Si el trial expiró y no está yendo a pricing o trial-expired, bloquear
+            if (now > trialEnd && to.path !== '/trial-expired' && to.path !== '/pricing' && to.path !== '/welcome') {
+              console.log('🚫 Trial expirado, redirigiendo a /trial-expired');
+              next('/trial-expired');
+              return;
+            }
           }
 
           // Redirigir clientes desde /dashboard a /cliente/dashboard

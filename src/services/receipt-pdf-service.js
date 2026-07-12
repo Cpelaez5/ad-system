@@ -10,7 +10,7 @@
  */
 
 import { jsPDF } from 'jspdf'
-import systemLogo from '@/assets/icon.png'
+import systemLogo from '/ADSystem/logo.png'
 
 // ══════════════════════════════════════════════════════
 // Constantes de diseño corporativo

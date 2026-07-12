@@ -300,7 +300,9 @@ const userService = {
           lastLogin: userData.last_login || null,
           organization: userData.organization,
           organization_id: userData.organization_id || null,
-          client_id: userData.client_id || null
+          client_id: userData.client_id || null,
+          plan_id: userData.plan_id || null,
+          trial_end: userData.trial_end || null
         },
         session: authData.session,
         token: authData.session?.access_token || null,
@@ -415,7 +417,9 @@ const userService = {
           organization: profile.organizations || null,
           organization_id: profile.organization_id || null,
           client_id: profile.client_id || null,
-          client: profile.clients || null
+          client: profile.clients || null,
+          plan_id: profile.plan_id || null,
+          trial_end: profile.trial_end || null
         };
 
         // Guardar en localStorage para próximas consultas
