@@ -19,7 +19,7 @@
         size="small" 
         variant="outlined" 
         class="ml-4 trial-cta-btn text-none"
-        href="/#pricing"
+        to="/cliente/planes"
         style="min-width: 120px;"
       >
         <v-icon size="16" class="mr-1">mdi-rocket-launch</v-icon>
@@ -117,6 +117,10 @@ export default {
   font-weight: 600;
   transition: all 0.2s ease;
   white-space: nowrap;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .trial-cta-btn:hover {

@@ -68,23 +68,15 @@ export default {
         window.open('mailto:ventas@sistema.com?subject=Interés en Plan Corporate Nexus', '_blank');
         return;
       }
-      if (!confirm(`¿Deseas cambiar al plan ${plan.name}?`)) return;
-      this.processingPlan = plan.id;
-      try {
-        const result = await plansService.updateSubscription(
-          this.currentUser.client_id, plan.id, selectedBillingPeriod
-        );
-        if (result.success) {
-          this.showSnackbar(`Suscrito al plan ${plan.name}`, 'success');
-          await this.loadData();
-          window.dispatchEvent(new CustomEvent('userUpdated'));
-        } else { throw result.error; }
-      } catch (error) {
-        console.error('Error updating plan:', error);
-        this.showSnackbar('Error al actualizar el plan', 'error');
-      } finally {
-        this.processingPlan = null;
-      }
+      
+      // Redirigir al Checkout en lugar de procesar directamente
+      this.$router.push({
+        path: '/cliente/checkout',
+        query: {
+          plan_id: plan.id,
+          period: selectedBillingPeriod
+        }
+      });
     },
     showSnackbar(text, color) {
       this.snackbar = { show: true, text, color };

@@ -53,7 +53,7 @@ export default {
   },
   computed: {
     showNavigation() {
-      const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing'];
+      const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout'];
       return !publicRoutes.includes(this.$route.name);
     }
   },

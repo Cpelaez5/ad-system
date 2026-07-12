@@ -46,8 +46,8 @@ export default {
   name: 'TrialExpired',
   methods: {
     goToPricing() {
-      // Usamos el modo de pricing público
-      this.$router.push('/pricing');
+      // Redirigir a la vista de planes para usuarios autenticados
+      this.$router.push('/cliente/planes');
     },
     async logout() {
       try {

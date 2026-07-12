@@ -169,6 +169,12 @@ const routes = [
     meta: { requiresAuth: true, title: 'Facturación de Suscripción', roles: ['cliente'] }
   },
   {
+    path: '/cliente/checkout',
+    name: 'ClienteCheckout',
+    component: () => import('../views/cliente/Checkout.vue'),
+    meta: { requiresAuth: true, title: 'Completar Pago', roles: ['cliente'] }
+  },
+  {
     path: '/cliente/fiscal-360',
     name: 'ClienteFiscal360',
     component: () => import('@/views/cliente/Fiscal360.vue'),
@@ -342,8 +348,9 @@ router.beforeEach(async (to, from, next) => {
           if (userRole === 'cliente' && currentUser.plan_id === 'free_trial' && currentUser.trial_end) {
             const trialEnd = new Date(currentUser.trial_end);
             const now = new Date();
-            // Si el trial expiró y no está yendo a pricing o trial-expired, bloquear
-            if (now > trialEnd && to.path !== '/trial-expired' && to.path !== '/pricing' && to.path !== '/welcome') {
+            // Si el trial expiró y no está yendo a renovar, bloquear
+            const allowedRoutes = ['/trial-expired', '/pricing', '/welcome', '/cliente/planes', '/cliente/checkout'];
+            if (now > trialEnd && !allowedRoutes.includes(to.path)) {
               console.log('🚫 Trial expirado, redirigiendo a /trial-expired');
               next('/trial-expired');
               return;
