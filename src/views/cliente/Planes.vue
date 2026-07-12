@@ -1,7 +1,41 @@
 <template>
   <v-container fluid class="planes-page pa-4 pa-md-6">
+    <!-- Banner de suscripción actual -->
+    <v-alert
+      v-if="currentSubscription && currentSubscription.plan"
+      color="secondary"
+      variant="tonal"
+      class="mb-6 rounded-xl"
+      border="start"
+      border-color="primary"
+    >
+      <div class="d-flex align-center justify-space-between flex-wrap">
+        <div>
+          <h3 class="text-h6 font-weight-bold mb-1">
+            Plan Actual: {{ currentSubscription.plan.name }}
+            <v-chip size="small" :color="isActive ? 'success' : 'error'" class="ml-2 font-weight-bold">
+              {{ isActive ? 'Activo' : 'Expirado' }}
+            </v-chip>
+          </h3>
+          <p class="mb-0 text-body-2 opacity-80">
+            <template v-if="formattedExpirationDate">
+              Tu suscripción es válida hasta el <strong>{{ formattedExpirationDate }}</strong>.
+            </template>
+            <template v-else>
+              Tu suscripción se encuentra activa.
+            </template>
+          </p>
+        </div>
+        <div class="mt-3 mt-md-0" v-if="!isActive">
+          <v-btn color="primary" variant="flat" rounded="pill" @click="scrollToPlans">
+            Renovar Ahora
+          </v-btn>
+        </div>
+      </div>
+    </v-alert>
+
     <PricingSection
-      title="Mi Suscripción"
+      title="Planes de Suscripción"
       subtitle="Escala tus operaciones con el plan ideal para tu negocio."
       :current-plan-id="currentSubscription?.plan_id"
       :processing-plan-id="processingPlan"
@@ -46,7 +80,27 @@ export default {
   async mounted() {
     await this.loadData();
   },
+  computed: {
+    isActive() {
+      if (!this.currentSubscription) return false;
+      if (this.currentSubscription.status === 'active' || this.currentSubscription.status === 'trial') return true;
+      if (this.currentSubscription.next_billing_date) {
+        return new Date(this.currentSubscription.next_billing_date) > new Date();
+      }
+      return false;
+    },
+    formattedExpirationDate() {
+      if (this.currentSubscription?.next_billing_date) {
+        const date = new Date(this.currentSubscription.next_billing_date);
+        return date.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+      }
+      return null;
+    }
+  },
   methods: {
+    scrollToPlans() {
+      window.scrollTo({ top: 300, behavior: 'smooth' });
+    },
     async loadData() {
       try {
         this.currentUser = await userService.getCurrentUser();
@@ -89,7 +143,7 @@ export default {
       return this.currentSubscription?.plan_id === plan.id;
     },
     isPendingPlan(plan) {
-      return this.pendingPlanId === plan.id;
+      return this.pendingPlanId === plan.id && !this.isCurrentPlan(plan);
     },
     async handleSelectPlan(plan, selectedBillingPeriod) {
       if (this.isCurrentPlan(plan) || this.isPendingPlan(plan)) return;

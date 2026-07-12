@@ -36,6 +36,38 @@ export default {
                 .single();
 
             if (error && error.code !== 'PGRST116') throw error; // Ignorar error si no hay filas
+            
+            if (!data) {
+                // Fallback a users
+                const { data: userData, error: userError } = await supabase
+                    .from('users')
+                    .select('plan_id, trial_end, client_id')
+                    .eq('client_id', clientId)
+                    .limit(1)
+                    .single();
+                    
+                if (userData && userData.plan_id) {
+                    // Obtener detalles del plan
+                    const { data: planData } = await supabase
+                        .from('subscription_plans')
+                        .select('*')
+                        .eq('id', userData.plan_id)
+                        .single();
+                        
+                    return {
+                        success: true,
+                        data: {
+                            client_id: userData.client_id,
+                            plan_id: userData.plan_id,
+                            status: userData.trial_end && new Date(userData.trial_end) > new Date() ? 'active' : 'active',
+                            billing_period: 'monthly', // default
+                            next_billing_date: userData.trial_end,
+                            plan: planData
+                        }
+                    };
+                }
+            }
+            
             return { success: true, data };
         } catch (error) {
             console.error('Error fetching subscription:', error);

@@ -4,7 +4,12 @@
       <div class="header-section text-center mb-8">
         <h1 class="text-h3 font-weight-bold mb-2">¡Bienvenido, {{ firstName }}!</h1>
         <p class="text-h6 text-medium-emphasis">
-          Tienes <span class="text-primary font-weight-bold">{{ daysLeft }} días</span> de prueba gratuita.
+          <span v-if="daysLeft > 0">
+            Tienes <span class="text-primary font-weight-bold">{{ daysLeft }} días</span> de prueba gratuita.
+          </span>
+          <span v-else class="text-error font-weight-bold">
+            Tu periodo de prueba ha finalizado.
+          </span>
         </p>
       </div>
 
@@ -28,6 +33,7 @@
 
       <div class="actions-section">
         <v-btn
+          v-if="daysLeft > 0"
           color="primary"
           size="x-large"
           block
@@ -39,6 +45,19 @@
         </v-btn>
         
         <v-btn
+          v-else
+          color="primary"
+          size="x-large"
+          block
+          class="mb-4"
+          to="/pricing"
+        >
+          Ver planes disponibles
+          <v-icon end>mdi-arrow-right</v-icon>
+        </v-btn>
+
+        <v-btn
+          v-if="daysLeft > 0"
           variant="outlined"
           block
           to="/pricing"
@@ -76,8 +95,12 @@ export default {
       if (profile?.trial_end) {
         const end = new Date(profile.trial_end);
         const now = new Date();
-        const diffTime = Math.abs(end - now);
-        this.daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        if (now > end) {
+          this.daysLeft = 0;
+        } else {
+          const diffTime = end - now;
+          this.daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        }
       }
     }
   },

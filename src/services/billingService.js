@@ -619,6 +619,18 @@ export default {
 
             if (fetchError) throw fetchError;
 
+            // 1.5 Marcar el reporte como aprobado
+            const { error: updateReportError } = await supabase
+                .from('payment_reports')
+                .update({ 
+                    status: 'approved',
+                    reviewed_by: reviewerId,
+                    reviewed_at: new Date().toISOString()
+                })
+                .eq('id', reportId);
+
+            if (updateReportError) throw updateReportError;
+
             // 2. Calcular totales
             // Obtener TODOS los pagos aprobados para esta factura (incluyendo este que acabamos de aprobar)
             const { data: allReports, error: reportsError } = await supabase
