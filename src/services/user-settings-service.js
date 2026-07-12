@@ -41,6 +41,9 @@ const DEFAULT_SETTINGS = {
   // ── Tasas de cambio en el header ─────────────────────────────────────────
   showUsdRate: true,
   showEurRate: true,
+  showCnyRate: false,
+  showTryRate: false,
+  showRubRate: false,
 
   // ── Correo principal ────────────────────────────────────────────────────
   notifyPrimaryEmail: true,

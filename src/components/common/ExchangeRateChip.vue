@@ -60,7 +60,7 @@ export default {
     currency: {
       type: String,
       required: true,
-      validator: (v) => ['USD', 'EUR'].includes(v)
+      validator: (v) => ['USD', 'EUR', 'CNY', 'TRY', 'RUB'].includes(v)
     },
     rateValue: {
       type: Number,
@@ -110,7 +110,14 @@ export default {
   emits: ['click'],
   computed: {
     currencyIcon() {
-      return this.currency === 'USD' ? 'mdi-currency-usd' : 'mdi-currency-eur';
+      const icons = {
+        'USD': 'mdi-currency-usd',
+        'EUR': 'mdi-currency-eur',
+        'CNY': 'mdi-currency-cny',
+        'TRY': 'mdi-currency-try',
+        'RUB': 'mdi-currency-rub'
+      };
+      return icons[this.currency] || 'mdi-cash';
     },
     displayValue() {
       if (this.error) return 'Error';

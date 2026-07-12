@@ -90,8 +90,50 @@
               <v-switch v-model="form.showEurRate" color="primary" hide-details inset density="compact" />
             </div>
 
+            <!-- Yuan -->
+            <div class="pref-row mb-3">
+              <div class="d-flex align-center ga-3">
+                <div class="currency-icon-wrap cny">
+                  <v-icon size="20" color="white">mdi-currency-cny</v-icon>
+                </div>
+                <div>
+                  <p class="font-weight-semibold mb-0 text-high-emphasis">Yuan Chino (CNY)</p>
+                  <p class="text-caption text-grey ma-0">Tasa oficial BCV</p>
+                </div>
+              </div>
+              <v-switch v-model="form.showCnyRate" color="primary" hide-details inset density="compact" />
+            </div>
+
+            <!-- Lira Turca -->
+            <div class="pref-row mb-3">
+              <div class="d-flex align-center ga-3">
+                <div class="currency-icon-wrap try">
+                  <v-icon size="20" color="white">mdi-currency-try</v-icon>
+                </div>
+                <div>
+                  <p class="font-weight-semibold mb-0 text-high-emphasis">Lira Turca (TRY)</p>
+                  <p class="text-caption text-grey ma-0">Tasa oficial BCV</p>
+                </div>
+              </div>
+              <v-switch v-model="form.showTryRate" color="primary" hide-details inset density="compact" />
+            </div>
+
+            <!-- Rublo -->
+            <div class="pref-row">
+              <div class="d-flex align-center ga-3">
+                <div class="currency-icon-wrap rub">
+                  <v-icon size="20" color="white">mdi-currency-rub</v-icon>
+                </div>
+                <div>
+                  <p class="font-weight-semibold mb-0 text-high-emphasis">Rublo Ruso (RUB)</p>
+                  <p class="text-caption text-grey ma-0">Tasa oficial BCV</p>
+                </div>
+              </div>
+              <v-switch v-model="form.showRubRate" color="primary" hide-details inset density="compact" />
+            </div>
+
             <v-alert
-              v-if="!form.showUsdRate && !form.showEurRate"
+              v-if="!form.showUsdRate && !form.showEurRate && !form.showCnyRate && !form.showTryRate && !form.showRubRate"
               type="warning"
               variant="tonal"
               density="compact"
@@ -651,6 +693,9 @@ export default {
 }
 .currency-icon-wrap.usd { background: linear-gradient(135deg, #1F355C, #2d4a7a); }
 .currency-icon-wrap.eur { background: linear-gradient(135deg, #02254d, #1F355C); }
+.currency-icon-wrap.cny { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+.currency-icon-wrap.try { background: linear-gradient(135deg, #A81C22, #d63031); }
+.currency-icon-wrap.rub { background: linear-gradient(135deg, #2980b9, #3498db); }
 
 /* Barra de guardado */
 .save-bar {

@@ -33,17 +33,25 @@ class BCVService {
         return cached;
       }
 
-      console.log('🌐 BCV: Obteniendo tasas desde Edge Function...');
+      console.log('🌐 BCV: Obteniendo tasas desde Proxy API...');
 
-      // ── Capa 2: Edge Function (scraping oficial) ──
+      // ── Capa 2: Proxy API (nueva) ──
       let rateData = null;
       try {
-        rateData = await this.fetchFromEdgeFunction();
+        rateData = await this.fetchFromProxyApi();
       } catch (e) {
-        console.warn('⚠️ BCV Edge Function falló:', e.message);
+        console.warn('⚠️ BCV Proxy API falló:', e.message);
+        
+        // ── Capa 2.1: Edge Function (Respaldo / DolarAPI) ──
+        console.log('🌐 BCV: Intentando Edge Function como respaldo...');
+        try {
+          rateData = await this.fetchFromEdgeFunction();
+        } catch (err) {
+          console.warn('⚠️ BCV Edge Function falló:', err.message);
+        }
       }
 
-      // Si la Edge Function falla, intentar DB como fallback
+      // Si Proxy y Edge Function fallan, intentar DB como fallback
       if (!rateData) {
         console.log('🗄️ BCV: Fallback a base de datos...');
         const dbRate = await this.getLatestRateFromDB();
@@ -95,6 +103,49 @@ class BCVService {
     } catch (error) {
       console.error('❌ Error al obtener tasa del BCV:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // PROXY API (Extra Monedas)
+  // ═══════════════════════════════════════════
+
+  /**
+   * Llama a la nueva Proxy API en Render a través de un Edge Function (bcv-proxy)
+   * para evitar problemas de CORS en el navegador.
+   */
+  async fetchFromProxyApi() {
+    try {
+      const { data: responseData, error } = await supabase.functions.invoke('bcv-proxy', {
+        method: 'GET'
+      });
+
+      if (error) throw new Error(`Error en bcv-proxy: ${error.message}`);
+      if (!responseData) throw new Error('Respuesta vacía de bcv-proxy');
+
+      // responseData contiene el JSON devuelto por Render
+      if (!responseData.success || !responseData.data) {
+        throw new Error('Proxy API respuesta inválida');
+      }
+      
+      const rates = responseData.data;
+      if (!rates.usd || typeof rates.usd.tasa !== 'number') throw new Error('Proxy API: falta tasa USD');
+      
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      return {
+        dollar: rates.usd.tasa,
+        euro: rates.euro?.tasa || null,
+        yuan: rates.yuan?.tasa || null,
+        lira: rates.lira?.tasa || null,
+        rublo: rates.rublo?.tasa || null,
+        date: todayStr, 
+        dateText: responseData.fecha_valor || null,
+        source: 'PROXY-API',
+        timestamp: responseData.timestamp || new Date().toISOString()
+      };
+    } catch (error) {
+      throw error;
     }
   }
 
@@ -293,7 +344,37 @@ class BCVService {
         date: rateData.date,
         currency: 'EUR',
         rate: rateData.euro,
-        source: 'BCV'
+        source: rateData.source || 'BCV'
+      });
+    }
+
+    // Guardar tasa del yuan
+    if (rateData.yuan) {
+      inserts.push({
+        date: rateData.date,
+        currency: 'CNY',
+        rate: rateData.yuan,
+        source: rateData.source || 'BCV'
+      });
+    }
+
+    // Guardar tasa de la lira
+    if (rateData.lira) {
+      inserts.push({
+        date: rateData.date,
+        currency: 'TRY',
+        rate: rateData.lira,
+        source: rateData.source || 'BCV'
+      });
+    }
+
+    // Guardar tasa del rublo
+    if (rateData.rublo) {
+      inserts.push({
+        date: rateData.date,
+        currency: 'RUB',
+        rate: rateData.rublo,
+        source: rateData.source || 'BCV'
       });
     }
 

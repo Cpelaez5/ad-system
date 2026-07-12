@@ -253,6 +253,42 @@
             EUR: €{{ Number(bcvRate?.euro).toFixed(2) }}
           </span>
         </v-chip>
+        <v-chip
+          v-if="showCnyRate && bcvRate?.yuan"
+          color="#1F355C"
+          variant="flat"
+          size="small"
+          class="cursor-pointer font-weight-bold px-3"
+          @click="refreshBCVRate"
+        >
+          <span style="color: white; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
+            CNY: ¥{{ Number(bcvRate?.yuan).toFixed(2) }}
+          </span>
+        </v-chip>
+        <v-chip
+          v-if="showTryRate && bcvRate?.lira"
+          color="#1F355C"
+          variant="flat"
+          size="small"
+          class="cursor-pointer font-weight-bold px-3"
+          @click="refreshBCVRate"
+        >
+          <span style="color: white; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
+            TRY: ₺{{ Number(bcvRate?.lira).toFixed(2) }}
+          </span>
+        </v-chip>
+        <v-chip
+          v-if="showRubRate && bcvRate?.rublo"
+          color="#1F355C"
+          variant="flat"
+          size="small"
+          class="cursor-pointer font-weight-bold px-3"
+          @click="refreshBCVRate"
+        >
+          <span style="color: white; font-family: 'Roboto Mono', monospace; font-size: 0.85rem;">
+            RUB: ₽{{ Number(bcvRate?.rublo).toFixed(2) }}
+          </span>
+        </v-chip>
         <v-btn
           v-if="bcvLoading"
           icon
@@ -298,6 +334,9 @@ export default {
       bcvInterval: null,
       showUsdRate: true,
       showEurRate: true,
+      showCnyRate: false,
+      showTryRate: false,
+      showRubRate: false,
     };
   },
   computed: {
@@ -376,6 +415,9 @@ export default {
         const settings = userSettingsService.getSettings();
         this.showUsdRate = settings.showUsdRate;
         this.showEurRate = settings.showEurRate;
+        this.showCnyRate = settings.showCnyRate;
+        this.showTryRate = settings.showTryRate;
+        this.showRubRate = settings.showRubRate;
       } catch (error) {
         console.error('Error loading settings:', error);
       }
@@ -385,6 +427,9 @@ export default {
         const settings = event.detail;
         this.showUsdRate = settings.showUsdRate;
         this.showEurRate = settings.showEurRate;
+        this.showCnyRate = settings.showCnyRate;
+        this.showTryRate = settings.showTryRate;
+        this.showRubRate = settings.showRubRate;
       }
     },
     async loadBCVRate() {

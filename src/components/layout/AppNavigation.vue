@@ -57,6 +57,45 @@
         class="d-none d-md-inline-flex"
         @click="refreshBCVRate"
       />
+
+      <!-- Chip Yuan (solo MD+) -->
+      <ExchangeRateChip
+        v-if="showCnyRate && !bcvLoading && bcvRate?.yuan"
+        currency="CNY"
+        :rate-value="bcvRate?.yuan"
+        :loading="bcvLoading"
+        :error="bcvError"
+        color="#1F355C"
+        variant="flat"
+        class="d-none d-lg-inline-flex"
+        @click="refreshBCVRate"
+      />
+
+      <!-- Chip Lira (solo MD+) -->
+      <ExchangeRateChip
+        v-if="showTryRate && !bcvLoading && bcvRate?.lira"
+        currency="TRY"
+        :rate-value="bcvRate?.lira"
+        :loading="bcvLoading"
+        :error="bcvError"
+        color="#1F355C"
+        variant="flat"
+        class="d-none d-lg-inline-flex"
+        @click="refreshBCVRate"
+      />
+
+      <!-- Chip Rublo (solo MD+) -->
+      <ExchangeRateChip
+        v-if="showRubRate && !bcvLoading && bcvRate?.rublo"
+        currency="RUB"
+        :rate-value="bcvRate?.rublo"
+        :loading="bcvLoading"
+        :error="bcvError"
+        color="#1F355C"
+        variant="flat"
+        class="d-none d-lg-inline-flex"
+        @click="refreshBCVRate"
+      />
     </div>
 
     <!-- Menú de usuario (siempre visible, flex-shrink: 0) -->
@@ -125,6 +164,9 @@ export default {
       // Preferencias de tasas de cambio
       showUsdRate: true,
       showEurRate: true,
+      showCnyRate: false,
+      showTryRate: false,
+      showRubRate: false,
 		}
 	},
 	computed: {
@@ -174,6 +216,9 @@ export default {
       const settings = userSettingsService.getSettings()
       this.showUsdRate = settings.showUsdRate
       this.showEurRate = settings.showEurRate
+      this.showCnyRate = settings.showCnyRate
+      this.showTryRate = settings.showTryRate
+      this.showRubRate = settings.showRubRate
     },
 
     // Responde a cambios de configuración emitidos desde Settings.vue
@@ -181,6 +226,9 @@ export default {
       const settings = event.detail
       this.showUsdRate = settings.showUsdRate
       this.showEurRate = settings.showEurRate
+      this.showCnyRate = settings.showCnyRate
+      this.showTryRate = settings.showTryRate
+      this.showRubRate = settings.showRubRate
     },
 
     handleBannerVisibility(isVisible) {
