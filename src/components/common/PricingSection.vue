@@ -50,6 +50,7 @@
             :plan="plan"
             :billing-period="billingPeriod"
             :is-current="currentPlanId === plan.id"
+            :is-pending="pendingPlanId === plan.id"
             :loading="processingPlanId === plan.id"
             @select="$emit('select-plan', plan, billingPeriod)"
           />
@@ -91,6 +92,7 @@ export default {
     subtitle: { type: String, default: 'Escala tus operaciones con el plan ideal para tu negocio.' },
     currentPlanId: { type: String, default: null },
     processingPlanId: { type: String, default: null },
+    pendingPlanId: { type: String, default: null },
     initialBillingPeriod: { type: String, default: 'monthly' },
     showFaqs: { type: Boolean, default: true }
   },

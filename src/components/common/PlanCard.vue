@@ -16,6 +16,11 @@
       <span>Tu plan actual</span>
     </div>
 
+    <div v-if="isPending" class="pending-ribbon">
+      <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
+      <span>Pago en revisión</span>
+    </div>
+
     <!-- Encabezado del plan -->
     <div class="plan-header text-center" :style="headerStyle">
       <h3 class="text-h5 font-weight-bold mb-1">{{ plan.name }}</h3>
@@ -80,6 +85,7 @@ export default {
     plan: { type: Object, required: true },
     billingPeriod: { type: String, default: 'monthly' },
     isCurrent: { type: Boolean, default: false },
+    isPending: { type: Boolean, default: false },
     loading: { type: Boolean, default: false }
   },
   emits: ['select'],
@@ -104,7 +110,7 @@ export default {
     cardClasses() {
       return {
         'plan-card--featured': this.isFeatured,
-        'plan-card--active': this.isCurrent,
+        'plan-card--active': this.isCurrent || this.isPending,
         'plan-card--enterprise': this.isEnterprise
       };
     },
@@ -139,17 +145,19 @@ export default {
     },
     btnColor() {
       if (this.isCurrent) return '#4CAF50';
+      if (this.isPending) return '#FF9800'; // Orange for pending
       if (this.isFeatured) return '#E0B04F'; // Gold button for Featured
       if (this.isEnterprise) return '#ffffff'; // White button for Enterprise
       return '#1F355C'; // Dark Blue button for Basic
     },
     btnVariant() {
-      if (this.isCurrent) return 'tonal';
+      if (this.isCurrent || this.isPending) return 'tonal';
       if (this.isEnterprise) return 'outlined';
       return 'flat';
     },
     buttonText() {
       if (this.isCurrent) return 'Plan Actual';
+      if (this.isPending) return 'En Revisión (Pendiente)';
       if (this.isEnterprise) return 'Contactar Ventas';
       return 'Elegir Este Plan';
     }
@@ -184,8 +192,7 @@ export default {
 }
 
 /* Ribbons */
-.featured-ribbon,
-.current-ribbon {
+.featured-ribbon {
   position: absolute;
   top: 14px;
   right: -1px;
@@ -194,18 +201,47 @@ export default {
   font-weight: 700;
   padding: 4px 14px 4px 12px;
   border-radius: 20px 0 0 20px;
-}
-
-.featured-ribbon {
   background: #E0B04F;
   color: #1F355C;
 }
 
 .current-ribbon {
+  position: absolute;
+  top: 12px;
+  left: 12px;
   background: #4CAF50;
-  color: #fff;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: bold;
   display: flex;
   align-items: center;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.pending-ribbon {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: #FF9800;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 /* Botón */

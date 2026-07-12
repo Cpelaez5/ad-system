@@ -77,6 +77,30 @@ export default {
     },
 
     /**
+     * Crea una nueva factura pendiente a través de RPC (bypassa RLS de forma segura)
+     * Usado por clientes al solicitar una nueva suscripción.
+     */
+    async createPendingSubscriptionInvoice(invoiceData) {
+        try {
+            const { data, error } = await supabase.rpc('create_pending_subscription_invoice_v3', {
+                payload: {
+                    client_id: invoiceData.client_id,
+                    amount: invoiceData.amount,
+                    notes: invoiceData.notes || null
+                }
+            });
+
+            if (error) throw error;
+            if (!data.success) throw new Error(data.error);
+
+            return { success: true, data: data.data };
+        } catch (error) {
+            console.error('Error creating pending subscription invoice (RPC):', error);
+            return { success: false, error };
+        }
+    },
+
+    /**
      * Crea una nueva factura del sistema (super_admin).
      * @param {Object} invoiceData - Datos de la factura
      */

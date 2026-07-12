@@ -15,6 +15,30 @@
       <p class="text-h6 mt-4 text-secondary font-weight-medium">Preparando tu checkout...</p>
     </div>
 
+    <!-- Success State -->
+    <div v-else-if="paymentSuccessful" class="d-flex flex-column align-center justify-center text-center px-4" style="height: 80vh;">
+      <v-avatar color="success" size="100" class="mb-6 elevation-3" style="animation: bounceIn 0.8s ease;">
+        <v-icon size="60" color="white">mdi-check-bold</v-icon>
+      </v-avatar>
+      <h2 class="text-h4 font-weight-bold mb-4 text-secondary">¡Pago Enviado Exitosamente!</h2>
+      <p class="text-body-1 text-medium-emphasis max-w-sm mb-6" style="max-width: 500px;">
+        Tu pago ha sido registrado correctamente. El equipo de <strong class="text-secondary">AD System</strong> lo revisará y aprobará en breve.
+      </p>
+      
+      <v-card variant="flat" color="blue-lighten-5" class="pa-4 mb-8" style="max-width: 500px; width: 100%; border-radius: 12px;">
+        <div class="d-flex align-center">
+          <v-icon color="info" size="32" class="mr-4">mdi-information</v-icon>
+          <div class="text-left text-body-2 text-info-darken-2">
+            Te notificaremos por correo electrónico una vez que tu pago sea verificado y tu plan sea activado.
+          </div>
+        </div>
+      </v-card>
+
+      <v-btn color="primary" variant="flat" to="/cliente/facturacion-suscripcion" size="x-large" rounded="pill" class="text-none px-8 font-weight-bold elevation-2">
+        Volver a Mi Suscripción
+      </v-btn>
+    </div>
+
     <!-- Error State -->
     <div v-else-if="error" class="d-flex flex-column align-center justify-center text-center px-4" style="height: 60vh;">
       <v-avatar color="error" variant="tonal" size="80" class="mb-4">
@@ -317,6 +341,7 @@ export default {
   data() {
     return {
       loading: true,
+      paymentSuccessful: false,
       error: null,
       invoice: null,
       currentUser: null,
@@ -539,34 +564,14 @@ export default {
     },
 
     async _processNewSubscriptionInvoice() {
-        const { default: plansService } = await import('@/services/plansService');
-        // 1. Crear suscripción
-        const subRes = await plansService.updateSubscription(this.currentUser.client_id, this.selectedPlan.id, this.billingPeriod);
-        if (!subRes.success) throw new Error("No se pudo activar la suscripción.");
-        const newSub = subRes.data;
-
-        // 2. Generar Invoice Number
-        const numRes = await billingService.getNextInvoiceNumber();
-        const invoiceNumber = numRes.success ? numRes.data : `SYS-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`;
-
-        // 3. Crear Invoice
-        const periodStart = new Date().toISOString();
-        const nextDate = new Date();
-        nextDate.setDate(nextDate.getDate() + (this.billingPeriod === 'monthly' ? 30 : 365));
-        
-        const invRes = await billingService.createInvoice({
+        // 1. Crear Invoice pendiente vía RPC
+        const invRes = await billingService.createPendingSubscriptionInvoice({
            client_id: this.currentUser.client_id,
-           subscription_id: newSub.id,
-           invoice_number: invoiceNumber,
            amount: this.invoice.amount,
-           currency: 'USD',
-           period_start: periodStart,
-           period_end: nextDate.toISOString(),
-           due_date: periodStart,
-           notes: `Suscripción a plan ${this.selectedPlan.name}`
+           notes: `Suscripción a plan ${this.selectedPlan.name} (${this.billingPeriod}) - PENDIENTE DE APROBACIÓN`
         });
         
-        if (!invRes.success) throw new Error("No se pudo generar la factura del sistema.");
+        if (!invRes.success) throw new Error("No se pudo generar la factura de la solicitud de suscripción: " + (invRes.error?.message || ""));
         return invRes.data; // Retorna la factura real creada
     },
 
@@ -616,12 +621,9 @@ export default {
         }
 
         if (result.success) {
-          this.showSnackbar('¡Pago procesado exitosamente! Redirigiendo...', 'success');
-          setTimeout(() => {
-             this.$router.push('/cliente/facturacion-suscripcion');
-             // Despachar evento para que la app principal recargue el estado del usuario/plan
-             window.dispatchEvent(new CustomEvent('userUpdated'));
-          }, 2000);
+          this.paymentSuccessful = true;
+          // Despachar evento para que la app principal recargue el estado del usuario/plan en background
+          window.dispatchEvent(new CustomEvent('userUpdated'));
         } else {
           throw result.error;
         }

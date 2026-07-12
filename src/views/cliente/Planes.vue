@@ -5,6 +5,7 @@
       subtitle="Escala tus operaciones con el plan ideal para tu negocio."
       :current-plan-id="currentSubscription?.plan_id"
       :processing-plan-id="processingPlan"
+      :pending-plan-id="pendingPlanId"
       :initial-billing-period="billingPeriod"
       @select-plan="handleSelectPlan"
     />
@@ -35,6 +36,7 @@ export default {
   data() {
     return {
       processingPlan: null,
+      pendingPlanId: null,
       currentSubscription: null,
       currentUser: null,
       billingPeriod: 'monthly',
@@ -54,6 +56,30 @@ export default {
             this.currentSubscription = subResult.data;
             this.billingPeriod = this.currentSubscription.billing_period || 'monthly';
           }
+          
+          // Cargar facturas pendientes de suscripción
+          const { supabase } = await import('@/lib/supabaseClient');
+          const { data: pendingInvoices } = await supabase
+            .from('system_invoices')
+            .select('notes')
+            .eq('client_id', this.currentUser.client_id)
+            .eq('status', 'pending')
+            .ilike('notes', 'Suscripción a plan%')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (pendingInvoices && pendingInvoices.length > 0) {
+            const notes = pendingInvoices[0].notes;
+            // Extraer el nombre del plan usando regex o includes
+            // La nota es: Suscripción a plan AD Visionary (monthly) - PENDIENTE DE APROBACIÓN
+            const plansRes = await plansService.getPlans();
+            if (plansRes.success) {
+              const pendingPlan = plansRes.data.find(p => notes.includes(p.name));
+              if (pendingPlan) {
+                this.pendingPlanId = pendingPlan.id;
+              }
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading subscription:', error);
@@ -62,8 +88,11 @@ export default {
     isCurrentPlan(plan) {
       return this.currentSubscription?.plan_id === plan.id;
     },
+    isPendingPlan(plan) {
+      return this.pendingPlanId === plan.id;
+    },
     async handleSelectPlan(plan, selectedBillingPeriod) {
-      if (this.isCurrentPlan(plan)) return;
+      if (this.isCurrentPlan(plan) || this.isPendingPlan(plan)) return;
       if (plan.name === 'AD Corporate Nexus') {
         window.open('mailto:ventas@sistema.com?subject=Interés en Plan Corporate Nexus', '_blank');
         return;
