@@ -2,8 +2,7 @@
   <div class="landing-container">
     <nav class="navbar animate-fade-in-down">
       <div class="logo-container">
-        <img src="@/assets/icon-adaptableV2.svg" alt="Logo" class="logo-icon" />
-        <span class="brand-name">Sistema Contable</span>
+        <img src="/ADSystem/png/logo.png" alt="AD System" class="logo-icon" style="max-height: 40px; width: auto;" />
       </div>
       <div class="nav-buttons">
         <a href="#pricing" class="nav-btn text-grey-darken-2" @click.prevent="scrollToPricing">Precios</a>
@@ -69,7 +68,7 @@
 </template>
 
 <script>
-import PricingSection from '@/components/sections/PricingSection.vue'
+import PricingSection from '@/components/common/PricingSection.vue'
 
 export default {
   name: 'LandingPage',
@@ -83,13 +82,17 @@ export default {
         element.scrollIntoView({ behavior: 'smooth' });
       }
     },
-    handlePlanSelection(planId) {
+    handlePlanSelection(plan) {
+      if (plan.name === 'AD Corporate Nexus') {
+        window.open('mailto:ventas@sistema.com?subject=Interés en Plan Corporate Nexus', '_blank');
+        return;
+      }
       // Redirect to signup with plan pre-selected
       this.$router.push({ 
         path: '/signup', 
         query: { 
           type: 'public_client',
-          plan: planId 
+          plan: plan.id 
         } 
       });
     }

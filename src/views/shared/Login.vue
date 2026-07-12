@@ -4,7 +4,7 @@
     <div class="login-visual animate-fade-in">
       <div class="visual-content">
         <div class="brand-badge animate-slide-in-down">
-          <img src="/ADSystem/logo.png" alt="AD System" class="brand-logo-full" />
+          <img src="/ADSystem/png/logo.png" alt="AD System" class="brand-logo-full" />
         </div>
         <h1 class="visual-title animate-slide-in-up animate-delay-200">
           Bienvenido de nuevo
@@ -23,7 +23,7 @@
     <div class="login-form-wrapper animate-slide-in-right">
       <div class="form-content">
         <div class="mobile-brand d-md-none mb-8 text-center">
-           <img src="/ADSystem/logo.png" alt="AD System" style="max-width: 200px; height: auto;" />
+           <img src="/ADSystem/png/logo.png" alt="AD System" style="max-width: 200px; height: auto;" />
         </div>
 
         <div class="form-header">
@@ -334,6 +334,7 @@ export default {
   line-height: 1.1;
   margin-bottom: 24px;
   background: linear-gradient(to right, #fff, #ccc);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

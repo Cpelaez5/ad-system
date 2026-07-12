@@ -112,27 +112,36 @@ export default {
       if (this.isFeatured) {
         return {
           border: '2px solid #1F355C',
-          background: '#ffffff'
+          background: '#1F355C',
+          color: '#ffffff'
         };
       }
-      return { border: '1px solid #e0e0e0' };
+      if (this.isEnterprise) {
+        return {
+          border: '2px solid #02254d',
+          background: '#02254d',
+          color: '#ffffff'
+        };
+      }
+      return { 
+        border: '1px solid #e0e0e0',
+        background: '#efefef',
+        color: '#02254d'
+      };
     },
     headerStyle() {
-      // Fondo del header con colores de marca
-      if (this.isFeatured) return { background: '#1F355C', color: '#ffffff' };
-      if (this.isEnterprise) return { background: '#02254d', color: '#ffffff' };
-      return { background: '#A81C22', color: '#ffffff' };
+      return { background: 'transparent', color: 'inherit' };
     },
     priceColor() {
-      if (this.isFeatured) return '#1F355C';
-      if (this.isEnterprise) return '#02254d';
-      return '#A81C22';
+      if (this.isFeatured) return '#ffffff';
+      if (this.isEnterprise) return '#ffffff';
+      return '#02254d';
     },
     btnColor() {
       if (this.isCurrent) return '#4CAF50';
-      if (this.isFeatured) return '#1F355C';
-      if (this.isEnterprise) return '#02254d';
-      return '#A81C22';
+      if (this.isFeatured) return '#E0B04F'; // Gold button for Featured
+      if (this.isEnterprise) return '#ffffff'; // White button for Enterprise
+      return '#1F355C'; // Dark Blue button for Basic
     },
     btnVariant() {
       if (this.isCurrent) return 'tonal';

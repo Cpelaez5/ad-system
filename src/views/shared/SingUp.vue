@@ -4,7 +4,7 @@
       <div class="signup-card animate-slide-in-up">
         <div class="signup-header">
           <div class="icon-container">
-            <img src="/ADSystem/logo.png" alt="AD System" style="max-width:180px;height:auto" />
+            <img src="/ADSystem/png/logo.png" alt="AD System" style="max-width:180px;height:auto" />
           </div>
           <h1 class="signup-title">Crear cuenta</h1>
           <p class="signup-subtitle">Regístrate para acceder al sistema</p>

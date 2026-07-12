@@ -18,6 +18,7 @@
             src="/ADSystem/png/icono.png"
             alt="Logo"
             class="logo-icon animate-micro-rotate"
+            style="filter: brightness(0) invert(1);"
           />
         </div>
       </div>

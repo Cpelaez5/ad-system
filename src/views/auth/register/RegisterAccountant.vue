@@ -2,7 +2,7 @@
   <div class="signup-card animate-slide-in-up">
     <div class="signup-header">
       <div class="icon-container animate-micro-rotate">
-        <img src="@/assets/icon-adaptableV2.svg" alt="Logo" class="logo-icon" style="width:48px;height:48px" />
+        <img src="/ADSystem/png/icono.png" alt="Logo" class="logo-icon" style="width:48px;height:48px" />
       </div>
       <h1 class="signup-title">Registro de Contador</h1>
       <p class="signup-subtitle">Únete al equipo de <strong>{{ invitation?.organization_name || 'la firma' }}</strong></p>
