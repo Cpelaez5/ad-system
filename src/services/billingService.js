@@ -601,19 +601,18 @@ export default {
     },
 
     /**
-     * Aprueba un reporte de pago (super_admin).
-     * Marca la factura como pagada.
+     * Aprueba un reporte de pago y si cubre la factura, marca la factura como pagada.
+     * También permite actualizar el plan y fecha de vencimiento si se proporcionan.
+     * @param {string} reportId 
+     * @param {string} reviewerId 
+     * @param {Object} options Opciones adicionales (plan_id, trial_end)
      */
-    /**
-     * Aprueba un reporte de pago (super_admin).
-     * Marca la factura como pagada y abona excedentes al balance del cliente si existen.
-     */
-    async approvePayment(reportId, reviewerId) {
+    async approvePayment(reportId, reviewerId, options = {}) {
         try {
-            // 1. Obtener reporte y factura
+            // 1. Obtener el reporte actual y su factura
             const { data: report, error: fetchError } = await supabase
                 .from('payment_reports')
-                .select('*, invoice:system_invoices(amount, client_id)')
+                .select('*, invoice:system_invoices(*)')
                 .eq('id', reportId)
                 .single();
 
@@ -706,6 +705,23 @@ export default {
                             .eq('id', report.client_id);
                         console.log(`💰 Saldo abonado al cliente ${report.client_id}: +$${newExcess}`);
                     }
+                }
+            }
+
+            // 6. Actualizar plan del usuario si se especificó
+            if (options.plan_id) {
+                try {
+                    const { error: userError } = await supabase
+                        .from('users')
+                        .update({ 
+                            plan_id: options.plan_id, 
+                            trial_end: options.trial_end || null 
+                        })
+                        .eq('client_id', report.invoice.client_id);
+                        
+                    if (userError) throw userError;
+                } catch (e) {
+                    console.error('❌ Error al actualizar el plan del cliente:', e);
                 }
             }
 

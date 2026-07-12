@@ -571,7 +571,7 @@
     </v-dialog>
 
     <!-- Dialog: Confirmar Aprobación -->
-    <v-dialog v-model="showApproveConfirm" max-width="400">
+    <v-dialog v-model="showApproveConfirm" max-width="450">
       <v-card rounded="xl" class="pa-4">
         <div class="text-center mb-4">
           <v-icon size="48" color="success">mdi-check-circle</v-icon>
@@ -580,7 +580,35 @@
         <p class="text-body-2 text-center text-medium-emphasis mb-4">
           La factura será marcada como <strong>pagada</strong> y el cliente será notificado.
         </p>
-        <div class="d-flex justify-center gap-3">
+        
+        <!-- Si es un pago de suscripción, permitir definir el plan y caducidad -->
+        <div v-if="isSubscriptionPayment" class="mb-4">
+          <v-divider class="mb-4"></v-divider>
+          <p class="text-subtitle-2 font-weight-bold mb-3 text-secondary">Definir Plan de Suscripción</p>
+          <v-select
+            v-model="subscriptionForm.plan_id"
+            :items="availablePlans"
+            item-title="name"
+            item-value="id"
+            label="Plan a activar"
+            variant="outlined"
+            density="comfortable"
+            prepend-inner-icon="mdi-crown"
+            class="mb-3"
+          ></v-select>
+          <v-text-field
+            v-model="subscriptionForm.trial_end"
+            label="Fecha de vencimiento"
+            type="datetime-local"
+            variant="outlined"
+            density="comfortable"
+            prepend-inner-icon="mdi-calendar-clock"
+            hint="Dejar vacío para acceso indefinido"
+            persistent-hint
+          ></v-text-field>
+        </div>
+
+        <div class="d-flex justify-center gap-3 mt-4">
           <v-btn variant="text" @click="showApproveConfirm = false">Cancelar</v-btn>
           <v-btn color="success" variant="flat" class="text-none font-weight-bold" :loading="processingAction"
             @click="approvePayment">
@@ -626,6 +654,7 @@
 
 <script>
 import billingService from '@/services/billingService';
+import plansService from '@/services/plansService';
 import { supabase } from '@/lib/supabaseClient';
 
 export default {
@@ -642,6 +671,7 @@ export default {
       paymentReports: [],
       paymentMethods: [],
       clientsForBilling: [],
+      availablePlans: [],
       balance: { totalFacturado: 0, totalPagado: 0, totalPendiente: 0, totalVencido: 0 },
 
       // Filtros
@@ -698,11 +728,15 @@ export default {
       actionReport: null,
       rejectionReason: '',
       processingAction: false,
+      subscriptionForm: { plan_id: null, trial_end: '' },
 
       snackbar: { show: false, text: '', color: 'success' }
     };
   },
   computed: {
+    isSubscriptionPayment() {
+      return this.actionReport?.invoice?.notes?.toLowerCase().includes('suscripción a plan') || false;
+    },
     filteredInvoices() {
       if (!this.invoiceSearch) return this.invoices;
       const q = this.invoiceSearch.toLowerCase();
@@ -733,7 +767,14 @@ export default {
     },
 
     async loadAllData() {
-      await Promise.all([this.loadInvoices(), this.loadReports(), this.loadMethods(), this.loadBalance(), this.loadClients()]);
+      await Promise.all([this.loadInvoices(), this.loadReports(), this.loadMethods(), this.loadBalance(), this.loadClients(), this.loadPlans()]);
+    },
+    
+    async loadPlans() {
+      const res = await plansService.getPlans();
+      if (res.success) {
+        this.availablePlans = res.data;
+      }
     },
 
     async loadInvoices() {
@@ -862,8 +903,33 @@ export default {
 
     confirmApprovePayment(report) {
       this.actionReport = report;
-      this.showApproveConfirm = true;
       this.showReportDetail = false;
+      this.showApproveConfirm = true;
+      
+      // Intentar pre-llenar los datos si es suscripción
+      if (report?.invoice?.notes?.toLowerCase().includes('suscripción a plan')) {
+        const notes = report.invoice.notes;
+        let matchedPlanId = null;
+        for (const plan of this.availablePlans) {
+          if (notes.includes(plan.name)) {
+            matchedPlanId = plan.id;
+            break;
+          }
+        }
+        
+        // Sugerir la fecha de vencimiento según la factura
+        let suggestedEndDate = '';
+        if (report.invoice.period_end) {
+          suggestedEndDate = new Date(report.invoice.period_end).toISOString().slice(0, 16);
+        }
+        
+        this.subscriptionForm = {
+          plan_id: matchedPlanId,
+          trial_end: suggestedEndDate
+        };
+      } else {
+        this.subscriptionForm = { plan_id: null, trial_end: '' };
+      }
     },
 
     confirmRejectPayment(report) {
@@ -874,10 +940,24 @@ export default {
     },
 
     async approvePayment() {
+      // Validar si es suscripción que tenga plan seleccionado
+      if (this.isSubscriptionPayment && !this.subscriptionForm.plan_id) {
+        this.showSnackbar('Debes seleccionar un plan a activar', 'error');
+        return;
+      }
+      
       this.processingAction = true;
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        const result = await billingService.approvePayment(this.actionReport.id, user.id);
+        
+        // Construir opciones adicionales para la aprobación
+        const options = {};
+        if (this.isSubscriptionPayment) {
+          options.plan_id = this.subscriptionForm.plan_id;
+          options.trial_end = this.subscriptionForm.trial_end ? new Date(this.subscriptionForm.trial_end).toISOString() : null;
+        }
+        
+        const result = await billingService.approvePayment(this.actionReport.id, user.id, options);
         if (result.success) {
           this.showSnackbar('¡Pago aprobado exitosamente!', 'success');
           this.showApproveConfirm = false;

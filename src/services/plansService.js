@@ -47,18 +47,37 @@ export default {
                     .single();
                     
                 if (userData && userData.plan_id) {
-                    // Obtener detalles del plan
-                    const { data: planData } = await supabase
-                        .from('subscription_plans')
-                        .select('*')
-                        .eq('id', userData.plan_id)
-                        .single();
+                    // Manejar códigos legacy ('pro', 'basic', 'free_trial') o UUIDs
+                    let planData = null;
+                    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+                    if (uuidRegex.test(userData.plan_id)) {
+                        const { data } = await supabase
+                            .from('subscription_plans')
+                            .select('*')
+                            .eq('id', userData.plan_id)
+                            .single();
+                        planData = data;
+                    } else if (userData.plan_id === 'free_trial') {
+                        planData = { id: 'free_trial', name: 'Prueba Gratuita', price_monthly: 0, price_annual: 0 };
+                    } else {
+                        const legacyMap = { 'basic': 'Básico', 'pro': 'Profesional', 'enterprise': 'Empresarial' };
+                        const mappedName = legacyMap[userData.plan_id] || userData.plan_id;
+                        
+                        const { data } = await supabase
+                            .from('subscription_plans')
+                            .select('*')
+                            .eq('name', mappedName)
+                            .limit(1)
+                            .single();
+                        planData = data;
+                    }
                         
                     return {
                         success: true,
                         data: {
                             client_id: userData.client_id,
-                            plan_id: userData.plan_id,
+                            plan_id: planData ? planData.id : userData.plan_id,
                             status: userData.trial_end && new Date(userData.trial_end) > new Date() ? 'active' : 'active',
                             billing_period: 'monthly', // default
                             next_billing_date: userData.trial_end,
