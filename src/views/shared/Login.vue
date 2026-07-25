@@ -203,7 +203,11 @@ export default {
           }
           
           window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }))
-          this.$router.push('/dashboard')
+          if (result.user.role === 'cliente') {
+            this.$router.push('/cliente/dashboard')
+          } else {
+            this.$router.push('/dashboard')
+          }
         } else {
           alert(result.message || 'Usuario o contraseña incorrectos')
         }
@@ -261,7 +265,16 @@ export default {
     // ... (Copiar lógica original simplificada) ...
     const usuarioAutenticado = localStorage.getItem('usuarioAutenticado')
     if (usuarioAutenticado === 'true') {
-       this.$router.push('/dashboard')
+       try {
+         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+         if (currentUser.role === 'cliente') {
+           this.$router.push('/cliente/dashboard')
+         } else {
+           this.$router.push('/dashboard')
+         }
+       } catch (e) {
+         this.$router.push('/dashboard')
+       }
     }
     
     // Detectar recovery

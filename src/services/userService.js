@@ -301,6 +301,7 @@ const userService = {
           organization: userData.organization,
           organization_id: userData.organization_id || null,
           client_id: userData.client_id || null,
+          client: userData.client || null,
           plan_id: userData.plan_id || null,
           trial_end: userData.trial_end || null
         },
