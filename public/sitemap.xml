@@ -2,31 +2,31 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <!-- Página de inicio -->
   <url>
-    <loc>https://ad-businessgroup.netlify.app/</loc>
-    <lastmod>2026-05-25</lastmod>
+    <loc>https://adsystemapp.com/</loc>
+    <lastmod>2024-03-20T00:00:00+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   
   <!-- Planes y Precios -->
   <url>
-    <loc>https://ad-businessgroup.netlify.app/pricing</loc>
-    <lastmod>2026-05-25</lastmod>
+    <loc>https://adsystemapp.com/pricing</loc>
+    <lastmod>2024-03-20T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <!-- Login -->
   <url>
-    <loc>https://ad-businessgroup.netlify.app/login</loc>
-    <lastmod>2026-05-25</lastmod>
+    <loc>https://adsystemapp.com/login</loc>
+    <lastmod>2024-03-20T00:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.6</priority>
   </url>
 
   <!-- Registro -->
   <url>
-    <loc>https://ad-businessgroup.netlify.app/signup</loc>
+    <loc>https://adsystemapp.com/signup</loc>
     <lastmod>2026-05-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

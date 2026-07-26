@@ -1143,7 +1143,7 @@ El sistema de invitaciones funciona perfectamente en producción (Netlify):
    - VITE_DEEPSEEK_API_KEY (opcional)
 
 2. LINKS DE INVITACIÓN:
-   - Formato: https://ad-businessgroup.netlify.app/signup?token=UUID
+   - Formato: https://adsystemapp.com/signup?token=UUID
    - Funcionan igual que en desarrollo local
    - Token se pasa por query params (independiente del dominio)
 

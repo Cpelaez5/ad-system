@@ -648,8 +648,8 @@ function drawFooter(doc, pageWidth, pageNum, totalPages) {
 
   // Número de página + URL
   const rightText = totalPages > 1
-    ? `Pag. ${pageNum}/${totalPages}  |  ad-businessgroup.netlify.app`
-    : 'ad-businessgroup.netlify.app'
+    ? `Pag. ${pageNum}/${totalPages}  |  adsystemapp.com`
+    : 'adsystemapp.com'
   doc.text(rightText, pageWidth - MARGIN, y, { align: 'right' })
 }
 

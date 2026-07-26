@@ -73,7 +73,7 @@ function buildEmailHtml(payload: {
   const SECONDARY = "#1F355C";
   const ACCENT = "#E0B04F";
   const BG = "#f7f7f7";
-  const LOGO_URL = "https://ad-businessgroup.netlify.app/icon-adaptableV2.svg";
+  const LOGO_URL = "https://adsystemapp.com/icon-adaptableV2.svg";
 
   // Filas de ítems
   const itemRows = items
@@ -207,7 +207,7 @@ function buildEmailHtml(payload: {
   <!-- CTA -->
   <tr>
     <td style="padding:0 32px 28px;text-align:center;">
-      <a href="https://ad-businessgroup.netlify.app/cliente/facturacion" style="display:inline-block;background:${PRIMARY};color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Ver en AD System</a>
+      <a href="https://adsystemapp.com/cliente/facturacion" style="display:inline-block;background:${PRIMARY};color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Ver en AD System</a>
     </td>
   </tr>
 

@@ -136,7 +136,7 @@ CREATE TABLE invitations (
 
 Los links funcionan igual en producción:
 ```
-https://ad-businessgroup.netlify.app/signup?token=UUID
+https://adsystemapp.com/signup?token=UUID
 ```
 
 ## 📊 Módulos Principales
