@@ -58,7 +58,9 @@
     </main>
 
     <!-- Pricing Section -->
-    <PricingSection @select-plan="handlePlanSelection" />
+    <div id="pricing">
+      <PricingSection @select-plan="handlePlanSelection" />
+    </div>
     
     <div class="background-shapes">
       <div class="shape shape-1"></div>

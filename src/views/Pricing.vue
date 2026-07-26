@@ -41,6 +41,19 @@ export default {
   components: { PricingSection },
   methods: {
     handleSelectPlan(plan) {
+      // Disparar evento a Google Tag Manager / Analytics
+      if (window.dataLayer) {
+        window.dataLayer.push({
+          event: 'begin_checkout',
+          ecommerce: {
+            items: [{
+              item_name: plan.name || 'Plan',
+              item_id: plan.id || 'N/A'
+            }]
+          }
+        });
+      }
+
       if (plan.name === 'AD Corporate Nexus') {
         window.open('mailto:ventas@sistema.com?subject=Interés en Plan Corporate Nexus', '_blank');
         return;

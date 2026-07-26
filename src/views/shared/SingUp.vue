@@ -115,6 +115,29 @@ export default {
           return
         }
 
+        // Disparar evento de conversión a Google Tag Manager / Analytics
+        if (window.dataLayer) {
+          const planSeleccionado = this.$route.query.plan || 'Registro General';
+          
+          window.dataLayer.push({
+            event: 'purchase',
+            ecommerce: {
+              transaction_id: data.user?.id || Date.now().toString(),
+              value: 0, // Aquí se podría mapear el precio real
+              currency: 'USD',
+              items: [{
+                item_name: planSeleccionado,
+                item_id: planSeleccionado
+              }]
+            }
+          });
+          
+          window.dataLayer.push({
+            event: 'sign_up',
+            method: 'email'
+          });
+        }
+
         // Éxito: informar al usuario que revise su correo para confirmar (si aplica)
         alert('Cuenta creada. Revisa tu correo para confirmar la cuenta y luego inicia sesión.')
         // Opcional: redirigir a login para que el usuario ingrese
