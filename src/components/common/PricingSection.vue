@@ -122,6 +122,14 @@ export default {
         {
           q: '¿Qué pasa con mis datos si cancelo?',
           a: 'Tus datos te pertenecen. Puedes exportar toda tu información a Excel o PDF antes de cancelar. Mantenemos una copia de seguridad por 30 días.'
+        },
+        {
+          q: '¿Qué incluye el Servicio de Contabilidad Mensual Adicional?',
+          a: 'Incluye Asesoría Tributaria Permanente, Declaraciones de Impuestos (SENIAT, Alcaldía), Declaraciones Parafiscales (IVSS, BANAVIH, INCES, MINTRAPP), Libros Contables y Archivación en la nube (incluye asesoría de control y archivación interna).'
+        },
+        {
+          q: 'Soy profesional y manejo múltiples empresas. ¿Tienen un plan para mí?',
+          a: 'Sí, para profesionales con multiempresas tenemos una tarifa especial de $8 mensuales por cada empresa adicional gestionada en la plataforma.'
         }
       ]
     };

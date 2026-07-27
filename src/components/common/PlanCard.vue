@@ -35,7 +35,7 @@
         </span>
         <span class="text-body-2 text-medium-emphasis ml-1">/ mes</span>
       </div>
-      <span class="text-caption text-medium-emphasis">
+      <span class="text-caption" :class="isFeatured || isEnterprise ? 'text-white-50' : 'text-medium-emphasis'">
         {{ billingPeriod === 'annual' ? 'Facturado anualmente' : 'Facturado mes a mes' }}
       </span>
     </div>
@@ -63,9 +63,9 @@
         :color="btnColor"
         :variant="btnVariant"
         :loading="loading"
-        :disabled="isCurrent"
+        :style="isCurrent ? 'pointer-events: none; opacity: 1;' : ''"
         @click="$emit('select', plan)"
-        class="font-weight-bold text-none plan-btn"
+        :class="['font-weight-bold text-none plan-btn', { 'text-white': isCurrent }]"
         :elevation="isCurrent ? 0 : 3"
       >
         <v-icon v-if="isCurrent" start size="18">mdi-check-circle</v-icon>
@@ -151,14 +151,14 @@ export default {
       return '#1F355C'; // Dark Blue button for Basic
     },
     btnVariant() {
-      if (this.isCurrent || this.isPending) return 'tonal';
+      if (this.isCurrent) return 'flat';
+      if (this.isPending) return 'tonal';
       if (this.isEnterprise) return 'outlined';
       return 'flat';
     },
     buttonText() {
       if (this.isCurrent) return 'Plan Actual';
       if (this.isPending) return 'En Revisión (Pendiente)';
-      if (this.isEnterprise) return 'Contactar Ventas';
       return 'Elegir Este Plan';
     }
   }
@@ -252,5 +252,9 @@ export default {
 
 .plan-btn:hover:not(:disabled) {
   transform: scale(1.02);
+}
+
+.text-white-50 {
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 </style>

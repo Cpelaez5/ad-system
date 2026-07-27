@@ -52,6 +52,10 @@ const DEFAULT_SETTINGS = {
   notificationEmails: [],
   // Ejemplo de entrada:
   // { email: 'contador@firma.com', notifyOnVenta: true, notifyOnCompra: true, notifyOnGasto: true }
+
+  // ── Notificaciones del Super Admin (Solo rol super_admin) ───────────────
+  notifyOnPaymentReport: true, // Recibir notificación cuando un cliente reporta un pago
+  paymentReportEmails: [], // Array de correos adicionales: [{ email: 'admin@firma.com' }]
 }
 
 /**

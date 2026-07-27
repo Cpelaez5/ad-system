@@ -84,17 +84,27 @@ export default {
         element.scrollIntoView({ behavior: 'smooth' });
       }
     },
-    handlePlanSelection(plan) {
-      if (plan.name === 'AD Corporate Nexus') {
-        window.open('mailto:ventas@sistema.com?subject=Interés en Plan Corporate Nexus', '_blank');
-        return;
+    handlePlanSelection(plan, billingPeriod) {
+      if (window.dataLayer) {
+        window.dataLayer.push({
+          event: 'begin_checkout',
+          ecommerce: {
+            items: [{
+              item_name: plan.name || 'Plan',
+              item_id: plan.id || 'N/A'
+            }]
+          }
+        });
       }
-      // Redirect to signup with plan pre-selected
+
       this.$router.push({ 
         path: '/signup', 
         query: { 
           type: 'public_client',
-          plan: plan.id 
+          plan: plan.id,
+          period: billingPeriod || 'monthly',
+          planName: plan.name,
+          planPrice: billingPeriod === 'annual' ? plan.price_annual : plan.price_monthly
         } 
       });
     }

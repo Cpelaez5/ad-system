@@ -225,6 +225,106 @@ function buildEmailHtml(payload: {
 </html>`;
 }
 
+// ─── Plantilla HTML para Notificación de Reporte de Pago ──────────────
+function buildPaymentReportHtml(payload: {
+  clientName: string;
+  planName: string;
+  billingPeriod: string;
+  amountUsd: number;
+  amountBs: number | null;
+  bcvRate: number | null;
+  paymentMethod: string;
+  reference: string;
+  reportId: string;
+}) {
+  const { clientName, planName, billingPeriod, amountUsd, amountBs, bcvRate, paymentMethod, reference, reportId } = payload;
+  
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+
+  const fmtBs = (n: number) =>
+    new Intl.NumberFormat("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+
+  const PRIMARY = "#A81C22";
+  const SECONDARY = "#1F355C";
+  const ACCENT = "#E0B04F";
+  const BG = "#f7f7f7";
+  const LOGO_URL = "https://adsystemapp.com/icon-adaptableV2.svg";
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:${BG};font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+  
+  <!-- Header -->
+  <tr>
+    <td style="background:${SECONDARY};padding:28px 32px;text-align:center;">
+      <img src="${LOGO_URL}" alt="AD System" height="48" style="display:inline-block;vertical-align:middle;margin-right:12px;">
+      <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:1px;">AD System</span>
+    </td>
+  </tr>
+  <!-- Línea decorativa dorada -->
+  <tr><td style="background:${ACCENT};height:4px;"></td></tr>
+
+  <!-- Contenido -->
+  <tr>
+    <td style="padding:28px 32px 12px;">
+      <h2 style="margin:0;font-size:20px;color:${SECONDARY};">¡Nuevo Pago Reportado!</h2>
+      <p style="margin:12px 0 0;font-size:15px;color:#555;">El cliente <strong>${clientName}</strong> ha reportado el pago de una suscripción.</p>
+    </td>
+  </tr>
+
+  <!-- Detalles -->
+  <tr>
+    <td style="padding:10px 32px 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;border-radius:8px;">
+        <tr>
+          <td style="padding:14px 18px;font-size:14px;color:#333;border-bottom:1px solid #e0e0e0;">
+            <strong style="color:${SECONDARY};">Plan:</strong> ${planName} (${billingPeriod})
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:14px 18px;font-size:14px;color:#333;border-bottom:1px solid #e0e0e0;">
+            <strong style="color:${SECONDARY};">Monto Reportado (USD):</strong> $${fmt(amountUsd)}
+          </td>
+        </tr>
+        ${amountBs ? `
+        <tr>
+          <td style="padding:14px 18px;font-size:14px;color:#333;border-bottom:1px solid #e0e0e0;">
+            <strong style="color:${SECONDARY};">Monto en Bolívares (Pago Móvil):</strong> Bs. ${fmtBs(amountBs)} <br/>
+            <span style="font-size:12px;color:#777;">Tasa BCV usada: Bs. ${bcvRate}</span>
+          </td>
+        </tr>
+        ` : ''}
+        <tr>
+          <td style="padding:14px 18px;font-size:14px;color:#333;border-bottom:1px solid #e0e0e0;">
+            <strong style="color:${SECONDARY};">Método:</strong> ${paymentMethod}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:14px 18px;font-size:14px;color:#333;">
+            <strong style="color:${SECONDARY};">Referencia:</strong> ${reference}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- CTA -->
+  <tr>
+    <td style="padding:0 32px 28px;text-align:center;">
+      <a href="https://adsystemapp.com/admin/facturacion-sistema?report_id=${reportId}" style="display:inline-block;background:${PRIMARY};color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Ver Reporte y Aprobar</a>
+    </td>
+  </tr>
+</table>
+</td></tr></table>
+</body>
+</html>`;
+}
+
 // ─── Handler principal ────────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
   // Preflight CORS
@@ -242,6 +342,80 @@ Deno.serve(async (req: Request) => {
     const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "AD System <onboarding@resend.dev>";
 
     const payload = await req.json();
+    const mode = payload.mode || "invoice"; // invoice, payment_report
+
+    if (mode === "payment_report") {
+      // ─── Modo: Reporte de Pago al Super Admin ────────────────────────────────
+      const { report_id, client_name, plan_name, billing_period, amount_usd, amount_bs, bcv_rate, payment_method, reference } = payload;
+      
+      // Buscar super admins y sus correos
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      // Obtener todos los super_admin
+      const { data: superAdmins } = await supabaseAdmin.from("users").select("id, email").eq("role", "super_admin");
+      
+      if (!superAdmins || superAdmins.length === 0) {
+        return new Response(JSON.stringify({ success: true, message: "No super admins found" }), { headers: corsHeaders, status: 200 });
+      }
+
+      let emailsToNotify = new Set<string>();
+
+      // Por cada super admin, buscar sus user_preferences
+      for (const admin of superAdmins) {
+        const { data: prefs } = await supabaseAdmin
+          .from("user_preferences")
+          .select("preference_value")
+          .eq("user_id", admin.id)
+          .eq("preference_key", "user_settings")
+          .maybeSingle();
+        
+        const settings = prefs?.preference_value || {};
+        if (settings.notifyOnPaymentReport !== false) {
+           emailsToNotify.add(admin.email);
+        }
+        
+        if (settings.paymentReportEmails && Array.isArray(settings.paymentReportEmails)) {
+          settings.paymentReportEmails.forEach((e: any) => {
+            if (e.email) emailsToNotify.add(e.email);
+          });
+        }
+      }
+
+      const toEmails = Array.from(emailsToNotify);
+      if (toEmails.length === 0) {
+        return new Response(JSON.stringify({ success: true, message: "No emails configured to receive" }), { headers: corsHeaders, status: 200 });
+      }
+
+      const html = buildPaymentReportHtml({
+         clientName: client_name,
+         planName: plan_name,
+         billingPeriod: billing_period,
+         amountUsd: amount_usd,
+         amountBs: amount_bs,
+         bcvRate: bcv_rate,
+         paymentMethod: payment_method,
+         reference: reference,
+         reportId: report_id
+      });
+      const subject = `💰 Nuevo Pago Reportado: ${client_name}`;
+
+      const resendResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM_EMAIL, to: toEmails, subject, html }),
+      });
+
+      const resendResult = await resendResponse.json();
+      if (!resendResponse.ok) throw new Error(`Resend error: ${resendResult?.message}`);
+
+      return new Response(JSON.stringify({ success: true, message: "Report notification sent" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    }
+
+    // ─── Modo: Factura Normal (por defecto) ───────────────────────────────────
     const { to, attachments: attachmentUrls, ...emailData } = payload;
 
     if (!to) {

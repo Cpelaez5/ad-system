@@ -49,10 +49,23 @@
             </label>
           </div>
 
-          <button type="submit" class="signup-button" :disabled="cargando || !puedoEnviar">
+          <button type="submit" class="signup-button mb-3" :disabled="cargando || !puedoEnviar">
             <span v-if="!cargando">Crear cuenta</span>
             <span v-else class="loading-spinner">Procesando...</span>
           </button>
+
+          <div v-if="esPlanCorporate" class="corporate-contact-card">
+            <div class="corporate-header">
+              <i class="mdi mdi-whatsapp corporate-icon"></i>
+              <div class="corporate-text">
+                <strong>¿Asistencia Corporativa?</strong>
+                <p>Habla directamente con ventas</p>
+              </div>
+            </div>
+            <button type="button" class="whatsapp-outline-btn" @click="contactarVentasWhatsapp">
+              Contactar Ventas
+            </button>
+          </div>
 
           <div class="signup-footer">
             <p>¿Ya tienes cuenta? <router-link to="/login">Inicia sesión</router-link></p>
@@ -83,9 +96,21 @@ export default {
   computed: {
     puedoEnviar() {
       return this.form.first_name && this.form.last_name && this.form.email && this.form.password && this.form.confirmPassword && (this.form.password === this.form.confirmPassword)
+    },
+    esPlanCorporate() {
+      return this.$route.query.planName === 'AD Corporate Nexus';
     }
   },
   methods: {
+    contactarVentasWhatsapp() {
+      const q = this.$route.query;
+      const periodStr = q.period === 'annual' ? 'Anual' : 'Mensual';
+      const name = q.planName || 'AD Corporate Nexus';
+      const price = q.planPrice || '189.00';
+      const msg = `Hola, me gustaría comprar el plan ${periodStr} ${name} de $${price}.`;
+      const phone = '584140945444';
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    },
     async registrar() {
       if (!this.puedoEnviar) return alert('Completa todos los campos y confirma la contraseña')
       this.cargando = true
@@ -182,6 +207,58 @@ export default {
 .signup-footer { margin-top:12px; text-align:center; color:#666 }
 .checkbox-container { display:flex; align-items:center; gap:8px }
 .loading-spinner { display:inline-block }
+.mb-3 { margin-bottom: 12px; }
+
+.corporate-contact-card {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.corporate-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.corporate-icon {
+  font-size: 24px;
+  color: #25D366;
+  background: #dcfce7;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.corporate-text strong {
+  display: block;
+  font-size: 14px;
+  color: #166534;
+}
+.corporate-text p {
+  margin: 0;
+  font-size: 12px;
+  color: #15803d;
+}
+.whatsapp-outline-btn {
+  width: 100%;
+  padding: 10px;
+  background: white;
+  color: #25D366;
+  border: 2px solid #25D366;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.whatsapp-outline-btn:hover {
+  background: #25D366;
+  color: white;
+}
 
 @media (max-width:480px) { .form-row { flex-direction:column } }
 </style>

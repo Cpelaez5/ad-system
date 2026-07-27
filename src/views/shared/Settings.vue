@@ -345,6 +345,77 @@
 
     </v-row>
 
+    <!-- ─── Notificaciones del Sistema (Solo Super Admin) ────────────── -->
+    <v-row v-if="isSuperAdmin" class="mt-2">
+      <v-col cols="12">
+        <v-card class="settings-card" rounded="xl" elevation="0">
+          <div class="settings-card-header bg-secondary">
+            <v-icon color="white" class="mr-2">mdi-shield-crown</v-icon>
+            <span>Notificaciones del Sistema (Super Admin)</span>
+          </div>
+
+          <v-card-text class="pa-6">
+            <div class="pref-row mb-5">
+              <div class="d-flex align-center ga-3">
+                <div class="currency-icon-wrap bg-primary">
+                  <v-icon size="20" color="white">mdi-cash-fast</v-icon>
+                </div>
+                <div>
+                  <p class="font-weight-semibold mb-0 text-high-emphasis">Notificar Reportes de Pago</p>
+                  <p class="text-caption text-grey ma-0">Recibirás un email cada vez que un cliente reporte el pago de una factura del sistema.</p>
+                </div>
+              </div>
+              <v-switch v-model="form.notifyOnPaymentReport" color="primary" hide-details inset density="compact" />
+            </div>
+
+            <v-expand-transition>
+              <div v-if="form.notifyOnPaymentReport">
+                <p class="text-caption font-weight-bold text-uppercase text-grey-darken-1 mb-3">
+                  Correos adicionales para recibir avisos de pago
+                </p>
+
+                <div v-if="form.paymentReportEmails.length > 0" class="mb-4">
+                  <div
+                    v-for="(entry, i) in form.paymentReportEmails"
+                    :key="i"
+                    class="email-entry-card mb-3 pa-3 bg-grey-lighten-4 rounded-lg"
+                  >
+                    <div class="d-flex align-center justify-space-between">
+                      <div class="d-flex align-center ga-2">
+                        <v-icon color="secondary" size="16">mdi-email</v-icon>
+                        <span class="text-body-2 font-weight-medium text-high-emphasis">
+                          {{ entry.email }}
+                        </span>
+                      </div>
+                      <v-btn icon="mdi-close" size="x-small" variant="text" color="error" @click="removePaymentReportEmail(i)" />
+                    </div>
+                  </div>
+                </div>
+                
+                <v-text-field
+                  v-model="newPaymentReportEmail"
+                  placeholder="admin_pagos@ejemplo.com"
+                  variant="outlined"
+                  density="compact"
+                  hide-details="auto"
+                  :error-messages="paymentReportEmailError"
+                  prepend-inner-icon="mdi-email-plus-outline"
+                  class="mb-3"
+                  @keyup.enter="addPaymentReportEmail"
+                >
+                  <template v-slot:append>
+                    <v-btn color="secondary" variant="tonal" :disabled="!newPaymentReportEmail" @click="addPaymentReportEmail">
+                      Agregar
+                    </v-btn>
+                  </template>
+                </v-text-field>
+              </div>
+            </v-expand-transition>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
     <!-- ═══════════════════════════════════════════════ -->
     <!-- BARRA DE ACCIÓN — GUARDAR                       -->
     <!-- ═══════════════════════════════════════════════ -->
@@ -405,6 +476,7 @@
 <script>
 import userSettingsService from '@/services/user-settings-service.js'
 import { supabase } from '@/lib/supabaseClient'
+import userService from '@/services/userService'
 
 export default {
   name: 'SettingsView',
@@ -426,6 +498,7 @@ export default {
 
       // Email del usuario registrado
       userEmail: '',
+      isSuperAdmin: false,
 
       // Indica si estamos cargando datos desde Supabase
       loadingRemote: true,
@@ -438,6 +511,10 @@ export default {
         notifyOnCompra: true,
         notifyOnGasto:  false,
       },
+
+      // Estado del formulario de nuevo correo para reportes de pago
+      newPaymentReportEmail: '',
+      paymentReportEmailError: '',
 
       // Estado de UI
       saving: false,
@@ -453,10 +530,11 @@ export default {
   async mounted() {
     try {
       // Obtener email del usuario autenticado
-      const { data } = await supabase.auth.getUser()
-      this.userEmail = data?.user?.email || ''
+      const currentUser = await userService.getCurrentUser()
+      this.userEmail = currentUser?.email || ''
+      this.isSuperAdmin = currentUser?.role === 'super_admin'
     } catch (e) {
-      console.warn('No se pudo obtener email del usuario:', e)
+      console.warn('No se pudo obtener usuario:', e)
     }
 
     // Cargar configuración fresca desde Supabase (reemplaza cache local si hay datos remotos)
@@ -469,6 +547,9 @@ export default {
             ? { email: e, notifyOnVenta: true, notifyOnCompra: true, notifyOnGasto: false }
             : e
         ),
+        paymentReportEmails: (remote.paymentReportEmails || []).map(e =>
+          typeof e === 'string' ? { email: e } : e
+        )
       }
       this.original = JSON.parse(JSON.stringify(this.form))
     } catch (e) {
@@ -537,6 +618,37 @@ export default {
     /** Elimina un correo adicional por índice */
     removeEmail(index) {
       this.form.notificationEmails = this.form.notificationEmails.filter((_, i) => i !== index)
+    },
+
+    /** Agrega un correo para notificaciones de pagos */
+    addPaymentReportEmail() {
+      this.paymentReportEmailError = ''
+      const email = this.newPaymentReportEmail.trim().toLowerCase()
+      if (!email) return
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        this.paymentReportEmailError = 'Formato de correo inválido'
+        return
+      }
+      
+      if (email === this.userEmail) {
+        this.paymentReportEmailError = 'Este es tu correo principal, si el switch general está activo, ya lo recibirás.'
+        return
+      }
+
+      if (this.form.paymentReportEmails.some(e => e.email === email)) {
+        this.paymentReportEmailError = 'Este correo ya está en la lista'
+        return
+      }
+
+      this.form.paymentReportEmails = [...this.form.paymentReportEmails, { email }]
+      this.newPaymentReportEmail = ''
+    },
+
+    /** Elimina un correo de reportes por índice */
+    removePaymentReportEmail(index) {
+      this.form.paymentReportEmails = this.form.paymentReportEmails.filter((_, i) => i !== index)
     },
 
     /** Guarda las configuraciones en localStorage + Supabase */

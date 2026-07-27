@@ -40,7 +40,7 @@ export default {
   name: 'Pricing',
   components: { PricingSection },
   methods: {
-    handleSelectPlan(plan) {
+    handleSelectPlan(plan, billingPeriod) {
       // Disparar evento a Google Tag Manager / Analytics
       if (window.dataLayer) {
         window.dataLayer.push({
@@ -54,15 +54,14 @@ export default {
         });
       }
 
-      if (plan.name === 'AD Corporate Nexus') {
-        window.open('mailto:ventas@sistema.com?subject=Interés en Plan Corporate Nexus', '_blank');
-        return;
-      }
       this.$router.push({
         path: '/signup',
         query: {
           type: 'public_client',
-          plan: plan.id
+          plan: plan.id,
+          period: billingPeriod || 'monthly',
+          planName: plan.name,
+          planPrice: billingPeriod === 'annual' ? plan.price_annual : plan.price_monthly
         }
       });
     }

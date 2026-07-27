@@ -37,6 +37,15 @@ export function getCurrentOrganizationId() {
           console.log('✅ Organization ID obtenido del usuario actual:', orgId)
           return orgId
         }
+        
+        // Si es super_admin, asignar el ID global para que puedan guardar sus preferencias
+        if (currentUser?.role === 'super_admin') {
+          orgId = '11111111-1111-1111-1111-111111111111'
+          localStorage.setItem('organization_id', orgId)
+          localStorage.setItem('current_organization_id', orgId)
+          console.log('✅ Organization ID global asignado para super_admin:', orgId)
+          return orgId
+        }
       } catch (e) {
         console.warn('⚠️ No se pudo obtener organization_id del usuario actual')
       }

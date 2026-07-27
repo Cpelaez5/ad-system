@@ -53,6 +53,7 @@
     <v-row v-else class="ma-0 max-w-1200 mx-auto px-4 px-md-8" justify="center">
       <!-- Columna Izquierda: Resumen del Pedido (Mobile: Arriba) -->
       <v-col cols="12" md="5" lg="4" class="pa-4 pa-md-6 order-1 order-md-2" style="background-color: #f8f9fa; border-radius: 20px;">
+        <div class="summary-sticky">
         <h2 class="text-h6 font-weight-bold mb-4 text-secondary">Resumen de Pago</h2>
         
         <v-card variant="flat" class="bg-transparent mb-6">
@@ -90,9 +91,17 @@
             <span class="text-subtitle-1 font-weight-bold">Total a pagar</span>
             <div class="text-right">
               <div class="text-h5 font-weight-bold text-primary">${{ formatMoney(finalAmountUsd) }} {{ invoice?.currency || 'USD' }}</div>
-              <div v-if="bcvRate && finalAmountUsd > 0" class="text-caption text-medium-emphasis mt-1">
-                Aprox. Bs. {{ formatMoney(finalAmountUsd * bcvRate.dollar) }}
-              </div>
+            </div>
+          </div>
+
+          <!-- Monto en Bolívares con tasa BCV -->
+          <div v-if="bcvRate && finalAmountUsd > 0" class="mt-4 pa-3 rounded-lg" style="background: #e8f5e9;">
+            <div class="d-flex justify-space-between align-center mb-1">
+              <span class="text-body-2 font-weight-bold" style="color: #2e7d32;">Equivalente en Bolívares</span>
+              <span class="text-h6 font-weight-bold" style="color: #1b5e20;">Bs. {{ formatMoney(finalAmountUsd * bcvRate.dollar) }}</span>
+            </div>
+            <div class="text-caption" style="color: #4a7c59;">
+              Tasa BCV del día: <strong>Bs. {{ Number(bcvRate.dollar).toFixed(4) }} / USD</strong>
             </div>
           </div>
         </v-card>
@@ -114,10 +123,30 @@
           </v-switch>
         </v-card>
         
-        <v-alert variant="tonal" color="info" density="compact" class="text-caption">
+        <v-alert variant="tonal" color="info" density="compact" class="text-caption mb-4">
           <v-icon start size="16">mdi-shield-check</v-icon>
           Pago seguro. Los datos son procesados y validados por nuestro equipo.
         </v-alert>
+
+        <!-- WhatsApp Contact for All Plans -->
+        <v-card variant="outlined" color="success" class="pa-4 bg-white" rounded="lg" style="border-width: 2px;">
+          <div class="d-flex align-start">
+            <v-avatar color="success" variant="tonal" size="40" class="mr-3">
+              <v-icon size="24" color="success">mdi-whatsapp</v-icon>
+            </v-avatar>
+            <div>
+              <div class="text-body-2 font-weight-bold text-success mb-1">Atención Personalizada</div>
+              <div class="text-caption text-medium-emphasis mb-3">
+                Nuestro equipo de ventas está disponible para asistirte con tu compra.
+              </div>
+              <v-btn color="#25D366" variant="flat" size="small" class="text-none text-white font-weight-bold w-100" @click="contactarVentasWhatsapp">
+                Contactar Ventas
+              </v-btn>
+            </div>
+          </div>
+        </v-card>
+
+        </div><!-- fin summary-sticky -->
       </v-col>
 
       <!-- Columna Derecha: Métodos de Pago (Mobile: Abajo) -->
@@ -172,6 +201,21 @@
                 </v-col>
               </v-row>
             </v-card>
+
+            <!-- Ayuda de WhatsApp para el método de pago -->
+            <v-slide-y-transition>
+              <div v-if="selectedMethod?.support_phone" class="text-caption text-center mb-6 mt-n2">
+                <v-icon size="16" color="success" class="mr-1 mb-1">mdi-whatsapp</v-icon>
+                <span class="text-medium-emphasis">¿Tienes problemas con este método de pago?</span>
+                <a 
+                  :href="`https://wa.me/58${(selectedMethod.support_phone_prefix || '').replace(/^0/, '')}${(selectedMethod.support_phone || '').replace(/\D/g, '')}`" 
+                  target="_blank" 
+                  class="text-success text-decoration-underline font-weight-bold ml-1"
+                >
+                  Contáctanos aquí
+                </a>
+              </div>
+            </v-slide-y-transition>
 
             <!-- Paso 2: Comprobante y Datos -->
             <div class="mb-6">
@@ -240,6 +284,21 @@
                   </v-col>
                   <v-col cols="12" md="6">
                     <v-text-field 
+                      v-if="selectedMethodType === 'mobile_payment'"
+                      v-model="paymentFormData.amountBsFormatted" 
+                      label="Monto Reportado (Bs.)" 
+                      variant="outlined" 
+                      density="comfortable" 
+                      type="text"
+                      prepend-inner-icon="mdi-cash"
+                      :rules="[v => parseBsAmount(v) > 0 || 'Debe ser mayor a 0']" 
+                      :hint="`Ingresa el monto exacto en Bs. que transferiste (incluye decimales). Equivale a $${formatMoney(montoReportadoEnUsd)} USD`"
+                      persistent-hint
+                      @input="handleBsInput"
+                      @focus="handleBsInput"
+                    ></v-text-field>
+                    <v-text-field 
+                      v-else
                       v-model.number="paymentFormData.amount" 
                       label="Monto Reportado (USD)" 
                       variant="outlined" 
@@ -248,9 +307,18 @@
                       step="0.01" 
                       prepend-inner-icon="mdi-currency-usd"
                       :rules="[v => v > 0 || 'Debe ser mayor a 0']" 
+                      hint="Ingresa el monto exacto que pagaste, con decimales incluidos"
+                      persistent-hint
                     ></v-text-field>
                   </v-col>
                 </v-row>
+
+                <!-- Alerta de pago en Bs para Pago Móvil -->
+                <v-alert v-if="selectedMethodType === 'mobile_payment' && bcvRate" variant="tonal" color="success" density="compact" class="mb-4 text-body-2">
+                  <v-icon start size="18">mdi-cash-multiple</v-icon>
+                  <strong>Debes transferir Bs. {{ formatMoney(finalAmountUsd * bcvRate.dollar) }}</strong>
+                  <span class="text-medium-emphasis ml-1">(Tasa BCV: Bs. {{ Number(bcvRate.dollar).toFixed(4) }} / USD)</span>
+                </v-alert>
 
                 <!-- Campos Dinámicos -->
                 <v-row v-if="selectedMethodType === 'mobile_payment'">
@@ -297,29 +365,29 @@
         <v-divider class="mb-6"></v-divider>
 
         <!-- Acciones -->
-        <div class="d-flex flex-column align-end">
-          <div class="d-flex flex-column flex-sm-row justify-end gap-3 w-100 mb-3">
-            <v-btn variant="tonal" color="grey-darken-2" size="large" class="text-none font-weight-bold px-8" to="/cliente/facturacion-suscripcion">
-              Cancelar
-            </v-btn>
-            <v-btn 
-              color="primary" 
-              variant="flat" 
-              size="large" 
-              class="text-none font-weight-bold px-8" 
-              :loading="submitting"
-              :disabled="!isReadyToSubmit"
-              @click="submitPayment"
-            >
-              <v-icon start>mdi-check-decagram</v-icon>
-              Confirmar y Pagar
-            </v-btn>
+        <div class="d-flex flex-column align-end mt-6">
+          <div class="d-flex flex-column flex-sm-row justify-end gap-3 w-100 mb-2">
+              <v-btn variant="tonal" color="grey-darken-2" size="large" class="text-none font-weight-bold px-8" to="/cliente/facturacion-suscripcion">
+                Cancelar
+              </v-btn>
+              <v-btn 
+                color="primary" 
+                variant="flat" 
+                size="large" 
+                class="text-none font-weight-bold px-8" 
+                :loading="submitting"
+                :disabled="!isReadyToSubmit"
+                @click="submitPayment"
+              >
+                <v-icon start>mdi-check-decagram</v-icon>
+                Confirmar y Pagar
+              </v-btn>
+            </div>
+            <div class="text-caption text-medium-emphasis text-right w-100">
+              Al hacer clic en "Confirmar y Pagar", aceptas todos los 
+              <a href="#" @click.prevent class="text-primary text-decoration-none font-weight-bold">términos y condiciones</a>.
+            </div>
           </div>
-          <div class="text-caption text-medium-emphasis text-right">
-            Al hacer clic en "Confirmar y Pagar", aceptas todos los 
-            <router-link to="/terminos" class="text-primary text-decoration-none font-weight-bold">términos y condiciones</router-link>.
-          </div>
-        </div>
       </v-col>
     </v-row>
     
@@ -335,6 +403,7 @@ import billingService from '@/services/billingService';
 import paymentOcrService from '@/services/paymentOcrService';
 import userService from '@/services/userService';
 import bcvService from '@/services/bcvService';
+import { supabase } from '@/lib/supabaseClient';
 
 export default {
   name: 'Checkout',
@@ -355,6 +424,7 @@ export default {
         payment_method_id: null,
         reference: '',
         amount: 0,
+        amountBsFormatted: '',
         sender_details: {}
       },
       proofFile: null,
@@ -411,6 +481,13 @@ export default {
       if (this.selectedMethodType === 'balance') return 0;
       return Math.max(0, this.totalWithIgtf - this.balanceUsedAmount);
     },
+    // Computed: convierte monto reportado en Bs a USD cuando el método es Pago Móvil
+    montoReportadoEnUsd() {
+      if (this.selectedMethodType !== 'mobile_payment' || !this.bcvRate?.dollar) return 0;
+      const bsVal = this.parseBsAmount(this.paymentFormData.amountBsFormatted);
+      if (!bsVal) return 0;
+      return bsVal / this.bcvRate.dollar;
+    },
     isReadyToSubmit() {
       if (!this.selectedMethod) return false;
       if (this.selectedMethodType === 'balance') return true; // Listo para cobrar todo del saldo
@@ -426,6 +503,8 @@ export default {
   watch: {
     finalAmountUsd: {
       handler(val) {
+        // No sobreescribir si el método es Pago Móvil (el monto está en Bs)
+        if (this.selectedMethodType === 'mobile_payment') return;
         if (this.paymentFormData.amount === 0 || !this.paymentFormData.amount || this.paymentFormData.amount === this.totalWithIgtf) {
            this.paymentFormData.amount = parseFloat(val.toFixed(2));
         }
@@ -437,6 +516,14 @@ export default {
     await this.loadData();
   },
   methods: {
+    contactarVentasWhatsapp() {
+      const periodStr = this.billingPeriod === 'annual' ? 'Anual' : 'Mensual';
+      const name = this.invoice?.subscription?.plan?.name || this.selectedPlan?.name || 'Suscripción';
+      const price = this.invoice?.amount || '0.00';
+      const msg = `Hola, necesito ayuda con la compra del plan ${periodStr} ${name} de $${price}.`;
+      const phone = '584140945444';
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    },
     async loadData() {
       this.loading = true;
       this.error = null;
@@ -509,7 +596,13 @@ export default {
       this.paymentFormData.payment_method_id = method.id;
       this.paymentFormData.sender_details = {}; // reset
       if (method.type !== 'balance') {
-         this.paymentFormData.amount = parseFloat(this.finalAmountUsd.toFixed(2));
+        // Si es Pago Móvil, pre-llenar con el monto en Bs; si no, en USD
+        if (method.type === 'mobile_payment' && this.bcvRate?.dollar) {
+          const bsValue = this.finalAmountUsd * this.bcvRate.dollar;
+          this.paymentFormData.amountBsFormatted = this.formatBsValue(bsValue);
+        } else {
+          this.paymentFormData.amount = parseFloat(this.finalAmountUsd.toFixed(2));
+        }
       }
     },
 
@@ -553,6 +646,10 @@ export default {
              if (ocrData.sender.email) this.paymentFormData.sender_details.sender_email = ocrData.sender.email;
              if (ocrData.sender.binance_id) this.paymentFormData.sender_details.sender_binance_id = ocrData.sender.binance_id;
              if (ocrData.amount) this.paymentFormData.amount = ocrData.amount;
+          }
+          // Para Pago Móvil, cargar el monto en Bs si se encontró
+          if (this.selectedMethodType === 'mobile_payment' && ocrData.amount) {
+             this.paymentFormData.amountBsFormatted = this.formatBsValue(ocrData.amount);
           }
           this.ocrCompleted = true;
         }
@@ -609,13 +706,29 @@ export default {
               if (!balResult.success) throw balResult.error;
            }
 
+           // Contexto del plan
+           const planName = this.invoice?.subscription?.plan?.name || this.selectedPlan?.name || 'Suscripción';
+           finalSenderDetails.plan_name = planName;
+           finalSenderDetails.billing_period = this.billingPeriod === 'annual' ? 'Anual' : 'Mensual';
+           finalSenderDetails.plan_price_usd = this.invoice?.amount;
+
+           // Si es Pago Móvil, guardar monto en Bs y la tasa para trazabilidad
+           let reportedAmount = parseFloat(this.paymentFormData.amount);
+           if (this.selectedMethodType === 'mobile_payment' && this.bcvRate?.dollar) {
+             const bsVal = this.parseBsAmount(this.paymentFormData.amountBsFormatted);
+             finalSenderDetails.reported_amount_bs = bsVal;
+             finalSenderDetails.bcv_rate_used = this.bcvRate.dollar;
+             // Convertir a USD para el sistema
+             reportedAmount = parseFloat((bsVal / this.bcvRate.dollar).toFixed(2));
+           }
+
            result = await billingService.submitPaymentReport({
               invoice_id: activeInvoice.id,
               client_id: this.currentUser.client_id,
               payment_method_id: this.paymentFormData.payment_method_id,
               payment_method_type: this.selectedMethodType,
               reference: this.paymentFormData.reference.trim(),
-              amount: parseFloat(this.paymentFormData.amount),
+              amount: reportedAmount,
               sender_details: finalSenderDetails
            }, this.proofFile);
         }
@@ -624,6 +737,30 @@ export default {
           this.paymentSuccessful = true;
           // Despachar evento para que la app principal recargue el estado del usuario/plan en background
           window.dispatchEvent(new CustomEvent('userUpdated'));
+          
+          // Invocar notificación fire-and-forget al super admin
+          fetch(`${supabase.supabaseUrl}/functions/v1/send-invoice-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabase.supabaseKey}`
+            },
+            body: JSON.stringify({
+              mode: 'payment_report',
+              report_id: result.data.id,
+              client_name: this.currentUser?.client?.company_name || this.currentUser?.first_name || 'Cliente',
+              plan_name: this.invoice?.subscription?.plan?.name || this.selectedPlan?.name || 'Suscripción',
+              billing_period: this.billingPeriod === 'annual' ? 'Anual' : 'Mensual',
+              amount_usd: this.selectedMethodType === 'mobile_payment' && this.bcvRate?.dollar 
+                            ? (this.parseBsAmount(this.paymentFormData.amountBsFormatted) / this.bcvRate.dollar).toFixed(2)
+                            : this.paymentFormData.amount,
+              amount_bs: this.selectedMethodType === 'mobile_payment' ? this.parseBsAmount(this.paymentFormData.amountBsFormatted) : null,
+              bcv_rate: this.bcvRate?.dollar,
+              payment_method: this.selectedMethod?.name || this.selectedMethodType,
+              reference: this.paymentFormData.reference.trim()
+            })
+          }).catch(err => console.warn('Error invocando send-payment-report-email:', err));
+
         } else {
           throw result.error;
         }
@@ -638,6 +775,34 @@ export default {
     formatMoney(val) {
       if (!val) return '0.00';
       return parseFloat(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+    
+    // Helpers para Bs
+    handleBsInput(evt) {
+      // Extraemos solo los dígitos
+      const digits = evt.target.value.replace(/\D/g, '');
+      if (!digits) {
+        this.paymentFormData.amountBsFormatted = '';
+        return;
+      }
+      
+      // Tratamos los dígitos como enteros que representan centavos
+      const val = parseInt(digits, 10) / 100;
+      
+      // Formateamos inmediatamente
+      this.paymentFormData.amountBsFormatted = parseFloat(val).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+    parseBsAmount(str) {
+      if (!str) return 0;
+      // Remueve puntos (separadores de miles) y cambia la coma decimal por un punto decimal
+      const cleanStr = str.toString().replace(/\./g, '').replace(',', '.');
+      const val = parseFloat(cleanStr);
+      return isNaN(val) ? 0 : val;
+    },
+    formatBsValue(val) {
+      if (!val) return '0,00';
+      // Formato venezolano (es-VE) da 73.480,69
+      return parseFloat(val).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     },
     methodColor(type) {
       const colors = { mobile_payment: 'info', bank_transfer: 'primary', zelle: 'purple', binance: 'warning', balance: 'success' };
@@ -664,6 +829,11 @@ export default {
 }
 .max-w-1200 {
   max-width: 1200px;
+}
+/* Columna de resumen sticky en desktop */
+.summary-sticky {
+  position: sticky;
+  top: 24px;
 }
 .payment-method-card {
   transition: all 0.2s ease;

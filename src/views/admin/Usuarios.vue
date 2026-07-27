@@ -338,9 +338,9 @@
             <label class="form-label">Plan Actual</label>
             <select v-model="trialForm.plan_id" class="form-select" required>
               <option value="free_trial">Prueba Gratuita</option>
-              <option value="basic">Básico</option>
-              <option value="pro">Profesional</option>
-              <option value="enterprise">Empresarial</option>
+              <option v-for="plan in plans" :key="plan.id" :value="plan.id">
+                {{ plan.name }} - ${{ plan.price_monthly }}/mes
+              </option>
             </select>
           </div>
 
@@ -371,6 +371,7 @@
 
 <script>
 import userService from '@/services/userService.js'
+import plansService from '@/services/plansService.js'
 import { supabase } from '@/lib/supabaseClient'
 
 export default {
@@ -380,6 +381,7 @@ export default {
       users: [],
       filteredUsers: [],
       roles: {},
+      plans: [],
       searchQuery: '',
       roleFilter: '',
       statusFilter: '',
@@ -412,13 +414,15 @@ export default {
     async loadData() {
       try {
         this.loading = true
-        const [usersData, rolesData] = await Promise.all([
+        const [usersData, rolesData, plansResponse] = await Promise.all([
           userService.getUsers(),
-          userService.getRoles()
+          userService.getRoles(),
+          plansService.getPlans()
         ])
         this.users = usersData
         this.filteredUsers = usersData
         this.roles = rolesData
+        this.plans = plansResponse.success ? plansResponse.data : []
       } catch (error) {
         console.error('Error cargando datos:', error)
         alert('Error al cargar los datos')
@@ -624,13 +628,16 @@ export default {
     },
     
     getPlanName(planId) {
-      const plans = {
-        'free_trial': 'Prueba Gratuita',
+      if (planId === 'free_trial') return 'Prueba Gratuita'
+      const plan = this.plans.find(p => p.id === planId)
+      if (plan) return plan.name
+      
+      const legacyPlans = {
         'basic': 'Básico',
         'pro': 'Profesional',
         'enterprise': 'Empresarial'
       }
-      return plans[planId] || planId || 'N/A'
+      return legacyPlans[planId] || planId || 'N/A'
     },
 
     hasPermission(permission) {

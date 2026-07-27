@@ -514,6 +514,25 @@
             <v-col cols="6"><div class="text-caption text-medium-emphasis">Fecha</div><div class="font-weight-bold">{{ formatDateTime(selectedReport.created_at) }}</div></v-col>
           </v-row>
 
+          <template v-if="selectedReport.sender_details?.plan_name">
+            <v-divider class="my-4"></v-divider>
+            <p class="text-subtitle-2 font-weight-bold mb-2 text-secondary">Contexto del Plan</p>
+            <v-row dense>
+              <v-col cols="6"><div class="text-caption text-medium-emphasis">Plan</div><div class="font-weight-bold">{{ selectedReport.sender_details.plan_name }}</div></v-col>
+              <v-col cols="6"><div class="text-caption text-medium-emphasis">Periodo</div><div class="font-weight-bold">{{ selectedReport.sender_details.billing_period }}</div></v-col>
+              <v-col cols="6"><div class="text-caption text-medium-emphasis">Precio Plan</div><div class="font-weight-bold">${{ formatMoney(selectedReport.sender_details.plan_price_usd) }}</div></v-col>
+            </v-row>
+          </template>
+          
+          <template v-if="selectedReport.sender_details?.reported_amount_bs">
+            <v-divider class="my-4"></v-divider>
+            <p class="text-subtitle-2 font-weight-bold mb-2 text-secondary">Pago en Bolívares</p>
+            <v-row dense>
+              <v-col cols="6"><div class="text-caption text-medium-emphasis">Monto (Bs.)</div><div class="font-weight-bold text-success">Bs. {{ formatBs(selectedReport.sender_details.reported_amount_bs) }}</div></v-col>
+              <v-col cols="6"><div class="text-caption text-medium-emphasis">Tasa BCV Usada</div><div class="font-weight-bold">Bs. {{ selectedReport.sender_details.bcv_rate_used }}</div></v-col>
+            </v-row>
+          </template>
+
           <!-- Datos del emisor -->
           <template v-if="selectedReport.sender_details && Object.keys(selectedReport.sender_details).length">
             <v-divider class="my-4"></v-divider>
@@ -756,6 +775,14 @@ export default {
   },
   async mounted() {
     await this.loadAllData();
+    const reportId = this.$route.query.report_id;
+    if (reportId) {
+      this.activeTab = 'reports';
+      const targetReport = this.paymentReports.find(r => r.id === reportId);
+      if (targetReport) {
+        this.viewReportDetails(targetReport);
+      }
+    }
   },
   methods: {
     // -- Datos iniciales vacíos para formularios --
@@ -990,6 +1017,10 @@ export default {
 
     // ---- HELPERS ----
     formatMoney(val) { return parseFloat(val || 0).toFixed(2); },
+    formatBs(val) {
+      if (!val) return '0,00';
+      return parseFloat(val).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
     formatDate(d) {
       if (!d) return '—';
       return new Date(d).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });

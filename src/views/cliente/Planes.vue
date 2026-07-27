@@ -147,9 +147,17 @@ export default {
     },
     async handleSelectPlan(plan, selectedBillingPeriod) {
       if (this.isCurrentPlan(plan) || this.isPendingPlan(plan)) return;
-      if (plan.name === 'AD Corporate Nexus') {
-        window.open('mailto:ventas@sistema.com?subject=Interés en Plan Corporate Nexus', '_blank');
-        return;
+
+      if (window.dataLayer) {
+        window.dataLayer.push({
+          event: 'begin_checkout',
+          ecommerce: {
+            items: [{
+              item_name: plan.name || 'Plan',
+              item_id: plan.id || 'N/A'
+            }]
+          }
+        });
       }
       
       // Redirigir al Checkout en lugar de procesar directamente
