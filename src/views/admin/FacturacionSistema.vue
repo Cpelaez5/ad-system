@@ -988,6 +988,22 @@ export default {
         if (result.success) {
           this.showSnackbar('¡Pago aprobado exitosamente!', 'success');
           this.showApproveConfirm = false;
+          
+          // Enviar notificación al cliente
+          const clientEmail = this.actionReport.invoice?.client?.email || this.actionReport.sender_details?.sender_email;
+          if (clientEmail) {
+            supabase.functions.invoke('send-invoice-email', {
+              body: {
+                mode: 'payment_status_update',
+                to: clientEmail,
+                client_name: this.actionReport.invoice?.client?.company_name || 'Cliente',
+                invoice_number: this.actionReport.invoice?.invoice_number || 'S/N',
+                status: 'approved',
+                amount: this.actionReport.amount
+              }
+            }).catch(err => console.warn('Error enviando notificación de aprobación:', err));
+          }
+
           await Promise.all([this.loadReports(), this.loadInvoices(), this.loadBalance()]);
         } else throw result.error;
       } catch (e) {
@@ -1006,6 +1022,23 @@ export default {
         if (result.success) {
           this.showSnackbar('Pago rechazado', 'warning');
           this.showRejectConfirm = false;
+
+          // Enviar notificación al cliente
+          const clientEmail = this.actionReport.invoice?.client?.email || this.actionReport.sender_details?.sender_email;
+          if (clientEmail) {
+            supabase.functions.invoke('send-invoice-email', {
+              body: {
+                mode: 'payment_status_update',
+                to: clientEmail,
+                client_name: this.actionReport.invoice?.client?.company_name || 'Cliente',
+                invoice_number: this.actionReport.invoice?.invoice_number || 'S/N',
+                status: 'rejected',
+                rejection_reason: this.rejectionReason.trim(),
+                amount: this.actionReport.amount
+              }
+            }).catch(err => console.warn('Error enviando notificación de rechazo:', err));
+          }
+
           await this.loadReports();
         } else throw result.error;
       } catch (e) {

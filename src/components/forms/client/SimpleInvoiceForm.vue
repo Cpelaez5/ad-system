@@ -400,29 +400,40 @@
           {{ formData.flow === 'VENTA' ? '¿A quién le estás vendiendo?' : '¿De quién es esta factura?' }}
         </p>
         <v-row dense>
-          <v-col cols="12" sm="7">
-            <v-text-field
-              v-model="counterpartName"
-              :label="formData.flow === 'VENTA' ? 'Nombre o empresa del cliente' : 'Nombre o empresa del proveedor'"
-              :placeholder="formData.flow === 'VENTA' ? 'Ej: Distribuidora López' : 'Ej: Proveedor ABC'"
-              variant="outlined"
-              density="comfortable"
-              :rules="[v => !!v || 'Este campo es obligatorio']"
-              hide-details="auto"
-              class="mb-2"
+          <!-- COMPRA: Selector de Proveedor -->
+          <v-col cols="12" v-if="formData.flow === 'COMPRA'">
+            <ProveedorAutocomplete
+              v-model="proveedor"
+              @add-new="showQuickAddSheet = true"
             />
           </v-col>
-          <v-col cols="12" sm="5">
-            <v-text-field
-              v-model="counterpartRif"
-              label="RIF (opcional)"
-              placeholder="J-12345678-9"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              class="mb-2"
-            />
-          </v-col>
+
+          <!-- VENTA: Campos de Cliente -->
+          <template v-else>
+            <v-col cols="12" sm="7">
+              <v-text-field
+                v-model="counterpartName"
+                label="Nombre o empresa del cliente"
+                placeholder="Ej: Distribuidora López"
+                variant="outlined"
+                density="comfortable"
+                :rules="[v => !!v || 'Este campo es obligatorio']"
+                hide-details="auto"
+                class="mb-2"
+              />
+            </v-col>
+            <v-col cols="12" sm="5">
+              <v-text-field
+                v-model="counterpartRif"
+                label="RIF (opcional)"
+                placeholder="J-12345678-9"
+                variant="outlined"
+                density="comfortable"
+                hide-details
+                class="mb-2"
+              />
+            </v-col>
+          </template>
 
           <!-- Mis datos (pre-llenados, colapsables) -->
           <v-col cols="12">
@@ -706,6 +717,18 @@
         </div>
       </div>
 
+      <!-- Resumen de Retenciones (solo COMPRA) -->
+      <div v-if="formData.flow === 'COMPRA'" class="mt-4">
+        <RetentionSummaryCard
+          :proveedor="proveedor"
+          :retentionConfig="retentionConfig"
+          :retencionesResult="retencionesResult"
+          :financial="formData.financial"
+          :loadingConfig="loadingRetentionConfig"
+          @adjust="showAdjustSheet = true"
+        />
+      </div>
+
       <!-- ══════════════════════════════════════════════════════
            SECCIÓN 6: NOTAS (colapsable)
       ══════════════════════════════════════════════════════════ -->
@@ -782,6 +805,20 @@
 
   </v-form>
   </v-card>
+
+  <!-- Sheet para agregar proveedor rápido -->
+  <ProveedorQuickAddSheet
+    v-model="showQuickAddSheet"
+    @saved="p => { proveedor = p }"
+  />
+
+  <!-- Sheet para ajustar retenciones manualmente -->
+  <RetentionAdjustSheet
+    v-if="formData.flow === 'COMPRA'"
+    v-model="showAdjustSheet"
+    :config="retentionConfig"
+    @update:config="cfg => { retentionConfig = cfg; calcularRetenciones(); }"
+  />
 </template>
 
 <script>
@@ -795,13 +832,21 @@ import FileUploadZone from '@/components/common/FileUploadZone.vue';
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue';
 import ExpenseCategorySelector from '@/components/common/ExpenseCategorySelector.vue';
+import ProveedorAutocomplete from '@/components/forms/ProveedorAutocomplete.vue';
+import ProveedorQuickAddSheet from '@/components/forms/ProveedorQuickAddSheet.vue';
+import RetentionSummaryCard from '@/components/forms/RetentionSummaryCard.vue';
+import RetentionAdjustSheet from '@/components/forms/RetentionAdjustSheet.vue';
 import { supabase } from '@/lib/supabaseClient';
 
 let _itemKey = 0;
 
 export default {
   name: 'SimpleInvoiceForm',
-  components: { AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete, ExpenseCategorySelector },
+  components: { 
+    AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete, 
+    ExpenseCategorySelector, ProveedorAutocomplete, ProveedorQuickAddSheet,
+    RetentionSummaryCard, RetentionAdjustSheet
+  },
 
   props: {
     invoice: { type: Object, default: null },
@@ -835,6 +880,18 @@ export default {
 
       // Usuario actual
       currentUser: null,
+
+      // Retenciones
+      proveedor: null,
+      retentionConfig: {
+        aplicarIva: false, porcentajeIva: 75, baseIva: 0,
+        aplicarIslr: false, conceptoIslr: null, baseIslr: 0,
+        aplicarMunicipal: false, porcentajeMunicipal: 0, baseMunicipal: 0
+      },
+      retencionesResult: null,
+      showQuickAddSheet: false,
+      showAdjustSheet: false,
+      loadingRetentionConfig: false,
 
       // Snackbar
       snackbar: { show: false, message: '', type: 'info', timeout: 4000 },
@@ -995,6 +1052,42 @@ export default {
 
   // ─── WATCH ───────────────────────────────────────────────────────────────────
   watch: {
+    proveedor: {
+      async handler(nuevoProveedor) {
+        if (!nuevoProveedor) {
+          this.retentionConfig = { aplicarIva: false, porcentajeIva: 75, aplicarIslr: false, conceptoIslr: null, aplicarMunicipal: false, porcentajeMunicipal: 0 };
+          this.calcularRetenciones();
+          return;
+        }
+        
+        this.loadingRetentionConfig = true;
+        try {
+          const id = nuevoProveedor.id;
+          const { data, error } = await supabase.from('proveedores').select('*').eq('id', id).single();
+          if (error) throw error;
+          
+          this.retentionConfig = {
+            aplicarIva: data.retencion_iva || false,
+            porcentajeIva: data.porcentaje_retencion_iva || 75,
+            aplicarIslr: data.retencion_islr || false,
+            conceptoIslr: data.concepto_islr_id || null,
+            aplicarMunicipal: data.retencion_municipal || false,
+            porcentajeMunicipal: data.alicuota_municipal || 0
+          };
+          
+          this.formData.issuer.id = data.id || '';
+          this.formData.issuer.companyName = data.razon_social || '';
+          this.formData.issuer.rif = data.rif || '';
+          this.formData.issuer.address = data.direccion || '';
+          
+          await this.calcularRetenciones();
+        } catch (err) {
+          console.error("Error al cargar config de retenciones del proveedor:", err);
+        } finally {
+          this.loadingRetentionConfig = false;
+        }
+      }
+    },
     'formData.invoiceNumber'(v) {
       if (!v) { this.isDuplicate = false; return; }
       if (this.invoiceCheckTimer) clearTimeout(this.invoiceCheckTimer);
@@ -1222,6 +1315,7 @@ export default {
       if (!this.currentUser) return;
       const c = this.currentUser.client || {};
       const userData = {
+        id:           c.id || this.currentUser.client_id || this.currentUser.id || '',
         companyName:  c.company_name || this.currentUser.companyName || this.currentUser.name || '',
         rif:          c.rif || this.currentUser.rif || '',
         taxpayerType: c.taxpayer_type || 'PERSONA JURÍDICA',
@@ -1335,6 +1429,49 @@ export default {
       const iva    = parseFloat(this.formData.financial.taxDebit) || 0;
       const igtf   = parseFloat(this.formData.financial.igtf) || 0;
       this.formData.financial.totalSales = parseFloat((base + exento + iva + igtf).toFixed(2));
+      
+      this.calcularRetenciones();
+    },
+    
+    // ── Retenciones ───────────────────────────────────────────────────────────
+    async calcularRetenciones() {
+      if (this.formData.flow !== 'COMPRA' || !this.proveedor) {
+        this.retencionesResult = null;
+        this.formData.financial.ivaRetention = 0;
+        this.formData.financial.islrRetention = 0;
+        this.formData.financial.municipalRetention = 0;
+        return;
+      }
+      
+      const config = this.retentionConfig;
+      const amount = parseFloat(this.formData.financial.taxableSales) || 0;
+      const tax = parseFloat(this.formData.financial.taxDebit) || 0;
+      
+      let iva = 0;
+      if (config.aplicarIva && tax > 0) {
+        iva = parseFloat((tax * (config.porcentajeIva / 100)).toFixed(2));
+      }
+      
+      let islr = 0;
+      if (config.aplicarIslr && config.conceptoIslr && amount > 0) {
+        try {
+          const { data: concepto } = await supabase.from('conceptos_islr').select('*').eq('id', config.conceptoIslr).single();
+          if (concepto) {
+             const rate = this.proveedor.tipo_persona === 'PERSONA NATURAL' ? concepto.porcentaje_pn : concepto.porcentaje_pj;
+             islr = parseFloat((amount * (rate / 100)).toFixed(2));
+          }
+        } catch(e) { console.error("Error calculando ISLR", e); }
+      }
+      
+      let municipal = 0;
+      if (config.aplicarMunicipal && config.porcentajeMunicipal > 0 && amount > 0) {
+         municipal = parseFloat((amount * (config.porcentajeMunicipal / 100)).toFixed(2));
+      }
+      
+      this.retencionesResult = { iva, islr, municipal };
+      this.formData.financial.ivaRetention = iva;
+      this.formData.financial.islrRetention = islr;
+      this.formData.financial.municipalRetention = municipal;
     },
 
     // ── Ítems ─────────────────────────────────────────────────────────────────

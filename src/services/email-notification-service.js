@@ -158,6 +158,27 @@ class EmailNotificationService {
       return { success: false, message: error.message || 'Error inesperado' }
     }
   }
+
+  /**
+   * Envía notificación de actualización de estado de pago (Aprobado/Rechazado) al cliente
+   */
+  async notifyPaymentStatusUpdate(paymentData) {
+    try {
+      const payload = {
+        mode: 'payment_status_update',
+        to: paymentData.clientEmail,
+        client_name: paymentData.clientName,
+        invoice_number: paymentData.invoiceNumber,
+        status: paymentData.status, // 'approved' or 'rejected'
+        rejection_reason: paymentData.rejectionReason,
+        amount: paymentData.amount
+      }
+      return await this.sendEmail(payload)
+    } catch (error) {
+      console.warn('⚠️ [Email] Error inesperado al enviar notificación de estado de pago:', error)
+      return { success: false, message: error.message || 'Error inesperado' }
+    }
+  }
 }
 
 // Exportar instancia única (Singleton)

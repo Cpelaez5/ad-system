@@ -738,28 +738,35 @@ export default {
           // Despachar evento para que la app principal recargue el estado del usuario/plan en background
           window.dispatchEvent(new CustomEvent('userUpdated'));
           
-          // Invocar notificación fire-and-forget al super admin
-          fetch(`${supabase.supabaseUrl}/functions/v1/send-invoice-email`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.supabaseKey}`
-            },
-            body: JSON.stringify({
+          // 1. Invocar notificación fire-and-forget al super admin
+          supabase.functions.invoke('send-invoice-email', {
+            body: {
               mode: 'payment_report',
               report_id: result.data.id,
-              client_name: this.currentUser?.client?.company_name || this.currentUser?.first_name || 'Cliente',
-              plan_name: this.invoice?.subscription?.plan?.name || this.selectedPlan?.name || 'Suscripción',
-              billing_period: this.billingPeriod === 'annual' ? 'Anual' : 'Mensual',
-              amount_usd: this.selectedMethodType === 'mobile_payment' && this.bcvRate?.dollar 
-                            ? (this.parseBsAmount(this.paymentFormData.amountBsFormatted) / this.bcvRate.dollar).toFixed(2)
-                            : this.paymentFormData.amount,
-              amount_bs: this.selectedMethodType === 'mobile_payment' ? this.parseBsAmount(this.paymentFormData.amountBsFormatted) : null,
-              bcv_rate: this.bcvRate?.dollar,
+              client_name: this.currentUser?.company_name || this.currentUser?.email || 'Cliente',
+              plan_name: finalSenderDetails.plan_name,
+              billing_period: finalSenderDetails.billing_period,
+              amount_usd: reportedAmount,
+              amount_bs: finalSenderDetails.reported_amount_bs || null,
+              bcv_rate: finalSenderDetails.bcv_rate_used || null,
               payment_method: this.selectedMethod?.name || this.selectedMethodType,
               reference: this.paymentFormData.reference.trim()
-            })
-          }).catch(err => console.warn('Error invocando send-payment-report-email:', err));
+            }
+          }).catch(err => console.warn('Error notify super_admin:', err));
+
+          // 2. Invocar notificación fire-and-forget al cliente de confirmación de recepción
+          supabase.functions.invoke('send-invoice-email', {
+            body: {
+              mode: 'payment_received',
+              to: this.currentUser.email,
+              client_name: this.currentUser?.company_name || this.currentUser?.email || 'Cliente',
+              plan_name: finalSenderDetails.plan_name,
+              amount_usd: reportedAmount,
+              amount_bs: finalSenderDetails.reported_amount_bs || null,
+              payment_method: this.selectedMethod?.name || this.selectedMethodType,
+              reference: this.paymentFormData.reference.trim()
+            }
+          }).catch(err => console.warn('Error notify client payment received:', err));
 
         } else {
           throw result.error;

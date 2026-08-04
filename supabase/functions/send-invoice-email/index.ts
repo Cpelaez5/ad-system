@@ -225,6 +225,102 @@ function buildEmailHtml(payload: {
 </html>`;
 }
 
+// ─── Plantilla HTML para Notificación de Estado de Pago (Aprobado/Rechazado) al Cliente ──────────────
+function buildPaymentStatusHtml(payload: {
+  clientName: string;
+  invoiceNumber: string;
+  status: 'approved' | 'rejected';
+  rejectionReason?: string;
+  amount: number;
+}) {
+  const { clientName, invoiceNumber, status, rejectionReason, amount } = payload;
+  
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+
+  const PRIMARY = "#A81C22";
+  const SECONDARY = "#1F355C";
+  const ACCENT = "#E0B04F";
+  const BG = "#f7f7f7";
+  const LOGO_URL = "https://adsystemapp.com/icon-adaptableV2.svg";
+
+  const isApproved = status === 'approved';
+  const statusColor = isApproved ? "#4CAF50" : PRIMARY;
+  const statusText = isApproved ? "Aprobado" : "Rechazado";
+  const iconUrl = isApproved 
+    ? "https://cdn-icons-png.flaticon.com/512/190/190411.png" 
+    : "https://cdn-icons-png.flaticon.com/512/190/190406.png";
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:${BG};font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+  
+  <!-- Header -->
+  <tr>
+    <td style="background:${SECONDARY};padding:28px 32px;text-align:center;">
+      <img src="${LOGO_URL}" alt="AD System" height="48" style="display:inline-block;vertical-align:middle;margin-right:12px;">
+      <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:1px;">AD System</span>
+    </td>
+  </tr>
+  <!-- Línea decorativa dorada -->
+  <tr><td style="background:${ACCENT};height:4px;"></td></tr>
+
+  <!-- Contenido -->
+  <tr>
+    <td style="padding:32px 32px 12px;text-align:center;">
+      <img src="${iconUrl}" width="64" style="margin-bottom:16px;">
+      <h2 style="margin:0;font-size:24px;color:${statusColor};">Pago ${statusText}</h2>
+      <p style="margin:16px 0 0;font-size:16px;color:#444;line-height:1.5;text-align:left;">
+        Hola <strong>${clientName}</strong>, tu reporte de pago por <strong>$${fmt(amount)}</strong> asociado a la factura <strong>${invoiceNumber}</strong> ha sido <strong>${statusText.toLowerCase()}</strong>.
+      </p>
+    </td>
+  </tr>
+
+  <!-- Detalles -->
+  <tr>
+    <td style="padding:10px 32px 20px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;border-radius:8px;">
+        ${!isApproved && rejectionReason ? `
+        <tr>
+          <td style="padding:16px 18px;font-size:15px;color:#333;">
+            <strong style="color:${PRIMARY};">Motivo del rechazo:</strong><br>
+            <span style="display:block;margin-top:4px;color:#555;">${rejectionReason}</span>
+          </td>
+        </tr>
+        ` : ''}
+        ${isApproved ? `
+        <tr>
+          <td style="padding:16px 18px;font-size:15px;color:#333;">
+            La factura ha sido marcada como pagada (o abonada). Puedes iniciar sesión para ver el estado de tu cuenta y acceder a tus recibos.
+          </td>
+        </tr>
+        ` : `
+        <tr>
+          <td style="padding:16px 18px;font-size:15px;color:#333;border-top:1px solid #e0e0e0;">
+            Por favor, revisa el motivo, corrige cualquier información necesaria y vuelve a reportar el pago desde tu portal de cliente.
+          </td>
+        </tr>
+        `}
+      </table>
+    </td>
+  </tr>
+
+  <!-- CTA -->
+  <tr>
+    <td style="padding:0 32px 32px;text-align:center;">
+      <a href="https://adsystemapp.com/" style="display:inline-block;background:${isApproved ? SECONDARY : PRIMARY};color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600;">Ir al Portal</a>
+    </td>
+  </tr>
+</table>
+</td></tr></table>
+</body>
+</html>`;
+}
+
 // ─── Plantilla HTML para Notificación de Reporte de Pago ──────────────
 function buildPaymentReportHtml(payload: {
   clientName: string;
@@ -413,6 +509,68 @@ Deno.serve(async (req: Request) => {
       if (!resendResponse.ok) throw new Error(`Resend error: ${resendResult?.message}`);
 
       return new Response(JSON.stringify({ success: true, message: "Report notification sent" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    }
+
+    if (mode === "payment_status_update") {
+      // ─── Modo: Actualización del Estado del Pago (Aprobado/Rechazado) al Cliente ────────────────
+      const { to, client_name, invoice_number, status, rejection_reason, amount } = payload;
+      
+      if (!to) {
+        throw new Error("Campo 'to' (email destino) es requerido");
+      }
+
+      const html = buildPaymentStatusHtml({
+         clientName: client_name,
+         invoiceNumber: invoice_number,
+         status: status,
+         rejectionReason: rejection_reason,
+         amount: amount
+      });
+      
+      const statusLabel = status === 'approved' ? 'Aprobado' : 'Rechazado';
+      const subject = `El estado de tu pago ha cambiado: ${statusLabel}`;
+
+      const resendResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject, html }),
+      });
+
+      const resendResult = await resendResponse.json();
+      if (!resendResponse.ok) throw new Error(`Resend error: ${resendResult?.message}`);
+
+      return new Response(JSON.stringify({ success: true, message: "Payment status update sent to client" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    }
+
+    if (mode === "payment_received") {
+      // ─── Modo: Reporte de Pago Recibido (Al Cliente) ──────────────────────
+      const { to, client_name, plan_name, amount_usd, amount_bs, payment_method, reference } = payload;
+      
+      if (!to) {
+        throw new Error("Campo 'to' (email destino) es requerido");
+      }
+
+      const html = buildPaymentReceivedHtml({
+         clientName: client_name,
+         planName: plan_name,
+         amountUsd: amount_usd,
+         amountBs: amount_bs,
+         paymentMethod: payment_method,
+         reference: reference
+      });
+      
+      const subject = `Recibimos tu reporte de pago - AD System`;
+
+      const resendResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject, html }),
+      });
+
+      const resendResult = await resendResponse.json();
+      if (!resendResponse.ok) throw new Error(`Resend error: ${resendResult?.message}`);
+
+      return new Response(JSON.stringify({ success: true, message: "Payment received notification sent to client" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
     }
 
     // ─── Modo: Factura Normal (por defecto) ───────────────────────────────────

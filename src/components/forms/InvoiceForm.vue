@@ -328,11 +328,12 @@
           <!-- Paso 2: Emisor y Cliente -->
           <v-stepper-window-item :value="2">
             <v-container fluid class="pa-6">
-              <!-- Selector de Cliente -->
+              <!-- Selector de Cliente o Proveedor -->
               <v-card variant="outlined" class="mb-4">
-                <v-card-title>
+                <v-card-title v-if="formData.flow === 'VENTA'">
                   <v-icon left>mdi-account-multiple</v-icon>
                   Seleccionar Cliente
+
                   <v-spacer></v-spacer>
                   <v-chip 
                     v-if="currentUser" 
@@ -342,7 +343,7 @@
                     {{ currentUser.name }} ({{ currentUser.role }})
                   </v-chip>
                 </v-card-title>
-                <v-card-text>
+                <v-card-text v-if="formData.flow === 'VENTA'">
                   <v-select
                     v-if="canSelectClients"
                     v-model="selectedClientId"
@@ -392,6 +393,19 @@
                     <v-icon left>mdi-alert</v-icon>
                     No hay clientes registrados. Debe crear al menos un cliente antes de crear facturas.
                   </v-alert>
+                </v-card-text>
+
+                <!-- Flujo COMPRA: Selector de Proveedor -->
+                <v-card-text v-else>
+                  <ProveedorAutocomplete
+                    v-model="proveedor"
+                    @add-new="showQuickAddSheet = true"
+                  />
+                  <!-- Sheet para agregar proveedor rápido -->
+                  <ProveedorQuickAddSheet
+                    v-model="showQuickAddSheet"
+                    @saved="p => { proveedor = p }"
+                  />
                 </v-card-text>
               </v-card>
 
@@ -576,33 +590,52 @@
                     variant="outlined"
                   ></v-text-field>
                 </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model.number="formData.financial.ivaRetention"
-                    label="Retención IVA"
-                    type="number"
-                    step="0.01"
-                    variant="outlined"
-                  ></v-text-field>
+                <!-- Bloque de Retenciones (Fase 2) -->
+                <v-col cols="12" v-if="formData.flow === 'COMPRA'">
+                  <RetentionSummaryCard
+                    :proveedor="proveedor"
+                    :aplicar-iva="retentionConfig.aplicar_iva"
+                    :aplicar-islr="retentionConfig.aplicar_islr"
+                    :aplicar-municipal="retentionConfig.aplicar_municipal"
+                    :concepto-islr-nombre="getConceptoIslrNombre()"
+                    @adjust="showAdjustSheet = true"
+                  />
+                  <!-- Sheet para ajustar retenciones -->
+                  <RetentionAdjustSheet
+                    v-model="showAdjustSheet"
+                    v-model:config="retentionConfig"
+                  />
                 </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model.number="formData.financial.islrRetention"
-                    label="Retención ISLR"
-                    type="number"
-                    step="0.01"
-                    variant="outlined"
-                  ></v-text-field>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model.number="formData.financial.municipalRetention"
-                    label="Retención Municipal"
-                    type="number"
-                    step="0.01"
-                    variant="outlined"
-                  ></v-text-field>
-                </v-col>
+
+                <template v-else>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model.number="formData.financial.ivaRetention"
+                      label="Retención IVA"
+                      type="number"
+                      step="0.01"
+                      variant="outlined"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model.number="formData.financial.islrRetention"
+                      label="Retención ISLR"
+                      type="number"
+                      step="0.01"
+                      variant="outlined"
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model.number="formData.financial.municipalRetention"
+                      label="Retención Municipal"
+                      type="number"
+                      step="0.01"
+                      variant="outlined"
+                    ></v-text-field>
+                  </v-col>
+                </template>
                 <v-col cols="12" md="6">
                   <v-text-field
                     v-model.number="formData.financial.igtf"
@@ -827,18 +860,20 @@
           Siguiente
         </v-btn>
         
-        <v-btn
-          v-if="currentStep === 4"
-          color="success"
-          :loading="loading"
-          @click="handleSubmit"
-          prepend-icon="mdi-check-circle"
-          size="large"
-          variant="elevated"
-          class="px-6"
-        >
-          {{ isEditing ? 'Actualizar Factura' : 'Crear Factura' }}
-        </v-btn>
+        <template v-if="currentStep === 4">
+          <v-btn
+            v-if="formData.flow !== 'COMPRA'"
+            color="success"
+            :loading="loading"
+            @click="handleSubmit"
+            prepend-icon="mdi-check-circle"
+            size="large"
+            variant="elevated"
+            class="px-6"
+          >
+            {{ isEditing ? 'Actualizar Factura' : 'Crear Factura' }}
+          </v-btn>
+        </template>
         
         <v-btn
           color="grey"
@@ -851,6 +886,31 @@
       </v-card-actions>
     </v-card>
     
+    <!-- StickyPaymentBar para flujo COMPRA -->
+    <StickyPaymentBar
+      v-if="currentStep === 4 && formData.flow === 'COMPRA'"
+      :total-factura="Number(formData.financial.totalSales || 0) + Number(formData.financial.taxDebit || 0)"
+      :total-retenido="calculateEstimatedRetentions()"
+      :disabled="!valid"
+      :loading="loading"
+      @submit="showConfirmSheet = true"
+    />
+    
+    <!-- Confirmar Compra Sheet -->
+    <ConfirmPurchaseSheet
+      v-model="showConfirmSheet"
+      :loading="loading"
+      @confirm="submitCompraConRetenciones"
+    />
+    
+    <!-- Success Sheet -->
+    <PurchaseSuccessSheet
+      v-model="showSuccessSheet"
+      :retenciones="retencionesResult"
+      @reset="resetForm"
+      @dashboard="$emit('cancel')"
+    />
+
     <!-- Snackbar reutilizable para mensajes -->
     <AppSnackbar
       v-model="snackbar.show"
@@ -867,14 +927,34 @@ import clientService from '@/services/clientService.js';
 import userService from '@/services/userService.js';
 import adminOcrService from '@/services/adminOcrService.js';
 import bcvService from '@/services/bcvService.js';
+import retentionRpcService from '@/services/retentionRpcService.js';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue';
 import ExpenseCategorySelector from '@/components/common/ExpenseCategorySelector.vue';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
+import ProveedorAutocomplete from './ProveedorAutocomplete.vue';
+import ProveedorQuickAddSheet from './ProveedorQuickAddSheet.vue';
+import RetentionSummaryCard from './RetentionSummaryCard.vue';
+import RetentionAdjustSheet from './RetentionAdjustSheet.vue';
+import StickyPaymentBar from './StickyPaymentBar.vue';
+import ConfirmPurchaseSheet from './ConfirmPurchaseSheet.vue';
+import PurchaseSuccessSheet from '../feedback/PurchaseSuccessSheet.vue';
 
 export default {
   name: 'InvoiceForm',
-  components: { FileUploadZone, ProductAutocomplete, ExpenseCategorySelector, AppSnackbar },
+  components: { 
+    FileUploadZone, 
+    ProductAutocomplete, 
+    ExpenseCategorySelector, 
+    AppSnackbar,
+    ProveedorAutocomplete,
+    ProveedorQuickAddSheet,
+    RetentionSummaryCard,
+    RetentionAdjustSheet,
+    StickyPaymentBar,
+    ConfirmPurchaseSheet,
+    PurchaseSuccessSheet
+  },
   props: {
     invoice: {
       type: Object,
@@ -905,6 +985,21 @@ export default {
       uploadedFile: null,
       extracting: false,
       extractionResult: null,
+
+      // Fase 2 - Retenciones
+      showQuickAddSheet: false,
+      showAdjustSheet: false,
+      showConfirmSheet: false,
+      showSuccessSheet: false,
+      proveedor: null,
+      retentionConfig: {
+        aplicar_iva: true,
+        aplicar_islr: true,
+        aplicar_municipal: true,
+        islr_concept_id: null
+      },
+      retencionesResult: null,
+
       
       // Clientes
       clients: [],
@@ -1096,6 +1191,58 @@ export default {
     }
   },
   methods: {
+    // --- NUEVOS METODOS FASE 2: RETENCIONES ---
+    calculateEstimatedRetentions() {
+      if (!this.proveedor) return 0;
+      let totalRet = 0;
+      
+      const taxDebit = Number(this.formData.financial.taxDebit || 0);
+      const totalSales = Number(this.formData.financial.totalSales || 0);
+
+      if (this.retentionConfig.aplicar_iva && this.proveedor.iva_retention_rate > 0) {
+        totalRet += taxDebit * (this.proveedor.iva_retention_rate / 100);
+      }
+      if (this.retentionConfig.aplicar_municipal && this.proveedor.municipal_rate > 0) {
+        totalRet += totalSales * (this.proveedor.municipal_rate / 100);
+      }
+      
+      return totalRet;
+    },
+    getConceptoIslrNombre() {
+      if (this.retentionConfig.islr_concept_id) return 'Sobrescrito';
+      if (this.proveedor && this.proveedor.islr_concept_id) return 'Por Defecto';
+      return 'N/A';
+    },
+    async submitCompraConRetenciones() {
+      this.showConfirmSheet = false;
+      this.loading = true;
+      try {
+        if (!this.proveedor) throw new Error('Debe seleccionar un proveedor');
+
+        const payload = {
+          p_proveedor_id: this.proveedor.id,
+          p_factura: this.formData,
+          p_aplicar_iva: this.retentionConfig.aplicar_iva,
+          p_aplicar_islr: this.retentionConfig.aplicar_islr,
+          p_islr_concept_id: this.retentionConfig.islr_concept_id || this.proveedor.islr_concept_id,
+          p_aplicar_municipal: this.retentionConfig.aplicar_municipal
+        };
+        
+        const result = await retentionRpcService.registrarCompra(payload);
+        
+        this.retencionesResult = result;
+        this.showSuccessSheet = true;
+      } catch (error) {
+        console.error('Error registrando compra:', error);
+        this.showSnackbar(error.message || 'Error registrando compra', 'error');
+      } finally {
+        this.loading = false;
+      }
+    },
+    resetForm() {
+      this.$emit('cancel'); // Opcionalmente podríamos resetear estado interno, pero por ahora delegamos a quien abre el modal
+    },
+    // ------------------------------------------
     checkStockAvailability() {
       // Solo validar en VENTAS
       if (this.formData.flow !== 'VENTA') return true;

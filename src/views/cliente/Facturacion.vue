@@ -233,6 +233,14 @@
           </v-chip>
         </v-tab>
 
+        <v-tab value="retenciones" class="text-none font-weight-medium">
+          <v-icon start size="24" color="purple">mdi-file-document-outline</v-icon>
+          Mis Retenciones
+          <v-chip size="small" class="ml-2" color="purple" variant="tonal">
+            {{ retencionesCount }}
+          </v-chip>
+        </v-tab>
+
         <v-tab value="trash" class="text-none font-weight-medium">
           <v-icon start size="24" color="grey">mdi-delete</v-icon>
           Papelera
@@ -495,6 +503,15 @@
               title="Exportar Excel"
             ></v-btn>
             <v-btn
+              v-if="item.financial?.islrRetention > 0"
+              icon="mdi-file-excel-box"
+              size="small"
+              color="purple"
+              variant="text"
+              @click="downloadISLR(item)"
+              title="Comprobante ISLR"
+            ></v-btn>
+            <v-btn
               icon="mdi-delete"
               size="small"
               color="error"
@@ -635,6 +652,32 @@
                     <div class="text-right">
                       <div class="text-caption text-primary font-weight-bold mb-1">Monto Total</div>
                       <div class="text-h6 font-weight-bold text-success">{{ formatCurrency(viewingInvoice.financial.totalSales, viewingInvoice.financial.currency) }}</div>
+                    </div>
+                  </div>
+
+                  <!-- Bloque de Retenciones -->
+                  <div v-if="viewingInvoice.retenciones && (viewingInvoice.retenciones.iva > 0 || viewingInvoice.retenciones.islr > 0 || viewingInvoice.retenciones.municipal > 0)" class="info-item mt-3 pt-3 border-t">
+                    <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center text-primary">
+                      <v-icon size="small" class="mr-1">mdi-shield-check</v-icon>
+                      Retenciones Aplicadas
+                    </div>
+                    <v-row dense>
+                      <v-col cols="4" v-if="viewingInvoice.retenciones.iva > 0">
+                        <div class="text-caption text-grey-darken-1 mb-1">IVA</div>
+                        <div class="text-body-2 font-weight-bold text-error">-{{ formatCurrency(viewingInvoice.retenciones.iva, viewingInvoice.financial.currency) }}</div>
+                      </v-col>
+                      <v-col cols="4" v-if="viewingInvoice.retenciones.islr > 0">
+                        <div class="text-caption text-grey-darken-1 mb-1">ISLR</div>
+                        <div class="text-body-2 font-weight-bold text-error">-{{ formatCurrency(viewingInvoice.retenciones.islr, viewingInvoice.financial.currency) }}</div>
+                      </v-col>
+                      <v-col cols="4" v-if="viewingInvoice.retenciones.municipal > 0">
+                        <div class="text-caption text-grey-darken-1 mb-1">Municipal</div>
+                        <div class="text-body-2 font-weight-bold text-error">-{{ formatCurrency(viewingInvoice.retenciones.municipal, viewingInvoice.financial.currency) }}</div>
+                      </v-col>
+                    </v-row>
+                    <div class="d-flex justify-space-between align-end mt-2 pt-2 border-t">
+                       <div class="text-caption text-grey-darken-1 font-weight-medium">Neto a Pagar</div>
+                       <div class="text-body-1 font-weight-bold text-success">{{ formatCurrency(viewingInvoice.retenciones.neto_a_pagar || (viewingInvoice.financial.totalSales - (viewingInvoice.retenciones.iva || 0) - (viewingInvoice.retenciones.islr || 0) - (viewingInvoice.retenciones.municipal || 0)), viewingInvoice.financial.currency) }}</div>
                     </div>
                   </div>
                   
@@ -1060,6 +1103,7 @@ import CustomDatePicker from '@/components/common/CustomDatePicker.vue'
 import invoiceService from '@/services/invoiceService.js';
 import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
+import retentionRpcService from '@/services/retentionRpcService.js';
 import emailNotificationService from '@/services/email-notification-service.js';
 import ClientInvoiceForm from '@/components/forms/client/ClientInvoiceForm.vue';
 import SimpleInvoiceForm  from '@/components/forms/client/SimpleInvoiceForm.vue';
@@ -1219,6 +1263,14 @@ export default {
 
     trashCount() {
        return this.trashInvoices ? this.trashInvoices.length : 0;
+    },
+
+    retencionesCount() {
+      if (!this.invoices || !Array.isArray(this.invoices)) return 0;
+      return this.invoices.filter(inv => 
+        inv.flow === 'COMPRA' && 
+        (inv.financial?.islrRetention > 0 || inv.financial?.ivaRetention > 0)
+      ).length;
     },
 
     activeFiltersCount() {
@@ -1551,6 +1603,11 @@ export default {
             inv.flow === 'COMPRA' && inv.expense_type === 'GASTO'
           );
           break;
+        case 'retenciones':
+          filtered = filtered.filter(inv => 
+            inv.flow === 'COMPRA' && (inv.financial?.islrRetention > 0 || inv.financial?.ivaRetention > 0)
+          );
+          break;
         // caso trash ya está cubierto por sourceList, pero si quisiéramos filtrar trash por tipo...
       }
       
@@ -1717,7 +1774,30 @@ export default {
         if (formData.id) {
           savedResult = await invoiceService.updateInvoice(formData.id, formData);
         } else {
-          savedResult = await invoiceService.createInvoice(formData);
+          // Fase 2: Si es una compra y tiene retenciones, usar RPC seguro
+          if (formData.flow === 'COMPRA' && formData.expense_type === 'COMPRA') {
+            
+            // Construir el payload que espera el RPC
+            const rpcPayload = {
+              p_client_id: formData.client?.id || formData.client_id,
+              p_proveedor_id: formData.issuer?.id || formData.proveedor_id,
+              p_aplicar_iva: formData.financial?.ivaRetention > 0,
+              p_aplicar_islr: formData.financial?.islrRetention > 0,
+              p_aplicar_municipal: formData.financial?.municipalRetention > 0,
+              p_factura: formData
+            };
+            
+            if (formData.islr_concept_id) {
+              rpcPayload.p_islr_concept_id = formData.islr_concept_id;
+            }
+
+            const rpcData = await retentionRpcService.registrarCompra(rpcPayload);
+            // Simular la respuesta de invoiceService para mantener compatibilidad con el resto de la vista
+            savedResult = { success: true, data: { id: rpcData.invoice_id, ...formData } };
+
+          } else {
+            savedResult = await invoiceService.createInvoice(formData);
+          }
         }
 
         if (!savedResult || !savedResult.success) {
@@ -2185,6 +2265,24 @@ export default {
       this.filteredInvoices = [invoice];
       this.exportOptions.scope = 'filtered';
       this.showExportDialog = true;
+    },
+
+    async downloadISLR(invoice) {
+      try {
+        const clientProfile = this.$pinia?.state?.value?.auth?.clientProfile || {};
+        const orgProfile = this.$pinia?.state?.value?.auth?.currentOrganization || {};
+        const companyInfo = {
+          name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
+          rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
+          address: clientProfile.address || orgProfile.address || 'DIRECCIÓN NO REGISTRADA'
+        };
+
+        await exportService.exportarComprobanteISLR(invoice, companyInfo);
+        this.$root?.showSnackbar?.('Comprobante exportado exitosamente', 'success');
+      } catch (error) {
+        console.error('Error exportando comprobante ISLR:', error);
+        this.$root?.showSnackbar?.('Error al exportar comprobante ISLR', 'error');
+      }
     },
 
     /** Descarga un recibo PDF individual de la factura */

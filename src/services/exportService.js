@@ -554,6 +554,215 @@ class ExportService {
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, filename);
   }
+
+  // ==========================================
+  // COMPROBANTE DE RETENCIÓN DE ISLR
+  // ==========================================
+  async exportarComprobanteISLR(invoice, companyInfo) {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'AD System';
+    workbook.created = new Date();
+    
+    const worksheet = workbook.addWorksheet('Comprobante ISLR', {
+      pageSetup: { paperSize: 9, orientation: 'landscape', margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5 } }
+    });
+
+    try {
+      // Importante: Asegurar que el path sea accesible en Vite public folder
+      const response = await fetch('/ADSystem/logo.png');
+      if (response.ok) {
+        const imageBuffer = await response.arrayBuffer();
+        const logoId = workbook.addImage({
+          buffer: imageBuffer,
+          extension: 'png',
+        });
+        worksheet.addImage(logoId, {
+          tl: { col: 0, row: 0 },
+          ext: { width: 140, height: 60 } 
+        });
+      }
+    } catch(e) {
+      console.warn("⚠️ No se pudo cargar el logo de ADSystem:", e);
+    }
+
+    worksheet.columns = [
+      { width: 8 },  // A
+      { width: 12 }, // B
+      { width: 15 }, // C
+      { width: 15 }, // D
+      { width: 15 }, // E
+      { width: 15 }, // F
+      { width: 12 }, // G
+      { width: 15 }, // H
+      { width: 15 }, // I
+      { width: 15 }, // J
+      { width: 15 }, // K
+      { width: 10 }, // L
+      { width: 15 }, // M
+    ];
+
+    // Fila 2 y 3: Datos de la Empresa (Agente Retención) cabecera
+    worksheet.mergeCells('D2:J2');
+    const nameCell = worksheet.getCell('D2');
+    nameCell.value = companyInfo?.companyName || companyInfo?.name || 'EMPRESA DEMO';
+    nameCell.font = { bold: true, size: 14 };
+    nameCell.alignment = { horizontal: 'center' };
+
+    worksheet.mergeCells('D3:J3');
+    const rifCell = worksheet.getCell('D3');
+    rifCell.value = companyInfo?.rif || 'J-00000000-0';
+    rifCell.font = { bold: true, size: 12 };
+    rifCell.alignment = { horizontal: 'center' };
+
+    worksheet.mergeCells('A6:M6');
+    const titleCell = worksheet.getCell('A6');
+    titleCell.value = 'COMPROBANTE DE RETENCION DE IMPUESTO SOBRE LA RENTA';
+    titleCell.font = { bold: true, size: 14 };
+    titleCell.alignment = { horizontal: 'center' };
+
+    worksheet.mergeCells('A7:M7');
+    const subtitleCell = worksheet.getCell('A7');
+    subtitleCell.value = '(Para dar cumplimiento con la normativa establecida el Articulo 24, Decreto 1,808 en materia de Retenciones ISLR publicado en G. O. N° 36,203 del 12 de Mayo de 1997)';
+    subtitleCell.font = { size: 9 };
+    subtitleCell.alignment = { horizontal: 'center' };
+
+    worksheet.mergeCells('A9:D9');
+    worksheet.getCell('A9').value = `Fecha: ${this.formatDate(invoice.issueDate)}`;
+    
+    worksheet.mergeCells('K9:L9');
+    worksheet.getCell('K9').value = 'N° COMPROBANTE';
+    worksheet.getCell('K9').font = { bold: true };
+    worksheet.getCell('K9').alignment = { horizontal: 'right' };
+    
+    const yearMonth = dayjs(invoice.issueDate).format('YYYYMM');
+    // Generar correlativo básico si no existe (normalmente vendría del backend)
+    const comprobanteNum = invoice.retention_number || `${yearMonth}00001`; 
+    worksheet.getCell('M9').value = comprobanteNum;
+    worksheet.getCell('M9').font = { color: { argb: 'FFFF0000' }, bold: true }; 
+
+    worksheet.mergeCells('M10:M11');
+    worksheet.getCell('M10').value = `PERIODO FISCAL\nAÑO: ${dayjs(invoice.issueDate).format('YYYY')}   MES: ${dayjs(invoice.issueDate).format('MM')}`;
+    worksheet.getCell('M10').alignment = { horizontal: 'center', wrapText: true };
+    worksheet.getCell('M10').font = { bold: true };
+
+    // Agente Retención
+    worksheet.getCell('A12').value = 'NOMBRE O RAZON SOCIAL DEL AGENTE DE RETENCION:';
+    worksheet.getCell('A12').font = { bold: true };
+    worksheet.getCell('I12').value = 'REGISTRO DE INFORMACION FISCAL DEL AGENTE DE RETENCION:';
+    worksheet.getCell('I12').font = { bold: true };
+    
+    worksheet.getCell('A13').value = companyInfo?.companyName || companyInfo?.name || 'EMPRESA';
+    worksheet.getCell('I13').value = companyInfo?.rif || 'J-00000000-0';
+
+    worksheet.getCell('A15').value = 'DIRECCION FISCAL DEL AGENTE DE RETENCION:';
+    worksheet.getCell('A15').font = { bold: true };
+    worksheet.getCell('A16').value = companyInfo?.address || 'DIRECCIÓN NO REGISTRADA';
+
+    // Sujeto Retenido
+    worksheet.getCell('A18').value = 'NOMBRE O RAZON SOCIAL DEL SUJETO RETENIDO:';
+    worksheet.getCell('A18').font = { bold: true };
+    worksheet.getCell('I18').value = 'REGISTRO DE INFORMACION FISCAL DEL SUJETO RETENIDO (R.I.F):';
+    worksheet.getCell('I18').font = { bold: true };
+
+    const proveedorName = invoice.flow === 'VENTA' ? invoice.client?.companyName : invoice.issuer?.companyName;
+    const proveedorRif = invoice.flow === 'VENTA' ? invoice.client?.rif : invoice.issuer?.rif;
+    const proveedorDir = invoice.flow === 'VENTA' ? invoice.client?.address : invoice.issuer?.address;
+
+    worksheet.getCell('A19').value = proveedorName;
+    worksheet.getCell('I19').value = proveedorRif;
+
+    worksheet.getCell('A21').value = 'DIRECCION FISCAL DEL SUJETO RETENIDO:';
+    worksheet.getCell('A21').font = { bold: true };
+    worksheet.getCell('A22').value = proveedorDir || 'DIRECCIÓN NO REGISTRADA';
+
+    // Tabla Operaciones
+    const headerRow = 24;
+    const headers = [
+      'Oper.\nNro.', 'Fecha de pago o\nAbono en cuenta', 'Número de\nFactura', 'Número de\nControl',
+      'Número\nNota Débito', 'Número de\nNota Crédito', 'Tipo de\nTransacc.', 'Cantidad\nPagada',
+      'Total Compras\nIncluyendo\nel IVA', 'Compras sin\nderecho a\nCrédito IVA', 
+      'Cantidad Objeto\nde Retencion', '%\nAlicuota', 'Impuesto\nRetenido'
+    ];
+
+    const hRow = worksheet.getRow(headerRow);
+    headers.forEach((header, idx) => {
+      const cell = hRow.getCell(idx + 1);
+      cell.value = header;
+      cell.font = { bold: true, size: 9 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      this.addBorders(cell);
+    });
+    hRow.height = 45;
+
+    const dataRow = worksheet.getRow(25);
+    const base = invoice.financial?.taxableSales || 0;
+    const retencion = invoice.financial?.islrRetention || 0;
+    const exento = invoice.financial?.exemptSales || 0;
+    const total = invoice.financial?.totalSales || 0;
+    const alicuota = base > 0 ? ((retencion / base) * 100).toFixed(0) : 0;
+
+    dataRow.values = [
+      1,
+      this.formatDate(invoice.issueDate),
+      invoice.invoiceNumber,
+      invoice.controlNumber,
+      '',
+      '',
+      '01-reg',
+      this.formatCurrency(total - retencion),
+      this.formatCurrency(total),
+      this.formatCurrency(exento),
+      this.formatCurrency(base),
+      Number(alicuota),
+      this.formatCurrency(retencion)
+    ];
+
+    for (let col = 1; col <= 13; col++) {
+      const cell = dataRow.getCell(col);
+      this.addBorders(cell);
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      if (col >= 8) cell.numFmt = '#,##0.00';
+    }
+
+    const totalRow = worksheet.getRow(27);
+    worksheet.mergeCells('A27:G27');
+    const tLabel = worksheet.getCell('A27');
+    tLabel.value = 'TOTALES';
+    tLabel.font = { bold: true };
+    tLabel.alignment = { horizontal: 'right', vertical: 'middle' };
+    this.addBorders(tLabel);
+
+    totalRow.getCell(8).value = { formula: 'SUM(H25:H25)' };
+    totalRow.getCell(9).value = { formula: 'SUM(I25:I25)' };
+    totalRow.getCell(10).value = { formula: 'SUM(J25:J25)' };
+    totalRow.getCell(11).value = { formula: 'SUM(K25:K25)' };
+    totalRow.getCell(12).value = '';
+    totalRow.getCell(13).value = { formula: 'SUM(M25:M25)' };
+
+    for (let col = 8; col <= 13; col++) {
+      const cell = totalRow.getCell(col);
+      cell.font = { bold: true };
+      this.addBorders(cell);
+      if (col !== 12) cell.numFmt = '#,##0.00';
+    }
+
+    const firmaAgente = worksheet.getCell('C32');
+    firmaAgente.value = '_______________________________________\nFIRMA DEL AGENTE DE RETENCION\nSELLO';
+    firmaAgente.alignment = { horizontal: 'center', wrapText: true };
+    firmaAgente.font = { bold: true };
+    
+    worksheet.mergeCells('J32:L32');
+    const firmaRetenido = worksheet.getCell('J32');
+    firmaRetenido.value = '_______________________________________\nRECIBIDO POR\nFIRMA / SELLO';
+    firmaRetenido.alignment = { horizontal: 'center', wrapText: true };
+    firmaRetenido.font = { bold: true };
+
+    const filename = `Comprobante_ISLR_${invoice.invoiceNumber || 'Borrador'}.xlsx`;
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, filename);
+  }
 }
 
 export default new ExportService();

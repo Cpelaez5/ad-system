@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
+import emailNotificationService from './email-notification-service.js';
 
 /**
  * Servicio de Facturación de Suscripción
@@ -257,7 +258,7 @@ export default {
             // Obtener balance de crédito del cliente si aplica
             let clientBalance = 0;
             if (clientId) {
-                const { data: clientData } = await supabase.from('clients').select('balance').eq('id', clientId).single();
+                const { data: clientData } = await supabase.from('clients').select('balance').eq('id', clientId).maybeSingle();
                 clientBalance = clientData?.balance || 0;
             }
 
@@ -462,9 +463,13 @@ export default {
                 .from('system_invoices')
                 .select('amount')
                 .eq('id', invoiceId)
-                .single();
+                .maybeSingle();
 
             if (invError) throw invError;
+            if (!invoice) {
+                // Si por RLS o caché no se encuentra, asumimos que no está cubierta para permitir el reporte
+                return { success: true, exists: false };
+            }
 
             const remaining = Math.max(0, invoice.amount - totalReported);
 
@@ -584,7 +589,7 @@ export default {
         try {
             let query = supabase
                 .from('payment_reports')
-                .select('*, invoice:system_invoices(invoice_number, amount, currency, client:clients(company_name, rif)), payment_method:payment_methods(name, type)')
+                .select('*, invoice:system_invoices(invoice_number, amount, currency, client:clients(company_name, rif, email)), payment_method:payment_methods(name, type)')
                 .order('created_at', { ascending: false });
 
             if (statusFilter !== 'all') {
@@ -612,7 +617,7 @@ export default {
             // 1. Obtener el reporte actual y su factura
             const { data: report, error: fetchError } = await supabase
                 .from('payment_reports')
-                .select('*, invoice:system_invoices(*)')
+                .select('*, invoice:system_invoices(*), client:clients(email, company_name)')
                 .eq('id', reportId)
                 .single();
 
@@ -695,7 +700,7 @@ export default {
                         .from('clients')
                         .select('balance')
                         .eq('id', report.client_id)
-                        .single();
+                        .maybeSingle();
 
                     if (!clientError) {
                         const newBalance = (parseFloat(client.balance) || 0) + newExcess;
@@ -831,6 +836,17 @@ export default {
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', invoice_id);
+            }
+
+            // Enviar notificación por correo
+            if (report.client?.email) {
+                emailNotificationService.notifyPaymentStatusUpdate({
+                    clientEmail: report.client.email,
+                    clientName: report.client.company_name,
+                    invoiceNumber: report.invoice?.invoice_number || 'N/A',
+                    status: 'approved',
+                    amount: parseFloat(report.amount)
+                }).catch(e => console.warn('Error en notificación (Aprobado):', e));
             }
 
             return { success: true, data: report };
@@ -994,10 +1010,23 @@ export default {
                     rejection_reason: reason
                 })
                 .eq('id', reportId)
-                .select()
+                .select('*, invoice:system_invoices(*), client:clients(email, company_name)')
                 .single();
 
             if (error) throw error;
+
+            // Enviar notificación por correo
+            if (data.client?.email) {
+                emailNotificationService.notifyPaymentStatusUpdate({
+                    clientEmail: data.client.email,
+                    clientName: data.client.company_name,
+                    invoiceNumber: data.invoice?.invoice_number || 'N/A',
+                    status: 'rejected',
+                    rejectionReason: reason,
+                    amount: parseFloat(data.amount)
+                }).catch(e => console.warn('Error en notificación (Rechazado):', e));
+            }
+
             return { success: true, data };
         } catch (error) {
             console.error('❌ Error rechazando pago:', error);

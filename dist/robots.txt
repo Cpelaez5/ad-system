@@ -26,4 +26,4 @@ Disallow: /settings
 Disallow: /api/
 
 # Ruta al sitemap
-Sitemap: https://ad-businessgroup.netlify.app/sitemap.xml
+Sitemap: https://adsystemapp.com/sitemap.xml
