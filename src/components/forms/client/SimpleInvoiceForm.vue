@@ -1460,8 +1460,10 @@ export default {
         try {
           const { data: concepto } = await supabase.from('conceptos_islr').select('*').eq('id', config.conceptoIslr).single();
           if (concepto) {
-             const rate = this.proveedor.tipo_persona === 'PERSONA NATURAL' ? concepto.porcentaje_pn : concepto.porcentaje_pj;
-             islr = parseFloat((amount * (rate / 100)).toFixed(2));
+             const baseAplicable = parseFloat(concepto.porcentaje_base) || 100;
+             const baseMonto = amount * (baseAplicable / 100);
+             const rate = parseFloat(concepto.porcentaje_retencion) || 0;
+             islr = parseFloat((baseMonto * (rate / 100)).toFixed(2));
           }
         } catch(e) { console.error("Error calculando ISLR", e); }
       }

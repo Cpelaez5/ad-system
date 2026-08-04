@@ -486,31 +486,33 @@
               @click="editInvoice(item)"
               title="Editar"
             ></v-btn>
-            <v-btn
-              icon="mdi-file-pdf-box"
-              size="small"
-              color="error"
-              variant="text"
-              @click="downloadReceiptPdf(item)"
-              title="Descargar Recibo PDF"
-            ></v-btn>
-            <v-btn
-              icon="mdi-download"
-              size="small"
-              color="success"
-              variant="text"
-              @click="exportInvoice(item)"
-              title="Exportar Excel"
-            ></v-btn>
-            <v-btn
-              v-if="item.financial?.islrRetention > 0"
-              icon="mdi-file-excel-box"
-              size="small"
-              color="purple"
-              variant="text"
-              @click="downloadISLR(item)"
-              title="Comprobante ISLR"
-            ></v-btn>
+            <!-- Menú de Descargas Unificado -->
+            <v-menu>
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  icon="mdi-download"
+                  size="small"
+                  color="success"
+                  variant="text"
+                  v-bind="props"
+                  title="Opciones de descarga"
+                ></v-btn>
+              </template>
+              <v-list density="compact">
+                <v-list-item @click="downloadReceiptPdf(item)" prepend-icon="mdi-file-pdf-box">
+                  <v-list-item-title>Descargar Recibo (PDF)</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="exportInvoice(item)" prepend-icon="mdi-file-excel-box">
+                  <v-list-item-title>Descargar Registro (Excel)</v-list-item-title>
+                </v-list-item>
+                <v-list-item v-if="item.attachments && item.attachments.length > 0" @click="downloadAttachment(item)" prepend-icon="mdi-paperclip">
+                  <v-list-item-title>Descargar Archivo Adjunto</v-list-item-title>
+                </v-list-item>
+                <v-list-item v-if="item.retenciones && item.retenciones.islr > 0" @click="downloadISLR(item)" prepend-icon="mdi-shield-check">
+                  <v-list-item-title>Descargar Comprobante ISLR</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
             <v-btn
               icon="mdi-delete"
               size="small"
@@ -588,7 +590,7 @@
     </v-dialog>
 
     <!-- Diálogo de vista de factura -->
-    <v-dialog v-model="viewDialog" max-width="900px" scrollable :fullscreen="$vuetify.display.smAndDown">
+    <v-dialog v-model="viewDialog" max-width="1100px" scrollable :fullscreen="$vuetify.display.smAndDown">
       <v-card v-if="viewingInvoice" class="rounded-xl elevation-0" style="border-radius: 20px !important;">
         <!-- Header con gradiente sutil -->
         <div class="pa-4 pa-md-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
@@ -654,25 +656,26 @@
                       <div class="text-h6 font-weight-bold text-success">{{ formatCurrency(viewingInvoice.financial.totalSales, viewingInvoice.financial.currency) }}</div>
                     </div>
                   </div>
-
                   <!-- Bloque de Retenciones -->
                   <div v-if="viewingInvoice.retenciones && (viewingInvoice.retenciones.iva > 0 || viewingInvoice.retenciones.islr > 0 || viewingInvoice.retenciones.municipal > 0)" class="info-item mt-3 pt-3 border-t">
                     <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center text-primary">
-                      <v-icon size="small" class="mr-1">mdi-shield-check</v-icon>
-                      Retenciones Aplicadas
+                      <div class="d-flex align-center">
+                        <v-icon size="small" class="mr-1">mdi-shield-check</v-icon>
+                        Retenciones
+                      </div>
                     </div>
                     <v-row dense>
-                      <v-col cols="4" v-if="viewingInvoice.retenciones.iva > 0">
+                      <v-col cols="6" md="4" v-if="viewingInvoice.retenciones.iva > 0">
                         <div class="text-caption text-grey-darken-1 mb-1">IVA</div>
-                        <div class="text-body-2 font-weight-bold text-error">-{{ formatCurrency(viewingInvoice.retenciones.iva, viewingInvoice.financial.currency) }}</div>
+                        <div class="text-body-2 font-weight-bold text-error text-nowrap">-{{ formatCurrency(viewingInvoice.retenciones.iva, viewingInvoice.financial.currency) }}</div>
                       </v-col>
-                      <v-col cols="4" v-if="viewingInvoice.retenciones.islr > 0">
+                      <v-col cols="6" md="4" v-if="viewingInvoice.retenciones.islr > 0">
                         <div class="text-caption text-grey-darken-1 mb-1">ISLR</div>
-                        <div class="text-body-2 font-weight-bold text-error">-{{ formatCurrency(viewingInvoice.retenciones.islr, viewingInvoice.financial.currency) }}</div>
+                        <div class="text-body-2 font-weight-bold text-error text-nowrap">-{{ formatCurrency(viewingInvoice.retenciones.islr, viewingInvoice.financial.currency) }}</div>
                       </v-col>
-                      <v-col cols="4" v-if="viewingInvoice.retenciones.municipal > 0">
+                      <v-col cols="6" md="4" v-if="viewingInvoice.retenciones.municipal > 0">
                         <div class="text-caption text-grey-darken-1 mb-1">Municipal</div>
-                        <div class="text-body-2 font-weight-bold text-error">-{{ formatCurrency(viewingInvoice.retenciones.municipal, viewingInvoice.financial.currency) }}</div>
+                        <div class="text-body-2 font-weight-bold text-error text-nowrap">-{{ formatCurrency(viewingInvoice.retenciones.municipal, viewingInvoice.financial.currency) }}</div>
                       </v-col>
                     </v-row>
                     <div class="d-flex justify-space-between align-end mt-2 pt-2 border-t">
@@ -744,17 +747,7 @@
                       <div class="text-body-2 font-weight-medium text-wrap" style="white-space: pre-wrap;">{{ viewingInvoice.notes }}</div>
                   </div>
 
-                  <div v-if="hasAttachment(viewingInvoice)" class="mt-4">
-                      <v-btn
-                          color="primary"
-                          variant="tonal"
-                          block
-                          prepend-icon="mdi-download"
-                          @click="downloadAttachment(viewingInvoice)"
-                      >
-                          Descargar Archivo
-                      </v-btn>
-                  </div>
+
               </div>
             </v-col>
             
@@ -795,14 +788,30 @@
         </v-card-text>
         <v-divider></v-divider>
         <v-card-actions class="pa-4 bg-grey-lighten-5">
-          <v-btn
-            color="error"
-            variant="tonal"
-            prepend-icon="mdi-file-pdf-box"
-            @click="downloadReceiptPdf(viewingInvoice)"
-          >
-            Descargar Recibo
-          </v-btn>
+          <!-- Menú de Descargas Unificado (Modal) -->
+          <v-menu>
+            <template v-slot:activator="{ props }">
+              <v-btn
+                color="success"
+                variant="tonal"
+                prepend-icon="mdi-download"
+                v-bind="props"
+              >
+                Descargas
+              </v-btn>
+            </template>
+            <v-list density="compact">
+              <v-list-item @click="downloadReceiptPdf(viewingInvoice)" prepend-icon="mdi-file-pdf-box">
+                <v-list-item-title>Descargar Recibo (PDF)</v-list-item-title>
+              </v-list-item>
+              <v-list-item v-if="hasAttachment(viewingInvoice)" @click="downloadAttachment(viewingInvoice)" prepend-icon="mdi-paperclip">
+                <v-list-item-title>Descargar Archivo Adjunto</v-list-item-title>
+              </v-list-item>
+              <v-list-item v-if="viewingInvoice.retenciones && viewingInvoice.retenciones.islr > 0" @click="downloadISLR(viewingInvoice)" prepend-icon="mdi-shield-check">
+                <v-list-item-title>Descargar Comprobante ISLR</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
           <v-spacer></v-spacer>
           <v-btn color="primary" variant="elevated" @click="viewDialog = false" class="px-6">
             Cerrar
@@ -2268,8 +2277,11 @@ export default {
 
     async downloadISLR(invoice) {
       try {
-        const clientProfile = this.$pinia?.state?.value?.auth?.clientProfile || {};
-        const orgProfile = this.$pinia?.state?.value?.auth?.currentOrganization || {};
+        const clientProfile = this.currentUser?.client || {};
+        const orgProfile = Array.isArray(this.currentUser?.organization) 
+          ? this.currentUser.organization[0] 
+          : (this.currentUser?.organization || {});
+          
         const companyInfo = {
           name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
           rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',

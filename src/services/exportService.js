@@ -568,9 +568,11 @@ class ExportService {
     });
 
     try {
-      // Importante: Asegurar que el path sea accesible en Vite public folder
+      // LOGO REMOVIDO TEMPORALMENTE PARA EVITAR CORRUPCIÓN XML EN EXCELJS
+      /*
       const response = await fetch('/ADSystem/logo.png');
-      if (response.ok) {
+      const contentType = response.headers.get('content-type');
+      if (response.ok && contentType && contentType.includes('image')) {
         const imageBuffer = await response.arrayBuffer();
         const logoId = workbook.addImage({
           buffer: imageBuffer,
@@ -581,6 +583,7 @@ class ExportService {
           ext: { width: 140, height: 60 } 
         });
       }
+      */
     } catch(e) {
       console.warn("⚠️ No se pudo cargar el logo de ADSystem:", e);
     }
@@ -601,16 +604,43 @@ class ExportService {
       { width: 15 }, // M
     ];
 
-    // Fila 2 y 3: Datos de la Empresa (Agente Retención) cabecera
+    let agenteName, agenteRif, agenteDir;
+    let sujetoName, sujetoRif, sujetoDir;
+
+    // Tratar de obtener de la base de datos (invoice.organization para el tenant)
+    const tenantName = companyInfo?.name || companyInfo?.companyName || invoice.organization?.name || 'EMPRESA (TENANT)';
+    const tenantRif = companyInfo?.rif || invoice.organization?.rif || 'J-00000000-0';
+    const tenantDir = companyInfo?.address || companyInfo?.direccion || invoice.organization?.address || 'DIRECCIÓN NO REGISTRADA';
+
+    if (invoice.flow === 'COMPRA') {
+      // En una COMPRA, si el usuario es el cliente y está registrando su propia compra, 
+      // EL CLIENTE es el agente de retención. Pero en el sistema, las COMPRAS registradas
+      // pertenecen al tenant. Asumiremos que el Tenant es el agente y el emisor (proveedor) el sujeto.
+      agenteName = tenantName;
+      agenteRif = tenantRif;
+      agenteDir = tenantDir;
+      sujetoName = invoice.issuer?.razon_social || invoice.issuer?.nombre || invoice.issuer?.companyName || 'PROVEEDOR NO REGISTRADO';
+      sujetoRif = invoice.issuer?.rif || 'J-00000000-0';
+      sujetoDir = invoice.issuer?.direccion || invoice.issuer?.address || 'DIRECCIÓN NO REGISTRADA';
+    } else {
+      agenteName = invoice.client?.razon_social || invoice.client?.nombre || invoice.client?.companyName || 'CLIENTE NO REGISTRADO';
+      agenteRif = invoice.client?.rif || 'J-00000000-0';
+      agenteDir = invoice.client?.direccion || invoice.client?.address || 'DIRECCIÓN NO REGISTRADA';
+      sujetoName = tenantName;
+      sujetoRif = tenantRif;
+      sujetoDir = tenantDir;
+    }
+
+    // Fila 2 y 3: Datos del Agente de Retención (cabecera)
     worksheet.mergeCells('D2:J2');
     const nameCell = worksheet.getCell('D2');
-    nameCell.value = companyInfo?.companyName || companyInfo?.name || 'EMPRESA DEMO';
+    nameCell.value = agenteName;
     nameCell.font = { bold: true, size: 14 };
     nameCell.alignment = { horizontal: 'center' };
 
     worksheet.mergeCells('D3:J3');
     const rifCell = worksheet.getCell('D3');
-    rifCell.value = companyInfo?.rif || 'J-00000000-0';
+    rifCell.value = agenteRif;
     rifCell.font = { bold: true, size: 12 };
     rifCell.alignment = { horizontal: 'center' };
 
@@ -651,12 +681,12 @@ class ExportService {
     worksheet.getCell('I12').value = 'REGISTRO DE INFORMACION FISCAL DEL AGENTE DE RETENCION:';
     worksheet.getCell('I12').font = { bold: true };
     
-    worksheet.getCell('A13').value = companyInfo?.companyName || companyInfo?.name || 'EMPRESA';
-    worksheet.getCell('I13').value = companyInfo?.rif || 'J-00000000-0';
+    worksheet.getCell('A13').value = agenteName;
+    worksheet.getCell('I13').value = agenteRif;
 
     worksheet.getCell('A15').value = 'DIRECCION FISCAL DEL AGENTE DE RETENCION:';
     worksheet.getCell('A15').font = { bold: true };
-    worksheet.getCell('A16').value = companyInfo?.address || 'DIRECCIÓN NO REGISTRADA';
+    worksheet.getCell('A16').value = agenteDir;
 
     // Sujeto Retenido
     worksheet.getCell('A18').value = 'NOMBRE O RAZON SOCIAL DEL SUJETO RETENIDO:';
@@ -664,16 +694,12 @@ class ExportService {
     worksheet.getCell('I18').value = 'REGISTRO DE INFORMACION FISCAL DEL SUJETO RETENIDO (R.I.F):';
     worksheet.getCell('I18').font = { bold: true };
 
-    const proveedorName = invoice.flow === 'VENTA' ? invoice.client?.companyName : invoice.issuer?.companyName;
-    const proveedorRif = invoice.flow === 'VENTA' ? invoice.client?.rif : invoice.issuer?.rif;
-    const proveedorDir = invoice.flow === 'VENTA' ? invoice.client?.address : invoice.issuer?.address;
-
-    worksheet.getCell('A19').value = proveedorName;
-    worksheet.getCell('I19').value = proveedorRif;
+    worksheet.getCell('A19').value = sujetoName;
+    worksheet.getCell('I19').value = sujetoRif;
 
     worksheet.getCell('A21').value = 'DIRECCION FISCAL DEL SUJETO RETENIDO:';
     worksheet.getCell('A21').font = { bold: true };
-    worksheet.getCell('A22').value = proveedorDir || 'DIRECCIÓN NO REGISTRADA';
+    worksheet.getCell('A22').value = sujetoDir;
 
     // Tabla Operaciones
     const headerRow = 24;
@@ -733,12 +759,16 @@ class ExportService {
     tLabel.alignment = { horizontal: 'right', vertical: 'middle' };
     this.addBorders(tLabel);
 
-    totalRow.getCell(8).value = { formula: 'SUM(H25:H25)' };
-    totalRow.getCell(9).value = { formula: 'SUM(I25:I25)' };
-    totalRow.getCell(10).value = { formula: 'SUM(J25:J25)' };
-    totalRow.getCell(11).value = { formula: 'SUM(K25:K25)' };
+    totalRow.getCell(8).value = (total - retencion) || 0;
+    totalRow.getCell(9).value = total || 0;
+    totalRow.getCell(10).value = exento || 0;
+    totalRow.getCell(11).value = base || 0;
     totalRow.getCell(12).value = '';
-    totalRow.getCell(13).value = { formula: 'SUM(M25:M25)' };
+    totalRow.getCell(13).value = retencion || 0;
+
+    const masterCell = totalRow.getCell(1);
+    masterCell.font = { bold: true };
+    this.addBorders(masterCell);
 
     for (let col = 8; col <= 13; col++) {
       const cell = totalRow.getCell(col);
