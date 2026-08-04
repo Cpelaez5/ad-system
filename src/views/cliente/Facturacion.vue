@@ -1268,8 +1268,7 @@ export default {
     retencionesCount() {
       if (!this.invoices || !Array.isArray(this.invoices)) return 0;
       return this.invoices.filter(inv => 
-        inv.flow === 'COMPRA' && 
-        (inv.financial?.islrRetention > 0 || inv.financial?.ivaRetention > 0)
+        inv.flow === 'COMPRA' && ((inv.retenciones?.islr > 0) || (inv.retenciones?.iva > 0) || (inv.retenciones?.municipal > 0))
       ).length;
     },
 
@@ -1605,7 +1604,7 @@ export default {
           break;
         case 'retenciones':
           filtered = filtered.filter(inv => 
-            inv.flow === 'COMPRA' && (inv.financial?.islrRetention > 0 || inv.financial?.ivaRetention > 0)
+            inv.flow === 'COMPRA' && ((inv.retenciones?.islr > 0) || (inv.retenciones?.iva > 0) || (inv.retenciones?.municipal > 0))
           );
           break;
         // caso trash ya está cubierto por sourceList, pero si quisiéramos filtrar trash por tipo...

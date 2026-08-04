@@ -1066,19 +1066,22 @@ export default {
           const { data, error } = await supabase.from('proveedores').select('*').eq('id', id).single();
           if (error) throw error;
           
+          const ivaRate = data.iva_retention_rate ? parseFloat(data.iva_retention_rate) : 0;
+          const municipalRate = data.municipal_rate ? parseFloat(data.municipal_rate) : 0;
+
           this.retentionConfig = {
-            aplicarIva: data.retencion_iva || false,
-            porcentajeIva: data.porcentaje_retencion_iva || 75,
-            aplicarIslr: data.retencion_islr || false,
-            conceptoIslr: data.concepto_islr_id || null,
-            aplicarMunicipal: data.retencion_municipal || false,
-            porcentajeMunicipal: data.alicuota_municipal || 0
+            aplicarIva: ivaRate > 0,
+            porcentajeIva: ivaRate > 0 ? ivaRate : 75,
+            aplicarIslr: !!data.islr_concept_id,
+            conceptoIslr: data.islr_concept_id || null,
+            aplicarMunicipal: municipalRate > 0,
+            porcentajeMunicipal: municipalRate
           };
           
           this.formData.issuer.id = data.id || '';
-          this.formData.issuer.companyName = data.razon_social || '';
+          this.formData.issuer.companyName = data.nombre || '';
           this.formData.issuer.rif = data.rif || '';
-          this.formData.issuer.address = data.direccion || '';
+          this.formData.issuer.address = '';
           
           await this.calcularRetenciones();
         } catch (err) {
