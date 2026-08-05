@@ -500,16 +500,16 @@
               </template>
               <v-list density="compact">
                 <v-list-item @click="downloadReceiptPdf(item)" prepend-icon="mdi-file-pdf-box">
-                  <v-list-item-title>Descargar Recibo (PDF)</v-list-item-title>
+                  <v-list-item-title>Ver / Descargar Resumen en PDF</v-list-item-title>
                 </v-list-item>
                 <v-list-item @click="exportInvoice(item)" prepend-icon="mdi-file-excel-box">
-                  <v-list-item-title>Descargar Registro (Excel)</v-list-item-title>
+                  <v-list-item-title>Descargar Datos en Excel</v-list-item-title>
                 </v-list-item>
                 <v-list-item v-if="item.attachments && item.attachments.length > 0" @click="downloadAttachment(item)" prepend-icon="mdi-paperclip">
-                  <v-list-item-title>Descargar Archivo Adjunto</v-list-item-title>
+                  <v-list-item-title>Ver / Descargar Foto Adjunta</v-list-item-title>
                 </v-list-item>
                 <v-list-item v-if="item.retenciones && item.retenciones.islr > 0" @click="downloadISLR(item)" prepend-icon="mdi-shield-check">
-                  <v-list-item-title>Descargar Comprobante ISLR</v-list-item-title>
+                  <v-list-item-title>Descargar Planilla de Retención (ISLR)</v-list-item-title>
                 </v-list-item>
               </v-list>
             </v-menu>
@@ -590,7 +590,7 @@
     </v-dialog>
 
     <!-- Diálogo de vista de factura -->
-    <v-dialog v-model="viewDialog" max-width="1100px" scrollable :fullscreen="$vuetify.display.smAndDown">
+    <v-dialog v-model="viewDialog" max-width="1200px" scrollable :fullscreen="$vuetify.display.smAndDown">
       <v-card v-if="viewingInvoice" class="rounded-xl elevation-0" style="border-radius: 20px !important;">
         <!-- Header con gradiente sutil -->
         <div class="pa-4 pa-md-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
@@ -665,15 +665,15 @@
                       </div>
                     </div>
                     <v-row dense>
-                      <v-col cols="6" md="4" v-if="viewingInvoice.retenciones.iva > 0">
+                      <v-col cols="12" sm="6" md="4" v-if="viewingInvoice.retenciones.iva > 0">
                         <div class="text-caption text-grey-darken-1 mb-1">IVA</div>
                         <div class="text-body-2 font-weight-bold text-error text-nowrap">-{{ formatCurrency(viewingInvoice.retenciones.iva, viewingInvoice.financial.currency) }}</div>
                       </v-col>
-                      <v-col cols="6" md="4" v-if="viewingInvoice.retenciones.islr > 0">
+                      <v-col cols="12" sm="6" md="4" v-if="viewingInvoice.retenciones.islr > 0">
                         <div class="text-caption text-grey-darken-1 mb-1">ISLR</div>
                         <div class="text-body-2 font-weight-bold text-error text-nowrap">-{{ formatCurrency(viewingInvoice.retenciones.islr, viewingInvoice.financial.currency) }}</div>
                       </v-col>
-                      <v-col cols="6" md="4" v-if="viewingInvoice.retenciones.municipal > 0">
+                      <v-col cols="12" sm="6" md="4" v-if="viewingInvoice.retenciones.municipal > 0">
                         <div class="text-caption text-grey-darken-1 mb-1">Municipal</div>
                         <div class="text-body-2 font-weight-bold text-error text-nowrap">-{{ formatCurrency(viewingInvoice.retenciones.municipal, viewingInvoice.financial.currency) }}</div>
                       </v-col>
@@ -802,13 +802,13 @@
             </template>
             <v-list density="compact">
               <v-list-item @click="downloadReceiptPdf(viewingInvoice)" prepend-icon="mdi-file-pdf-box">
-                <v-list-item-title>Descargar Recibo (PDF)</v-list-item-title>
+                <v-list-item-title>Ver / Descargar Resumen en PDF</v-list-item-title>
               </v-list-item>
               <v-list-item v-if="hasAttachment(viewingInvoice)" @click="downloadAttachment(viewingInvoice)" prepend-icon="mdi-paperclip">
-                <v-list-item-title>Descargar Archivo Adjunto</v-list-item-title>
+                <v-list-item-title>Ver / Descargar Foto Adjunta</v-list-item-title>
               </v-list-item>
               <v-list-item v-if="viewingInvoice.retenciones && viewingInvoice.retenciones.islr > 0" @click="downloadISLR(viewingInvoice)" prepend-icon="mdi-shield-check">
-                <v-list-item-title>Descargar Comprobante ISLR</v-list-item-title>
+                <v-list-item-title>Descargar Planilla de Retención (ISLR)</v-list-item-title>
               </v-list-item>
             </v-list>
           </v-menu>

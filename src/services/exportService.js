@@ -9,7 +9,11 @@ class ExportService {
 
   formatCurrency(amount) {
     if (amount === undefined || amount === null) return 0;
-    return Number(amount);
+    if (typeof amount === 'string') {
+      const cleanString = amount.replace(/,/g, '');
+      return Number(cleanString) || 0;
+    }
+    return Number(amount) || 0;
   }
 
   formatDate(dateString) {
@@ -158,6 +162,9 @@ class ExportService {
     // ==========================================
     // DATOS (Fila 7+)
     // ==========================================
+    let sumTotalSales = 0, sumExemptSales = 0, sumTaxableSales = 0, sumTaxDebit = 0;
+    let sumIvaRetention = 0, sumIslrRetention = 0, sumMunicipalRetention = 0, sumIgtf = 0;
+
     let currentRow = headerRow + 1;
     fiscalInvoices.forEach((inv, index) => {
       const row = worksheet.getRow(currentRow);
@@ -167,6 +174,24 @@ class ExportService {
         console.warn(`⚠️ Factura sin número en posición ${index + 1}, usando ID: ${inv.id}`);
       }
 
+      const totalSales = this.formatCurrency(inv.financial?.totalSales);
+      const exemptSales = this.formatCurrency(inv.financial?.exemptSales);
+      const taxableSales = this.formatCurrency(inv.financial?.taxableSales);
+      const taxDebit = this.formatCurrency(inv.financial?.taxDebit);
+      const ivaRetention = this.formatCurrency(inv.financial?.ivaRetention);
+      const islrRetention = this.formatCurrency(inv.financial?.islrRetention);
+      const municipalRetention = this.formatCurrency(inv.financial?.municipalRetention);
+      const igtf = this.formatCurrency(inv.financial?.igtf);
+
+      sumTotalSales += totalSales;
+      sumExemptSales += exemptSales;
+      sumTaxableSales += taxableSales;
+      sumTaxDebit += taxDebit;
+      sumIvaRetention += ivaRetention;
+      sumIslrRetention += islrRetention;
+      sumMunicipalRetention += municipalRetention;
+      sumIgtf += igtf;
+
       row.values = [
         index + 1, // N° secuencial
         this.formatDate(inv.issueDate),
@@ -175,14 +200,14 @@ class ExportService {
         inv.controlNumber || '-',
         inv.issuer?.companyName || 'Proveedor',
         inv.issuer?.rif || '-',
-        this.formatCurrency(inv.financial?.totalSales),
-        this.formatCurrency(inv.financial?.exemptSales),
-        this.formatCurrency(inv.financial?.taxableSales),
-        this.formatCurrency(inv.financial?.taxDebit), // Crédito fiscal
-        this.formatCurrency(inv.financial?.ivaRetention),
-        this.formatCurrency(inv.financial?.islrRetention),
-        this.formatCurrency(inv.financial?.municipalRetention),
-        this.formatCurrency(inv.financial?.igtf)
+        totalSales,
+        exemptSales,
+        taxableSales,
+        taxDebit, // Crédito fiscal
+        ivaRetention,
+        islrRetention,
+        municipalRetention,
+        igtf
       ];
 
       // Aplicar bordes a todas las celdas
@@ -203,14 +228,14 @@ class ExportService {
     // Solo calcular totales si hay datos
     if (fiscalInvoices.length > 0) {
       totalRow.getCell(1).value = ''; // N°
-      totalRow.getCell(8).value = { formula: `SUM(H${dataStartRow}:H${dataEndRow})` };
-      totalRow.getCell(9).value = { formula: `SUM(I${dataStartRow}:I${dataEndRow})` };
-      totalRow.getCell(10).value = { formula: `SUM(J${dataStartRow}:J${dataEndRow})` };
-      totalRow.getCell(11).value = { formula: `SUM(K${dataStartRow}:K${dataEndRow})` };
-      totalRow.getCell(12).value = { formula: `SUM(L${dataStartRow}:L${dataEndRow})` };
-      totalRow.getCell(13).value = { formula: `SUM(M${dataStartRow}:M${dataEndRow})` };
-      totalRow.getCell(14).value = { formula: `SUM(N${dataStartRow}:N${dataEndRow})` };
-      totalRow.getCell(15).value = { formula: `SUM(O${dataStartRow}:O${dataEndRow})` };
+      totalRow.getCell(8).value = sumTotalSales;
+      totalRow.getCell(9).value = sumExemptSales;
+      totalRow.getCell(10).value = sumTaxableSales;
+      totalRow.getCell(11).value = sumTaxDebit;
+      totalRow.getCell(12).value = sumIvaRetention;
+      totalRow.getCell(13).value = sumIslrRetention;
+      totalRow.getCell(14).value = sumMunicipalRetention;
+      totalRow.getCell(15).value = sumIgtf;
 
       for (let col = 8; col <= 15; col++) {
         totalRow.getCell(col).font = { bold: true };
@@ -368,6 +393,9 @@ class ExportService {
     // ==========================================
     // DATOS (Fila 8+)
     // ==========================================
+    let sumTotalSales = 0, sumExemptSales = 0, sumTaxableSales = 0, sumTaxDebit = 0;
+    let sumIvaRetention = 0, sumIslrRetention = 0, sumMunicipalRetention = 0, sumIgtf = 0;
+
     let currentRow = headerRow + 1;
     fiscalInvoices.forEach((inv, index) => {
       const row = worksheet.getRow(currentRow);
@@ -377,6 +405,24 @@ class ExportService {
         console.warn(`⚠️ Factura sin número en posición ${index + 1}, usando ID: ${inv.id}`);
       }
 
+      const totalSales = this.formatCurrency(inv.financial?.totalSales);
+      const exemptSales = this.formatCurrency(inv.financial?.exemptSales);
+      const taxableSales = this.formatCurrency(inv.financial?.taxableSales);
+      const taxDebit = this.formatCurrency(inv.financial?.taxDebit);
+      const ivaRetention = this.formatCurrency(inv.financial?.ivaRetention);
+      const islrRetention = this.formatCurrency(inv.financial?.islrRetention);
+      const municipalRetention = this.formatCurrency(inv.financial?.municipalRetention);
+      const igtf = this.formatCurrency(inv.financial?.igtf);
+
+      sumTotalSales += totalSales;
+      sumExemptSales += exemptSales;
+      sumTaxableSales += taxableSales;
+      sumTaxDebit += taxDebit;
+      sumIvaRetention += ivaRetention;
+      sumIslrRetention += islrRetention;
+      sumMunicipalRetention += municipalRetention;
+      sumIgtf += igtf;
+
       row.values = [
         index + 1, // N° secuencial
         this.formatDate(inv.issueDate),
@@ -385,14 +431,14 @@ class ExportService {
         inv.controlNumber || '-',
         inv.client?.companyName || 'Cliente General',
         inv.client?.rif || '-',
-        this.formatCurrency(inv.financial?.totalSales),
-        this.formatCurrency(inv.financial?.exemptSales),
-        this.formatCurrency(inv.financial?.taxableSales),
-        this.formatCurrency(inv.financial?.taxDebit), // Débito fiscal
-        this.formatCurrency(inv.financial?.ivaRetention),
-        this.formatCurrency(inv.financial?.islrRetention),
-        this.formatCurrency(inv.financial?.municipalRetention),
-        this.formatCurrency(inv.financial?.igtf)
+        totalSales,
+        exemptSales,
+        taxableSales,
+        taxDebit, // Débito fiscal
+        ivaRetention,
+        islrRetention,
+        municipalRetention,
+        igtf
       ];
 
       // Aplicar bordes a todas las celdas
@@ -413,14 +459,14 @@ class ExportService {
     // Solo calcular totales si hay datos
     if (fiscalInvoices.length > 0) {
       totalRow.getCell(1).value = ''; // N°
-      totalRow.getCell(8).value = { formula: `SUM(H${dataStartRow}:H${dataEndRow})` };
-      totalRow.getCell(9).value = { formula: `SUM(I${dataStartRow}:I${dataEndRow})` };
-      totalRow.getCell(10).value = { formula: `SUM(J${dataStartRow}:J${dataEndRow})` };
-      totalRow.getCell(11).value = { formula: `SUM(K${dataStartRow}:K${dataEndRow})` };
-      totalRow.getCell(12).value = { formula: `SUM(L${dataStartRow}:L${dataEndRow})` };
-      totalRow.getCell(13).value = { formula: `SUM(M${dataStartRow}:M${dataEndRow})` };
-      totalRow.getCell(14).value = { formula: `SUM(N${dataStartRow}:N${dataEndRow})` };
-      totalRow.getCell(15).value = { formula: `SUM(O${dataStartRow}:O${dataEndRow})` };
+      totalRow.getCell(8).value = sumTotalSales;
+      totalRow.getCell(9).value = sumExemptSales;
+      totalRow.getCell(10).value = sumTaxableSales;
+      totalRow.getCell(11).value = sumTaxDebit;
+      totalRow.getCell(12).value = sumIvaRetention;
+      totalRow.getCell(13).value = sumIslrRetention;
+      totalRow.getCell(14).value = sumMunicipalRetention;
+      totalRow.getCell(15).value = sumIgtf;
 
       for (let col = 8; col <= 15; col++) {
         totalRow.getCell(col).font = { bold: true };
@@ -562,76 +608,57 @@ class ExportService {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'AD System';
     workbook.created = new Date();
-    
+
+    // IMPORTANTE: NO pasar margins en el constructor — el bundle browser de ExcelJS
+    // genera XML inválido (pageMargins sin header/footer) que Excel rechaza.
+    // Usamos pageSetup simple (igual que exportTable que sí funciona).
     const worksheet = workbook.addWorksheet('Comprobante ISLR', {
-      pageSetup: { paperSize: 9, orientation: 'landscape', margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5 } }
+      pageSetup: { paperSize: 9, orientation: 'landscape' }
     });
 
-    try {
-      // LOGO REMOVIDO TEMPORALMENTE PARA EVITAR CORRUPCIÓN XML EN EXCELJS
-      /*
-      const response = await fetch('/ADSystem/logo.png');
-      const contentType = response.headers.get('content-type');
-      if (response.ok && contentType && contentType.includes('image')) {
-        const imageBuffer = await response.arrayBuffer();
-        const logoId = workbook.addImage({
-          buffer: imageBuffer,
-          extension: 'png',
-        });
-        worksheet.addImage(logoId, {
-          tl: { col: 0, row: 0 },
-          ext: { width: 140, height: 60 } 
-        });
-      }
-      */
-    } catch(e) {
-      console.warn("⚠️ No se pudo cargar el logo de ADSystem:", e);
-    }
-
     worksheet.columns = [
-      { width: 8 },  // A
-      { width: 12 }, // B
-      { width: 15 }, // C
-      { width: 15 }, // D
-      { width: 15 }, // E
-      { width: 15 }, // F
-      { width: 12 }, // G
-      { width: 15 }, // H
-      { width: 15 }, // I
-      { width: 15 }, // J
-      { width: 15 }, // K
-      { width: 10 }, // L
-      { width: 15 }, // M
+      { width: 8 },  // A - Oper. Nro.
+      { width: 14 }, // B - Fecha
+      { width: 14 }, // C - Nro. Factura
+      { width: 14 }, // D - Nro. Control
+      { width: 12 }, // E - Nota Débito
+      { width: 12 }, // F - Nota Crédito
+      { width: 10 }, // G - Tipo Transacc.
+      { width: 14 }, // H - Cantidad Pagada
+      { width: 14 }, // I - Total Compras
+      { width: 14 }, // J - Compras sin crédito
+      { width: 14 }, // K - Cantidad Objeto Ret.
+      { width: 8 },  // L - % Alícuota
+      { width: 14 }, // M - Impuesto Retenido
     ];
 
+    // Determinar Agente de Retención y Sujeto Retenido
     let agenteName, agenteRif, agenteDir;
     let sujetoName, sujetoRif, sujetoDir;
 
-    // Tratar de obtener de la base de datos (invoice.organization para el tenant)
-    const tenantName = companyInfo?.name || companyInfo?.companyName || invoice.organization?.name || 'EMPRESA (TENANT)';
+    const tenantName = companyInfo?.name || companyInfo?.companyName || invoice.organization?.name || 'EMPRESA';
     const tenantRif = companyInfo?.rif || invoice.organization?.rif || 'J-00000000-0';
-    const tenantDir = companyInfo?.address || companyInfo?.direccion || invoice.organization?.address || 'DIRECCIÓN NO REGISTRADA';
+    const tenantDir = companyInfo?.address || companyInfo?.direccion || invoice.organization?.address || 'DIRECCION NO REGISTRADA';
 
     if (invoice.flow === 'COMPRA') {
-      // En una COMPRA, si el usuario es el cliente y está registrando su propia compra, 
-      // EL CLIENTE es el agente de retención. Pero en el sistema, las COMPRAS registradas
-      // pertenecen al tenant. Asumiremos que el Tenant es el agente y el emisor (proveedor) el sujeto.
+      // En COMPRA: el tenant es agente, el proveedor (issuer) es sujeto retenido
       agenteName = tenantName;
       agenteRif = tenantRif;
       agenteDir = tenantDir;
       sujetoName = invoice.issuer?.razon_social || invoice.issuer?.nombre || invoice.issuer?.companyName || 'PROVEEDOR NO REGISTRADO';
       sujetoRif = invoice.issuer?.rif || 'J-00000000-0';
-      sujetoDir = invoice.issuer?.direccion || invoice.issuer?.address || 'DIRECCIÓN NO REGISTRADA';
+      sujetoDir = invoice.issuer?.direccion || invoice.issuer?.address || 'DIRECCION NO REGISTRADA';
     } else {
+      // En VENTA: el cliente es agente, el tenant es sujeto retenido
       agenteName = invoice.client?.razon_social || invoice.client?.nombre || invoice.client?.companyName || 'CLIENTE NO REGISTRADO';
       agenteRif = invoice.client?.rif || 'J-00000000-0';
-      agenteDir = invoice.client?.direccion || invoice.client?.address || 'DIRECCIÓN NO REGISTRADA';
+      agenteDir = invoice.client?.direccion || invoice.client?.address || 'DIRECCION NO REGISTRADA';
       sujetoName = tenantName;
       sujetoRif = tenantRif;
       sujetoDir = tenantDir;
     }
 
-    // Fila 2 y 3: Datos del Agente de Retención (cabecera)
+    // === Cabecera: Nombre y RIF del Agente ===
     worksheet.mergeCells('D2:J2');
     const nameCell = worksheet.getCell('D2');
     nameCell.value = agenteName;
@@ -644,6 +671,7 @@ class ExportService {
     rifCell.font = { bold: true, size: 12 };
     rifCell.alignment = { horizontal: 'center' };
 
+    // === Título del comprobante ===
     worksheet.mergeCells('A6:M6');
     const titleCell = worksheet.getCell('A6');
     titleCell.value = 'COMPROBANTE DE RETENCION DE IMPUESTO SOBRE LA RENTA';
@@ -652,35 +680,37 @@ class ExportService {
 
     worksheet.mergeCells('A7:M7');
     const subtitleCell = worksheet.getCell('A7');
-    subtitleCell.value = '(Para dar cumplimiento con la normativa establecida el Articulo 24, Decreto 1,808 en materia de Retenciones ISLR publicado en G. O. N° 36,203 del 12 de Mayo de 1997)';
+    subtitleCell.value = '(Para dar cumplimiento con la normativa establecida el Articulo 24, Decreto 1,808 en materia de Retenciones ISLR publicado en G. O. N\u00b0 36,203 del 12 de Mayo de 1997)';
     subtitleCell.font = { size: 9 };
     subtitleCell.alignment = { horizontal: 'center' };
 
+    // === Fecha y número de comprobante ===
     worksheet.mergeCells('A9:D9');
-    worksheet.getCell('A9').value = `Fecha: ${this.formatDate(invoice.issueDate)}`;
-    
+    worksheet.getCell('A9').value = 'Fecha: ' + this.formatDate(invoice.issueDate);
+
     worksheet.mergeCells('K9:L9');
-    worksheet.getCell('K9').value = 'N° COMPROBANTE';
+    worksheet.getCell('K9').value = 'N\u00b0 COMPROBANTE';
     worksheet.getCell('K9').font = { bold: true };
     worksheet.getCell('K9').alignment = { horizontal: 'right' };
-    
-    const yearMonth = dayjs(invoice.issueDate).format('YYYYMM');
-    // Generar correlativo básico si no existe (normalmente vendría del backend)
-    const comprobanteNum = invoice.retention_number || `${yearMonth}00001`; 
-    worksheet.getCell('M9').value = comprobanteNum;
-    worksheet.getCell('M9').font = { color: { argb: 'FFFF0000' }, bold: true }; 
 
+    const yearMonth = dayjs(invoice.issueDate).format('YYYYMM');
+    const comprobanteNum = invoice.retention_number || (yearMonth + '00001');
+    worksheet.getCell('M9').value = comprobanteNum;
+    worksheet.getCell('M9').font = { color: { argb: 'FFFF0000' }, bold: true };
+
+    // Periodo fiscal (usa \n real para salto de línea en Excel)
     worksheet.mergeCells('M10:M11');
-    worksheet.getCell('M10').value = `PERIODO FISCAL\nAÑO: ${dayjs(invoice.issueDate).format('YYYY')}   MES: ${dayjs(invoice.issueDate).format('MM')}`;
+    const periodoText = 'PERIODO FISCAL\nA\u00d1O: ' + dayjs(invoice.issueDate).format('YYYY') + '   MES: ' + dayjs(invoice.issueDate).format('MM');
+    worksheet.getCell('M10').value = periodoText;
     worksheet.getCell('M10').alignment = { horizontal: 'center', wrapText: true };
     worksheet.getCell('M10').font = { bold: true };
 
-    // Agente Retención
+    // === Datos del Agente de Retención ===
     worksheet.getCell('A12').value = 'NOMBRE O RAZON SOCIAL DEL AGENTE DE RETENCION:';
     worksheet.getCell('A12').font = { bold: true };
     worksheet.getCell('I12').value = 'REGISTRO DE INFORMACION FISCAL DEL AGENTE DE RETENCION:';
     worksheet.getCell('I12').font = { bold: true };
-    
+
     worksheet.getCell('A13').value = agenteName;
     worksheet.getCell('I13').value = agenteRif;
 
@@ -688,7 +718,7 @@ class ExportService {
     worksheet.getCell('A15').font = { bold: true };
     worksheet.getCell('A16').value = agenteDir;
 
-    // Sujeto Retenido
+    // === Datos del Sujeto Retenido ===
     worksheet.getCell('A18').value = 'NOMBRE O RAZON SOCIAL DEL SUJETO RETENIDO:';
     worksheet.getCell('A18').font = { bold: true };
     worksheet.getCell('I18').value = 'REGISTRO DE INFORMACION FISCAL DEL SUJETO RETENIDO (R.I.F):';
@@ -701,16 +731,26 @@ class ExportService {
     worksheet.getCell('A21').font = { bold: true };
     worksheet.getCell('A22').value = sujetoDir;
 
-    // Tabla Operaciones
-    const headerRow = 24;
+    // === Tabla de Operaciones (13 columnas) ===
+    const headerRowNum = 24;
+    // NOTA: Deben ser exactamente 13 headers, uno por cada columna (A-M)
     const headers = [
-      'Oper.\nNro.', 'Fecha de pago o\nAbono en cuenta', 'Número de\nFactura', 'Número de\nControl',
-      'Número\nNota Débito', 'Número de\nNota Crédito', 'Tipo de\nTransacc.', 'Cantidad\nPagada',
-      'Total Compras\nIncluyendo\nel IVA', 'Compras sin\nderecho a\nCrédito IVA', 
-      'Cantidad Objeto\nde Retencion', '%\nAlicuota', 'Impuesto\nRetenido'
+      'Oper.\nNro.',
+      'Fecha de pago o\nAbono en cuenta',
+      'N\u00famero de\nFactura',
+      'N\u00famero de\nControl',
+      'N\u00famero\nNota D\u00e9bito',
+      'N\u00famero de\nNota Cr\u00e9dito',
+      'Tipo de\nTransacc.',
+      'Cantidad\nPagada',
+      'Total Compras\nIncluyendo\nel IVA',
+      'Compras sin\nderecho a\nCr\u00e9dito IVA',
+      'Cantidad Objeto\nde Retencion',
+      '%\nAlicuota',
+      'Impuesto\nRetenido'
     ];
 
-    const hRow = worksheet.getRow(headerRow);
+    const hRow = worksheet.getRow(headerRowNum);
     headers.forEach((header, idx) => {
       const cell = hRow.getCell(idx + 1);
       cell.value = header;
@@ -721,74 +761,83 @@ class ExportService {
     });
     hRow.height = 45;
 
+    // === Fila de datos ===
     const dataRow = worksheet.getRow(25);
-    const base = invoice.financial?.taxableSales || 0;
-    const retencion = invoice.financial?.islrRetention || 0;
-    const exento = invoice.financial?.exemptSales || 0;
-    const total = invoice.financial?.totalSales || 0;
-    const alicuota = base > 0 ? ((retencion / base) * 100).toFixed(0) : 0;
+    const base = this.formatCurrency(invoice.financial?.taxableSales);
+    const retencion = this.formatCurrency(invoice.financial?.islrRetention);
+    const exento = this.formatCurrency(invoice.financial?.exemptSales);
+    const total = this.formatCurrency(invoice.financial?.totalSales);
+    const alicuota = base > 0 ? Number(((retencion / base) * 100).toFixed(2)) : 0;
 
-    dataRow.values = [
+    const dataValues = [
       1,
       this.formatDate(invoice.issueDate),
-      invoice.invoiceNumber,
-      invoice.controlNumber,
+      invoice.invoiceNumber || '',
+      invoice.controlNumber || '',
       '',
       '',
       '01-reg',
-      this.formatCurrency(total - retencion),
-      this.formatCurrency(total),
-      this.formatCurrency(exento),
-      this.formatCurrency(base),
-      Number(alicuota),
-      this.formatCurrency(retencion)
+      total - retencion,
+      total,
+      exento,
+      base,
+      alicuota,
+      retencion
     ];
 
-    for (let col = 1; col <= 13; col++) {
-      const cell = dataRow.getCell(col);
+    // Asignar celda por celda para evitar problemas con dataRow.values
+    dataValues.forEach((val, idx) => {
+      const cell = dataRow.getCell(idx + 1);
+      cell.value = val;
       this.addBorders(cell);
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      if (col >= 8) cell.numFmt = '#,##0.00';
-    }
+      // Formato numérico para columnas H-M (índices 7-12, basados en 0)
+      if (idx >= 7) cell.numFmt = '#,##0.00';
+    });
 
-    const totalRow = worksheet.getRow(27);
+    // === Fila de totales ===
+    // Primero hacer el merge, luego asignar valores solo a celdas no-esclavas
     worksheet.mergeCells('A27:G27');
+
     const tLabel = worksheet.getCell('A27');
     tLabel.value = 'TOTALES';
     tLabel.font = { bold: true };
     tLabel.alignment = { horizontal: 'right', vertical: 'middle' };
     this.addBorders(tLabel);
 
-    totalRow.getCell(8).value = (total - retencion) || 0;
-    totalRow.getCell(9).value = total || 0;
-    totalRow.getCell(10).value = exento || 0;
-    totalRow.getCell(11).value = base || 0;
-    totalRow.getCell(12).value = '';
-    totalRow.getCell(13).value = retencion || 0;
+    const totalRow = worksheet.getRow(27);
+    const totalValues = {
+      8: total - retencion,
+      9: total,
+      10: exento,
+      11: base,
+      12: '',
+      13: retencion
+    };
 
-    const masterCell = totalRow.getCell(1);
-    masterCell.font = { bold: true };
-    this.addBorders(masterCell);
-
+    // Aplicar valores y estilos solo a celdas H27-M27 (no esclavas del merge)
     for (let col = 8; col <= 13; col++) {
       const cell = totalRow.getCell(col);
+      cell.value = totalValues[col];
       cell.font = { bold: true };
       this.addBorders(cell);
       if (col !== 12) cell.numFmt = '#,##0.00';
     }
 
+    // === Firmas ===
     const firmaAgente = worksheet.getCell('C32');
     firmaAgente.value = '_______________________________________\nFIRMA DEL AGENTE DE RETENCION\nSELLO';
     firmaAgente.alignment = { horizontal: 'center', wrapText: true };
     firmaAgente.font = { bold: true };
-    
+
     worksheet.mergeCells('J32:L32');
     const firmaRetenido = worksheet.getCell('J32');
     firmaRetenido.value = '_______________________________________\nRECIBIDO POR\nFIRMA / SELLO';
     firmaRetenido.alignment = { horizontal: 'center', wrapText: true };
     firmaRetenido.font = { bold: true };
 
-    const filename = `Comprobante_ISLR_${invoice.invoiceNumber || 'Borrador'}.xlsx`;
+    // === Generar y descargar ===
+    const filename = 'Comprobante_ISLR_' + (invoice.invoiceNumber || 'Borrador') + '.xlsx';
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, filename);
