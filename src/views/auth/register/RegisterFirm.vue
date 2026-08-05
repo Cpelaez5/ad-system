@@ -60,6 +60,8 @@
 </template>
 
 <script>
+import { analyticsService } from '@/services/analyticsService'
+
 export default {
   name: 'RegisterFirm',
   data() {
@@ -106,6 +108,10 @@ export default {
         })
 
         if (error) throw error
+
+        // 🎯 Trackear evento de Registro en GA y Meta
+        analyticsService.trackEvent('CompleteRegistration', { role: 'admin' })
+        analyticsService.trackEvent('generate_lead', { role: 'admin' })
 
         alert('Firma registrada. Revisa tu correo para confirmar la cuenta.')
         this.$router.push('/login')

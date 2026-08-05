@@ -105,6 +105,8 @@
 </template>
 
 <script>
+import { analyticsService } from '@/services/analyticsService'
+
 export default {
   name: 'RegisterClient',
   props: {
@@ -196,6 +198,10 @@ export default {
         if (data.error) throw new Error(data.error);
 
         const { ONBOARDING_V1 } = await import('@/config/featureFlags');
+
+        // 🎯 Trackear evento de Registro en GA y Meta
+        analyticsService.trackEvent('CompleteRegistration', { role: 'cliente' })
+        analyticsService.trackEvent('generate_lead', { role: 'cliente' })
 
         if (ONBOARDING_V1) {
           this.$router.push({ 

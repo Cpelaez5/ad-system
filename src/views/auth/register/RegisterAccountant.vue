@@ -52,6 +52,8 @@
 </template>
 
 <script>
+import { analyticsService } from '@/services/analyticsService'
+
 export default {
   name: 'RegisterAccountant',
   props: {
@@ -100,6 +102,10 @@ export default {
         })
 
         if (error) throw error
+
+        // 🎯 Trackear evento de Registro en GA y Meta
+        analyticsService.trackEvent('CompleteRegistration', { role: 'contador' })
+        analyticsService.trackEvent('generate_lead', { role: 'contador' })
 
         // Marcar invitación como aceptada
         await supabase

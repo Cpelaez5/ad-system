@@ -161,6 +161,8 @@
 </template>
 
 <script>
+import { analyticsService } from '@/services/analyticsService'
+
 export default {
   name: 'Login',
   data() {
@@ -201,6 +203,10 @@ export default {
           if (result.user.organization) {
             localStorage.setItem('current_organization_id', result.user.organization.id)
           }
+
+          // 🎯 Identificar usuario y trackear Login
+          analyticsService.identifyUser(result.user)
+          analyticsService.trackEvent('Login', { role: result.user.role })
           
           window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }))
           if (result.user.role === 'cliente') {

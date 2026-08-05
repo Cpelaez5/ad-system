@@ -37,6 +37,7 @@ import TestForm from '@/components/common/TestForm.vue'
 
 // Definir las rutas del sistema
 import LandingPage from '@/views/LandingPage.vue'
+import { analyticsService } from '@/services/analyticsService'
 
 // Definir las rutas del sistema
 const routes = [
@@ -455,6 +456,9 @@ router.afterEach((to) => {
       )
     }
   }
+
+  // 3. Tracking de Analítica (Google Analytics, Meta Pixel, etc.)
+  analyticsService.trackPageView(to.path)
 })
 
 export default router

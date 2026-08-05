@@ -404,6 +404,7 @@ import paymentOcrService from '@/services/paymentOcrService';
 import userService from '@/services/userService';
 import bcvService from '@/services/bcvService';
 import { supabase } from '@/lib/supabaseClient';
+import { analyticsService } from '@/services/analyticsService';
 
 export default {
   name: 'Checkout',
@@ -584,6 +585,13 @@ export default {
             this.selectMethod(this.availableMethods.find(m => m.id === 'balance_method'));
         }
 
+        // 🎯 Trackear InitiateCheckout
+        analyticsService.trackEvent('InitiateCheckout', {
+          value: this.invoice.amount,
+          currency: 'USD',
+          plan_name: this.invoice?.subscription?.plan?.name || this.selectedPlan?.name || 'Suscripción'
+        });
+
       } catch (err) {
         console.error(err);
         this.error = err.message || "Ocurrió un error inesperado al cargar el checkout.";
@@ -735,6 +743,15 @@ export default {
 
         if (result.success) {
           this.paymentSuccessful = true;
+
+          // 🎯 Trackear evento de Suscripción/Compra
+          analyticsService.trackEvent('Subscribe', {
+            value: reportedAmount,
+            currency: 'USD',
+            predicted_ltv: reportedAmount * (this.billingPeriod === 'annual' ? 1 : 12),
+            plan_name: finalSenderDetails.plan_name
+          });
+
           // Despachar evento para que la app principal recargue el estado del usuario/plan en background
           window.dispatchEvent(new CustomEvent('userUpdated'));
           
