@@ -385,7 +385,7 @@
             </div>
             <div class="text-caption text-medium-emphasis text-right w-100">
               Al hacer clic en "Confirmar y Pagar", aceptas todos los 
-              <a href="#" @click.prevent class="text-primary text-decoration-none font-weight-bold">términos y condiciones</a>.
+              <router-link to="/legal?tab=terminos" target="_blank" class="text-primary text-decoration-none font-weight-bold">términos y condiciones</router-link>.
             </div>
           </div>
       </v-col>

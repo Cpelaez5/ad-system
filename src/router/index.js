@@ -81,6 +81,16 @@ const routes = [
     meta: { requiresAuth: true, title: 'Área de Contador', roles: ['admin', 'contador'] }
   },
   {
+    path: '/legal',
+    name: 'Legal',
+    component: () => import('@/views/shared/Legal.vue'),
+    meta: { 
+      requiresAuth: false,
+      title: 'Términos y Políticas | AD SYSTEM',
+      description: 'Políticas de privacidad, tratamiento de datos y términos de condiciones de AD SYSTEM.'
+    }
+  },
+  {
     path: '/registration-success',
     name: 'RegistrationSuccess',
     component: () => import('@/views/auth/RegistrationSuccess.vue')

@@ -23,8 +23,11 @@
     <!-- Chat de soporte IA (visible solo para clientes) -->
     <SupportChat v-if="showNavigation" />
     
+    <!-- Banner de Cookies -->
+    <CookieConsent />
+    
     <!-- Footer -->
-    <!-- <AppFooter /> -->
+    <AppFooter v-if="showFooter" />
   </v-app>
 </template>
 
@@ -34,6 +37,7 @@ import AppFooter from './components/layout/AppFooter.vue'
 import NotificationSystem from './components/common/NotificationSystem.vue'
 import PageTransition from './components/common/PageTransition.vue'
 import SupportChat from './components/common/SupportChat.vue'
+import CookieConsent from './components/common/CookieConsent.vue'
 import userSettingsService from '@/services/user-settings-service.js'
 // (Se elimina ThemeFavicon para usar solo los <link rel="icon"> de index.html)
 
@@ -44,7 +48,8 @@ export default {
     AppFooter,
     NotificationSystem,
     PageTransition,
-    SupportChat
+    SupportChat,
+    CookieConsent
   },
   data() {
     return {
@@ -53,8 +58,12 @@ export default {
   },
   computed: {
     showNavigation() {
-      const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout'];
+      const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout', 'Legal'];
       return !publicRoutes.includes(this.$route.name);
+    },
+    showFooter() {
+      const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout', 'Legal'];
+      return publicRoutes.includes(this.$route.name);
     }
   },
   methods: {
