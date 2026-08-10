@@ -1825,13 +1825,8 @@ const exportToPDF = async () => {
             const catTypes = FISCAL_TYPES[cat] || []
             if (catTypes.length === 0 && catDocs.length === 0) continue
 
-            // Anticipar si la categoría entera tiene tipos con contenido
-            // para no imprimir el header si todo está vacío y no requerido
-            const catHasContent = catTypes.some(type => {
-                const docsOfType = catDocs.filter(d => d.doc_type === type.id)
-                return docsOfType.length > 0 || type.required
-            })
-            if (!catHasContent) continue
+            // Solo omitir categorías sin tipos definidos o OTROS sin documentos
+            if (cat === 'OTROS' && catDocs.length === 0) continue
 
             // ── Header de categoría ──────────────────────────────────────
             // Reservar espacio: al menos 25px para el header + primera línea
@@ -1853,8 +1848,8 @@ const exportToPDF = async () => {
                 // Filas con documento real (cargado)
                 const uploadedRows  = rows.filter(r => r.doc)
 
-                // ── Omitir tipos que no son requeridos Y no tienen ningún doc
-                if (!type.required && uploadedRows.length === 0) continue
+                // Solo omitir el tipo genérico 'Otro Documento' si no tiene docs
+                if (type.id === 'OTRO' && uploadedRows.length === 0) continue
 
                 // Reservar espacio: header del tipo + al menos 1 fila
                 y = pdfCheckPage(doc, y, 255)
