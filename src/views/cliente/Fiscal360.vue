@@ -198,26 +198,26 @@
             show-arrows
             height="64"
           >
-            <v-tab value="all" class="text-none font-weight-medium">
-              <v-icon start size="24">mdi-view-list</v-icon>
-              <span class="d-none d-sm-inline">Todos</span>
-              <v-chip size="small" class="ml-2" color="primary" variant="tonal">
+            <v-tab value="all" class="text-none font-weight-medium px-2 px-sm-4">
+              <v-icon start size="20">mdi-view-list</v-icon>
+              <span class="d-none d-sm-inline text-caption">Todos</span>
+              <v-chip size="small" class="ml-1" color="primary" variant="tonal">
                 {{ stats.total }}
               </v-chip>
             </v-tab>
 
-            <v-tab v-for="cat in categories" :key="cat.value" :value="cat.value" class="text-none font-weight-medium">
-              <v-icon start size="24" :color="getCategoryChipColor(cat.value)">{{ getCategoryIcon(cat.value) }}</v-icon>
-              <span class="d-none d-sm-inline">{{ cat.title }}</span>
-              <v-chip size="small" class="ml-2" :color="getCategoryChipColor(cat.value)" variant="tonal">
+            <v-tab v-for="cat in categories" :key="cat.value" :value="cat.value" class="text-none font-weight-medium px-2 px-sm-4">
+              <v-icon start size="20" :color="getCategoryChipColor(cat.value)">{{ getCategoryIcon(cat.value) }}</v-icon>
+              <span class="d-none d-sm-inline text-caption">{{ cat.title }}</span>
+              <v-chip size="small" class="ml-1" :color="getCategoryChipColor(cat.value)" variant="tonal">
                 {{ getCategoryCount(cat.value) }}
               </v-chip>
             </v-tab>
 
-            <v-tab value="trash" class="text-none font-weight-medium">
-              <v-icon start size="24" color="grey">mdi-delete-outline</v-icon>
-              <span class="d-none d-sm-inline">Papelera</span>
-              <v-chip size="small" class="ml-2" color="grey" variant="tonal">
+            <v-tab value="trash" class="text-none font-weight-medium px-2 px-sm-4">
+              <v-icon start size="20" color="grey">mdi-delete-outline</v-icon>
+              <span class="d-none d-sm-inline text-caption">Papelera</span>
+              <v-chip size="small" class="ml-1" color="grey" variant="tonal">
                 {{ stats.trash }}
               </v-chip>
             </v-tab>
@@ -849,6 +849,7 @@ const availableYears = computed(() => {
 
 const categories = [
     { title: 'Legal', value: 'LEGAL' },
+    { title: 'Libros Contables', value: 'LIBROS' },
     { title: 'Municipal', value: 'MUNICIPAL' },
     { title: 'Seniat', value: 'SENIAT' },
     { title: 'Parafiscales y nómina', value: 'NOMINA' },
@@ -1379,6 +1380,7 @@ const getCategoryIcon = (cat) => {
         'MUNICIPAL': 'mdi-city',
         'SENIAT': 'mdi-bank',
         'NOMINA': 'mdi-account-group',
+        'LIBROS': 'mdi-book-open-page-variant',
         'OTROS': 'mdi-file'
     }
     return map[cat] || 'mdi-file'
@@ -1390,6 +1392,7 @@ const getCategoryChipColor = (cat) => {
         'MUNICIPAL': 'blue',
         'SENIAT': 'teal',
         'NOMINA': 'orange',
+        'LIBROS': 'brown',
         'OTROS': 'grey'
     }
     return map[cat] || 'grey'

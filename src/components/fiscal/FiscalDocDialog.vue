@@ -324,6 +324,7 @@ const formData = reactive({ ...defaultForm })
 // Opciones
 const categories = [
   { title: 'Legal', value: 'LEGAL' },
+  { title: 'Libros Contables', value: 'LIBROS' },
   { title: 'Municipal', value: 'MUNICIPAL' },
   { title: 'Seniat', value: 'SENIAT' },
   { title: 'Parafiscales y nómina', value: 'NOMINA' },

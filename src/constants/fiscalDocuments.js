@@ -55,6 +55,13 @@ export const FISCAL_TYPES = {
     ],
     'OTROS': [
         { id: 'OTRO', label: 'Otro Documento', frequency: 'AdHoc', required: false, allowMultiple: true }
+    ],
+    'LIBROS': [
+        { id: 'LIBRO_DIARIO',       label: 'Libro Diario',       frequency: 'MONTHLY',   required: true,  allowMultiple: true, flexible: true },
+        { id: 'LIBRO_MAYOR',        label: 'Libro Mayor',        frequency: 'MONTHLY',   required: true,  allowMultiple: true, flexible: true },
+        { id: 'LIBRO_INVENTARIO',   label: 'Libro de Inventario',frequency: 'ANNUAL',    required: true,  allowMultiple: true, flexible: true },
+        { id: 'LIBRO_ACTAS',        label: 'Libro de Actas',     frequency: 'AdHoc',     required: false, allowMultiple: true, flexible: true },
+        { id: 'LIBRO_ACCIONISTAS',  label: 'Libro de Accionistas',frequency: 'AdHoc',    required: false, allowMultiple: true, flexible: true },
     ]
 }
 
