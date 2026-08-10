@@ -539,9 +539,22 @@ const save = async () => {
   const { valid } = await form.value.validate()
   if (!valid) return
 
+  let finalName = formData.name;
+  if (!finalName && formData.doc_type && formData.category) {
+      const types = FISCAL_TYPES[formData.category] || [];
+      const matchedType = types.find(t => t.id === formData.doc_type);
+      if (matchedType) {
+          finalName = matchedType.label;
+      }
+  }
+  
+  if (!finalName) {
+      finalName = 'Documento Fiscal';
+  }
+
   emit('save', {
     ...formData,
-    name: formData.name || null, // Nombre es opcional
+    name: finalName,
     file: newFile.value
   })
 }
