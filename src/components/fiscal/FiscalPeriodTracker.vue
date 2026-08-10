@@ -120,7 +120,7 @@
           class="text-none"
           @click="$emit('open-dialog', { typeId: type.id, category: category })"
         >
-          Agregar declaración
+          Agregar documento
         </v-btn>
       </div>
     </template>
