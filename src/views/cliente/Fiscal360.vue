@@ -1559,66 +1559,95 @@ const getPeriodRowsForPdf = (type, catDocs, year) => {
 
 /** Dibuja el header de categoría. Retorna la nueva posición Y. */
 const pdfDrawCategoryHeader = (doc, pageWidth, margin, catName, progress, y) => {
-    doc.setFontSize(13)
+    // Fondo con borde redondeado para el header de categoría
+    const headerHeight = 10
+    doc.setFillColor(31, 53, 92) // #1F355C azul corporativo
+    doc.roundedRect(margin, y - 6, pageWidth - margin * 2, headerHeight, 3, 3, 'F')
+
+    doc.setFontSize(11)
     doc.setFont(undefined, 'bold')
-    doc.setTextColor(168, 28, 34)   // #A81C22 rojo corporativo
-    doc.text(catName, margin, y)
+    doc.setTextColor(255, 255, 255) // Texto blanco sobre fondo azul
+    doc.text(catName, margin + 5, y)
 
     if (progress) {
         doc.setFontSize(9)
         doc.setFont(undefined, 'normal')
-        doc.setTextColor(120)
-        doc.text(`(${progress.covered}/${progress.total} — ${progress.rate}%)`, margin + 60, y)
+        doc.setTextColor(224, 176, 79) // #E0B04F dorado corporativo
+        const progressText = `${progress.covered}/${progress.total} — ${progress.rate}%`
+        doc.text(progressText, pageWidth - margin - 5, y, { align: 'right' })
     }
 
-    return y + 3
+    return y + 8
 }
 
 /** Dibuja el sub-header de tipo de documento. Retorna la nueva posición Y. */
 const pdfDrawTypeHeader = (doc, margin, label, freqLabel, y) => {
+    // Línea decorativa a la izquierda
+    doc.setFillColor(168, 28, 34) // #A81C22 rojo corporativo
+    doc.rect(margin + 4, y - 4, 2, 5, 'F')
+
     doc.setFontSize(10)
     doc.setFont(undefined, 'bold')
-    doc.setTextColor(31, 53, 92)   // #1F355C azul corporativo
-    doc.text(`  ${label}`, margin, y)
+    doc.setTextColor(31, 53, 92) // #1F355C
+    doc.text(`  ${label}`, margin + 8, y)
 
     doc.setFontSize(8)
     doc.setFont(undefined, 'normal')
     doc.setTextColor(140)
-    doc.text(`(${freqLabel})`, margin + 70, y)
+    doc.text(`(${freqLabel})`, margin + 75, y)
 
     return y + 2
 }
 
 /** Dibuja una fila de período. Retorna la nueva posición Y. */
-const pdfDrawPeriodRow = (doc, margin, pageWidth, label, statusLabel, isFuture, y) => {
-    // Columnas: label | estado
+const pdfDrawPeriodRow = (doc, margin, pageWidth, label, statusLabel, isFuture, y, isAlternate = false) => {
     const colStatus = pageWidth - margin - 45
+    const rowHeight = 5
+
+    // Fondo alternado sutil
+    if (isAlternate) {
+        doc.setFillColor(245, 245, 250) // Gris muy claro
+        doc.rect(margin + 6, y - 4, pageWidth - margin * 2 - 6, rowHeight, 'F')
+    }
 
     doc.setFontSize(9)
     doc.setFont(undefined, 'normal')
-
-    // Fondo alternado sutil — no implementado para mantener simplicidad
 
     // Label (sangría para indicar jerarquía)
     doc.setTextColor(40)
     const truncated = label.length > 38 ? label.substring(0, 35) + '…' : label
     doc.text(`    · ${truncated}`, margin, y)
 
-    // Estado con color
+    // Estado con color y fondo tipo badge
+    let badgeR, badgeG, badgeB
+    let textR, textG, textB
+
     if (isFuture) {
-        doc.setTextColor(180)
+        badgeR = 230; badgeG = 230; badgeB = 230
+        textR = 150; textG = 150; textB = 150
     } else if (statusLabel === 'PRESENTADO') {
-        doc.setTextColor(46, 125, 50)   // verde
-    } else if (statusLabel === 'EN TRÁMITE') {
-        doc.setTextColor(230, 120, 0)   // naranja
+        badgeR = 232; badgeG = 245; badgeB = 233 // Verde claro
+        textR = 46; textG = 125; textB = 50
+    } else if (statusLabel === 'EN TRAMITE' || statusLabel === 'EN TRÁMITE') {
+        badgeR = 255; badgeG = 243; badgeB = 224 // Naranja claro
+        textR = 230; textG = 120; textB = 0
     } else if (statusLabel === 'NO APLICA') {
-        doc.setTextColor(120)           // gris
-    } else if (statusLabel === 'NO PRESENTADO') {
-        doc.setTextColor(198, 40, 40)   // rojo
+        badgeR = 238; badgeG = 238; badgeB = 238 // Gris claro
+        textR = 120; textG = 120; textB = 120
     } else {
-        doc.setTextColor(198, 40, 40)
+        badgeR = 255; badgeG = 228; badgeB = 228 // Rojo claro
+        textR = 198; textG = 40; textB = 40
     }
-    doc.text(statusLabel, colStatus, y)
+
+    // Dibujar badge redondeado detrás del texto de estado
+    const statusWidth = doc.getTextWidth(statusLabel) + 6
+    doc.setFillColor(badgeR, badgeG, badgeB)
+    doc.roundedRect(colStatus - 2, y - 3.5, statusWidth, 5, 1.5, 1.5, 'F')
+
+    doc.setTextColor(textR, textG, textB)
+    doc.setFont(undefined, 'bold')
+    doc.setFontSize(7.5)
+    doc.text(statusLabel, colStatus + 1, y)
 
     return y + 6
 }
@@ -1668,24 +1697,36 @@ const exportToPDF = async () => {
             })
         }
 
+        // ── Franja superior decorativa ──
+        doc.setFillColor(31, 53, 92) // #1F355C
+        doc.rect(0, 0, pageWidth, 4, 'F')
+        doc.setFillColor(168, 28, 34) // #A81C22
+        doc.rect(0, 4, pageWidth, 2, 'F')
+
+        // ── Logo centrado ──
         try {
             const logoInfo = await getBase64ImageFromURL(systemLogo)
-            const pdfHeight = 12 // Reduced from 18
+            const pdfHeight = 9 // Logo pequeño
             const ratio = logoInfo.width / logoInfo.height
             const pdfWidth = pdfHeight * ratio
             
-            doc.addImage(logoInfo.dataURL, 'PNG', margin, 10, pdfWidth, pdfHeight)
+            doc.addImage(logoInfo.dataURL, 'PNG', (pageWidth - pdfWidth) / 2, 10, pdfWidth, pdfHeight)
         } catch (e) {
             console.warn('Could not load logo for PDF', e)
         }
 
-        doc.setFontSize(20)
-        doc.setTextColor(31, 53, 92) // #1F355C - secondary color
+        // Título centrado debajo del logo
+        y = 26
+        doc.setFontSize(16)
+        doc.setTextColor(31, 53, 92) // #1F355C
+        doc.setFont(undefined, 'bold')
         doc.text('Expediente Fiscal 360', pageWidth / 2, y, { align: 'center' })
         
+        // ── Información de la empresa ──
         y += 8
         doc.setFontSize(12)
         doc.setTextColor(80)
+        doc.setFont(undefined, 'normal')
         doc.text(clientName, pageWidth / 2, y, { align: 'center' })
 
         if (clientRif) {
@@ -1694,63 +1735,80 @@ const exportToPDF = async () => {
             doc.text(`RIF/CI: ${clientRif}`, pageWidth / 2, y, { align: 'center' })
         }
         
-        y += 10
-        doc.setFontSize(10)
-        doc.setTextColor(100)
+        y += 8
+        doc.setFontSize(9)
+        doc.setTextColor(140)
         doc.text(`Generado: ${new Date().toLocaleDateString('es-ES', { 
             day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' 
         })}`, pageWidth / 2, y, { align: 'center' })
         
-        // Progress Summary
-        y += 15
-        doc.setFontSize(12)
-        doc.setTextColor(0)
+        // ── Línea divisoria elegante ──
+        y += 6
+        doc.setDrawColor(224, 176, 79) // #E0B04F dorado
+        doc.setLineWidth(0.8)
+        doc.line(margin, y, pageWidth - margin, y)
+        doc.setLineWidth(0.2)
+        
+        // ── Progress Summary ──
+        y += 10
+        doc.setFontSize(11)
+        doc.setFont(undefined, 'bold')
+        doc.setTextColor(31, 53, 92) // #1F355C
         doc.text(`Progreso General: ${progressRate.value}%`, margin, y)
         
-        // Draw progress bar
+        // Barra de progreso con bordes redondeados
         y += 5
-        const barWidth = 60
-        const barHeight = 5
+        const barWidth = 80
+        const barHeight = 6
+        // Fondo gris de la barra
         doc.setFillColor(230, 230, 230)
-        doc.rect(margin, y, barWidth, barHeight, 'F')
-        doc.setFillColor(76, 175, 80) // Green
-        doc.rect(margin, y, barWidth * (progressRate.value / 100), barHeight, 'F')
+        doc.roundedRect(margin, y, barWidth, barHeight, 3, 3, 'F')
+        // Progreso con gradiente simulado
+        const progressWidth = barWidth * (progressRate.value / 100)
+        if (progressWidth > 0) {
+            doc.setFillColor(168, 28, 34) // #A81C22 rojo corporativo
+            doc.roundedRect(margin, y, Math.max(progressWidth, 6), barHeight, 3, 3, 'F')
+        }
         
-        y += 15
+        y += 14
 
-        // ── Leyenda de estado (sin símbolos ● — jsPDF no los soporta sin font especial) ──
-        doc.setFontSize(8)
-        doc.setFont(undefined, 'normal')
+        // ── Leyenda de estado con badges ──
+        doc.setFontSize(7.5)
+        doc.setFont(undefined, 'bold')
         const legendItems = [
-            { label: 'PRESENTADO / VIGENTE', r: 46,  g: 125, b: 50  },
-            { label: 'EN TRAMITE',           r: 230, g: 120, b: 0   },
-            { label: 'NO PRESENTADO',        r: 198, g: 40,  b: 40  },
-            { label: 'NO APLICA',            r: 120, g: 120, b: 120 },
+            { label: 'PRESENTADO / VIGENTE', bgR: 232, bgG: 245, bgB: 233, r: 46,  g: 125, b: 50  },
+            { label: 'EN TRAMITE',           bgR: 255, bgG: 243, bgB: 224, r: 230, g: 120, b: 0   },
+            { label: 'NO PRESENTADO',        bgR: 255, bgG: 228, bgB: 228, r: 198, g: 40,  b: 40  },
+            { label: 'NO APLICA',            bgR: 238, bgG: 238, bgB: 238, r: 120, g: 120, b: 120 },
         ]
         let lx = margin
         for (const l of legendItems) {
-            // Cuadrito de color (en vez del símbolo ●)
-            doc.setFillColor(l.r, l.g, l.b)
-            doc.rect(lx, y - 3, 4, 4, 'F')
-            doc.setTextColor(60)
-            doc.text(l.label, lx + 6, y)
-            lx += 45
+            const textWidth = doc.getTextWidth(l.label) + 8
+            // Badge de fondo
+            doc.setFillColor(l.bgR, l.bgG, l.bgB)
+            doc.roundedRect(lx, y - 3.5, textWidth, 5, 1.5, 1.5, 'F')
+            // Texto
+            doc.setTextColor(l.r, l.g, l.b)
+            doc.text(l.label, lx + 4, y)
+            lx += textWidth + 4
         }
         y += 10
 
-        // ── Línea divisoria ──────────────────────────────────────────────
+        // ── Línea divisoria ──
         doc.setDrawColor(200)
+        doc.setLineWidth(0.2)
         doc.line(margin, y, pageWidth - margin, y)
         y += 8
 
         // ─────────────────────────────────────────────────────────────────
-        // Loop principal: Categoría → Tipo → Períodos (compacto)
+        // Loop principal: Categoría → Tipo → Períodos
         // ─────────────────────────────────────────────────────────────────
         const PDF_CAT_NAMES = {
             LEGAL:     'Legal',
+            LIBROS:    'Libros Contables',
             MUNICIPAL: 'Municipal',
             SENIAT:    'SENIAT',
-            NOMINA:    'Nomina y Parafiscales',
+            NOMINA:    'Nómina y Parafiscales',
             OTROS:     'Otros'
         }
         const FREQ_LABELS = {
@@ -1762,7 +1820,7 @@ const exportToPDF = async () => {
 
         const pdfYear = selectedYear.value
 
-        for (const cat of ['LEGAL', 'MUNICIPAL', 'SENIAT', 'NOMINA', 'OTROS']) {
+        for (const cat of ['LEGAL', 'LIBROS', 'MUNICIPAL', 'SENIAT', 'NOMINA', 'OTROS']) {
             const catDocs  = docs.value.filter(d => d.category === cat)
             const catTypes = FISCAL_TYPES[cat] || []
             if (catTypes.length === 0 && catDocs.length === 0) continue
@@ -1784,19 +1842,16 @@ const exportToPDF = async () => {
                 complianceDetail.value[cat],
                 y
             )
-            doc.setDrawColor(220)
-            doc.line(margin, y + 2, pageWidth - margin, y + 2)
-            y += 7
+            y += 3
 
             // ── Por cada tipo de documento de esta categoría ──────────────
+            let rowIndex = 0
             for (const type of catTypes) {
                 const rows       = getPeriodRowsForPdf(type, catDocs, pdfYear)
                 const docsOfType = catDocs.filter(d => d.doc_type === type.id)
 
                 // Filas con documento real (cargado)
                 const uploadedRows  = rows.filter(r => r.doc)
-                // Filas pasadas sin documento
-                const missingRows   = rows.filter(r => !r.doc && !r.isFuture)
 
                 // ── Omitir tipos que no son requeridos Y no tienen ningún doc
                 if (!type.required && uploadedRows.length === 0) continue
@@ -1820,7 +1875,8 @@ const exportToPDF = async () => {
                     if (flexRows.length === 0) {
                         // No hay nada cargado → una línea informativa neutra
                         y = pdfCheckPage(doc, y)
-                        y = pdfDrawPeriodRow(doc, margin, pageWidth, 'Sin declaraciones cargadas', 'NO PRESENTADO', false, y)
+                        y = pdfDrawPeriodRow(doc, margin, pageWidth, 'Sin documentos cargados', 'NO PRESENTADO', false, y, rowIndex % 2 === 1)
+                        rowIndex++
                     } else {
                         for (const d of flexRows) {
                             const lbl = d.name || (d.emission_date
@@ -1829,7 +1885,8 @@ const exportToPDF = async () => {
                             const sMap = { VIGENTE: 'PRESENTADO', PRESENTADO: 'PRESENTADO', TRAMITE: 'EN TRAMITE', NO_APLICA: 'NO APLICA' }
                             const statusLabel = sMap[d.status] || 'VENCIDO'
                             y = pdfCheckPage(doc, y)
-                            y = pdfDrawPeriodRow(doc, margin, pageWidth, lbl, statusLabel, false, y)
+                            y = pdfDrawPeriodRow(doc, margin, pageWidth, lbl, statusLabel, false, y, rowIndex % 2 === 1)
+                            rowIndex++
                         }
                     }
                 }
@@ -1837,15 +1894,16 @@ const exportToPDF = async () => {
                 else if (uploadedRows.length === 0) {
                     // Una sola línea neutra — sin contar ni mencionar periodos faltantes
                     y = pdfCheckPage(doc, y)
-                    y = pdfDrawPeriodRow(doc, margin, pageWidth, 'Sin registro cargado', 'NO PRESENTADO', false, y)
+                    y = pdfDrawPeriodRow(doc, margin, pageWidth, 'Sin registro cargado', 'NO PRESENTADO', false, y, rowIndex % 2 === 1)
+                    rowIndex++
                 }
                 // ── Caso 3: Hay documentos cargados — mostrar cada uno ──────
                 else {
                     for (const row of uploadedRows) {
                         y = pdfCheckPage(doc, y)
-                        y = pdfDrawPeriodRow(doc, margin, pageWidth, row.label, row.statusLabel, false, y)
+                        y = pdfDrawPeriodRow(doc, margin, pageWidth, row.label, row.statusLabel, false, y, rowIndex % 2 === 1)
+                        rowIndex++
                     }
-                    // SIN resumen de faltantes — la cliente no lo quiere
                 }
 
                 y += 4 // Espacio entre tipos
@@ -1854,18 +1912,32 @@ const exportToPDF = async () => {
             y += 8 // Espacio entre categorías
         }
         
-        // Footer
+        // Footer con línea decorativa
         const pageCount = doc.internal.getNumberOfPages()
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i)
+            const pageH = doc.internal.pageSize.getHeight()
+            
+            // Línea dorada en el footer
+            doc.setDrawColor(224, 176, 79) // #E0B04F
+            doc.setLineWidth(0.5)
+            doc.line(margin, pageH - 15, pageWidth - margin, pageH - 15)
+            
+            // Texto de página
             doc.setFontSize(8)
+            doc.setFont(undefined, 'normal')
             doc.setTextColor(150)
             doc.text(
                 `Página ${i} de ${pageCount}`, 
                 pageWidth / 2, 
-                doc.internal.pageSize.getHeight() - 10, 
+                pageH - 10, 
                 { align: 'center' }
             )
+
+            // Marca de agua sutil: "AD System"
+            doc.setTextColor(230)
+            doc.setFontSize(7)
+            doc.text('AD System', pageWidth - margin, pageH - 10, { align: 'right' })
         }
         
         // Save

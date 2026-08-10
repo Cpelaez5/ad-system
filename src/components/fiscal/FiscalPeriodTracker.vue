@@ -301,6 +301,7 @@ const frequencyLabel = computed(() => FREQUENCIES[props.type.frequency] || props
 const categoryIcon = computed(() => {
   const icons = {
     LEGAL:    'mdi-gavel',
+    LIBROS:   'mdi-book-open-page-variant',
     MUNICIPAL:'mdi-city',
     SENIAT:   'mdi-bank',
     NOMINA:   'mdi-account-group',

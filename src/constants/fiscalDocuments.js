@@ -51,6 +51,7 @@ export const FISCAL_TYPES = {
         { id: 'MINTRAPP',          label: 'MINTRAPP',          frequency: 'QUARTERLY', required: true,  allowMultiple: false },
         { id: 'RUPDAE',            label: 'RUPDAE',            frequency: 'ANNUAL',    required: true,  allowMultiple: false },
         { id: 'FONACIT',           label: 'FONACIT',           frequency: 'ANNUAL',    required: false, allowMultiple: false },
+        { id: 'FONA',              label: 'FONA (Fondo Nacional Antidrogas)', frequency: 'ANNUAL', required: false, allowMultiple: false },
         { id: 'OTROS_PARAFISCALES',label: 'Otros Parafiscales',frequency: 'AdHoc',     required: false, allowMultiple: true  },
     ],
     'OTROS': [
