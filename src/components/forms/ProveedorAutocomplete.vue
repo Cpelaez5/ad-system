@@ -43,8 +43,7 @@
 </template>
 
 <script>
-import { supabase } from '@/lib/supabaseClient'
-import { getCurrentOrganizationId } from '@/utils/tenantHelpers'
+import proveedorService from '@/services/proveedorService.js'
 
 export default {
   name: 'ProveedorAutocomplete',
@@ -69,24 +68,19 @@ export default {
   },
   async mounted() {
     await this.fetchProveedores()
+    window.addEventListener('ad-proveedor-changed', this.fetchProveedores)
+  },
+  beforeUnmount() {
+    window.removeEventListener('ad-proveedor-changed', this.fetchProveedores)
   },
   methods: {
     async fetchProveedores() {
       this.loading = true
       try {
-        const orgId = getCurrentOrganizationId()
-        if (!orgId) return
-
-        const { data, error } = await supabase
-          .from('proveedores')
-          .select('id, nombre, rif, tipo_persona, iva_retention_rate, islr_concept_id, municipal_rate, municipio_id')
-          .eq('organization_id', orgId)
-          .order('nombre')
-
-        if (error) throw error
+        const data = await proveedorService.getProveedores({ onlyActive: true })
         this.proveedores = data || []
       } catch (error) {
-        console.error('Error fetching proveedores:', error)
+        console.error('Error fetching proveedores in autocomplete:', error)
       } finally {
         this.loading = false
       }

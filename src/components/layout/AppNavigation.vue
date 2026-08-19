@@ -290,6 +290,7 @@ export default {
 				'ClienteCompras': 'Mis Compras',
 				'ClienteGastos': 'Mis Gastos',
 				'ClienteArchivo': 'Mis Documentos',
+				'ClienteProveedores': 'Directorio de Proveedores',
 				'ContadorArea': 'Área de Contador',
 				'Contabilidad': 'Contabilidad',
 				'Auditoria': 'Auditoría',

@@ -36,8 +36,8 @@
         <v-select
           v-if="localConfig.aplicar_islr"
           v-model="localConfig.islr_concept_id"
-          :items="conceptosIslr"
-          item-title="nombre"
+          :items="formattedConceptos"
+          item-title="displayLabel"
           item-value="id"
           label="Concepto ISLR (Override)"
           variant="outlined"
@@ -46,7 +46,19 @@
           persistent-hint
           clearable
           class="ml-4 mb-2"
-        ></v-select>
+        >
+          <template v-slot:item="{ props, item }">
+            <v-list-item v-bind="props">
+              <template v-slot:subtitle>
+                <span class="text-caption">
+                  {{ item.raw.codigo ? `Cód. ${item.raw.codigo}` : '' }}
+                  {{ item.raw.porcentaje_retencion ? ` • ${item.raw.porcentaje_retencion}%` : '' }}
+                  {{ item.raw.sustraendo_ut > 0 ? ` • Sustr. ${item.raw.sustraendo_ut} UT` : '' }}
+                </span>
+              </template>
+            </v-list-item>
+          </template>
+        </v-select>
 
         <v-divider class="my-3"></v-divider>
 
@@ -78,7 +90,7 @@
 </template>
 
 <script>
-import { supabase } from '@/lib/supabaseClient'
+import proveedorService from '@/services/proveedorService.js'
 
 export default {
   name: 'RetentionAdjustSheet',
@@ -90,6 +102,10 @@ export default {
     config: {
       type: Object,
       required: true
+    },
+    tipoPersona: {
+      type: String,
+      default: null
     }
   },
   emits: ['update:modelValue', 'update:config'],
@@ -103,6 +119,16 @@ export default {
         islr_concept_id: null
       },
       conceptosIslr: []
+    }
+  },
+  computed: {
+    formattedConceptos() {
+      return this.conceptosIslr
+        .filter(c => !this.tipoPersona || !c.aplica_persona || c.aplica_persona === 'AMBOS' || c.aplica_persona === 'AMBAS' || c.aplica_persona === this.tipoPersona)
+        .map(c => ({
+          ...c,
+          displayLabel: `${c.codigo ? '[' + c.codigo + '] ' : ''}${c.nombre} (${c.porcentaje_retencion}%)`
+        }))
     }
   },
   watch: {
@@ -127,9 +153,11 @@ export default {
       this.close()
     },
     async fetchConceptos() {
-      if (this.conceptosIslr.length === 0) {
-        const { data } = await supabase.from('conceptos_islr').select('*').eq('is_active', true)
+      try {
+        const data = await proveedorService.getISLRConcepts(this.tipoPersona)
         if (data) this.conceptosIslr = data
+      } catch (err) {
+        console.warn('Error fetching conceptos ISLR in RetentionAdjustSheet:', err)
       }
     }
   }

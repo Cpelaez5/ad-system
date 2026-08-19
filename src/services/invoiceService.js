@@ -141,10 +141,12 @@ class InvoiceService {
         client: invoice.client_info || {},
         financial: invoice.financial || {},
         retenciones: {
-          iva: invoice.iva_retention,
-          islr: invoice.islr_retention,
-          municipal: invoice.municipal_retention,
-          neto_a_pagar: invoice.neto_a_pagar
+          iva: Number(invoice.iva_retention ?? invoice.financial?.ivaRetention ?? 0),
+          islr: Number(invoice.islr_retention ?? invoice.financial?.islrRetention ?? 0),
+          municipal: Number(invoice.municipal_retention ?? invoice.financial?.municipalRetention ?? 0),
+          neto_a_pagar: invoice.neto_a_pagar !== null && invoice.neto_a_pagar !== undefined
+            ? Number(invoice.neto_a_pagar)
+            : (Number(invoice.financial?.totalSales || 0) - Number(invoice.iva_retention ?? invoice.financial?.ivaRetention ?? 0) - Number(invoice.islr_retention ?? invoice.financial?.islrRetention ?? 0) - Number(invoice.municipal_retention ?? invoice.financial?.municipalRetention ?? 0))
         },
         items: invoice.items || [],
         attachments: invoice.attachments || [],
@@ -244,10 +246,12 @@ class InvoiceService {
         client: invoice.client_info || {},
         financial: invoice.financial || {},
         retenciones: {
-          iva: invoice.iva_retention,
-          islr: invoice.islr_retention,
-          municipal: invoice.municipal_retention,
-          neto_a_pagar: invoice.neto_a_pagar
+          iva: Number(invoice.iva_retention ?? invoice.financial?.ivaRetention ?? 0),
+          islr: Number(invoice.islr_retention ?? invoice.financial?.islrRetention ?? 0),
+          municipal: Number(invoice.municipal_retention ?? invoice.financial?.municipalRetention ?? 0),
+          neto_a_pagar: invoice.neto_a_pagar !== null && invoice.neto_a_pagar !== undefined
+            ? Number(invoice.neto_a_pagar)
+            : (Number(invoice.financial?.totalSales || 0) - Number(invoice.iva_retention ?? invoice.financial?.ivaRetention ?? 0) - Number(invoice.islr_retention ?? invoice.financial?.islrRetention ?? 0) - Number(invoice.municipal_retention ?? invoice.financial?.municipalRetention ?? 0))
         },
         items: invoice.items || [],
         attachments: invoice.attachments || [],
@@ -308,6 +312,10 @@ class InvoiceService {
         issuer: invoiceData.issuer || {},
         client_info: invoiceData.client || {},
         financial: invoiceData.financial || {},
+        iva_retention: Number(invoiceData.retenciones?.iva ?? invoiceData.financial?.ivaRetention ?? 0),
+        islr_retention: Number(invoiceData.retenciones?.islr ?? invoiceData.financial?.islrRetention ?? 0),
+        municipal_retention: Number(invoiceData.retenciones?.municipal ?? invoiceData.financial?.municipalRetention ?? 0),
+        neto_a_pagar: invoiceData.retenciones?.neto_a_pagar ?? invoiceData.neto_a_pagar ?? null,
         items: invoiceData.items || [],
         attachments: invoiceData.attachments || [],
         notes: invoiceData.notes || null,
@@ -544,6 +552,10 @@ class InvoiceService {
         issuer: invoiceData.issuer || {},
         client_info: invoiceData.client || {},
         financial: invoiceData.financial || {},
+        iva_retention: invoiceData.retenciones?.iva !== undefined ? Number(invoiceData.retenciones.iva) : (invoiceData.financial?.ivaRetention !== undefined ? Number(invoiceData.financial.ivaRetention) : undefined),
+        islr_retention: invoiceData.retenciones?.islr !== undefined ? Number(invoiceData.retenciones.islr) : (invoiceData.financial?.islrRetention !== undefined ? Number(invoiceData.financial.islrRetention) : undefined),
+        municipal_retention: invoiceData.retenciones?.municipal !== undefined ? Number(invoiceData.retenciones.municipal) : (invoiceData.financial?.municipalRetention !== undefined ? Number(invoiceData.financial.municipalRetention) : undefined),
+        neto_a_pagar: invoiceData.retenciones?.neto_a_pagar !== undefined ? Number(invoiceData.retenciones.neto_a_pagar) : (invoiceData.neto_a_pagar !== undefined ? Number(invoiceData.neto_a_pagar) : undefined),
         items: invoiceData.items || [],
         attachments: invoiceData.attachments || [],
         notes: invoiceData.notes || null

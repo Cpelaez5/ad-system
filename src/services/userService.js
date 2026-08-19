@@ -11,6 +11,7 @@ import {
   deleteWithTenant
 } from '@/utils/tenantHelpers';
 import userSettingsService from '@/services/user-settings-service.js';
+import sealService from '@/services/seal-service.js';
 
 // Definición de roles y permisos (simplificados para 4 tipos de usuarios)
 const roles = {
@@ -579,6 +580,7 @@ const userService = {
         localStorage.removeItem('usuarioAutenticado');
         localStorage.removeItem('currentUser');
         userSettingsService.clearLocalCache();
+        sealService.clearLocalCache();
 
         console.log('✅ Sesión cerrada correctamente');
         return { success: true, message: 'Sesión cerrada correctamente' };

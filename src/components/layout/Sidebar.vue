@@ -114,6 +114,13 @@
           value="cliente-inventario"
         ></v-list-item>
 
+        <v-list-item
+          :to="{ name: 'ClienteProveedores' }"
+          prepend-icon="mdi-truck-delivery-outline"
+          title="Proveedores"
+          value="cliente-proveedores"
+        ></v-list-item>
+
         <!-- <v-list-item
           :to="{ name: 'ClienteFacturacionSuscripcion' }"
           prepend-icon="mdi-credit-card-outline"

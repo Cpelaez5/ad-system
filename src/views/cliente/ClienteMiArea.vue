@@ -98,6 +98,157 @@
             </v-form>
           </v-card-text>
         </v-card>
+
+        <!-- Sello y Firma Digital de la Empresa -->
+        <v-card class="mb-6 seal-card" elevation="0" border rounded="lg">
+          <v-card-item class="px-6 pt-6">
+            <template v-slot:prepend>
+              <v-avatar color="secondary" variant="tonal" rounded="lg">
+                <v-icon color="secondary">mdi-stamper</v-icon>
+              </v-avatar>
+            </template>
+            <v-card-title class="text-h6 font-weight-bold" style="color: #1F355C;">
+              Sello y Firma Digital
+            </v-card-title>
+            <v-card-subtitle>
+              Configura el sello húmedo y/o firma autorizada que se estamparán automáticamente en tus Comprobantes de Retención y documentos fiscales.
+            </v-card-subtitle>
+          </v-card-item>
+
+          <v-card-text class="px-6 pb-6 pt-2">
+            <v-alert
+              color="info"
+              variant="tonal"
+              density="compact"
+              icon="mdi-lightbulb-on-outline"
+              class="mb-4 text-caption rounded-lg"
+            >
+              <strong>Tip fiscal:</strong> Puedes cargar tu sello húmedo, firma o ambos. Se recomienda formato <strong>PNG con fondo transparente</strong> o imagen nítida en JPG/WebP/PDF.
+            </v-alert>
+
+            <v-row>
+              <!-- 1. Sello Húmedo de la Empresa -->
+              <v-col cols="12" sm="6">
+                <div class="seal-upload-box pa-4 rounded-xl border d-flex flex-column align-center text-center h-100">
+                  <div class="d-flex align-center justify-space-between w-100 mb-2">
+                    <span class="text-subtitle-2 font-weight-bold text-secondary">
+                      <v-icon size="18" class="mr-1" color="secondary">mdi-stamper</v-icon>
+                      Sello de la Empresa
+                    </span>
+                    <v-chip v-if="sealConfig.sealUrl" size="x-small" color="success" variant="flat">
+                      Activo
+                    </v-chip>
+                  </div>
+
+                  <!-- Preview Sello -->
+                  <div class="seal-preview-wrap my-3 d-flex align-center justify-center rounded-lg">
+                    <img
+                      v-if="sealConfig.sealUrl"
+                      :src="sealConfig.sealUrl"
+                      alt="Sello Empresa"
+                      class="seal-img"
+                    />
+                    <div v-else class="text-center pa-4 text-grey-darken-1">
+                      <v-icon size="36" color="grey-lighten-1" class="mb-1">mdi-image-outline</v-icon>
+                      <p class="text-caption ma-0">Sin sello cargado</p>
+                    </div>
+                  </div>
+
+                  <!-- Acciones Sello -->
+                  <input
+                    type="file"
+                    ref="sealFileInput"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,application/pdf"
+                    class="d-none"
+                    @change="handleFileUpload($event, 'seal')"
+                  />
+
+                  <div class="d-flex ga-2 w-100 mt-auto pt-2">
+                    <v-btn
+                      variant="tonal"
+                      color="secondary"
+                      size="small"
+                      block
+                      prepend-icon="mdi-upload"
+                      :loading="uploadingSeal"
+                      @click="$refs.sealFileInput.click()"
+                    >
+                      {{ sealConfig.sealUrl ? 'Cambiar Sello' : 'Cargar Sello' }}
+                    </v-btn>
+                    <v-btn
+                      v-if="sealConfig.sealUrl"
+                      variant="text"
+                      color="error"
+                      icon="mdi-delete-outline"
+                      size="small"
+                      @click="deleteSealAsset('seal')"
+                    />
+                  </div>
+                </div>
+              </v-col>
+
+              <!-- 2. Firma del Representante Legal -->
+              <v-col cols="12" sm="6">
+                <div class="seal-upload-box pa-4 rounded-xl border d-flex flex-column align-center text-center h-100">
+                  <div class="d-flex align-center justify-space-between w-100 mb-2">
+                    <span class="text-subtitle-2 font-weight-bold text-secondary">
+                      <v-icon size="18" class="mr-1" color="secondary">mdi-draw-pen</v-icon>
+                      Firma Autorizada
+                    </span>
+                    <v-chip v-if="sealConfig.signatureUrl" size="x-small" color="success" variant="flat">
+                      Activa
+                    </v-chip>
+                  </div>
+
+                  <!-- Preview Firma -->
+                  <div class="seal-preview-wrap my-3 d-flex align-center justify-center rounded-lg">
+                    <img
+                      v-if="sealConfig.signatureUrl"
+                      :src="sealConfig.signatureUrl"
+                      alt="Firma Autorizada"
+                      class="seal-img"
+                    />
+                    <div v-else class="text-center pa-4 text-grey-darken-1">
+                      <v-icon size="36" color="grey-lighten-1" class="mb-1">mdi-draw</v-icon>
+                      <p class="text-caption ma-0">Sin firma cargada</p>
+                    </div>
+                  </div>
+
+                  <!-- Acciones Firma -->
+                  <input
+                    type="file"
+                    ref="signatureFileInput"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,application/pdf"
+                    class="d-none"
+                    @change="handleFileUpload($event, 'signature')"
+                  />
+
+                  <div class="d-flex ga-2 w-100 mt-auto pt-2">
+                    <v-btn
+                      variant="tonal"
+                      color="secondary"
+                      size="small"
+                      block
+                      prepend-icon="mdi-upload"
+                      :loading="uploadingSignature"
+                      @click="$refs.signatureFileInput.click()"
+                    >
+                      {{ sealConfig.signatureUrl ? 'Cambiar Firma' : 'Cargar Firma' }}
+                    </v-btn>
+                    <v-btn
+                      v-if="sealConfig.signatureUrl"
+                      variant="text"
+                      color="error"
+                      icon="mdi-delete-outline"
+                      size="small"
+                      @click="deleteSealAsset('signature')"
+                    />
+                  </div>
+                </div>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
       </v-col>
 
       <!-- Columna Derecha: Datos Usuario y Seguridad -->
@@ -276,6 +427,7 @@
 
 <script>
 import userService from '@/services/userService';
+import sealService from '@/services/seal-service';
 
 export default {
   name: 'PerfilCliente',
@@ -286,6 +438,13 @@ export default {
       loadingUser: false,
       loadingPassword: false,
       showPasswordModal: false,
+      uploadingSeal: false,
+      uploadingSignature: false,
+      sealConfig: {
+        sealUrl: null,
+        signatureUrl: null,
+        combinedUrl: null
+      },
       form: {
         firstName: '', lastName: '', email: '', username: '',
         companyName: '', rif: '', phone: '', address: '', activity_type: ''
@@ -317,6 +476,7 @@ export default {
   },
   async mounted() {
     await this.loadUser();
+    await this.loadSealConfig();
   },
   methods: {
     async loadUser(force = false) {
@@ -336,6 +496,68 @@ export default {
           this.form.address = client.address || '';
           this.form.activity_type = client.activity_type || '';
         }
+      }
+    },
+
+    async loadSealConfig() {
+      try {
+        const clientId = this.currentUser?.client_id || this.currentUser?.client?.id || null;
+        this.sealConfig = await sealService.getSealConfig(clientId);
+      } catch (e) {
+        console.warn('Error loading seal config:', e);
+      }
+    },
+
+    async handleFileUpload(event, type) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      if (type === 'seal') this.uploadingSeal = true;
+      if (type === 'signature') this.uploadingSignature = true;
+
+      try {
+        const clientId = this.currentUser?.client_id || this.currentUser?.client?.id || null;
+        const result = await sealService.uploadSealAsset(file, type, clientId);
+        if (result.success) {
+          this.sealConfig = result.config;
+          this.snackbar = {
+            show: true,
+            text: `${type === 'seal' ? 'Sello' : 'Firma'} digital guardado(a) correctamente`,
+            color: 'success'
+          };
+        } else {
+          throw new Error(result.message || 'Error al subir archivo');
+        }
+      } catch (error) {
+        console.error('Error uploading asset:', error);
+        this.snackbar = {
+          show: true,
+          text: error.message || 'Error al procesar el archivo',
+          color: 'error'
+        };
+      } finally {
+        if (type === 'seal') this.uploadingSeal = false;
+        if (type === 'signature') this.uploadingSignature = false;
+        // Reset input value to allow re-uploading same file
+        event.target.value = '';
+      }
+    },
+
+    async deleteSealAsset(type) {
+      try {
+        const clientId = this.currentUser?.client_id || this.currentUser?.client?.id || null;
+        const result = await sealService.removeSealAsset(type, clientId);
+        if (result.success) {
+          this.sealConfig = result.config;
+          this.snackbar = {
+            show: true,
+            text: `${type === 'seal' ? 'Sello' : 'Firma'} eliminado(a) correctamente`,
+            color: 'info'
+          };
+        }
+      } catch (error) {
+        console.error('Error deleting asset:', error);
+        this.snackbar = { show: true, text: 'Error al eliminar activo', color: 'error' };
       }
     },
 
@@ -428,3 +650,35 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.seal-card {
+  transition: all 0.3s ease;
+}
+
+.seal-upload-box {
+  background-color: #fcfdfe;
+  border-color: #e2e8f0 !important;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.seal-upload-box:hover {
+  border-color: #1F355C !important;
+  box-shadow: 0 4px 12px rgba(31, 53, 92, 0.06);
+}
+
+.seal-preview-wrap {
+  width: 100%;
+  height: 120px;
+  background-color: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  overflow: hidden;
+}
+
+.seal-img {
+  max-width: 90%;
+  max-height: 100px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+</style>

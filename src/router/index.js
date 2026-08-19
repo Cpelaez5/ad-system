@@ -198,6 +198,12 @@ const routes = [
     meta: { requiresAuth: true, title: 'Inventario de Mercancía', roles: ['cliente'] }
   },
   {
+    path: '/cliente/proveedores',
+    name: 'ClienteProveedores',
+    component: () => import('@/views/cliente/Proveedores.vue'),
+    meta: { requiresAuth: true, title: 'Directorio de Proveedores', roles: ['cliente'] }
+  },
+  {
     path: '/clientes',
     name: 'Clientes',
     component: Clientes,

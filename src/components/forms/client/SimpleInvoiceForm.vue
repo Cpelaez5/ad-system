@@ -404,7 +404,7 @@
           <v-col cols="12" v-if="formData.flow === 'COMPRA'">
             <ProveedorAutocomplete
               v-model="proveedor"
-              @add-new="showQuickAddSheet = true"
+              @add-new="showProveedorModal = true"
             />
           </v-col>
 
@@ -806,10 +806,10 @@
   </v-form>
   </v-card>
 
-  <!-- Sheet para agregar proveedor rápido -->
-  <ProveedorQuickAddSheet
-    v-model="showQuickAddSheet"
-    @saved="p => { proveedor = p }"
+  <!-- Modal completo del Directorio de Proveedores para crear/editar con parámetros fiscales -->
+  <ProveedorModalForm
+    v-model="showProveedorModal"
+    @saved="onNewProveedorSaved"
   />
 
   <!-- Sheet para ajustar retenciones manualmente -->
@@ -827,13 +827,14 @@ import userService from '@/services/userService.js';
 import clientOcrService from '@/services/clientOcrService.js';
 import inventoryService from '@/services/inventoryService.js';
 import bcvService from '@/services/bcvService.js';
+import proveedorService from '@/services/proveedorService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue';
 import ExpenseCategorySelector from '@/components/common/ExpenseCategorySelector.vue';
 import ProveedorAutocomplete from '@/components/forms/ProveedorAutocomplete.vue';
-import ProveedorQuickAddSheet from '@/components/forms/ProveedorQuickAddSheet.vue';
+import ProveedorModalForm from '@/components/forms/ProveedorModalForm.vue';
 import RetentionSummaryCard from '@/components/forms/RetentionSummaryCard.vue';
 import RetentionAdjustSheet from '@/components/forms/RetentionAdjustSheet.vue';
 import { supabase } from '@/lib/supabaseClient';
@@ -844,7 +845,7 @@ export default {
   name: 'SimpleInvoiceForm',
   components: { 
     AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete, 
-    ExpenseCategorySelector, ProveedorAutocomplete, ProveedorQuickAddSheet,
+    ExpenseCategorySelector, ProveedorAutocomplete, ProveedorModalForm,
     RetentionSummaryCard, RetentionAdjustSheet
   },
 
@@ -889,7 +890,7 @@ export default {
         aplicarMunicipal: false, porcentajeMunicipal: 0, baseMunicipal: 0
       },
       retencionesResult: null,
-      showQuickAddSheet: false,
+      showProveedorModal: false,
       showAdjustSheet: false,
       loadingRetentionConfig: false,
 
@@ -1451,14 +1452,15 @@ export default {
       const tax = parseFloat(this.formData.financial.taxDebit) || 0;
       
       let iva = 0;
+      let islr = 0;
       if (config.aplicarIva && tax > 0) {
         iva = parseFloat((tax * (config.porcentajeIva / 100)).toFixed(2));
       }
       
-      let islr = 0;
       if (config.aplicarIslr && config.conceptoIslr && amount > 0) {
         try {
-          const { data: concepto } = await supabase.from('conceptos_islr').select('*').eq('id', config.conceptoIslr).single();
+          const concepts = await proveedorService.getISLRConcepts();
+          const concepto = (concepts || []).find(c => c.id === config.conceptoIslr);
           if (concepto) {
              const baseAplicable = parseFloat(concepto.porcentaje_base) || 100;
              const baseMonto = amount * (baseAplicable / 100);
@@ -1954,6 +1956,14 @@ export default {
     onSaveSuccess() {
       this.saving = false;
       this.savingStep = '';
+    },
+
+    // Llamado al crear un nuevo proveedor desde el ProveedorModalForm
+    onNewProveedorSaved(newProv) {
+      if (newProv) {
+        this.proveedor = newProv;
+        this.showSnackbar(`Proveedor "${newProv.nombre}" registrado y seleccionado`, 'success');
+      }
     },
 
     // ── Snackbar ──────────────────────────────────────────────────────────────

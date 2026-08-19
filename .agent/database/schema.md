@@ -410,6 +410,92 @@ CREATE TABLE support_messages (
 
 ---
 
+---
+
+## Tablas de Retenciones Fiscales
+
+### conceptos_islr
+Catálogo de conceptos de retención de Impuesto Sobre La Renta (Decreto 1.808 SENIAT).
+
+```sql
+CREATE TABLE conceptos_islr (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  codigo TEXT, -- Ej: '055', '054', '053', '060'
+  nombre TEXT NOT NULL,
+  porcentaje_base DECIMAL(5,2) NOT NULL DEFAULT 100,
+  porcentaje_retencion DECIMAL(5,2) NOT NULL,
+  sustraendo_ut DECIMAL(10,2) NOT NULL DEFAULT 0,
+  monto_minimo_ut DECIMAL(10,2) NOT NULL DEFAULT 0,
+  aplica_persona TEXT DEFAULT 'AMBAS' CHECK (aplica_persona IN ('NATURAL', 'JURIDICA', 'AMBAS')),
+  descripcion TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### proveedores
+Directorio de proveedores con configuración de retenciones fiscales y contacto.
+
+```sql
+CREATE TABLE proveedores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  client_id UUID REFERENCES clients(id) ON DELETE CASCADE, -- Aislamiento por cliente
+  nombre TEXT NOT NULL,
+  rif TEXT NOT NULL,
+  tipo_persona TEXT NOT NULL CHECK (tipo_persona IN ('NATURAL', 'JURIDICA')),
+  telefono TEXT,
+  email TEXT,
+  direccion TEXT,
+  contacto_nombre TEXT,
+  iva_retention_rate DECIMAL(5,2) DEFAULT 0,
+  islr_concept_id UUID REFERENCES conceptos_islr(id),
+  municipal_rate DECIMAL(5,2) DEFAULT 0,
+  licencia_actividad_economica TEXT,
+  municipio_id UUID REFERENCES municipios(id),
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+```
+
+### retenciones
+Registro histórico y oficial de comprobantes de retención emitidos.
+
+```sql
+CREATE TABLE retenciones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  client_id UUID NOT NULL REFERENCES clients(id),
+  invoice_id UUID NOT NULL REFERENCES invoices(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('IVA', 'ISLR', 'MUNICIPAL')),
+  numero_comprobante TEXT NOT NULL,
+  proveedor_id UUID REFERENCES proveedores(id),
+  proveedor_nombre TEXT NOT NULL,
+  proveedor_rif TEXT NOT NULL,
+  proveedor_tipo_persona TEXT NOT NULL,
+  factura_numero TEXT,
+  factura_control TEXT,
+  factura_fecha DATE,
+  base_imponible DECIMAL(15,2) NOT NULL,
+  monto_iva DECIMAL(15,2),
+  porcentaje_retencion DECIMAL(5,2) NOT NULL,
+  monto_retenido DECIMAL(15,2) NOT NULL,
+  concepto_islr_id UUID REFERENCES conceptos_islr(id),
+  concepto_islr_nombre TEXT,
+  sustraendo_ut DECIMAL(10,2),
+  valor_ut DECIMAL(15,2),
+  municipio_id UUID REFERENCES municipios(id),
+  licencia_actividad TEXT,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+```
+
+---
+
 ## Migraciones
 
 Ubicación: `/migrations/`
@@ -419,6 +505,10 @@ migrations/
 ├── 001_initial_schema.sql
 ├── 002_add_users_table.sql
 ├── 003_add_invoices_table.sql
+├── 006_retenciones_backend_schema.sql
+├── 007_retenciones_registrar_compra.sql
+├── 008_islr_catalogo_completo.sql
+├── 009_proveedores_schema_rls_views.sql
 └── ...
 ```
 
@@ -436,3 +526,4 @@ NNN_descripcion_breve.sql
 
 [SQL statements]
 ```
+

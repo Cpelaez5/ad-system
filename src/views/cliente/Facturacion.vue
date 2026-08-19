@@ -353,11 +353,11 @@
     <v-card class="animate-section" style="animation-delay: 0.5s">
       <v-card-title>
         <v-icon left>mdi-receipt-long</v-icon>
-        Lista de Facturas ({{ filteredInvoices.length }})
+        {{ currentTab === 'retenciones' ? 'Registro de Retenciones Fiscales' : 'Lista de Facturas' }} ({{ filteredInvoices.length }})
       </v-card-title>
       
       <v-data-table
-        :headers="headers"
+        :headers="dynamicHeaders"
         :items="filteredInvoices"
         :loading="loading"
         class="elevation-1"
@@ -366,9 +366,17 @@
       >
         <!-- Columna de número de factura -->
         <template v-slot:item.invoiceNumber="{ item }">
-          <v-chip color="primary" variant="tonal">
-            {{ item.invoiceNumber }}
-          </v-chip>
+          <div class="d-flex align-center flex-wrap ga-1">
+            <v-chip color="primary" variant="tonal" size="small">
+              {{ item.invoiceNumber }}
+            </v-chip>
+            <v-chip v-if="(item.retenciones && item.retenciones.iva > 0) || (item.financial && item.financial.ivaRetention > 0)" color="indigo" variant="flat" size="x-small" class="font-weight-bold">
+              IVA
+            </v-chip>
+            <v-chip v-if="(item.retenciones && item.retenciones.islr > 0) || (item.financial && item.financial.islrRetention > 0)" color="purple" variant="flat" size="x-small" class="font-weight-bold">
+              ISLR
+            </v-chip>
+          </div>
         </template>
 
         <!-- Columna de cliente/proveedor -->
@@ -415,7 +423,25 @@
           <span v-else class="text-caption text-grey">-</span>
         </template>
 
+        <!-- Columna de Retención IVA (en tab Retenciones) -->
+        <template v-slot:item.retencionesIva="{ item }">
+          <div v-if="(item.retenciones && item.retenciones.iva > 0) || (item.financial && item.financial.ivaRetention > 0)">
+            <v-chip color="indigo" size="small" variant="tonal" class="font-weight-bold">
+              -{{ formatCurrency(item.retenciones?.iva || item.financial?.ivaRetention, item.financial?.currency) }}
+            </v-chip>
+          </div>
+          <span v-else class="text-caption text-grey">-</span>
+        </template>
 
+        <!-- Columna de Retención ISLR (en tab Retenciones) -->
+        <template v-slot:item.retencionesIslr="{ item }">
+          <div v-if="(item.retenciones && item.retenciones.islr > 0) || (item.financial && item.financial.islrRetention > 0)">
+            <v-chip color="purple" size="small" variant="tonal" class="font-weight-bold">
+              -{{ formatCurrency(item.retenciones?.islr || item.financial?.islrRetention, item.financial?.currency) }}
+            </v-chip>
+          </div>
+          <span v-else class="text-caption text-grey">-</span>
+        </template>
 
         <!-- Columna de total -->
         <template v-slot:item.total="{ item }">
@@ -436,6 +462,13 @@
             <div v-if="getEquivalentAmount(item)" class="text-caption text-grey ml-6">
               ≈ {{ getEquivalentAmount(item) }}
             </div>
+          </div>
+        </template>
+
+        <!-- Columna de Neto a Pagar (en tab Retenciones) -->
+        <template v-slot:item.netoPagar="{ item }">
+          <div class="font-weight-bold text-success">
+            {{ formatCurrency(item.retenciones?.neto_a_pagar || (Number(item.financial?.totalSales || 0) - Number(item.retenciones?.iva || item.financial?.ivaRetention || 0) - Number(item.retenciones?.islr || item.financial?.islrRetention || 0) - Number(item.retenciones?.municipal || item.financial?.municipalRetention || 0)), item.financial?.currency) }}
           </div>
         </template>
 
@@ -508,8 +541,11 @@
                 <v-list-item v-if="item.attachments && item.attachments.length > 0" @click="downloadAttachment(item)" prepend-icon="mdi-paperclip">
                   <v-list-item-title>Ver / Descargar Foto Adjunta</v-list-item-title>
                 </v-list-item>
-                <v-list-item v-if="item.retenciones && item.retenciones.islr > 0" @click="downloadISLR(item)" prepend-icon="mdi-shield-check">
-                  <v-list-item-title>Descargar Planilla de Retención (ISLR)</v-list-item-title>
+                <v-list-item v-if="(item.retenciones && item.retenciones.islr > 0) || (item.financial && item.financial.islrRetention > 0)" @click="downloadISLR(item)" prepend-icon="mdi-file-percent">
+                  <v-list-item-title>Descargar Comprobante ISLR (PDF)</v-list-item-title>
+                </v-list-item>
+                <v-list-item v-if="(item.retenciones && item.retenciones.iva > 0) || (item.financial && item.financial.ivaRetention > 0)" @click="downloadIVA(item)" prepend-icon="mdi-file-certificate">
+                  <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
                 </v-list-item>
               </v-list>
             </v-menu>
@@ -807,8 +843,11 @@
               <v-list-item v-if="hasAttachment(viewingInvoice)" @click="downloadAttachment(viewingInvoice)" prepend-icon="mdi-paperclip">
                 <v-list-item-title>Ver / Descargar Foto Adjunta</v-list-item-title>
               </v-list-item>
-              <v-list-item v-if="viewingInvoice.retenciones && viewingInvoice.retenciones.islr > 0" @click="downloadISLR(viewingInvoice)" prepend-icon="mdi-shield-check">
-                <v-list-item-title>Descargar Planilla de Retención (ISLR)</v-list-item-title>
+              <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.islr > 0) || (viewingInvoice.financial && viewingInvoice.financial.islrRetention > 0)" @click="downloadISLR(viewingInvoice)" prepend-icon="mdi-file-percent">
+                <v-list-item-title>Descargar Comprobante ISLR (PDF)</v-list-item-title>
+              </v-list-item>
+              <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.iva > 0) || (viewingInvoice.financial && viewingInvoice.financial.ivaRetention > 0)" @click="downloadIVA(viewingInvoice)" prepend-icon="mdi-file-certificate">
+                <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
               </v-list-item>
             </v-list>
           </v-menu>
@@ -1119,6 +1158,7 @@ import SimpleInvoiceForm  from '@/components/forms/client/SimpleInvoiceForm.vue'
 import CasheaInstallmentsModal from '@/components/forms/client/CasheaInstallmentsModal.vue';
 import userService from '@/services/userService.js';
 import { generateReceiptPdf } from '@/services/receipt-pdf-service.js';
+import retentionPdfService from '@/services/retention-pdf-service.js';
 import dayjs from 'dayjs';
 
 export default {
@@ -1249,8 +1289,22 @@ export default {
     };
   },
   computed: {
-    // displayTotalAmount removed; use `convertedStatsTotal` instead
-    
+    dynamicHeaders() {
+      if (this.currentTab === 'retenciones') {
+        return [
+          { title: 'N° Factura', key: 'invoiceNumber', sortable: true },
+          { title: 'Proveedor', key: 'client', sortable: true },
+          { title: 'Fecha', key: 'issueDate', sortable: true },
+          { title: 'Retención IVA', key: 'retencionesIva', sortable: true },
+          { title: 'Retención ISLR', key: 'retencionesIslr', sortable: true },
+          { title: 'Total Factura', key: 'total', sortable: true },
+          { title: 'Neto a Pagar', key: 'netoPagar', sortable: true },
+          { title: 'Estado', key: 'status', sortable: true },
+          { title: 'Comprobantes', key: 'actions', sortable: false }
+        ];
+      }
+      return this.headers;
+    },
     ventasCount() {
       if (!this.invoices || !Array.isArray(this.invoices)) return 0;
       return this.invoices.filter(inv => inv.flow === 'VENTA').length;
@@ -1424,44 +1478,27 @@ export default {
     async loadInvoices() {
       if (!this.currentUser) return;
       
+      const myClientId = this.currentUser.client_id || this.currentUser.id;
+      
       try {
         this.loading = true;
-        console.log('🔄 Cargando facturas del cliente...');
+        console.log('🔄 Cargando facturas del cliente...', { clientId: myClientId });
         
-        // 1. Cargar Ventas (donde yo soy el emisor - aproximación por frontend filter)
-        // Nota: getInvoices({ flow: 'VENTA' }) trae todas las ventas de la org.
-        // debemos filtrar por mi RIF o ID si es posible.
-        const allSales = await invoiceService.getInvoices({ flow: 'VENTA' });
+        // 1. Cargar Ventas y Compras por client_id — ambas usan el mismo filtro seguro
+        // Las facturas de VENTA donde yo soy emisor tienen client_id asignado
+        const [salesRes, purchasesRes] = await Promise.all([
+          invoiceService.getInvoices({ flow: 'VENTA', clientId: myClientId }),
+          invoiceService.getInvoices({ flow: 'COMPRA', clientId: myClientId })
+        ]);
         
-        // Obtener el RIF del cliente desde user.client.rif
-        const myRif = this.currentUser.client?.rif;
+        this.invoices = [...(salesRes || []), ...(purchasesRes || [])];
         
-        const mySales = allSales.filter(inv => {
-          // Filtrar donde el emisor soy yo
-          // Asumimos que currentUser tiene RIF o nombre de empresa
-          if (!myRif) {
-            console.warn('⚠️ Cliente sin RIF configurado, mostrando todas las ventas');
-            return true; // Si no tengo RIF, mostrar todo (fallback)
-          }
-          return inv.issuer?.rif === myRif;
-        });
-        
-        // 2. Cargar Compras (donde yo soy el cliente)
-        // Aquí sí podemos usar el filtro clientId del servicio
-        const myPurchases = await invoiceService.getInvoices({ 
-          flow: 'COMPRA', 
-          clientId: this.currentUser.client_id || this.currentUser.id 
-        });
-        
-        this.invoices = [...mySales, ...myPurchases];
-        
-        // 3. Cargar Papelera (trashed=true)
-        const trashSales = await invoiceService.getInvoices({ flow: 'VENTA' }, { trashed: true });
-        const trashPurchases = await invoiceService.getInvoices({ 
-           flow: 'COMPRA', 
-           clientId: this.currentUser.client_id || this.currentUser.id 
-        }, { trashed: true });
-        this.trashInvoices = [...trashSales, ...trashPurchases];
+        // 2. Cargar Papelera (trashed=true) — mismo filtro seguro
+        const [trashSalesRes, trashPurchasesRes] = await Promise.all([
+          invoiceService.getInvoices({ flow: 'VENTA', clientId: myClientId }, { trashed: true }),
+          invoiceService.getInvoices({ flow: 'COMPRA', clientId: myClientId }, { trashed: true })
+        ]);
+        this.trashInvoices = [...(trashSalesRes || []), ...(trashPurchasesRes || [])];
         
         console.log('📋 Facturas activas:', this.invoices.length);
         console.log('🗑️ Facturas en papelera:', this.trashInvoices.length);
@@ -1821,6 +1858,11 @@ export default {
         // Notificar al SimpleInvoiceForm que terminó con éxito
         if (this.$refs.simpleForm) {
           this.$refs.simpleForm.onSaveSuccess();
+        }
+
+        // Si fue una compra o gasto, notificar al módulo de proveedores para auto-sincronización
+        if (formData.flow === 'COMPRA' && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ad-proveedor-changed'));
         }
 
         this.closeInvoiceDialog();
@@ -2285,14 +2327,37 @@ export default {
         const companyInfo = {
           name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
           rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
-          address: clientProfile.address || orgProfile.address || 'DIRECCIÓN NO REGISTRADA'
+          address: clientProfile.address || orgProfile.address || 'DIRECCIÓN NO REGISTRADA',
+          phone: clientProfile.phone || orgProfile.phone || ''
         };
 
-        await exportService.exportarComprobanteISLR(invoice, companyInfo);
-        this.$root?.showSnackbar?.('Comprobante exportado exitosamente', 'success');
+        await retentionPdfService.generarComprobanteISLR(invoice, companyInfo);
+        this.$root?.showSnackbar?.('Comprobante ISLR exportado exitosamente', 'success');
       } catch (error) {
         console.error('Error exportando comprobante ISLR:', error);
         this.$root?.showSnackbar?.('Error al exportar comprobante ISLR', 'error');
+      }
+    },
+
+    async downloadIVA(invoice) {
+      try {
+        const clientProfile = this.currentUser?.client || {};
+        const orgProfile = Array.isArray(this.currentUser?.organization) 
+          ? this.currentUser.organization[0] 
+          : (this.currentUser?.organization || {});
+          
+        const companyInfo = {
+          name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
+          rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
+          address: clientProfile.address || orgProfile.address || 'DIRECCIÓN NO REGISTRADA',
+          phone: clientProfile.phone || orgProfile.phone || ''
+        };
+
+        await retentionPdfService.generarComprobanteIVA(invoice, companyInfo);
+        this.$root?.showSnackbar?.('Comprobante IVA exportado exitosamente', 'success');
+      } catch (error) {
+        console.error('Error exportando comprobante IVA:', error);
+        this.$root?.showSnackbar?.('Error al exportar comprobante IVA', 'error');
       }
     },
 

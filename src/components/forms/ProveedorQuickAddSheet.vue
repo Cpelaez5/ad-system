@@ -56,17 +56,32 @@
             class="mb-3"
           ></v-text-field>
 
+          <!-- Selector de Concepto ISLR filtrado por tipo de persona -->
           <v-select
             v-model="formData.islr_concept_id"
-            :items="conceptosIslr"
-            item-title="nombre"
+            :items="conceptosFiltrados"
+            item-title="displayLabel"
             item-value="id"
             label="Concepto ISLR (Por Defecto)"
             variant="outlined"
             density="comfortable"
             clearable
             class="mb-3"
-          ></v-select>
+            :hint="conceptoHint"
+            persistent-hint
+          >
+            <template v-slot:item="{ props, item }">
+              <v-list-item v-bind="props">
+                <template v-slot:subtitle>
+                  <span class="text-caption">
+                    {{ item.raw.codigo ? `Cód. ${item.raw.codigo}` : '' }}
+                    {{ item.raw.porcentaje_retencion ? ` • ${item.raw.porcentaje_retencion}%` : '' }}
+                    {{ item.raw.sustraendo_ut > 0 ? ` • Sustr. ${item.raw.sustraendo_ut} UT` : '' }}
+                  </span>
+                </template>
+              </v-list-item>
+            </template>
+          </v-select>
 
           <v-row>
             <v-col cols="12" sm="6">
@@ -125,8 +140,7 @@
 </template>
 
 <script>
-import { supabase } from '@/lib/supabaseClient'
-import { getCurrentOrganizationId } from '@/utils/tenantHelpers'
+import proveedorService from '@/services/proveedorService.js'
 
 export default {
   name: 'ProveedorQuickAddSheet',
@@ -142,18 +156,37 @@ export default {
       internalValue: this.modelValue,
       valid: false,
       saving: false,
-      conceptosIslr: [],
+      allConceptosIslr: [],
       municipios: [],
       formData: {
         nombre: '',
         rif: '',
         tipo_persona: 'JURIDICA',
-        iva_retention_rate: 0,
+        iva_retention_rate: 75,
         islr_concept_id: null,
         municipal_rate: 0,
         municipio_id: null,
         licencia_actividad_economica: ''
       }
+    }
+  },
+  computed: {
+    /** Filtra los conceptos ISLR según el tipo de persona seleccionado */
+    conceptosFiltrados() {
+      const tipo = this.formData.tipo_persona
+      return this.allConceptosIslr
+        .filter(c => !c.aplica_persona || c.aplica_persona === 'AMBOS' || c.aplica_persona === 'AMBAS' || c.aplica_persona === tipo)
+        .map(c => ({
+          ...c,
+          displayLabel: `${c.codigo ? '[' + c.codigo + '] ' : ''}${c.nombre} (${c.porcentaje_retencion}%)`
+        }))
+    },
+    /** Hint contextual para el selector de concepto ISLR */
+    conceptoHint() {
+      const tipo = this.formData.tipo_persona
+      return tipo === 'NATURAL'
+        ? 'Mostrando conceptos para Persona Natural'
+        : 'Mostrando conceptos para Persona Jurídica'
     }
   },
   watch: {
@@ -166,6 +199,9 @@ export default {
     },
     internalValue(val) {
       this.$emit('update:modelValue', val)
+    },
+    'formData.tipo_persona'() {
+      this.fetchCatalogs()
     }
   },
   methods: {
@@ -177,7 +213,7 @@ export default {
         nombre: '',
         rif: '',
         tipo_persona: 'JURIDICA',
-        iva_retention_rate: 0,
+        iva_retention_rate: 75,
         islr_concept_id: null,
         municipal_rate: 0,
         municipio_id: null,
@@ -186,33 +222,29 @@ export default {
       if (this.$refs.form) this.$refs.form.resetValidation()
     },
     async fetchCatalogs() {
-      if (this.conceptosIslr.length === 0) {
-        const { data: c } = await supabase.from('conceptos_islr').select('*').eq('is_active', true)
-        if (c) this.conceptosIslr = c
-      }
-      if (this.municipios.length === 0) {
-        const { data: m } = await supabase.from('municipios').select('*').order('nombre')
-        if (m) this.municipios = m
+      try {
+        const [islr, mun] = await Promise.all([
+          proveedorService.getISLRConcepts(this.formData.tipo_persona),
+          proveedorService.getMunicipios()
+        ])
+        this.allConceptosIslr = islr || []
+        this.municipios = mun || []
+      } catch (err) {
+        console.warn('Error cargando catálogos en QuickAddSheet:', err)
       }
     },
     async save() {
-      if (!this.$refs.form.validate()) return
+      if (this.$refs.form && !this.$refs.form.validate()) return
       
       this.saving = true
       try {
-        const orgId = getCurrentOrganizationId()
-        const insertData = { ...this.formData, organization_id: orgId }
-        
-        const { data, error } = await supabase
-          .from('proveedores')
-          .insert([insertData])
-          .select()
-          .single()
-
-        if (error) throw error
-
-        this.$emit('saved', data)
-        this.close()
+        const result = await proveedorService.createProveedor(this.formData)
+        if (result.success) {
+          this.$emit('saved', result.data)
+          this.close()
+        } else {
+          alert(result.error || 'Ocurrió un error guardando el proveedor')
+        }
       } catch (error) {
         console.error('Error guardando proveedor:', error)
         alert('Ocurrió un error guardando el proveedor')
