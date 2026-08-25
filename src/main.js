@@ -115,33 +115,33 @@ const vuetify = createVuetify({
     VTextField: {
       variant: 'outlined',
       density: 'comfortable',
-      style: 'border-radius: 20px; padding: 20px; font-family: "Montserrat", sans-serif;',
+      style: 'border-radius: 20px; font-family: "Montserrat", sans-serif;',
     },
     VSelect: {
       variant: 'outlined',
       density: 'comfortable',
-      style: 'border-radius: 20px; padding: 20px; font-family: "Montserrat", sans-serif;',
+      style: 'border-radius: 20px; font-family: "Montserrat", sans-serif;',
     },
     VTextarea: {
       variant: 'outlined',
       density: 'comfortable',
-      style: 'border-radius: 20px; padding: 20px; font-family: "Montserrat", sans-serif;',
+      style: 'border-radius: 20px; font-family: "Montserrat", sans-serif;',
     },
     VBtn: {
-      style: 'text-transform: none; font-weight: 500; border-radius: 10px; box-shadow: none; padding: 8px 16px; font-family: "Montserrat", sans-serif;',
+      style: 'text-transform: none; font-weight: 500; border-radius: 10px; box-shadow: none; font-family: "Montserrat", sans-serif;',
     },
     VCard: {
-      style: 'border-radius: 20px; box-shadow: none; padding: 20px; font-family: "Montserrat", sans-serif;',
+      style: 'border-radius: 20px; box-shadow: none; font-family: "Montserrat", sans-serif;',
     },
     VMenu: {
       zIndex: 2000,
-      style: 'border-radius: 20px; box-shadow: none; padding: 20px; font-family: "Montserrat", sans-serif;',
+      style: 'border-radius: 20px; box-shadow: none; font-family: "Montserrat", sans-serif;',
     },
     VList: {
-      style: 'border-radius: 20px; padding: 20px; font-family: "Montserrat", sans-serif;',
+      style: 'border-radius: 20px; font-family: "Montserrat", sans-serif;',
     },
     VListItem: {
-      style: 'border-radius: 20px; padding: 20px; font-family: "Montserrat", sans-serif;',
+      style: 'border-radius: 20px; font-family: "Montserrat", sans-serif;',
     },
   },
   display: {

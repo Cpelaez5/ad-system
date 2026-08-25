@@ -8,7 +8,7 @@
     <!-- HEADER fijo -->
     <v-card-title class="sif-header pa-5 pb-4">
       <div class="d-flex align-center justify-space-between">
-        <div class="d-flex align-center gap-3">
+        <div class="d-flex align-center ga-3">
           <v-avatar color="primary" size="44">
             <v-icon color="white" size="24">mdi-receipt-text-plus</v-icon>
           </v-avatar>
@@ -38,10 +38,10 @@
           class="d-flex align-center justify-space-between cursor-pointer"
           @click="ocrPanelOpen = !ocrPanelOpen"
         >
-          <div class="d-flex align-center gap-2">
+          <div class="d-flex align-center ga-2">
             <v-icon color="primary" size="22">mdi-robot-outline</v-icon>
             <span class="font-weight-medium text-body-2">
-              📄 ¿Tienes la factura en papel o PDF? <strong>Deja que la IA la lea por ti</strong>
+              ¿Tienes la factura en papel o PDF? <strong>Deja que la IA la lea por ti</strong>
             </span>
             <v-chip size="x-small" color="success" variant="tonal">Opcional</v-chip>
           </div>
@@ -89,7 +89,7 @@
                     <div
                       v-for="(item, i) in ocrResult.summary"
                       :key="i"
-                      class="d-flex align-center gap-1 text-caption mb-1"
+                      class="d-flex align-center ga-1 text-caption mb-1"
                     >
                       <v-icon :color="item.found ? 'success' : 'warning'" size="14">
                         {{ item.found ? 'mdi-check' : 'mdi-alert' }}
@@ -446,7 +446,7 @@
           <!-- Mis datos (pre-llenados, colapsables) -->
           <v-col cols="12">
             <div
-              class="d-flex align-center gap-1 cursor-pointer text-caption text-primary mb-1"
+              class="d-flex align-center ga-1 cursor-pointer text-caption text-primary mb-1"
               @click="myDataExpanded = !myDataExpanded"
             >
               <v-icon size="14">{{ myDataExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
@@ -531,7 +531,7 @@
               <!-- Descripción / producto -->
               <v-col cols="12" sm="5">
                 <!-- Indicador de código/SKU si viene del OCR y no es producto de inventario -->
-                <div v-if="item.code && !item.product_id" class="d-flex align-center gap-1 mb-1">
+                <div v-if="item.code && !item.product_id" class="d-flex align-center ga-1 mb-1">
                   <v-chip size="x-small" color="info" variant="tonal">
                     <v-icon start size="12">mdi-barcode</v-icon>
                     {{ item.code }}
@@ -557,7 +557,7 @@
               </v-col>
 
               <!-- Cantidad -->
-              <v-col cols="4" sm="2">
+              <v-col cols="6" sm="2">
                 <v-text-field
                   v-model.number="item.quantity"
                   label="Cant."
@@ -580,7 +580,7 @@
               </v-col>
 
               <!-- Precio -->
-              <v-col cols="4" sm="2">
+              <v-col cols="6" sm="2">
                 <v-text-field
                   v-model.number="item.unitPrice"
                   label="Precio"
@@ -595,7 +595,7 @@
               </v-col>
 
               <!-- Total (calculado automáticamente) -->
-              <v-col cols="4" sm="2">
+              <v-col cols="10" sm="2">
                 <v-text-field
                   :model-value="formatNumber(item.total)"
                   label="Total"
@@ -609,7 +609,7 @@
               </v-col>
 
               <!-- Borrar -->
-              <v-col cols="12" sm="1" class="d-flex justify-end justify-sm-center">
+              <v-col cols="2" sm="1" class="d-flex justify-end justify-sm-center">
                 <v-btn
                   v-if="formData.items.length > 1"
                   icon="mdi-delete-outline"
@@ -690,10 +690,10 @@
           <v-col cols="12" sm="6" md="3" class="d-flex">
             <!-- Display personalizado para el TOTAL con Vuetify -->
             <v-sheet 
-              class="rounded-lg px-4 d-flex flex-column justify-center w-100" 
+              class="rounded-lg px-4 py-3 d-flex flex-column justify-center w-100" 
               :class="{ 'elevation-2': !manualMode, 'elevation-0 border': manualMode }"
               color="blue-darken-4"
-              min-height="40"
+              min-height="64"
               :border="getAiColor('totalSales') ? getAiColor('totalSales') : (manualMode ? 'info' : false)"
             >
               <span class="text-overline text-white opacity-70 mb-0 pb-0" style="line-height: 1.2;">
@@ -718,7 +718,7 @@
         </v-row>
 
         <!-- Tasa de cambio — USD y EUR -->
-        <div v-if="formData.financial.currency === 'USD'" class="mt-2 d-flex align-center gap-2">
+        <div v-if="formData.financial.currency === 'USD'" class="mt-2 d-flex align-center ga-2">
           <v-icon color="info" size="16">mdi-swap-horizontal</v-icon>
           <span class="text-caption d-flex align-center">
             Tasa oficial BCV: <strong>{{ formData.financial.exchangeRate }} Bs/USD</strong>
@@ -728,7 +728,7 @@
             Equivalente: ≈ <strong class="text-info">{{ formatNumber(formData.financial.totalSales * formData.financial.exchangeRate) }} Bs.</strong>
           </span>
         </div>
-        <div v-else-if="formData.financial.currency === 'EUR'" class="mt-2 d-flex align-center gap-2">
+        <div v-else-if="formData.financial.currency === 'EUR'" class="mt-2 d-flex align-center ga-2">
           <v-icon color="warning" size="16">mdi-currency-eur</v-icon>
           <span class="text-caption">
             Tasa oficial BCV: <strong v-if="formData.financial.exchangeRateEur">{{ formData.financial.exchangeRateEur }} Bs/EUR</strong>
@@ -757,7 +757,7 @@
       ══════════════════════════════════════════════════════════ -->
       <div class="sif-section">
         <div
-          class="d-flex align-center gap-1 cursor-pointer mb-2"
+          class="d-flex align-center ga-1 cursor-pointer mb-2"
           @click="notesExpanded = !notesExpanded"
         >
           <v-icon size="18" color="grey">mdi-note-text-outline</v-icon>
@@ -790,7 +790,7 @@
       <!-- Barra de progreso de guardado -->
       <v-expand-transition>
         <div v-if="saving" class="mb-3 w-100">
-          <div class="d-flex align-center gap-2 mb-1">
+          <div class="d-flex align-center ga-2 mb-1">
             <v-progress-circular size="16" width="2" indeterminate color="primary" />
             <span class="text-caption text-primary font-weight-medium">{{ savingStep }}</span>
           </div>
@@ -798,7 +798,7 @@
         </div>
       </v-expand-transition>
 
-      <div class="d-flex align-center gap-3 w-100">
+      <div class="d-flex align-center ga-3 w-100">
         <v-btn variant="text" color="grey-darken-1" @click="$emit('cancel')" :disabled="saving">
           Cancelar
         </v-btn>
@@ -1596,8 +1596,7 @@ export default {
           companyName: this.currentUser?.companyName || this.currentUser?.name || this.currentUser?.client?.company_name || '',
           rif:         this.currentUser?.rif || this.currentUser?.client?.rif || ''
         };
-
-        console.log('🤖 [OCR] Enviando contexto del usuario:', userContext);
+        console.log('[OCR] Enviando contexto del usuario:', userContext);
 
         const data = await procesarComprobanteOCR(file, { 
           userContext, 
@@ -1605,7 +1604,7 @@ export default {
           onProgress: (msg) => { this.extracting = msg !== null; } 
         });
 
-        console.log('🤖 [OCR] Respuesta recibida:', {
+        console.log('[OCR] Respuesta recibida:', {
           detectedFlow: data.detectedFlow,
           flowConfidence: data.flowConfidence,
           flowReason: data.flowReason,
@@ -1635,7 +1634,7 @@ export default {
 
           if (matchingOpt) {
             this.selectFlow(matchingOpt);
-            console.log('✅ [OCR] Flujo aplicado:', matchingOpt.label);
+            console.log('[OCR] Flujo aplicado:', matchingOpt.label);
           }
         }
 
@@ -2073,7 +2072,7 @@ export default {
 .sif-card {
   display: flex;
   flex-direction: column;
-  max-height: 92vh;
+  height: 100%;
 }
 
 /* v-card-text: Vuetify agrega overflow-y:auto automáticamente cuando scrollable=true en el dialog */
