@@ -1,4 +1,5 @@
 ---
+name: nueva-migracion
 description: Crear nueva migración de base de datos
 ---
 

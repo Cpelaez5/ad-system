@@ -1,130 +1,61 @@
 <template>
-  <v-container class="pa-6">
-    <v-row>
+  <v-container class="pa-4 pa-sm-6">
+    <v-row class="mb-2">
       <v-col cols="12">
-        <h1 class="text-h4 mb-2">🤖 Demo: OCR de Facturas con IA</h1>
-        <p class="text-body-1 text-grey mb-6">
-          Prueba la extracción automática de datos usando DeepSeek Vision API
+        <h1 class="text-h5 text-sm-h4 mb-1 font-weight-bold text-white d-flex align-center">
+          <v-icon color="#e0b04f" class="mr-2" size="large">mdi-robot-outline</v-icon>
+          Demo: OCR de Facturas
+        </h1>
+        <p class="text-body-2 text-sm-body-1 text-grey-lighten-1 mb-0">
+          Sube un comprobante para probar el sistema Multi-Proveedor (Gemini/Deepseek).
         </p>
       </v-col>
     </v-row>
 
     <v-row>
       <!-- Upload Zone -->
-      <v-col cols="12" md="6">
+      <v-col cols="12" md="5" class="d-flex flex-column gap-4">
         <FileUploadZone
           :loading="isExtracting"
-          loading-message="Extrayendo datos con IA... 🧠"
+          :loading-message="loadingMessage"
           @file-selected="onFileSelected"
           @extract-data="extractInvoiceData"
           @file-removed="onFileRemoved"
         />
+        
+        <!-- Error Segregado (S.O.L.I.D) -->
+        <OcrErrorAlert 
+          v-if="errorState" 
+          :error="errorState" 
+          @manual-entry="onManualEntry" 
+        />
       </v-col>
 
       <!-- Resultados -->
-      <v-col cols="12" md="6">
-        <v-card v-if="extractedData">
-          <v-card-title class="d-flex align-center">
-            <v-icon color="success" class="mr-2">mdi-check-circle</v-icon>
-            Datos Extraídos
-            <v-spacer />
-            <v-chip :color="confidenceColor" variant="tonal">
-              Confianza: {{ Math.round(extractedData.confidence * 100) }}%
-            </v-chip>
-          </v-card-title>
+      <v-col cols="12" md="7">
+        
+        <!-- Resultado Segregado (S.O.L.I.D) -->
+        <OcrResultCard 
+          v-if="extractedData"
+          :data="extractedData"
+          @clear="extractedData = null"
+          @save="onSimulateSave"
+        />
 
-          <v-card-text>
-            <!-- Información básica -->
-            <v-list density="compact">
-              <v-list-item>
-                <template #prepend>
-                  <v-icon>mdi-file-document</v-icon>
-                </template>
-                <v-list-item-title>Número de Factura</v-list-item-title>
-                <v-list-item-subtitle>{{ extractedData.invoiceNumber || 'N/A' }}</v-list-item-subtitle>
-              </v-list-item>
-
-              <v-list-item>
-                <template #prepend>
-                  <v-icon>mdi-calendar</v-icon>
-                </template>
-                <v-list-item-title>Fecha de Emisión</v-list-item-title>
-                <v-list-item-subtitle>{{ extractedData.issueDate || 'N/A' }}</v-list-item-subtitle>
-              </v-list-item>
-
-              <v-list-item>
-                <template #prepend>
-                  <v-icon>mdi-office-building</v-icon>
-                </template>
-                <v-list-item-title>Cliente</v-list-item-title>
-                <v-list-item-subtitle>{{ extractedData.client?.companyName || 'N/A' }}</v-list-item-subtitle>
-              </v-list-item>
-
-              <v-list-item>
-                <template #prepend>
-                  <v-icon>mdi-cash</v-icon>
-                </template>
-                <v-list-item-title>Total</v-list-item-title>
-                <v-list-item-subtitle>
-                  {{ extractedData.currency || 'VES' }} {{ formatNumber(extractedData.total) }}
-                </v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-
-            <v-divider class="my-4" />
-
-            <!-- Items -->
-            <h4 class="text-subtitle-1 mb-2">Items ({{ extractedData.items?.length || 0 }})</h4>
-            <v-list density="compact">
-              <v-list-item
-                v-for="(item, index) in extractedData.items"
-                :key="index"
-              >
-                <v-list-item-title>{{ item.description }}</v-list-item-title>
-                <v-list-item-subtitle>
-                  Cant: {{ item.quantity }} × {{ formatNumber(item.unitPrice) }} = {{ formatNumber(item.amount) }}
-                </v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-
-            <v-divider class="my-4" />
-
-            <!-- JSON completo -->
-            <v-expansion-panels>
-              <v-expansion-panel>
-                <v-expansion-panel-title>
-                  <v-icon class="mr-2">mdi-code-json</v-icon>
-                  Ver JSON Completo
-                </v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <pre class="json-display">{{ JSON.stringify(extractedData, null, 2) }}</pre>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-            </v-expansion-panels>
-          </v-card-text>
-
-          <v-card-actions>
-            <v-btn color="primary" variant="elevated" @click="useData">
-              <v-icon start>mdi-check</v-icon>
-              Usar Estos Datos
-            </v-btn>
-            <v-btn variant="text" @click="extractedData = null">
-              Limpiar
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-
-        <!-- Placeholder -->
-        <v-card v-else class="text-center pa-8" variant="outlined">
-          <v-icon size="64" color="grey-lighten-1">mdi-file-search</v-icon>
-          <p class="text-body-1 text-grey mt-4">
-            Los datos extraídos aparecerán aquí
+        <!-- Placeholder (Empty State) -->
+        <v-card v-else class="text-center pa-6 pa-sm-10 bg-surface-dark border-thin rounded-lg d-flex flex-column align-center justify-center h-100" theme="dark">
+          <v-icon size="48" color="grey-darken-2" class="mb-3">mdi-file-search-outline</v-icon>
+          <h3 class="text-subtitle-1 text-sm-h6 text-grey-lighten-1 mb-1 font-weight-bold">Listo para extraer</h3>
+          <p class="text-caption text-sm-body-2 text-grey mb-0 px-2">
+            Sube un comprobante a la izquierda y el resultado aparecerá aquí.<br class="d-none d-sm-block">
+            Asegúrate de tener un Perfil IA activo configurado.
           </p>
         </v-card>
+
       </v-col>
     </v-row>
 
-    <!-- Snackbar -->
+    <!-- Snackbar para simulaciones -->
     <AppSnackbar
       v-model="snackbar.show"
       :type="snackbar.type"
@@ -133,95 +64,76 @@
   </v-container>
 </template>
 
-<script>
-import FileUploadZone from '@/components/common/FileUploadZone.vue'
-import AppSnackbar from '@/components/common/AppSnackbar.vue'
-import ocrService from '@/services/ocrService.js'
+<script setup>
+import { ref } from 'vue';
+import FileUploadZone from '@/components/common/FileUploadZone.vue';
+import AppSnackbar from '@/components/common/AppSnackbar.vue';
+import OcrErrorAlert from '@/components/ocr/OcrErrorAlert.vue';
+import OcrResultCard from '@/components/ocr/OcrResultCard.vue';
+import { procesarComprobanteOCR } from '@/services/gemini/geminiOcrService.js';
 
-export default {
-  name: 'OCRDemo',
-  components: {
-    FileUploadZone,
-    AppSnackbar
-  },
-  data() {
-    return {
-      isExtracting: false,
-      extractedData: null,
-      snackbar: {
-        show: false,
-        type: 'info',
-        message: ''
-      }
-    }
-  },
-  computed: {
-    confidenceColor() {
-      const confidence = this.extractedData?.confidence || 0
-      if (confidence >= 0.8) return 'success'
-      if (confidence >= 0.5) return 'warning'
-      return 'error'
-    }
-  },
-  methods: {
-    onFileSelected(file) {
-      console.log('📄 Archivo seleccionado:', file.name)
-      this.showSnackbar('info', `Archivo cargado: ${file.name}`)
-    },
+const isExtracting = ref(false);
+const loadingMessage = ref('Subiendo documento... ☁️');
+const extractedData = ref(null);
+const errorState = ref(null);
+const snackbar = ref({ show: false, type: 'info', message: '' });
+
+function showSnackbar(type, message) {
+  snackbar.value = { show: true, type, message };
+}
+
+function onFileSelected(file) {
+  errorState.value = null;
+}
+
+async function extractInvoiceData(file) {
+  isExtracting.value = true;
+  extractedData.value = null;
+  errorState.value = null;
+  loadingMessage.value = 'Subiendo documento... ☁️';
+  
+  try {
+    const data = await procesarComprobanteOCR(file, null, (msg) => {
+      if (msg) loadingMessage.value = msg;
+    });
     
-    async extractInvoiceData(file) {
-      try {
-        this.isExtracting = true
-        this.extractedData = null
-        
-        console.log('🤖 Iniciando extracción...')
-        const data = await ocrService.extractInvoiceData(file)
-        
-        this.extractedData = data
-        this.showSnackbar('success', '¡Datos extraídos exitosamente!')
-        
-      } catch (error) {
-        console.error('❌ Error:', error)
-        this.showSnackbar('error', error.message || 'Error al extraer datos')
-      } finally {
-        this.isExtracting = false
-      }
-    },
+    extractedData.value = data;
+    showSnackbar('success', '¡Datos extraídos con éxito!');
     
-    onFileRemoved() {
-      this.extractedData = null
-      this.showSnackbar('info', 'Archivo removido')
-    },
-    
-    useData() {
-      console.log('✅ Usando datos:', this.extractedData)
-      this.showSnackbar('success', 'Datos listos para usar en el formulario')
-      // Aquí podrías navegar al formulario con los datos
-      // this.$router.push({ name: 'InvoiceForm', params: { data: this.extractedData } })
-    },
-    
-    showSnackbar(type, message) {
-      this.snackbar = { show: true, type, message }
-    },
-    
-    formatNumber(value) {
-      if (!value) return '0.00'
-      return parseFloat(value).toLocaleString('es-VE', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
-    }
+  } catch (error) {
+    console.error('❌ Error OCR:', error);
+    errorState.value = {
+      code: error.code || 'UNKNOWN_ERROR',
+      message: error.message || 'Error desconocido al procesar el archivo',
+      suggestManualEntry: !!error.suggestManualEntry
+    };
+  } finally {
+    isExtracting.value = false;
   }
+}
+
+function onFileRemoved() {
+  extractedData.value = null;
+  errorState.value = null;
+}
+
+function onManualEntry() {
+  showSnackbar('info', '🚜 Simulación: Redirigiendo al formulario de ingreso manual de compras...');
+}
+
+function onSimulateSave() {
+  showSnackbar('success', '💾 Simulación: Guardando factura en base de datos...');
 }
 </script>
 
 <style scoped>
-.json-display {
-  background-color: #f5f5f5;
-  padding: 16px;
-  border-radius: 4px;
-  overflow-x: auto;
-  font-size: 12px;
-  line-height: 1.5;
+.gap-4 {
+  gap: 16px;
+}
+.bg-surface-dark {
+  background-color: #121212 !important;
+}
+.border-thin {
+  border: 1px dashed rgba(255, 255, 255, 0.15) !important;
 }
 </style>

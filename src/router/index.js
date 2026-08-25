@@ -31,6 +31,7 @@ const Archivo = () => import('../views/contador/Archivo.vue')
 // Vistas para admin y super_admin
 const Usuarios = () => import('../views/admin/Usuarios.vue')
 const FacturacionSistema = () => import('../views/admin/FacturacionSistema.vue')
+const AiSettings = () => import('../views/admin/AiSettings.vue')
 
 // Componentes de prueba
 import TestForm from '@/components/common/TestForm.vue'
@@ -250,6 +251,12 @@ const routes = [
     name: 'FacturacionSistema',
     component: FacturacionSistema,
     meta: { requiresAuth: true, title: 'Facturación del Sistema', roles: ['super_admin'] }
+  },
+  {
+    path: '/admin/ai-settings',
+    name: 'AiSettings',
+    component: AiSettings,
+    meta: { requiresAuth: true, title: 'Configuración IA', roles: ['super_admin'] }
   },
   {
     path: '/profile',

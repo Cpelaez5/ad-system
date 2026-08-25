@@ -1,4 +1,5 @@
 ---
+name: nuevo-componente
 description: Crear nuevo componente reutilizable
 ---
 

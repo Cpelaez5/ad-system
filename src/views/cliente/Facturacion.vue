@@ -584,7 +584,7 @@
 
     <!-- Diálogo para nueva/editar factura -->
     <!-- Para volver al formulario original: cambiar USE_SIMPLE_FORM a false en data() -->
-    <v-dialog v-model="invoiceDialog" max-width="1100px" scrollable>
+    <v-dialog v-model="invoiceDialog" max-width="1100px" scrollable :fullscreen="$vuetify.display.smAndDown">
       <SimpleInvoiceForm
         v-if="USE_SIMPLE_FORM"
         ref="simpleForm"

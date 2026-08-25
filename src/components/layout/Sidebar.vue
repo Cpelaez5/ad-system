@@ -222,6 +222,15 @@
         value="facturacion-sistema"
       ></v-list-item>
 
+      <!-- Super Admin: Configuración IA -->
+      <v-list-item
+        v-if="isSuperAdmin"
+        :to="{ name: 'AiSettings' }"
+        prepend-icon="mdi-robot-outline"
+        title="Configuración IA"
+        value="ai-settings"
+      ></v-list-item>
+
       <!-- Super Admin: Gestión de Empresas (futuro) -->
       <v-list-item
         v-if="isSuperAdmin"

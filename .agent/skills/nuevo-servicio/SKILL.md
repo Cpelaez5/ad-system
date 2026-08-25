@@ -1,4 +1,5 @@
 ---
+name: nuevo-servicio
 description: Crear nuevo servicio de lógica de negocio
 ---
 

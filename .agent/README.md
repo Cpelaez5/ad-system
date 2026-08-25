@@ -1,6 +1,6 @@
 # 📁 .agent - Documentación para Desarrollo con IA
 
-> Contexto completo del proyecto para asistentes de IA.
+> Contexto completo del proyecto para asistentes de IA optimizado para Antigravity.
 
 ---
 
@@ -9,14 +9,17 @@
 ```
 ¿Qué necesitas?                    → Archivo a consultar
 ─────────────────────────────────────────────────────────
-Reglas de desarrollo               → rules/rules.md
+Reglas de desarrollo (Globales)    → rules/rules.md
+Reglas de BD/Supabase              → ../migrations/GEMINI.md
+Reglas de Componentes/UI           → ../src/components/GEMINI.md
+Reglas de Vistas por Rol           → ../src/views/GEMINI.md
 Estructura del proyecto            → context/proyecto.md
 Cómo usar una librería             → libs/[libreria].md
 API de un servicio                 → context/services.md
 Estructura de la BD                → database/schema.md
 Templates de código                → context/templates.md
 Manejo de errores                  → context/error-handling.md
-Workflows automatizados            → workflows/
+Skills y Automatizaciones          → skills/
 ```
 
 ---
@@ -27,8 +30,8 @@ Workflows automatizados            → workflows/
 .agent/
 ├── README.md              ← ESTE ARCHIVO (punto de entrada)
 ├── rules/
-│   └── rules.md           ← Reglas de desarrollo (LEER SIEMPRE)
-├── context/               ← Contexto del proyecto (13 archivos)
+│   └── rules.md           ← Reglas de desarrollo globales
+├── context/               ← Contexto del proyecto
 │   ├── proyecto.md        ← Tech stack, arquitectura
 │   ├── arquitectura.md    ← Multi-tenancy
 │   ├── modulos.md         ← Módulos del sistema
@@ -49,16 +52,15 @@ Workflows automatizados            → workflows/
 ├── database/
 │   ├── schema.md          ← Schema de tablas
 │   └── row-level-security.mdx
-├── libs/                  ← 21 cheat sheets de librerías
-│   └── [ver rules.md sección 9 para lista completa]
-└── workflows/             ← Comandos /slash (7 archivos)
-    ├── dev.md             → /dev
-    ├── deploy.md          → /deploy
-    ├── nueva-migracion.md → /nueva-migracion
-    ├── nuevo-componente.md→ /nuevo-componente
-    ├── nuevo-servicio.md  → /nuevo-servicio
-    ├── testing.md         → /testing
-    └── exportar.md        → /exportar
+├── libs/                  ← Cheat sheets de librerías
+└── skills/                ← Skills nativas de Antigravity (automatizaciones)
+    ├── dev/               → Iniciar entorno
+    ├── deploy/            → Deploy a prod
+    ├── nueva-migracion/   → Scaffold BD
+    ├── nuevo-componente/  → Scaffold UI
+    ├── nuevo-servicio/    → Scaffold lógica
+    ├── testing/           → QA roles
+    └── exportar/          → Docs xls/pdf
 ```
 
 ---
@@ -93,4 +95,4 @@ Workflows automatizados            → workflows/
 
 ---
 
-**Última actualización**: Febrero 2026
+**Última actualización**: Agosto 2026

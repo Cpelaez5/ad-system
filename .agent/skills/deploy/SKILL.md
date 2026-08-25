@@ -1,4 +1,5 @@
 ---
+name: deploy
 description: Build y deploy a producción
 ---
 

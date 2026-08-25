@@ -159,15 +159,11 @@
               density="comfortable"
               :rules="invoiceNumberRules"
               :loading="checkingDuplicate"
-              :append-inner-icon="isDuplicate ? 'mdi-alert-circle' : (formData.invoiceNumber && !checkingDuplicate ? 'mdi-check-circle' : undefined)"
-              :color="isDuplicate ? 'error' : 'primary'"
+              :append-inner-icon="isDuplicate ? 'mdi-alert-circle' : (getAiIcon('invoiceNumber') || (formData.invoiceNumber && !checkingDuplicate ? 'mdi-check-circle' : undefined))"
+              :color="isDuplicate ? 'error' : (getAiColor('invoiceNumber') || 'primary')"
               hide-details="auto"
               class="mb-2"
-            >
-              <template v-if="isDuplicate" v-slot:details>
-                <span class="text-error text-caption">⚠️ Ya existe una factura con este número</span>
-              </template>
-            </v-text-field>
+            />
           </v-col>
 
           <!-- Número de control (opcional) -->
@@ -180,6 +176,8 @@
               density="comfortable"
               hide-details
               class="mb-2"
+              :append-inner-icon="getAiIcon('controlNumber')"
+              :color="getAiColor('controlNumber') || 'primary'"
             />
           </v-col>
 
@@ -204,6 +202,8 @@
               density="comfortable"
               hide-details
               class="mb-2"
+              :append-inner-icon="getAiIcon('documentType')"
+              :color="getAiColor('documentType') || 'primary'"
             >
               <template v-slot:item="{ props, item }">
                 <v-list-item v-bind="props">
@@ -237,6 +237,8 @@
               density="comfortable"
               hide-details
               class="mb-2"
+              :append-inner-icon="getAiIcon('status')"
+              :color="getAiColor('status') || 'primary'"
             />
           </v-col>
 
@@ -250,6 +252,8 @@
               density="comfortable"
               hide-details
               class="mb-2"
+              :append-inner-icon="getAiIcon('currency')"
+              :color="getAiColor('currency') || 'primary'"
             />
           </v-col>
 
@@ -264,6 +268,8 @@
               hide-details
               clearable
               class="mb-2"
+              :append-inner-icon="getAiIcon('paymentMethod')"
+              :color="getAiColor('paymentMethod') || 'primary'"
             >
               <template v-slot:item="{ props, item }">
                 <v-list-item v-bind="props">
@@ -297,6 +303,8 @@
               density="comfortable"
               hide-details
               class="mb-2"
+              :append-inner-icon="getAiIcon('paymentReference')"
+              :color="getAiColor('paymentReference') || 'primary'"
             />
           </v-col>
         </v-row>
@@ -645,6 +653,8 @@
               hide-details
               :readonly="!manualMode"
               :bg-color="manualMode ? 'white' : 'grey-lighten-4'"
+              :append-inner-icon="getAiIcon('taxableSales')"
+              :color="getAiColor('taxableSales')"
             />
           </v-col>
           <v-col cols="12" sm="6" md="3">
@@ -658,6 +668,8 @@
               hide-details
               :readonly="!manualMode"
               :bg-color="manualMode ? 'white' : 'grey-lighten-4'"
+              :append-inner-icon="getAiIcon('taxDebit')"
+              :color="getAiColor('taxDebit')"
             />
           </v-col>
           <v-col cols="12" sm="6" md="3">
@@ -671,35 +683,46 @@
               hide-details
               :readonly="!manualMode"
               :bg-color="manualMode ? 'white' : 'grey-lighten-4'"
+              :append-inner-icon="getAiIcon('nonTaxableSales')"
+              :color="getAiColor('nonTaxableSales')"
             />
           </v-col>
           <v-col cols="12" sm="6" md="3" class="d-flex">
-            <!-- Display personalizado para el TOTAL -->
-            <div class="sif-total-box" :class="{ 'sif-total-box--editable': manualMode }">
-              <span class="sif-total-box__label">
+            <!-- Display personalizado para el TOTAL con Vuetify -->
+            <v-sheet 
+              class="rounded-lg px-4 d-flex flex-column justify-center w-100" 
+              :class="{ 'elevation-2': !manualMode, 'elevation-0 border': manualMode }"
+              color="blue-darken-4"
+              min-height="40"
+              :border="getAiColor('totalSales') ? getAiColor('totalSales') : (manualMode ? 'info' : false)"
+            >
+              <span class="text-overline text-white opacity-70 mb-0 pb-0" style="line-height: 1.2;">
                 TOTAL
+                <v-icon v-if="getAiIcon('totalSales')" :color="getAiColor('totalSales')" size="12" class="ml-1" :title="getAiTooltip('totalSales')">{{ getAiIcon('totalSales') }}</v-icon>
                 <v-icon v-if="manualMode" size="10" class="ml-1 opacity-70">mdi-pencil</v-icon>
               </span>
-              <div class="sif-total-box__value">
-                <span class="sif-total-box__prefix">{{ currencySymbol }}</span>
+              <div class="d-flex align-baseline mb-1">
+                <span class="text-caption font-weight-bold text-white opacity-80 mr-1">{{ currencySymbol }}</span>
                 <input 
                   v-if="manualMode"
                   type="number"
                   step="0.01"
                   v-model.number="formData.financial.totalSales"
-                  class="sif-total-box__input"
+                  class="text-h6 font-weight-bold text-white flex-grow-1"
+                  style="background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.3); outline: none;"
                 />
-                <span v-else class="sif-total-box__amount">{{ formatNumber(formData.financial.totalSales) }}</span>
+                <span v-else class="text-h6 font-weight-bold text-white">{{ formatNumber(formData.financial.totalSales) }}</span>
               </div>
-            </div>
+            </v-sheet>
           </v-col>
         </v-row>
 
         <!-- Tasa de cambio — USD y EUR -->
         <div v-if="formData.financial.currency === 'USD'" class="mt-2 d-flex align-center gap-2">
           <v-icon color="info" size="16">mdi-swap-horizontal</v-icon>
-          <span class="text-caption">
+          <span class="text-caption d-flex align-center">
             Tasa oficial BCV: <strong>{{ formData.financial.exchangeRate }} Bs/USD</strong>
+            <v-icon v-if="getAiIcon('exchangeRate')" :color="getAiColor('exchangeRate')" size="12" class="ml-1" :title="getAiTooltip('exchangeRate')">{{ getAiIcon('exchangeRate') }}</v-icon>
           </span>
           <span class="text-caption text-grey ml-2">
             Equivalente: ≈ <strong class="text-info">{{ formatNumber(formData.financial.totalSales * formData.financial.exchangeRate) }} Bs.</strong>
@@ -824,7 +847,7 @@
 <script>
 import invoiceService from '@/services/invoiceService.js';
 import userService from '@/services/userService.js';
-import clientOcrService from '@/services/clientOcrService.js';
+import { procesarComprobanteOCR } from '@/services/gemini/geminiOcrService.js';
 import inventoryService from '@/services/inventoryService.js';
 import bcvService from '@/services/bcvService.js';
 import proveedorService from '@/services/proveedorService.js';
@@ -872,6 +895,7 @@ export default {
       extracting:  false,
       uploadedFile: null,
       ocrResult:   null,
+      aiFieldsStatus: {}, // Guarda el estado de la extracción por campo: 'success', 'warning', 'not-found'
 
       // Duplicate check
       isDuplicate:      false,
@@ -1411,6 +1435,36 @@ export default {
       finally { this.checkingDuplicate = false; }
     },
 
+    // ── helpers visuales para IA ──────────────────────────────────────────────
+    getAiIcon(field) {
+      const status = this.aiFieldsStatus[field];
+      if (status === 'success') return 'mdi-robot-outline';
+      if (status === 'warning') return 'mdi-robot-dead-outline';
+      if (status === 'not-found') return 'mdi-help-circle-outline';
+      return null;
+    },
+    getAiColor(field) {
+      const status = this.aiFieldsStatus[field];
+      if (status === 'success') return 'success';
+      if (status === 'warning') return 'warning';
+      if (status === 'not-found') return 'grey';
+      return null;
+    },
+    getAiTooltip(field) {
+      const status = this.aiFieldsStatus[field];
+      if (status === 'success') return 'Dato extraído con éxito por la IA';
+      if (status === 'warning') return 'La IA extrajo este dato pero tiene dudas. Por favor, verifícalo.';
+      if (status === 'not-found') return 'La IA no pudo encontrar este dato en el documento.';
+      return null;
+    },
+    trackAiField(field, value, doubtfulFields = []) {
+      if (value !== null && value !== undefined && value !== '') {
+        this.aiFieldsStatus[field] = (doubtfulFields || []).includes(field) ? 'warning' : 'success';
+      } else {
+        this.aiFieldsStatus[field] = 'not-found';
+      }
+    },
+
     // ── Cálculos financieros ──────────────────────────────────────────────────
     calculateFromBase() {
       const base = parseFloat(this.formData.financial.taxableSales) || 0;
@@ -1535,6 +1589,7 @@ export default {
       if (!file) return;
       this.extracting = true;
       this.ocrResult  = null;
+      this.aiFieldsStatus = {}; // Resetear estado visual de IA
 
       try {
         const userContext = {
@@ -1544,7 +1599,11 @@ export default {
 
         console.log('🤖 [OCR] Enviando contexto del usuario:', userContext);
 
-        const data = await clientOcrService.extractInvoiceData(file, this.formData.flow || null, userContext);
+        const data = await procesarComprobanteOCR(file, { 
+          userContext, 
+          flowType: this.formData.flow || null, 
+          onProgress: (msg) => { this.extracting = msg !== null; } 
+        });
 
         console.log('🤖 [OCR] Respuesta recibida:', {
           detectedFlow: data.detectedFlow,
@@ -1583,10 +1642,14 @@ export default {
         // ═══════════════════════════════════════════════════════════════
         // PASO 2: MAPEAR DOCUMENTO
         // ═══════════════════════════════════════════════════════════════
-        if (data.invoiceNumber)  this.formData.invoiceNumber = data.invoiceNumber;
-        if (data.controlNumber)  this.formData.controlNumber = data.controlNumber;
-        if (data.issueDate)      this.formData.issueDate     = data.issueDate;
-        if (data.documentType)   this.formData.documentType  = data.documentType;
+        const df = data.doubtfulFields || [];
+
+        if (data.invoiceNumber) { this.formData.invoiceNumber = data.invoiceNumber; this.trackAiField('invoiceNumber', data.invoiceNumber, df); }
+        if (data.controlNumber) { this.formData.controlNumber = data.controlNumber; this.trackAiField('controlNumber', data.controlNumber, df); }
+        if (data.issueDate)     { this.formData.issueDate     = data.issueDate;     this.trackAiField('issueDate', data.issueDate, df); }
+        if (data.dueDate)       { this.formData.dueDate       = data.dueDate;       this.trackAiField('dueDate', data.dueDate, df); }
+        if (data.documentType)  { this.formData.documentType  = data.documentType;  this.trackAiField('documentType', data.documentType, df); }
+        if (data.status)        { this.formData.status        = data.status;        this.trackAiField('status', data.status, df); }
         if (data.documentCategory) this.formData.documentCategory = data.documentCategory;
 
         // ═══════════════════════════════════════════════════════════════
@@ -1631,18 +1694,47 @@ export default {
           // Usar los campos del documento que vienen del OCR
           if (data.financial.total) {
             this.formData.financial.totalSales = parseFloat(data.financial.total) || 0;
+            this.trackAiField('totalSales', data.financial.total, df);
           }
           if (data.financial.taxableAmount !== undefined) {
             this.formData.financial.taxableSales = parseFloat(data.financial.taxableAmount) || 0;
+            this.trackAiField('taxableSales', data.financial.taxableAmount, df);
           }
           if (data.financial.taxAmount !== undefined) {
             this.formData.financial.taxDebit = parseFloat(data.financial.taxAmount) || 0;
+            this.trackAiField('taxDebit', data.financial.taxAmount, df);
           }
           if (data.financial.exemptAmount !== undefined) {
             this.formData.financial.nonTaxableSales = parseFloat(data.financial.exemptAmount) || 0;
+            this.trackAiField('nonTaxableSales', data.financial.exemptAmount, df);
           }
-          if (data.financial.subtotal !== undefined) {
-            this.formData.financial.taxableSales = parseFloat(data.financial.subtotal) || 0;
+          if (data.financial.igtfAmount !== undefined) {
+            this.formData.financial.igtf = parseFloat(data.financial.igtfAmount) || 0;
+            this.trackAiField('igtf', data.financial.igtfAmount, df);
+          }
+          if (data.financial.exchangeRate !== undefined) {
+            this.formData.financial.exchangeRate = parseFloat(data.financial.exchangeRate) || 1;
+            this.trackAiField('exchangeRate', data.financial.exchangeRate, df);
+          }
+          if (data.financial.paymentMethod) {
+            this.formData.financial.paymentMethod = data.financial.paymentMethod;
+            this.trackAiField('paymentMethod', data.financial.paymentMethod, df);
+          }
+          if (data.financial.paymentReference) {
+            this.formData.financial.paymentReference = data.financial.paymentReference;
+            this.trackAiField('paymentReference', data.financial.paymentReference, df);
+          }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PASO 4.5: CASHEA
+        // ═══════════════════════════════════════════════════════════════
+        if (data.es_cashea) {
+          this.formData.financial.paymentMethod = 'CASHEA';
+          this.trackAiField('paymentMethod', 'CASHEA', df);
+          this.formData.financial.credit = this.formData.financial.credit || {};
+          if (data.numero_cuota !== null) {
+            this.formData.financial.credit.numero_cuota = data.numero_cuota;
           }
         }
 
@@ -2078,69 +2170,13 @@ export default {
 /* ─── Totales ─────────────────────────────────────────────── */
 .sif-totals { background: #f8f9ff; }
 
-/* Box personalizado para el TOTAL — sin problema de label flotante */
-.sif-total-box {
-  background: #1F355C;
-  border-radius: 8px;
-  padding: 0 14px;
-  width: 100%;        /* ocupa todo el v-col */
-  min-height: 40px;   /* mínimo igual a density=compact */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(31, 53, 92, 0.3);
-}
-
-.sif-total-box__label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.65);
-  line-height: 1;
-  margin-bottom: 2px;
-}
-
-.sif-total-box__value {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-
-.sif-total-box__prefix {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.sif-total-box__amount {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 0.01em;
-}
-
-.sif-total-box__input {
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  font-size: 1.05rem;
-  font-weight: 700;
-  width: 100%;
-  outline: none;
-  padding: 0;
-}
-.sif-total-box__input:focus {
-  border-bottom-color: white;
-}
 /* Ocultar flechas del input number nativo */
-.sif-total-box__input::-webkit-outer-spin-button,
-.sif-total-box__input::-webkit-inner-spin-button {
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-.sif-total-box__input[type=number] {
+input[type=number] {
   -moz-appearance: textfield;
 }
 

@@ -1,4 +1,5 @@
 ---
+name: dev
 description: Iniciar servidor de desarrollo local
 ---
 

@@ -34,41 +34,63 @@
       </div>
 
       <!-- Zona de upload -->
-      <div v-else class="upload-area" @click="triggerFileInput">
+      <div v-else class="upload-area text-center" @click="triggerFileInput">
         <v-icon
           :icon="isDragOver ? 'mdi-file-download' : 'mdi-cloud-upload'"
           size="64"
           :color="isDragOver ? 'primary' : 'grey'"
-          class="upload-icon"
+          class="upload-icon mb-2"
         />
         
-        <h3 class="text-h6 mt-4 mb-2">
+        <h3 class="text-h6 mb-2">
           {{ isDragOver ? 'Suelta el archivo aquí' : 'Arrastra tu factura aquí' }}
         </h3>
         
         <p class="text-body-2 text-grey mb-4">
           o haz clic para seleccionar
         </p>
+
+        <!-- Botón de cámara (Solo visible en móviles) -->
+        <v-btn
+          color="primary"
+          variant="tonal"
+          class="d-sm-none mb-4 mx-auto"
+          prepend-icon="mdi-camera"
+          @click.stop="triggerCameraInput"
+        >
+          Tomar Foto
+        </v-btn>
         
-        <v-chip variant="outlined" size="small">
-          <v-icon start size="18">mdi-file-pdf-box</v-icon>
-          PDF
-        </v-chip>
-        <v-chip variant="outlined" size="small" class="ml-2">
-          <v-icon start size="18">mdi-file-image</v-icon>
-          JPG, PNG
-        </v-chip>
+        <div class="d-flex justify-center mb-4">
+          <v-chip variant="outlined" size="small">
+            <v-icon start size="18">mdi-file-pdf-box</v-icon>
+            PDF
+          </v-chip>
+          <v-chip variant="outlined" size="small" class="ml-2">
+            <v-icon start size="18">mdi-file-image</v-icon>
+            JPG, PNG
+          </v-chip>
+        </div>
         
-        <p class="text-caption text-grey mt-4">
+        <p class="text-caption text-grey">
           Tamaño máximo: {{ maxSizeMB }}MB
         </p>
       </div>
 
-      <!-- Input file oculto -->
+      <!-- Input file oculto (Galería / PDF) -->
       <input
         ref="fileInput"
         type="file"
         :accept="accept"
+        style="display: none"
+        @change="handleFileSelect"
+      />
+      <!-- Input file oculto (Cámara) -->
+      <input
+        ref="cameraInput"
+        type="file"
+        accept="image/jpeg,image/png,image/jpg"
+        capture="environment"
         style="display: none"
         @change="handleFileSelect"
       />
@@ -141,6 +163,10 @@ export default {
   methods: {
     triggerFileInput() {
       this.$refs.fileInput.click()
+    },
+    
+    triggerCameraInput() {
+      this.$refs.cameraInput.click()
     },
     
     handleFileSelect(event) {
