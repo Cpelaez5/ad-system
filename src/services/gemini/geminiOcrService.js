@@ -66,10 +66,11 @@ export async function procesarComprobanteOCR(
   // --- 2. Subir a Storage ---
   onProgress?.('Subiendo documento...');
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  const { data: { session }, error: authError } = await supabase.auth.getSession();
+  if (authError || !session || !session.user) {
     throw { code: 'UNAUTHORIZED', message: 'Debes iniciar sesión para usar el OCR.', suggestManualEntry: true };
   }
+  const user = session.user;
 
   // Path incluye user_id para que RLS de Storage aplique correctamente
   const filePath = `${user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
@@ -86,8 +87,6 @@ export async function procesarComprobanteOCR(
 
   // --- 3. Llamar a la Edge Function ---
   onProgress?.('Analizando con IA...');
-
-  const { data: { session } } = await supabase.auth.getSession();
 
   let response;
   try {
