@@ -66,11 +66,15 @@ export async function procesarComprobanteOCR(
   // --- 2. Subir a Storage ---
   onProgress?.('Subiendo documento...');
 
-  const { data: { session }, error: authError } = await supabase.auth.getSession();
-  if (authError || !session || !session.user) {
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  // Resiliencia extrema: si Supabase pierde la sesión en memoria, usamos el localStorage
+  const token = session?.access_token || localStorage.getItem('authToken');
+  const user = session?.user || JSON.parse(localStorage.getItem('currentUser') || 'null');
+
+  if (!token || !user || !user.id) {
     throw { code: 'UNAUTHORIZED', message: 'Debes iniciar sesión para usar el OCR.', suggestManualEntry: true };
   }
-  const user = session.user;
 
   // Path incluye user_id para que RLS de Storage aplique correctamente
   const filePath = `${user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
@@ -96,7 +100,7 @@ export async function procesarComprobanteOCR(
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ 
           file_path: filePath, 

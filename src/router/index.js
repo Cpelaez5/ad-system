@@ -418,27 +418,21 @@ router.beforeEach(async (to, from, next) => {
 
         next()
       } else {
-        // No hay sesión de Supabase, verificar datos locales como fallback
-        const usuarioAutenticado = localStorage.getItem('usuarioAutenticado')
-        if (usuarioAutenticado === 'true') {
-          console.log('⚠️ No hay sesión de Supabase, pero hay datos locales (fallback)')
-          next()
-        } else {
-          console.log('❌ No hay sesión activa, redirigiendo a login')
-          next('/login')
-        }
+        console.log('❌ No hay sesión de Supabase activa, redirigiendo a login')
+        // Limpiar localStorage obsoleto si no hay sesión
+        localStorage.removeItem('usuarioAutenticado')
+        localStorage.removeItem('currentUser')
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('current_organization_id')
+        next('/login')
       }
     } catch (error) {
       console.error('❌ Error en router guard:', error)
-
-      // Fallback: verificar datos locales
-      const usuarioAutenticado = localStorage.getItem('usuarioAutenticado')
-      if (usuarioAutenticado === 'true') {
-        console.log('⚠️ Error en Supabase, usando fallback local')
-        next()
-      } else {
-        next('/login')
-      }
+      localStorage.removeItem('usuarioAutenticado')
+      localStorage.removeItem('currentUser')
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('current_organization_id')
+      next('/login')
     }
   } else {
     // Ruta pública, permitir acceso
