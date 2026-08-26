@@ -34,6 +34,10 @@ export default defineConfig(({ mode }) => {
     },
     optimizeDeps: {
       include: ['vuetify']
+    },
+    test: {
+      environment: 'happy-dom',
+      globals: true
     }
   }
 })

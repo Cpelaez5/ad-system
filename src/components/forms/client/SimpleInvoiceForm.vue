@@ -755,6 +755,103 @@
           :loadingConfig="loadingRetentionConfig"
           @adjust="showAdjustSheet = true"
         />
+
+        <!-- Números de Comprobante de Retención (COMPRA) -->
+        <div v-if="retencionesResult && (retencionesResult.iva > 0 || retencionesResult.islr > 0 || retencionesResult.municipal > 0)" class="mt-3">
+          <p class="sif-section-label">Comprobantes de Retención</p>
+          <div class="text-caption text-grey-darken-1 mb-3">
+            Números auto-generados. Activa la edición manual si necesitas modificarlos.
+          </div>
+          <v-row dense>
+            <!-- IVA comprobante -->
+            <v-col cols="12" sm="4" v-if="retencionesResult.iva > 0">
+              <v-text-field
+                v-model="formData.financial.ivaRetentionNumber"
+                label="Nro. Comprobante IVA"
+                variant="outlined"
+                density="comfortable"
+                :disabled="!editarComprobanteIva"
+                :error="comprobanteDuplicado.iva"
+                :error-messages="comprobanteDuplicado.iva ? 'Este número ya existe' : ''"
+                @update:model-value="checkComprobanteDuplicado('iva', $event)"
+              >
+                <template v-slot:append-inner>
+                  <v-tooltip location="top" text="Editar manualmente">
+                    <template v-slot:activator="{ props }">
+                      <v-icon
+                        v-bind="props"
+                        :color="editarComprobanteIva ? 'primary' : 'grey'"
+                        size="small"
+                        @click="editarComprobanteIva = !editarComprobanteIva"
+                        style="cursor: pointer;"
+                      >
+                        {{ editarComprobanteIva ? 'mdi-pencil' : 'mdi-pencil-off' }}
+                      </v-icon>
+                    </template>
+                  </v-tooltip>
+                </template>
+              </v-text-field>
+            </v-col>
+            <!-- ISLR comprobante -->
+            <v-col cols="12" sm="4" v-if="retencionesResult.islr > 0">
+              <v-text-field
+                v-model="formData.financial.islrRetentionNumber"
+                label="Nro. Comprobante ISLR"
+                variant="outlined"
+                density="comfortable"
+                :disabled="!editarComprobanteIslr"
+                :error="comprobanteDuplicado.islr"
+                :error-messages="comprobanteDuplicado.islr ? 'Este número ya existe' : ''"
+                @update:model-value="checkComprobanteDuplicado('islr', $event)"
+              >
+                <template v-slot:append-inner>
+                  <v-tooltip location="top" text="Editar manualmente">
+                    <template v-slot:activator="{ props }">
+                      <v-icon
+                        v-bind="props"
+                        :color="editarComprobanteIslr ? 'primary' : 'grey'"
+                        size="small"
+                        @click="editarComprobanteIslr = !editarComprobanteIslr"
+                        style="cursor: pointer;"
+                      >
+                        {{ editarComprobanteIslr ? 'mdi-pencil' : 'mdi-pencil-off' }}
+                      </v-icon>
+                    </template>
+                  </v-tooltip>
+                </template>
+              </v-text-field>
+            </v-col>
+            <!-- Municipal comprobante -->
+            <v-col cols="12" sm="4" v-if="retencionesResult.municipal > 0">
+              <v-text-field
+                v-model="formData.financial.municipalRetentionNumber"
+                label="Nro. Comprobante Municipal"
+                variant="outlined"
+                density="comfortable"
+                :disabled="!editarComprobanteMunicipal"
+                :error="comprobanteDuplicado.municipal"
+                :error-messages="comprobanteDuplicado.municipal ? 'Este número ya existe' : ''"
+                @update:model-value="checkComprobanteDuplicado('municipal', $event)"
+              >
+                <template v-slot:append-inner>
+                  <v-tooltip location="top" text="Editar manualmente">
+                    <template v-slot:activator="{ props }">
+                      <v-icon
+                        v-bind="props"
+                        :color="editarComprobanteMunicipal ? 'primary' : 'grey'"
+                        size="small"
+                        @click="editarComprobanteMunicipal = !editarComprobanteMunicipal"
+                        style="cursor: pointer;"
+                      >
+                        {{ editarComprobanteMunicipal ? 'mdi-pencil' : 'mdi-pencil-off' }}
+                      </v-icon>
+                    </template>
+                  </v-tooltip>
+                </template>
+              </v-text-field>
+            </v-col>
+          </v-row>
+        </div>
       </div>
 
       <!-- Ingreso Manual de Retenciones (solo VENTA) -->
@@ -772,7 +869,17 @@
               prefix="Bs."
               variant="outlined"
               density="comfortable"
+              hide-details="auto"
+            />
+            <v-text-field
+              v-if="formData.financial.ivaRetention > 0"
+              v-model="formData.financial.ivaRetentionNumber"
+              label="Nro. Comprobante IVA"
+              variant="outlined"
+              density="comfortable"
               hide-details
+              class="mt-2"
+              placeholder="Ej: 20260800000001"
             />
           </v-col>
           <v-col cols="12" sm="4">
@@ -783,7 +890,17 @@
               prefix="Bs."
               variant="outlined"
               density="comfortable"
+              hide-details="auto"
+            />
+            <v-text-field
+              v-if="formData.financial.islrRetention > 0"
+              v-model="formData.financial.islrRetentionNumber"
+              label="Nro. Comprobante ISLR"
+              variant="outlined"
+              density="comfortable"
               hide-details
+              class="mt-2"
+              placeholder="Ej: ISLR-2026-00000001"
             />
           </v-col>
           <v-col cols="12" sm="4">
@@ -794,7 +911,17 @@
               prefix="Bs."
               variant="outlined"
               density="comfortable"
+              hide-details="auto"
+            />
+            <v-text-field
+              v-if="formData.financial.municipalRetention > 0"
+              v-model="formData.financial.municipalRetentionNumber"
+              label="Nro. Comprobante Municipal"
+              variant="outlined"
+              density="comfortable"
               hide-details
+              class="mt-2"
+              placeholder="Ej: MUN-2026-00000001"
             />
           </v-col>
         </v-row>
@@ -968,6 +1095,13 @@ export default {
       showAdjustSheet: false,
       loadingRetentionConfig: false,
 
+      // Números de comprobante de retención — edición manual
+      editarComprobanteIva: false,
+      editarComprobanteIslr: false,
+      editarComprobanteMunicipal: false,
+      comprobanteDuplicado: { iva: false, islr: false, municipal: false },
+      comprobanteCheckTimers: { iva: null, islr: null, municipal: null },
+
       // Snackbar
       snackbar: { show: false, message: '', type: 'info', timeout: 4000 },
 
@@ -1030,6 +1164,7 @@ export default {
           totalSales: 0, nonTaxableSales: 0, taxableSales: 0,
           taxDebit: 0, ivaRetention: 0, islrRetention: 0,
           municipalRetention: 0, igtf: 0,
+          ivaRetentionNumber: '', islrRetentionNumber: '', municipalRetentionNumber: '',
           currency: 'VES', exchangeRate: 1, exchangeRateEur: null,
           paymentMethod: null, paymentReference: '',
           credit: null
@@ -1548,6 +1683,9 @@ export default {
         this.formData.financial.ivaRetention = 0;
         this.formData.financial.islrRetention = 0;
         this.formData.financial.municipalRetention = 0;
+        this.formData.financial.ivaRetentionNumber = '';
+        this.formData.financial.islrRetentionNumber = '';
+        this.formData.financial.municipalRetentionNumber = '';
         return;
       }
       
@@ -1583,7 +1721,90 @@ export default {
       this.formData.financial.ivaRetention = iva;
       this.formData.financial.islrRetention = islr;
       this.formData.financial.municipalRetention = municipal;
+
+      // Sugerir números de comprobante (solo si no se editó manualmente)
+      await this.sugerirCorrelativosRetencion(iva, islr, municipal);
     },
+
+    // ── Sugerir correlativos de retención ──────────────────────────────────────
+    async sugerirCorrelativosRetencion(iva, islr, municipal) {
+      try {
+        const clientId = this.currentUser?.client?.id || this.currentUser?.client_id;
+        const fecha = this.formData.issueDate || new Date().toISOString().split('T')[0];
+        if (!clientId) return;
+
+        // Solo sugerir si el campo no fue editado manualmente
+        if (iva > 0 && !this.editarComprobanteIva) {
+          const { data } = await supabase.rpc('sugerir_correlativo_retencion', {
+            p_org_id: this.currentUser?.organization_id,
+            p_client_id: clientId,
+            p_tipo: 'IVA',
+            p_fecha: fecha
+          });
+          if (data) this.formData.financial.ivaRetentionNumber = data;
+        } else if (iva === 0) {
+          this.formData.financial.ivaRetentionNumber = '';
+        }
+
+        if (islr > 0 && !this.editarComprobanteIslr) {
+          const { data } = await supabase.rpc('sugerir_correlativo_retencion', {
+            p_org_id: this.currentUser?.organization_id,
+            p_client_id: clientId,
+            p_tipo: 'ISLR',
+            p_fecha: fecha
+          });
+          if (data) this.formData.financial.islrRetentionNumber = data;
+        } else if (islr === 0) {
+          this.formData.financial.islrRetentionNumber = '';
+        }
+
+        if (municipal > 0 && !this.editarComprobanteMunicipal) {
+          const { data } = await supabase.rpc('sugerir_correlativo_retencion', {
+            p_org_id: this.currentUser?.organization_id,
+            p_client_id: clientId,
+            p_tipo: 'MUNICIPAL',
+            p_fecha: fecha
+          });
+          if (data) this.formData.financial.municipalRetentionNumber = data;
+        } else if (municipal === 0) {
+          this.formData.financial.municipalRetentionNumber = '';
+        }
+      } catch (e) {
+        console.warn('No se pudieron sugerir correlativos de retención:', e);
+      }
+    },
+
+    // ── Validar duplicado de comprobante (debounced) ───────────────────────────
+    checkComprobanteDuplicado(tipo, numero) {
+      // Limpiar timer anterior
+      if (this.comprobanteCheckTimers[tipo]) {
+        clearTimeout(this.comprobanteCheckTimers[tipo]);
+      }
+
+      if (!numero || numero.trim() === '') {
+        this.comprobanteDuplicado[tipo] = false;
+        return;
+      }
+
+      // Debounce de 500ms
+      this.comprobanteCheckTimers[tipo] = setTimeout(async () => {
+        try {
+          const tipoDb = tipo === 'iva' ? 'IVA' : tipo === 'islr' ? 'ISLR' : 'MUNICIPAL';
+          const { data, error } = await supabase.rpc('validar_comprobante_unico', {
+            p_org_id: this.currentUser?.organization_id,
+            p_tipo: tipoDb,
+            p_numero: numero.trim()
+          });
+          if (error) throw error;
+          // data = true si es único, false si ya existe
+          this.comprobanteDuplicado[tipo] = !data;
+        } catch (e) {
+          console.warn('Error validando comprobante duplicado:', e);
+          this.comprobanteDuplicado[tipo] = false;
+        }
+      }, 500);
+    },
+
 
     // ── Ítems ─────────────────────────────────────────────────────────────────
     addItem() {
@@ -2052,6 +2273,13 @@ export default {
         const overflow = this.formData.items.find(i => i.product && i.quantity > i.product.stock);
         if (overflow) {
           this.showSnackbar(`Sin stock suficiente para: ${overflow.product.name} (quedan ${overflow.product.stock})`, 'error');
+          return false;
+        }
+      }
+      // 6. Números de comprobante de retención no duplicados (solo COMPRA)
+      if (this.formData.flow === 'COMPRA') {
+        if (this.comprobanteDuplicado.iva || this.comprobanteDuplicado.islr || this.comprobanteDuplicado.municipal) {
+          this.showSnackbar('Hay números de comprobante de retención duplicados. Corrígelos antes de guardar.', 'error');
           return false;
         }
       }
