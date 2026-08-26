@@ -208,7 +208,7 @@
                 />
                 <v-checkbox
                   v-model="formData.isPermanent"
-                  label="Documento permanente (sin vencimiento)"
+                  label="No aplica"
                   color="primary"
                   density="compact"
                   hide-details
