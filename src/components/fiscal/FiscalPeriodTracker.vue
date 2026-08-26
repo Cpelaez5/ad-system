@@ -136,7 +136,7 @@
           <v-list-item
             :class="[
               'py-2 px-4',
-              (period.isFuture && !period.doc) ? 'opacity-50' : '',
+              (period.isFuture && !period.isCurrent && !period.doc) ? 'opacity-50' : '',
               period.doc ? 'cursor-pointer' : ''
             ]"
             @click="period.doc ? $emit('open-preview', period.doc) : null"
@@ -234,8 +234,8 @@
                   </v-btn>
                 </template>
 
-                <!-- Período sin documento -->
-                <template v-else-if="!period.isFuture">
+                <!-- Período sin documento (se permite si es pasado o actual) -->
+                <template v-else-if="!period.isFuture || period.isCurrent">
                   <!-- Subir documento -->
                   <v-btn
                     size="x-small"
@@ -253,7 +253,7 @@
                   </v-btn>
                 </template>
 
-                <!-- Período futuro -->
+                <!-- Período futuro (solo si no es actual) -->
                 <template v-else>
                   <v-chip size="x-small" variant="text" color="grey" class="text-caption">
                     Próximo
