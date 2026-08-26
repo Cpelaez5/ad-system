@@ -361,6 +361,15 @@ export default {
     proveedor: {
       type: Object,
       default: null
+    },
+    /**
+     * Datos iniciales para pre-rellenar al crear un proveedor nuevo (ej: desde OCR).
+     * Formato: { nombre, rif, direccion, telefono, email }
+     * Solo se usa cuando proveedor es null (creación, no edición).
+     */
+    initialData: {
+      type: Object,
+      default: null
     }
   },
   emits: ['update:modelValue', 'saved'],
@@ -448,14 +457,18 @@ export default {
           is_active: this.proveedor.is_active !== false
         }
       } else {
+        // Pre-rellenar con datos OCR si están disponibles (creación nueva)
+        const init = this.initialData || {}
+        const rifVal = (init.rif || '').trim().toUpperCase()
+        const isNatural = rifVal.startsWith('V') || rifVal.startsWith('E')
         this.formData = {
           id: null,
-          nombre: '',
-          rif: '',
-          tipo_persona: 'JURIDICA',
-          telefono: '',
-          email: '',
-          direccion: '',
+          nombre: init.nombre || '',
+          rif: init.rif || '',
+          tipo_persona: isNatural ? 'NATURAL' : 'JURIDICA',
+          telefono: init.telefono || '',
+          email: init.email || '',
+          direccion: init.direccion || '',
           contacto_nombre: '',
           iva_retention_rate: 75,
           islr_concept_id: null,

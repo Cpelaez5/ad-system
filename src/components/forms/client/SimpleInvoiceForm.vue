@@ -411,6 +411,7 @@
           <!-- COMPRA: Selector de Proveedor -->
           <v-col cols="12" v-if="formData.flow === 'COMPRA'">
             <ProveedorAutocomplete
+              ref="proveedorAutocomplete"
               v-model="proveedor"
               @add-new="showProveedorModal = true"
             />
@@ -832,6 +833,7 @@
   <!-- Modal completo del Directorio de Proveedores para crear/editar con parámetros fiscales -->
   <ProveedorModalForm
     v-model="showProveedorModal"
+    :initial-data="proveedorInitialData"
     @saved="onNewProveedorSaved"
   />
 
@@ -915,6 +917,7 @@ export default {
       },
       retencionesResult: null,
       showProveedorModal: false,
+      proveedorInitialData: null,
       showAdjustSheet: false,
       loadingRetentionConfig: false,
 
@@ -1674,14 +1677,18 @@ export default {
           if (data.issuer?.phone) this.myPhone = data.issuer.phone;
 
         } else {
-          // En COMPRA o GASTO: Yo soy el cliente, la contraparte es el emisor/proveedor
-          // El campo "issuer" del documento es quien me vendió
+          // En COMPRA o GASTO: Yo soy el CLIENTE, la contraparte es el EMISOR/proveedor
+          // IMPORTANTE: data.issuer = proveedor (quien vendió), data.client = nosotros (quien compró)
           if (data.issuer?.companyName) {
             this.counterpartName = data.issuer.companyName;
             this.counterpartRif = data.issuer.rif || '';
-            console.log('✅ [OCR] COMPRA/GASTO - Contraparte (proveedor):', data.issuer.companyName);
+            console.log('[OCR] COMPRA/GASTO - Contraparte (proveedor):', data.issuer.companyName);
+
+            // Auto-vincular proveedor existente o sugerir crear uno nuevo
+            await this.matchProveedorFromOcr(data.issuer);
           }
           // Mis datos como cliente (pre-llenados, pero actualizamos si hay datos nuevos)
+          // NOTA: Usamos data.client (nosotros), NO data.issuer (el proveedor)
           if (data.client?.address) this.myAddress = data.client.address;
           if (data.client?.phone) this.myPhone = data.client.phone;
         }
@@ -2053,8 +2060,133 @@ export default {
     onNewProveedorSaved(newProv) {
       if (newProv) {
         this.proveedor = newProv;
+        this.proveedorInitialData = null; // Limpiar datos OCR pre-rellenados
         this.showSnackbar(`Proveedor "${newProv.nombre}" registrado y seleccionado`, 'success');
       }
+    },
+
+    /**
+     * Busca un proveedor existente en el directorio a partir de los datos del EMISOR (issuer)
+     * extraídos por el OCR. Solo aplica en flujo COMPRA/GASTO.
+     *
+     * IMPORTANTE: issuerData proviene de data.issuer (el proveedor que nos vendió),
+     * NUNCA de data.client (que somos nosotros, el usuario).
+     *
+     * @param {Object} issuerData - { companyName, rif, address, phone, email } del emisor OCR
+     */
+    async matchProveedorFromOcr(issuerData) {
+      if (!issuerData) return;
+
+      // Utilidades de normalización
+      const normalizeRif = (rif) => String(rif || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      const normalizeName = (name) => String(name || '').toLowerCase().trim();
+
+      const ocrRif = normalizeRif(issuerData.rif);
+      const ocrName = normalizeName(issuerData.companyName);
+
+      console.log('[OCR] Iniciando matching de proveedor - RIF:', ocrRif, 'Nombre:', ocrName);
+
+      // Esperar a que Vue renderice el ProveedorAutocomplete (tiene v-if="COMPRA")
+      // El PASO 1 acaba de cambiar el flow, el componente aún no está en el DOM
+      await this.$nextTick();
+      await this.$nextTick(); // Doble nextTick para asegurar que el componente se montó
+
+      let proveedores = [];
+
+      // Intentar obtener proveedores del autocomplete (ya cargados en memoria)
+      const autocomplete = this.$refs.proveedorAutocomplete;
+      if (autocomplete) {
+        proveedores = autocomplete.getProveedoresList?.() || [];
+        // Si el autocomplete se acaba de montar, puede que aún no tenga datos
+        if (proveedores.length === 0) {
+          await autocomplete.fetchProveedores();
+          proveedores = autocomplete.getProveedoresList() || [];
+        }
+      }
+
+      // Fallback: si el ref no está disponible, cargar directo del servicio
+      if (proveedores.length === 0) {
+        console.log('[OCR] Autocomplete no disponible o vacío, cargando proveedores del servicio...');
+        try {
+          proveedores = await proveedorService.getProveedores({ onlyActive: true }) || [];
+        } catch (err) {
+          console.warn('[OCR] Error cargando proveedores para matching:', err);
+          proveedores = [];
+        }
+      }
+
+      console.log('[OCR] Proveedores disponibles para matching:', proveedores.length);
+
+      if (proveedores.length === 0) {
+        console.log('[OCR] No hay proveedores en el directorio para matching');
+        this._ofrecerCrearProveedor(issuerData);
+        return;
+      }
+
+      let matched = null;
+      let confidence = 'none';
+
+      // NIVEL 1: Match exacto por RIF (máxima confianza)
+      if (ocrRif && ocrRif.length >= 6) {
+        matched = proveedores.find(p => normalizeRif(p.rif) === ocrRif);
+        if (matched) confidence = 'exact-rif';
+      }
+
+      // NIVEL 2: Match por nombre exacto normalizado
+      if (!matched && ocrName && ocrName.length >= 3) {
+        matched = proveedores.find(p => normalizeName(p.nombre) === ocrName);
+        if (matched) confidence = 'exact-name';
+      }
+
+      // NIVEL 3: Match parcial por nombre (substring)
+      if (!matched && ocrName && ocrName.length >= 5) {
+        matched = proveedores.find(p => {
+          const pName = normalizeName(p.nombre);
+          return pName.includes(ocrName) || ocrName.includes(pName);
+        });
+        if (matched) confidence = 'partial-name';
+      }
+
+      if (matched) {
+        // Vincular proveedor encontrado (dispara el watcher que carga retenciones)
+        this.proveedor = matched;
+        const label = confidence === 'exact-rif'
+          ? `Proveedor "${matched.nombre}" vinculado automáticamente (RIF: ${matched.rif})`
+          : `Proveedor "${matched.nombre}" vinculado automáticamente por nombre`;
+        this.showSnackbar(label, 'success');
+        console.log(`[OCR] Proveedor vinculado (${confidence}):`, matched.nombre, matched.rif);
+      } else {
+        // No hay match: ofrecer crear nuevo proveedor con datos del EMISOR (issuer)
+        console.log('[OCR] Sin match. RIF buscado:', ocrRif, '| Nombre buscado:', ocrName);
+        this._ofrecerCrearProveedor(issuerData);
+      }
+    },
+
+    /**
+     * Ofrece al usuario crear un nuevo proveedor pre-rellenando el formulario
+     * con los datos del EMISOR (issuer) extraídos por OCR.
+     *
+     * NUNCA usa data.client (que es el usuario/comprador).
+     *
+     * @param {Object} issuerData - Datos del emisor del OCR: { companyName, rif, address, phone }
+     */
+    _ofrecerCrearProveedor(issuerData) {
+      // Guardar datos del EMISOR (proveedor) para pre-rellenar el modal
+      this.proveedorInitialData = {
+        nombre: issuerData.companyName || '',
+        rif: issuerData.rif || '',
+        direccion: issuerData.address || '',
+        telefono: issuerData.phone || '',
+        email: issuerData.email || ''
+      };
+
+      console.log('[OCR] Proveedor no encontrado en directorio. Datos del EMISOR para pre-rellenar:', this.proveedorInitialData);
+
+      this.showSnackbar(
+        `Proveedor "${issuerData.companyName || 'desconocido'}" no está en tu directorio. Haz clic en "Nuevo" para registrarlo.`,
+        'warning',
+        8000
+      );
     },
 
     // ── Snackbar ──────────────────────────────────────────────────────────────

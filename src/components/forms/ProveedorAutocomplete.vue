@@ -87,6 +87,13 @@ export default {
     },
     onSelect(val) {
       this.$emit('update:modelValue', val)
+    },
+    /**
+     * Expone la lista cargada de proveedores para búsqueda externa (ej: matching OCR).
+     * @returns {Array} Lista de proveedores activos cargados
+     */
+    getProveedoresList() {
+      return this.proveedores
     }
   }
 }
