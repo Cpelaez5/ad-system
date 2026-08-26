@@ -48,15 +48,8 @@
     <template v-else>
       <!-- HEADER -->
       <v-row no-gutters class="pb-2">
-        <v-col cols="12" md="8">
-          <h1 class="text-h4 text-md-h4 text-h5 font-weight-bold text-secondary mb-1">
-            Expediente Fiscal 360
-          </h1>
-          <p class="text-body-2 text-md-body-1 text-grey-darken-1">
-            Gestiona tus permisos y mantén tu empresa al día.
-          </p>
-        </v-col>
-        <v-col cols="12" md="4" class="d-flex align-center justify-start justify-md-end flex-wrap mt-4 mt-md-0">
+        
+        <v-col cols="12" md="12" class="d-flex align-center justify-end flex-wrap mt-4 mt-md-0">
           <v-btn
             color="secondary"
             prepend-icon="mdi-file-pdf-box"

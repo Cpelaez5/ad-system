@@ -203,7 +203,17 @@
                   persistent-hint
                   hint="Indique cuándo vence este documento"
                   :rules="expirationDateRules"
-                  required
+                  :disabled="formData.isPermanent"
+                  :required="!formData.isPermanent"
+                />
+                <v-checkbox
+                  v-model="formData.isPermanent"
+                  label="Documento permanente (sin vencimiento)"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                  class="mt-1"
+                  @update:model-value="val => { if(val) formData.expiration_date = null; }"
                 />
               </v-col>
             </template>
@@ -315,6 +325,7 @@ const defaultForm = {
   noAplica: false, // Switch UI — se convierte a status='NO_APLICA' al guardar
   emission_date: null,
   expiration_date: null,
+  isPermanent: false,
   notes: '',
   observations: ''
 }
@@ -355,9 +366,9 @@ const existingFile = computed(() => {
   return null
 })
 
-// Validación: fecha de vencimiento requerida solo si no es No Aplica
+// Validación: fecha de vencimiento requerida solo si no es No Aplica y no es permanente
 const expirationDateRules = computed(() => {
-    if (formData.noAplica) return [] // No se exige fecha cuando No Aplica
+    if (formData.noAplica || formData.isPermanent) return [] // No se exige fecha cuando No Aplica o es permanente
     return [
         v => !!v || 'La fecha de vencimiento es requerida',
         v => {
@@ -383,6 +394,7 @@ const handleNoAplicaToggle = (val) => {
     if (val) {
         formData.status = 'NO_APLICA'
         formData.expiration_date = null
+        formData.isPermanent = false
         newFile.value = null
         analysisComplete.value = false
     } else {
@@ -572,19 +584,23 @@ const resetForm = () => {
 watch(() => props.modelValue, (val) => {
   if (val) {
     if (props.editingItem) {
-        const isNoAplica = props.editingItem.status === 'NO_APLICA'
-        Object.assign(formData, {
-          id:              props.editingItem.id,
-          name:            props.editingItem.name,
-          category:        props.editingItem.category,
-          doc_type:        props.editingItem.doc_type,
-          status:          isNoAplica ? 'NO_APLICA' : props.editingItem.status,
-          noAplica:        isNoAplica,
-          emission_date:   props.editingItem.emission_date,
-          expiration_date: props.editingItem.expiration_date,
-          notes:           props.editingItem.notes || '',
-          document_id:     props.editingItem.document_id
-        })
+      const isNoAplica = props.editingItem.status === 'NO_APLICA'
+      // Es permanente si no tiene fecha de expiración y NO es "No Aplica"
+      const isPermanent = !isNoAplica && props.editingItem.emission_date && !props.editingItem.expiration_date
+      
+      Object.assign(formData, {
+        id: props.editingItem.id,
+        name: props.editingItem.name || '',
+        category: props.editingItem.category || null,
+        doc_type: props.editingItem.doc_type || null,
+        status: props.editingItem.status || 'VIGENTE',
+        noAplica: isNoAplica,
+        emission_date: props.editingItem.emission_date || null,
+        expiration_date: props.editingItem.expiration_date || null,
+        isPermanent: isPermanent,
+        notes: props.editingItem.notes || '',
+        document_id: props.editingItem.document_id
+      })
     } else {
         resetForm()
     }
