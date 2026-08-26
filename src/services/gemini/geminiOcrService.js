@@ -147,6 +147,9 @@ export async function procesarComprobanteOCR(
       case 'OCR_IN_PROGRESS':
         friendlyMessage = 'Ya hay una extracción en curso para tu usuario. Por favor, espera a que termine.';
         break;
+      case 'PROVIDER_ERROR':
+        friendlyMessage = 'Ha ocurrido un problema al escanear el documento. Por favor, inténtalo de nuevo más tarde.';
+        break;
       case 'FILE_TOO_LARGE':
         friendlyMessage = `El archivo excede el tamaño máximo permitido (${MAX_FILE_SIZE_MB}MB).`;
         break;

@@ -1,16 +1,11 @@
 <template>
   <div class="custom-date-picker">
-    <label v-if="label" class="date-picker-label" :class="{ 'error': hasError }">
-      {{ label }}
-      <span v-if="required" class="required-asterisk">*</span>
-    </label>
-    
     <VueDatePicker
       v-model="selectedDate"
       :format="format"
       :placeholder="placeholder"
       :disabled="disabled"
-      :clearable="clearable"
+      :clearable="false"
       :range="range"
       :multi-calendars="multiCalendars"
       :enable-time-picker="enableTimePicker"
@@ -19,20 +14,42 @@
       :auto-apply="autoApply"
       :close-on-auto-apply="closeOnAutoApply"
       :preview-format="previewFormat"
-      :class="[
-        'custom-date-picker-input',
-        { 'error': hasError },
-        { 'disabled': disabled }
-      ]"
+      locale="es"
+      cancel-text="Cancelar"
+      select-text="Seleccionar"
+      :class="[ 'custom-date-picker-input' ]"
       @update:model-value="handleDateChange"
       @cleared="handleCleared"
-    />
+    >
+      <template #dp-input="{ value, onInput, onEnter, onTab, onClear, onBlur, onFocus, onPaste }">
+        <v-text-field
+          :model-value="value"
+          :label="label"
+          :placeholder="placeholder"
+          :error-messages="hasError ? [errorMessage || 'Inválido'] : []"
+          :disabled="disabled"
+          :clearable="clearable"
+          prepend-inner-icon="mdi-calendar"
+          variant="outlined"
+          density="comfortable"
+          hide-details="auto"
+          class="bg-white"
+          @input="onInput"
+          @keydown.enter="onEnter"
+          @keydown.tab="onTab"
+          @blur="onBlur"
+          @focus="onFocus"
+          @paste="onPaste"
+          @click:clear="onClear(); handleCleared();"
+        >
+          <template v-if="required" v-slot:label>
+            {{ label }} <span class="text-error ml-1">*</span>
+          </template>
+        </v-text-field>
+      </template>
+    </VueDatePicker>
     
-    <div v-if="errorMessage" class="date-picker-error">
-      {{ errorMessage }}
-    </div>
-    
-    <div v-if="hint" class="date-picker-hint">
+    <div v-if="hint && !hasError" class="date-picker-hint">
       {{ hint }}
     </div>
   </div>
@@ -41,7 +58,6 @@
 <script>
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
-
 export default {
   name: 'CustomDatePicker',
   components: {
@@ -168,6 +184,8 @@ export default {
 <style scoped>
 .custom-date-picker {
   width: 100%;
+  height: max-content;
+  align-self: flex-start;
 }
 
 .date-picker-label {
@@ -237,37 +255,108 @@ export default {
   font-family: 'Poppins', sans-serif;
 }
 
-/* Estilos para el dropdown del datepicker */
+/* =========================================
+   AD SYSTEM: Modern Minimalist Calendar
+   ========================================= */
+
+/* 1. Container & Layout */
 :deep(.dp__menu) {
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(2, 37, 77, 0.15);
-  border: 1px solid #EDEDED;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(2, 37, 77, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03);
+  border: 1px solid #E5E7EB;
+  font-family: 'Poppins', sans-serif;
+  overflow: hidden;
+  padding: 8px;
 }
 
-:deep(.dp__calendar_header) {
-  background-color: #02254D;
-  color: white;
-  border-radius: 8px 8px 0 0;
+/* 2. Month/Year Controls */
+:deep(.dp__month_year_row) {
+  margin-bottom: 8px;
 }
-
-:deep(.dp__calendar_header_item) {
-  color: white;
-  font-weight: 500;
-}
-
-:deep(.dp__today) {
-  border: 2px solid #F2B648;
+:deep(.dp__month_year_select) {
   color: #02254D;
   font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+:deep(.dp__month_year_select:hover) {
+  background-color: #F3F4F6;
+}
+:deep(.dp__button) {
+  color: #6B7280;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+:deep(.dp__button:hover) {
+  background-color: #F3F4F6;
+  color: #02254D;
+}
+
+/* 3. Days of the Week Header */
+:deep(.dp__calendar_header) {
+  background-color: transparent;
+  border-bottom: 1px solid #F3F4F6;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+}
+:deep(.dp__calendar_header_item) {
+  color: #6B7280;
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* 4. Calendar Days Grid (Interactive Cells) */
+:deep(.dp__cell_inner) {
+  border-radius: 50% !important; /* Perfect circles */
+  width: 36px;
+  height: 36px;
+  margin: auto;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid transparent;
+}
+
+/* 5. States (Hover, Active, Today) */
+:deep(.dp__date_hover) {
+  background-color: #F0F4F8 !important; /* Soft interactive blue */
+  color: #02254D !important;
+  transform: scale(1.1); /* Micro-animation */
 }
 
 :deep(.dp__active_date) {
-  background-color: #02254D;
-  color: white;
+  background-color: #02254D !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 10px rgba(2, 37, 77, 0.3);
+  transform: scale(1.05);
 }
 
-:deep(.dp__date_hover) {
-  background-color: #F0D29B;
-  color: #010101;
+:deep(.dp__today) {
+  border: 2px solid #02254D !important; /* Elegant outline */
+  color: #02254D;
+  font-weight: 700;
+}
+
+/* 6. Overlays (Month/Year Picker) */
+:deep(.dp__overlay) {
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.98);
+}
+:deep(.dp__overlay_cell) {
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+:deep(.dp__overlay_cell:hover) {
+  background-color: #F0F4F8;
+  color: #02254D;
+  transform: scale(1.05);
+}
+:deep(.dp__overlay_cell_active) {
+  background-color: #02254D !important;
+  color: #FFFFFF !important;
 }
 </style>

@@ -48,57 +48,86 @@ export class GeminiProvider implements IOcrProvider {
       payload.generationConfig.thinkingConfig = { thinkingBudget: 'medium' };
     }
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55_000); // 55s timeout (Supabase corta a los 60s)
+    const modelsToTry = [model, 'gemini-3.1-pro-preview', 'gemini-1.5-flash'];
+    let lastError: any = null;
 
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          signal: controller.signal,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}));
-        const code = response.status === 429 ? 'QUOTA_EXCEEDED'
-                   : response.status === 401 ? 'INVALID_KEY'
-                   : 'PROVIDER_ERROR';
-                   
-        const isPreviewRateLimit = response.status === 429 && errBody?.error?.message?.includes('rate');
-        throw {
-          code: isPreviewRateLimit ? 'PREVIEW_RATE_LIMIT' : code,
-          message: errBody?.error?.message ?? `HTTP ${response.status}`,
-        };
-      }
-
-      const data = await response.json();
-      let resultJson: any;
+    for (const currentModel of modelsToTry) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 55_000); // 55s timeout
+      
       try {
-        resultJson = JSON.parse(data.candidates[0].content.parts[0].text);
-      } catch {
-        throw { code: 'PARSE_ERROR', message: 'El proveedor devolvió una respuesta que no es JSON válido' };
-      }
-
-      return {
-        data: resultJson,
-        usage: {
-          promptTokenCount: data.usageMetadata?.promptTokenCount || 0,
-          candidatesTokenCount: data.usageMetadata?.candidatesTokenCount || 0,
+        console.log(`[OCR] Intentando extraer con modelo: ${currentModel}`);
+        
+        // Ajustar thinkingConfig dinámicamente si el modelo lo requiere
+        if (currentModel.includes('pro')) {
+          payload.generationConfig.thinkingConfig = { thinkingBudget: 'medium' };
+        } else {
+          delete payload.generationConfig.thinkingConfig;
         }
-      };
 
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        throw { code: 'TIMEOUT', message: 'El proveedor tardó demasiado en responder.' };
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          const errMsg = errBody?.error?.message ?? `HTTP ${response.status}`;
+          
+          // Si es un error temporal por alta demanda (503) o "high demand", intentar fallback
+          const isHighDemand = response.status === 503 || errMsg.toLowerCase().includes('high demand');
+          const isPreviewRateLimit = response.status === 429 && errMsg.toLowerCase().includes('rate');
+          
+          if (isHighDemand || isPreviewRateLimit) {
+            console.warn(`[OCR] Modelo ${currentModel} ocupado/limitado (${response.status}). Cambiando a fallback...`);
+            lastError = { code: isPreviewRateLimit ? 'PREVIEW_RATE_LIMIT' : 'PROVIDER_ERROR', message: errMsg };
+            clearTimeout(timeoutId);
+            continue; // Ir al siguiente modelo en el array
+          }
+
+          const code = response.status === 429 ? 'QUOTA_EXCEEDED'
+                     : response.status === 401 ? 'INVALID_KEY'
+                     : 'PROVIDER_ERROR';
+                     
+          throw { code, message: errMsg };
+        }
+
+        const data = await response.json();
+        let resultJson: any;
+        try {
+          resultJson = JSON.parse(data.candidates[0].content.parts[0].text);
+        } catch {
+          throw { code: 'PARSE_ERROR', message: 'El proveedor devolvió una respuesta que no es JSON válido' };
+        }
+
+        clearTimeout(timeoutId);
+        return {
+          data: resultJson,
+          usage: {
+            promptTokenCount: data.usageMetadata?.promptTokenCount || 0,
+            candidatesTokenCount: data.usageMetadata?.candidatesTokenCount || 0,
+          }
+        };
+
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+          console.warn(`[OCR] Timeout con el modelo ${currentModel}. Cambiando a fallback...`);
+          lastError = { code: 'TIMEOUT', message: 'El proveedor tardó demasiado en responder.' };
+          continue; // Intentar el siguiente modelo
+        }
+        // Si es un error fatal (ej. clave inválida, no es JSON válido), no reintentar, arrojarlo.
+        throw err;
       }
-      throw err;
-    } finally {
-      clearTimeout(timeoutId);
     }
+
+    // Si se agotan los modelos de fallback y todos fallan por rate/demand/timeout
+    throw lastError;
   }
 
   async generateText(

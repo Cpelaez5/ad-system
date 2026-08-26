@@ -186,6 +186,7 @@
             <CustomDatePicker
               v-model="formData.issueDate"
               label="Fecha"
+              class="mb-2"
               :rules="[v => !!v || 'La fecha es requerida']"
             />
           </v-col>
@@ -741,6 +742,9 @@
         </div>
       </div>
 
+      <!-- ══════════════════════════════════════════════════════
+           SECCIÓN: RETENCIONES
+      ══════════════════════════════════════════════════════════ -->
       <!-- Resumen de Retenciones (solo COMPRA) -->
       <div v-if="formData.flow === 'COMPRA'" class="mt-4">
         <RetentionSummaryCard
@@ -751,6 +755,49 @@
           :loadingConfig="loadingRetentionConfig"
           @adjust="showAdjustSheet = true"
         />
+      </div>
+
+      <!-- Ingreso Manual de Retenciones (solo VENTA) -->
+      <div v-else-if="formData.flow === 'VENTA'" class="sif-section">
+        <p class="sif-section-label">Retenciones aplicadas por tu cliente (Opcional)</p>
+        <div class="text-caption text-grey-darken-1 mb-3">
+          Si tu cliente es Contribuyente Especial y te aplicó retenciones, regístralas aquí para que se deduzcan de tu total a pagar de impuestos.
+        </div>
+        <v-row dense>
+          <v-col cols="12" sm="4">
+            <v-text-field
+              v-model.number="formData.financial.ivaRetention"
+              label="Retención IVA"
+              type="number"
+              prefix="Bs."
+              variant="outlined"
+              density="comfortable"
+              hide-details
+            />
+          </v-col>
+          <v-col cols="12" sm="4">
+            <v-text-field
+              v-model.number="formData.financial.islrRetention"
+              label="Retención ISLR"
+              type="number"
+              prefix="Bs."
+              variant="outlined"
+              density="comfortable"
+              hide-details
+            />
+          </v-col>
+          <v-col cols="12" sm="4">
+            <v-text-field
+              v-model.number="formData.financial.municipalRetention"
+              label="Retención Municipal"
+              type="number"
+              prefix="Bs."
+              variant="outlined"
+              density="comfortable"
+              hide-details
+            />
+          </v-col>
+        </v-row>
       </div>
 
       <!-- ══════════════════════════════════════════════════════
@@ -1718,6 +1765,18 @@ export default {
             this.formData.financial.igtf = parseFloat(data.financial.igtfAmount) || 0;
             this.trackAiField('igtf', data.financial.igtfAmount, df);
           }
+          if (data.financial.ivaRetention !== undefined) {
+            this.formData.financial.ivaRetention = parseFloat(data.financial.ivaRetention) || 0;
+            this.trackAiField('ivaRetention', data.financial.ivaRetention, df);
+          }
+          if (data.financial.islrRetention !== undefined) {
+            this.formData.financial.islrRetention = parseFloat(data.financial.islrRetention) || 0;
+            this.trackAiField('islrRetention', data.financial.islrRetention, df);
+          }
+          if (data.financial.municipalRetention !== undefined) {
+            this.formData.financial.municipalRetention = parseFloat(data.financial.municipalRetention) || 0;
+            this.trackAiField('municipalRetention', data.financial.municipalRetention, df);
+          }
           if (data.financial.exchangeRate !== undefined) {
             this.formData.financial.exchangeRate = parseFloat(data.financial.exchangeRate) || 1;
             this.trackAiField('exchangeRate', data.financial.exchangeRate, df);
@@ -1951,8 +2010,9 @@ export default {
 
       } catch (err) {
         console.error('❌ [OCR] Error:', err);
-        this.ocrResult = { success: false, message: 'No se pudo leer el documento. Por favor, ingresa los datos manualmente.' };
-        this.showSnackbar('No se pudo leer el documento', 'error');
+        const errMsg = err.message || 'No se pudo leer el documento. Por favor, ingresa los datos manualmente.';
+        this.ocrResult = { success: false, message: errMsg };
+        this.showSnackbar(errMsg, 'error');
       } finally {
         this.$nextTick(() => { this.isMappingOcr = false; });
         this.extracting = false;
