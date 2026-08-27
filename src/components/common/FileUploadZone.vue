@@ -103,11 +103,12 @@
         color="primary"
         variant="elevated"
         size="large"
+        class="px-8"
         @click="extractData"
         :disabled="!selectedFile"
       >
-        <v-icon start>mdi-robot</v-icon>
-        Extraer Datos con IA
+        <v-icon start>mdi-auto-fix</v-icon>
+        Extraer automáticamente
       </v-btn>
       <v-spacer />
     </v-card-actions>
