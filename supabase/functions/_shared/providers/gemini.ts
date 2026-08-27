@@ -45,7 +45,7 @@ export class GeminiProvider implements IOcrProvider {
 
     // Para control de costos en Gemini Pro (opcional)
     if (model.includes('pro')) {
-      payload.generationConfig.thinkingConfig = { thinkingBudget: 'medium' };
+      payload.generationConfig.thinkingConfig = { thinkingBudget: 1024 };
     }
 
     const modelsToTry = [model, 'gemini-3.1-pro-preview', 'gemini-1.5-flash'];
@@ -60,7 +60,7 @@ export class GeminiProvider implements IOcrProvider {
         
         // Ajustar thinkingConfig dinámicamente si el modelo lo requiere
         if (currentModel.includes('pro')) {
-          payload.generationConfig.thinkingConfig = { thinkingBudget: 'medium' };
+          payload.generationConfig.thinkingConfig = { thinkingBudget: 1024 };
         } else {
           delete payload.generationConfig.thinkingConfig;
         }
@@ -145,7 +145,7 @@ export class GeminiProvider implements IOcrProvider {
     };
 
     if (model.includes('pro')) {
-      payload.generationConfig.thinkingConfig = { thinkingBudget: 'medium' };
+      payload.generationConfig.thinkingConfig = { thinkingBudget: 1024 };
     }
 
     const controller = new AbortController();

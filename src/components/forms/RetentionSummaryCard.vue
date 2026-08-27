@@ -1,5 +1,5 @@
 <template>
-  <v-card variant="outlined" class="mb-4 bg-grey-lighten-4 rounded-lg border-2">
+  <v-card variant="flat" class="mb-4 bg-grey-lighten-4 rounded-lg">
     <div class="d-flex align-center pa-3" @click="expanded = !expanded" style="cursor: pointer;">
       <v-icon color="primary" class="mr-3">mdi-percent</v-icon>
       <div>

@@ -746,7 +746,7 @@
            SECCIÓN: RETENCIONES
       ══════════════════════════════════════════════════════════ -->
       <!-- Resumen de Retenciones (solo COMPRA) -->
-      <div v-if="formData.flow === 'COMPRA'" class="mt-4">
+      <div v-if="formData.flow === 'COMPRA'" class="mt-4 mx-3">
         <RetentionSummaryCard
           :proveedor="proveedor"
           :retentionConfig="retentionConfig"
@@ -757,12 +757,12 @@
         />
 
         <!-- Números de Comprobante de Retención (COMPRA) -->
-        <div v-if="retencionesResult && (retencionesResult.iva > 0 || retencionesResult.islr > 0 || retencionesResult.municipal > 0)" class="mt-3">
-          <p class="sif-section-label">Comprobantes de Retención</p>
+        <v-card v-if="retencionesResult && (retencionesResult.iva > 0 || retencionesResult.islr > 0 || retencionesResult.municipal > 0)" class="mt-4 pa-4 rounded-lg" variant="outlined" color="grey-lighten-2">
+          <p class="sif-section-label text-black">Comprobantes de Retención</p>
           <div class="text-caption text-grey-darken-1 mb-3">
             Números auto-generados. Activa la edición manual si necesitas modificarlos.
           </div>
-          <v-row dense>
+          <v-row dense class="mx-0 mt-1">
             <!-- IVA comprobante -->
             <v-col cols="12" sm="4" v-if="retencionesResult.iva > 0">
               <v-text-field
@@ -770,7 +770,8 @@
                 label="Nro. Comprobante IVA"
                 variant="outlined"
                 density="comfortable"
-                :disabled="!editarComprobanteIva"
+                :class="{'text-black': editarComprobanteIva}"
+                :readonly="!editarComprobanteIva"
                 :error="comprobanteDuplicado.iva"
                 :error-messages="comprobanteDuplicado.iva ? 'Este número ya existe' : ''"
                 @update:model-value="checkComprobanteDuplicado('iva', $event)"
@@ -780,10 +781,10 @@
                     <template v-slot:activator="{ props }">
                       <v-icon
                         v-bind="props"
-                        :color="editarComprobanteIva ? 'primary' : 'grey'"
+                        :color="editarComprobanteIva ? 'black' : 'grey'"
                         size="small"
-                        @click="editarComprobanteIva = !editarComprobanteIva"
-                        style="cursor: pointer;"
+                        @mousedown.stop.prevent="editarComprobanteIva = !editarComprobanteIva"
+                        style="cursor: pointer; pointer-events: auto;"
                       >
                         {{ editarComprobanteIva ? 'mdi-pencil' : 'mdi-pencil-off' }}
                       </v-icon>
@@ -799,7 +800,8 @@
                 label="Nro. Comprobante ISLR"
                 variant="outlined"
                 density="comfortable"
-                :disabled="!editarComprobanteIslr"
+                :class="{'text-black': editarComprobanteIslr}"
+                :readonly="!editarComprobanteIslr"
                 :error="comprobanteDuplicado.islr"
                 :error-messages="comprobanteDuplicado.islr ? 'Este número ya existe' : ''"
                 @update:model-value="checkComprobanteDuplicado('islr', $event)"
@@ -809,10 +811,10 @@
                     <template v-slot:activator="{ props }">
                       <v-icon
                         v-bind="props"
-                        :color="editarComprobanteIslr ? 'primary' : 'grey'"
+                        :color="editarComprobanteIslr ? 'black' : 'grey'"
                         size="small"
-                        @click="editarComprobanteIslr = !editarComprobanteIslr"
-                        style="cursor: pointer;"
+                        @mousedown.stop.prevent="editarComprobanteIslr = !editarComprobanteIslr"
+                        style="cursor: pointer; pointer-events: auto;"
                       >
                         {{ editarComprobanteIslr ? 'mdi-pencil' : 'mdi-pencil-off' }}
                       </v-icon>
@@ -828,7 +830,8 @@
                 label="Nro. Comprobante Municipal"
                 variant="outlined"
                 density="comfortable"
-                :disabled="!editarComprobanteMunicipal"
+                :class="{'text-black': editarComprobanteMunicipal}"
+                :readonly="!editarComprobanteMunicipal"
                 :error="comprobanteDuplicado.municipal"
                 :error-messages="comprobanteDuplicado.municipal ? 'Este número ya existe' : ''"
                 @update:model-value="checkComprobanteDuplicado('municipal', $event)"
@@ -838,10 +841,10 @@
                     <template v-slot:activator="{ props }">
                       <v-icon
                         v-bind="props"
-                        :color="editarComprobanteMunicipal ? 'primary' : 'grey'"
+                        :color="editarComprobanteMunicipal ? 'black' : 'grey'"
                         size="small"
-                        @click="editarComprobanteMunicipal = !editarComprobanteMunicipal"
-                        style="cursor: pointer;"
+                        @mousedown.stop.prevent="editarComprobanteMunicipal = !editarComprobanteMunicipal"
+                        style="cursor: pointer; pointer-events: auto;"
                       >
                         {{ editarComprobanteMunicipal ? 'mdi-pencil' : 'mdi-pencil-off' }}
                       </v-icon>
@@ -851,7 +854,7 @@
               </v-text-field>
             </v-col>
           </v-row>
-        </div>
+        </v-card>
       </div>
 
       <!-- Ingreso Manual de Retenciones (solo VENTA) -->
