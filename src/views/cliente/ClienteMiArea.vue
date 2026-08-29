@@ -57,7 +57,7 @@
                   ></v-text-field>
                 </v-col>
                 
-                <v-col cols="12" md="6">
+                <v-col cols="12" md="4">
                   <v-select
                     v-model="form.activity_type"
                     label="Tipo de Actividad"
@@ -67,7 +67,54 @@
                     variant="outlined"
                     color="primary"
                     prepend-inner-icon="mdi-briefcase"
+                    :error="!form.activity_type && showMissingFieldsHighlight"
+                    :hint="(!form.activity_type && showMissingFieldsHighlight) ? 'Requerido' : ''"
+                    persistent-hint
                   ></v-select>
+                </v-col>
+
+                <v-col cols="12" md="4">
+                  <v-text-field
+                    v-model="form.licencia_actividad_economica"
+                    label="N° Licencia de Actividad"
+                    variant="outlined"
+                    color="primary"
+                    prepend-inner-icon="mdi-certificate-outline"
+                    placeholder="Ej. LAE-12345"
+                    :error="!form.licencia_actividad_economica && showMissingFieldsHighlight"
+                    :hint="(!form.licencia_actividad_economica && showMissingFieldsHighlight) ? 'Requerido' : ''"
+                    persistent-hint
+                  ></v-text-field>
+                </v-col>
+
+                <v-col cols="12" md="6">
+                  <v-autocomplete
+                    v-model="form.estado"
+                    :items="states"
+                    label="Estado"
+                    variant="outlined"
+                    color="primary"
+                    prepend-inner-icon="mdi-map-marker-outline"
+                    @update:model-value="onStateChange"
+                    :error="!form.estado && showMissingFieldsHighlight"
+                    :hint="(!form.estado && showMissingFieldsHighlight) ? 'Requerido' : ''"
+                    persistent-hint
+                  ></v-autocomplete>
+                </v-col>
+
+                <v-col cols="12" md="6">
+                  <v-autocomplete
+                    v-model="form.municipio"
+                    :items="municipalities"
+                    label="Municipio"
+                    variant="outlined"
+                    color="primary"
+                    prepend-inner-icon="mdi-city"
+                    :disabled="!form.estado"
+                    :error="!form.municipio && showMissingFieldsHighlight"
+                    :hint="(!form.municipio && showMissingFieldsHighlight) ? 'Requerido' : ''"
+                    persistent-hint
+                  ></v-autocomplete>
                 </v-col>
 
                 <v-col cols="12">
@@ -428,6 +475,7 @@
 <script>
 import userService from '@/services/userService';
 import sealService from '@/services/seal-service';
+import venezuelaLocationsService from '@/services/venezuelaLocationsService';
 
 export default {
   name: 'PerfilCliente',
@@ -447,7 +495,8 @@ export default {
       },
       form: {
         firstName: '', lastName: '', email: '', username: '',
-        companyName: '', rif: '', phone: '', address: '', activity_type: ''
+        companyName: '', rif: '', phone: '', address: '', activity_type: '',
+        licencia_actividad_economica: '', estado: '', municipio: ''
       },
       passwordForm: { current: '', new: '', confirm: '' },
       activityTypes: [
@@ -455,6 +504,8 @@ export default {
         { title: 'Servicios', value: 'services' },
         { title: 'Manufactura', value: 'manufacturing' }
       ],
+      states: [],
+      municipalities: [],
       snackbar: { show: false, text: '', color: 'success' }
     };
   },
@@ -472,16 +523,52 @@ export default {
              this.passwordForm.confirm && 
              !this.passwordError &&
              this.passwordForm.new.length >= 6;
+    },
+    isProfileIncomplete() {
+      return !this.form.activity_type || 
+             !this.form.licencia_actividad_economica || 
+             !this.form.estado || 
+             !this.form.municipio;
+    },
+    showMissingFieldsHighlight() {
+      // Solo mostrar resaltado rojo si está incompleto el perfil y estamos en el componente
+      return this.isProfileIncomplete;
+    }
+  },
+  beforeRouteLeave(to, from, next) {
+    if (this.currentUser?.role === 'cliente' && this.isProfileIncomplete) {
+      const confirmLeave = window.confirm("Aún no has completado tu información de Tipo de Actividad, Licencia, Estado y Municipio. Esta información es obligatoria para la correcta generación de comprobantes. ¿Estás seguro que deseas salir sin guardar estos datos?");
+      if (confirmLeave) {
+        next();
+      } else {
+        next(false); // Cancelar la navegación
+      }
+    } else {
+      next();
     }
   },
   async mounted() {
+    this.states = venezuelaLocationsService.getStates();
     await this.loadUser();
     await this.loadSealConfig();
+
+    if (this.$route.query.required === 'fiscal') {
+      this.snackbar = {
+        show: true,
+        text: '⚠️ Completa tus datos fiscales (Tipo de Actividad, Licencia, Estado y Municipio) para continuar.',
+        color: 'warning'
+      };
+    }
   },
   methods: {
     async loadUser(force = false) {
       this.currentUser = await userService.getCurrentUser(force);
       if (this.currentUser) {
+        // Notificar a AppNavigation y resto de componentes el usuario actualizado
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ad-user-updated', { detail: this.currentUser }));
+        }
+
         // Load basic data
         this.form.firstName = this.currentUser.firstName || '';
         this.form.lastName = this.currentUser.lastName || '';
@@ -495,6 +582,15 @@ export default {
           this.form.phone = client.phone || '';
           this.form.address = client.address || '';
           this.form.activity_type = client.activity_type || '';
+          this.form.licencia_actividad_economica = client.licencia_actividad_economica || '';
+          
+          const rawMunicipio = client.municipio || client.municipio_id || '';
+          this.form.municipio = rawMunicipio;
+          this.form.estado = client.estado || venezuelaLocationsService.getStateByMunicipality(rawMunicipio) || '';
+          
+          if (this.form.estado) {
+            this.municipalities = venezuelaLocationsService.getMunicipalities(this.form.estado);
+          }
         }
       }
     },
@@ -575,7 +671,10 @@ export default {
             companyName: this.form.companyName,
             phone: this.form.phone,
             activity_type: this.form.activity_type,
-            address: this.form.address
+            licencia_actividad_economica: this.form.licencia_actividad_economica,
+            address: this.form.address,
+            estado: this.form.estado,
+            municipio_id: this.form.municipio // guardamos municipio en municipio_id por legacy o podemos guardar ambos
           }
         };
 
@@ -585,7 +684,20 @@ export default {
           await this.loadUser(true);
         } else throw result.error;
       } catch (e) {
-        this.snackbar = { show: true, text: 'Error: ' + (e.message || 'Desconocido'), color: 'error' };
+        console.error('Error al actualizar datos de empresa:', e);
+        let userMsg = 'No se pudieron actualizar los datos de la empresa. Por favor intenta de nuevo.';
+        if (typeof e === 'string') {
+          userMsg = e;
+        } else if (e?.message) {
+          if (e.message.includes('schema cache') || e.message.includes('column')) {
+            userMsg = 'Ocurrió un inconveniente temporal al guardar los datos. Intenta nuevamente.';
+          } else if (e.message.includes('network') || e.message.includes('fetch')) {
+            userMsg = 'Error de conexión. Por favor verifica tu conexión a internet.';
+          } else {
+            userMsg = e.message;
+          }
+        }
+        this.snackbar = { show: true, text: userMsg, color: 'error' };
       } finally {
         this.loading = false;
       }
@@ -610,8 +722,11 @@ export default {
           throw result.error;
         }
       } catch (error) {
-        console.error(error);
-        this.snackbar = { show: true, text: 'Error: ' + (error.message || 'Desconocido'), color: 'error' };
+        console.error('Error al actualizar datos personales:', error);
+        let userMsg = 'No se pudieron actualizar tus datos personales. Por favor intenta de nuevo.';
+        if (typeof error === 'string') userMsg = error;
+        else if (error?.message) userMsg = error.message;
+        this.snackbar = { show: true, text: userMsg, color: 'error' };
       } finally {
         this.loadingUser = false;
       }
@@ -646,6 +761,13 @@ export default {
       } finally {
         this.loadingPassword = false;
       }
+    },
+
+    onStateChange() {
+      if (this.form.municipio && !venezuelaLocationsService.isValidMunicipality(this.form.estado, this.form.municipio)) {
+        this.form.municipio = '';
+      }
+      this.municipalities = this.form.estado ? venezuelaLocationsService.getMunicipalities(this.form.estado) : [];
     }
   }
 }

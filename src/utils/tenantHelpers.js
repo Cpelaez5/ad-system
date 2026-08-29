@@ -353,10 +353,30 @@ export function getCurrentClientId() {
   try {
     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
     // Normalizar nombres de propiedad posibles
-    return currentUser.client_id || currentUser.clientId || null
+    return currentUser.client_id || currentUser.clientId || localStorage.getItem('current_client_id') || null
   } catch (error) {
     console.error('❌ Error al obtener client_id:', error)
     return null
+  }
+}
+
+/**
+ * Guarda el ID del cliente actual en localStorage
+ * 
+ * @param {string|null} clientId
+ * @returns {boolean}
+ */
+export function setCurrentClientId(clientId) {
+  try {
+    if (!clientId) {
+      localStorage.removeItem('current_client_id')
+      return true
+    }
+    localStorage.setItem('current_client_id', clientId)
+    return true
+  } catch (error) {
+    console.error('❌ Error al guardar client_id:', error)
+    return false
   }
 }
 
@@ -372,5 +392,6 @@ export default {
   belongsToCurrentTenant,
   getCurrentOrganizationName,
   handleTenantError,
-  getCurrentClientId
+  getCurrentClientId,
+  setCurrentClientId
 }

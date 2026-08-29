@@ -87,11 +87,16 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="formData.municipal_rate"
-                label="Alícuota Municipal"
+                label="Alícuota Municipal (%)"
                 type="number"
+                min="0"
+                max="100"
+                :rules="[rules.validMunicipalRate]"
                 variant="outlined"
                 density="comfortable"
                 suffix="%"
+                hint="0% a 100%"
+                persistent-hint
                 class="mb-3"
               ></v-text-field>
             </v-col>
@@ -158,6 +163,12 @@ export default {
       saving: false,
       allConceptosIslr: [],
       municipios: [],
+      rules: {
+        required: v => !!v || 'Campo requerido',
+        validRif: v => !v || /^[JjGgVvEePpCc][-]?\d{6,9}[-]?\d?$/.test(v) || 'Formato de RIF inválido (ej: J-12345678-9)',
+        validEmail: v => !v || /.+@.+\..+/.test(v) || 'Correo electrónico inválido',
+        validMunicipalRate: v => v === null || v === '' || (Number(v) >= 0 && Number(v) <= 100) || 'La alícuota debe estar entre 0% y 100%'
+      },
       formData: {
         nombre: '',
         rif: '',
@@ -238,7 +249,12 @@ export default {
       
       this.saving = true
       try {
-        const result = await proveedorService.createProveedor(this.formData)
+        const payload = {
+          ...this.formData,
+          municipal_rate: Math.min(100, Math.max(0, parseFloat(this.formData.municipal_rate) || 0)),
+          iva_retention_rate: Math.min(100, Math.max(0, parseFloat(this.formData.iva_retention_rate) || 0))
+        }
+        const result = await proveedorService.createProveedor(payload)
         if (result.success) {
           this.$emit('saved', result.data)
           this.close()

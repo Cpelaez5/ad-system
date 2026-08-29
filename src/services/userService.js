@@ -8,10 +8,12 @@ import {
   queryWithTenant,
   insertWithTenant,
   updateWithTenant,
-  deleteWithTenant
+  deleteWithTenant,
+  setCurrentClientId
 } from '@/utils/tenantHelpers';
 import userSettingsService from '@/services/user-settings-service.js';
 import sealService from '@/services/seal-service.js';
+import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
 
 // Definición de roles y permisos (simplificados para 4 tipos de usuarios)
 const roles = {
@@ -349,6 +351,9 @@ const userService = {
                 console.log('⚠️ Cache de usuario desactualizada (falta datos de cliente), recargando...');
                 // Continuar a carga desde Supabase
               } else {
+                if (user.client && !user.client.estado && (user.client.municipio_id || user.client.municipio)) {
+                  user.client.estado = venezuelaLocationsService.getStateByMunicipality(user.client.municipio_id || user.client.municipio) || '';
+                }
                 console.log('✅ Usuario actual obtenido desde localStorage');
                 return user;
               }
@@ -385,6 +390,9 @@ const userService = {
             .maybeSingle();
 
           if (clientData) {
+            if (!clientData.estado && (clientData.municipio_id || clientData.municipio)) {
+              clientData.estado = venezuelaLocationsService.getStateByMunicipality(clientData.municipio_id || clientData.municipio) || '';
+            }
             profile.clients = clientData;
           }
         }
@@ -613,6 +621,8 @@ const userService = {
             phone: profileData.client.phone,
             address: profileData.client.address,
             activity_type: profileData.client.activity_type,
+            licencia_actividad_economica: profileData.client.licencia_actividad_economica,
+            municipio_id: profileData.client.municipio_id || profileData.client.municipio,
             // Billing data
             billing_name: profileData.client.billing_name,
             billing_tax_id: profileData.client.billing_tax_id,
@@ -625,27 +635,30 @@ const userService = {
 
           if (Object.keys(clientUpdates).length > 0) {
             const { error: errorClient } = await supabase.from('clients').update(clientUpdates).eq('id', profileData.client.id);
-            if (errorClient) throw errorClient;
-          }
-        }
-
-        // Limpiar cache local si el usuario actualizado es el usuario en sesión
-        const storedUser = localStorage.getItem('currentUser');
-        if (storedUser) {
-          try {
-            const user = JSON.parse(storedUser);
-            if (user && user.id === userId) {
-              localStorage.removeItem('currentUser');
+            if (errorClient) {
+              console.error('Error al actualizar datos de cliente en Supabase:', errorClient);
+              const friendlyMessage = errorClient.code === 'PGRST116' || errorClient.message?.includes('schema cache')
+                ? 'No se pudieron actualizar algunos datos de la empresa. Por favor intenta de nuevo.'
+                : (errorClient.message || 'Error al actualizar datos de la empresa');
+              throw { code: errorClient.code || 'CLIENT_UPDATE_ERROR', message: friendlyMessage };
             }
-          } catch (error) {
-            // Ignorar error de parseo
           }
         }
 
-        return { success: true };
+        // Recargar perfil completo y fresco de Supabase para actualizar cache local y notificar reactividad
+        const freshUser = await this.getCurrentUser(true);
+        if (freshUser) {
+          localStorage.setItem('currentUser', JSON.stringify(freshUser));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('ad-user-updated', { detail: freshUser }));
+          }
+        }
+
+        return { success: true, user: freshUser };
       } catch (e) {
-        console.error(e);
-        return { success: false, error: e };
+        console.error('Error al actualizar perfil de usuario:', e);
+        const friendlyMessage = e?.message || (typeof e === 'string' ? e : 'Ocurrió un error al actualizar el perfil. Por favor intenta de nuevo.');
+        return { success: false, error: { code: e?.code || 'UPDATE_ERROR', message: friendlyMessage } };
       }
     },
 

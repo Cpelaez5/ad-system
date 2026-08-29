@@ -70,6 +70,32 @@
           hide-details
           class="mb-2"
         ></v-switch>
+
+        <v-select
+          v-if="localConfig.aplicar_municipal"
+          v-model="localConfig.concepto_municipal_id"
+          :items="formattedConceptosMunicipales"
+          item-title="displayLabel"
+          item-value="id"
+          label="Concepto Municipal (Alcaldía)"
+          variant="outlined"
+          density="comfortable"
+          hint="Selecciona el concepto municipal"
+          persistent-hint
+          clearable
+          class="ml-4 mb-2"
+        >
+          <template v-slot:item="{ props, item }">
+            <v-list-item v-bind="props">
+              <template v-slot:subtitle>
+                <span class="text-caption">
+                  {{ item.raw.codigo ? `Cód. ${item.raw.codigo}` : '' }}
+                  {{ item.raw.porcentaje ? ` • ${item.raw.porcentaje}%` : '' }}
+                </span>
+              </template>
+            </v-list-item>
+          </template>
+        </v-select>
       </v-card-text>
       
       <v-divider></v-divider>
@@ -91,6 +117,7 @@
 
 <script>
 import proveedorService from '@/services/proveedorService.js'
+import { municipalConceptsService } from '@/services/municipalConceptsService.js'
 
 export default {
   name: 'RetentionAdjustSheet',
@@ -116,9 +143,11 @@ export default {
         aplicar_iva: true,
         aplicar_islr: true,
         aplicar_municipal: true,
-        islr_concept_id: null
+        islr_concept_id: null,
+        concepto_municipal_id: null
       },
-      conceptosIslr: []
+      conceptosIslr: [],
+      conceptosMunicipales: []
     }
   },
   computed: {
@@ -129,6 +158,12 @@ export default {
           ...c,
           displayLabel: `${c.codigo ? '[' + c.codigo + '] ' : ''}${c.nombre} (${c.porcentaje_retencion}%)`
         }))
+    },
+    formattedConceptosMunicipales() {
+      return this.conceptosMunicipales.map(c => ({
+        ...c,
+        displayLabel: `${c.codigo ? '[' + c.codigo + '] ' : ''}${c.descripcion} (${c.porcentaje}%)`
+      }))
     }
   },
   watch: {
@@ -138,6 +173,7 @@ export default {
         // Clonar la config para no mutar el prop directamente hasta que de a "Aplicar"
         this.localConfig = { ...this.config }
         this.fetchConceptos()
+        this.fetchConceptosMunicipales()
       }
     },
     internalValue(val) {
@@ -158,6 +194,16 @@ export default {
         if (data) this.conceptosIslr = data
       } catch (err) {
         console.warn('Error fetching conceptos ISLR in RetentionAdjustSheet:', err)
+      }
+    },
+    async fetchConceptosMunicipales() {
+      try {
+        const result = await municipalConceptsService.getConcepts();
+        if (result.success) {
+          this.conceptosMunicipales = result.data;
+        }
+      } catch (err) {
+        console.warn('Error fetching conceptos municipales:', err);
       }
     }
   }

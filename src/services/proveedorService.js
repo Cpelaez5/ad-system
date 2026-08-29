@@ -902,11 +902,11 @@ class ProveedorService {
       email: (payload.email || '').toLowerCase().trim() || null,
       direccion: (payload.direccion || '').trim() || null,
       contacto_nombre: (payload.contacto_nombre || '').trim() || null,
-      iva_retention_rate: payload.iva_retention_rate !== undefined ? Number(payload.iva_retention_rate) : 75,
+      iva_retention_rate: payload.iva_retention_rate !== undefined ? Math.min(100, Math.max(0, Number(payload.iva_retention_rate) || 0)) : 75,
       islr_concept_id: this._isValidUUID(payload.islr_concept_id) ? payload.islr_concept_id : null,
-      municipal_rate: payload.municipal_rate !== undefined ? Number(payload.municipal_rate) : 0,
+      municipal_rate: payload.municipal_rate !== undefined ? Math.min(100, Math.max(0, Number(payload.municipal_rate) || 0)) : 0,
       licencia_actividad_economica: (payload.licencia_actividad_economica || '').trim() || null,
-      municipio_id: this._isValidUUID(payload.municipio_id) ? payload.municipio_id : null,
+      municipio_id: payload.municipio_id ? String(payload.municipio_id).trim() : null,
       is_active: payload.is_active !== false
     }
 

@@ -749,10 +749,11 @@
       <div v-if="formData.flow === 'COMPRA'" class="mt-4 mx-3">
         <RetentionSummaryCard
           :proveedor="proveedor"
-          :retentionConfig="retentionConfig"
-          :retencionesResult="retencionesResult"
-          :financial="formData.financial"
-          :loadingConfig="loadingRetentionConfig"
+          :aplicarIva="retentionConfig.aplicarIva"
+          :aplicarIslr="retentionConfig.aplicarIslr"
+          :aplicarMunicipal="retentionConfig.aplicarMunicipal"
+          :conceptoIslrNombre="retentionConfig.conceptoIslrNombre"
+          :conceptoMunicipalNombre="retentionConfig.conceptoMunicipalNombre"
           @adjust="showAdjustSheet = true"
         />
 
@@ -1040,6 +1041,7 @@ import ProveedorModalForm from '@/components/forms/ProveedorModalForm.vue';
 import RetentionSummaryCard from '@/components/forms/RetentionSummaryCard.vue';
 import RetentionAdjustSheet from '@/components/forms/RetentionAdjustSheet.vue';
 import { supabase } from '@/lib/supabaseClient';
+import { municipalConceptsService } from '@/services/municipalConceptsService.js';
 
 let _itemKey = 0;
 
@@ -1089,8 +1091,8 @@ export default {
       proveedor: null,
       retentionConfig: {
         aplicarIva: false, porcentajeIva: 75, baseIva: 0,
-        aplicarIslr: false, conceptoIslr: null, baseIslr: 0,
-        aplicarMunicipal: false, porcentajeMunicipal: 0, baseMunicipal: 0
+        aplicarIslr: false, conceptoIslr: null, baseIslr: 0, conceptoIslrNombre: '',
+        aplicarMunicipal: false, porcentajeMunicipal: 0, baseMunicipal: 0, concepto_municipal_id: null, conceptoMunicipalNombre: ''
       },
       retencionesResult: null,
       showProveedorModal: false,
@@ -1287,14 +1289,20 @@ export default {
             porcentajeIva: ivaRate > 0 ? ivaRate : 75,
             aplicarIslr: !!data.islr_concept_id,
             conceptoIslr: data.islr_concept_id || null,
+            conceptoIslrNombre: '',
             aplicarMunicipal: municipalRate > 0,
-            porcentajeMunicipal: municipalRate
+            porcentajeMunicipal: municipalRate,
+            concepto_municipal_id: null,
+            conceptoMunicipalNombre: ''
           };
           
           this.formData.issuer.id = data.id || '';
           this.formData.issuer.companyName = data.nombre || '';
           this.formData.issuer.rif = data.rif || '';
-          this.formData.issuer.address = '';
+          this.formData.issuer.address = data.direccion || data.address || '';
+          this.formData.issuer.phone = data.telefono || data.phone || '';
+          this.formData.issuer.licencia_actividad_economica = data.licencia_actividad_economica || '';
+          this.formData.issuer.municipio_id = data.municipio_id || '';
           
           await this.calcularRetenciones();
         } catch (err) {
@@ -1537,7 +1545,11 @@ export default {
         taxpayerType: c.taxpayer_type || 'PERSONA JURÍDICA',
         phone:        c.phone || this.currentUser.phone || '',
         email:        c.email || this.currentUser.email || '',
-        address:      c.address || ''
+        address:      c.address || '',
+        licencia_actividad_economica: c.licencia_actividad_economica || '',
+        activity_type: c.activity_type || '',
+        estado:       c.estado || '',
+        municipio_id: c.municipio_id || c.municipio || ''
       };
       if (this.formData.flow === 'VENTA') {
         this.formData.issuer = { ...this.formData.issuer, ...userData };
@@ -1707,6 +1719,7 @@ export default {
           const concepts = await proveedorService.getISLRConcepts();
           const concepto = (concepts || []).find(c => c.id === config.conceptoIslr);
           if (concepto) {
+             this.retentionConfig.conceptoIslrNombre = concepto.nombre;
              const baseAplicable = parseFloat(concepto.porcentaje_base) || 100;
              const baseMonto = amount * (baseAplicable / 100);
              const rate = parseFloat(concepto.porcentaje_retencion) || 0;
@@ -1716,8 +1729,23 @@ export default {
       }
       
       let municipal = 0;
-      if (config.aplicarMunicipal && config.porcentajeMunicipal > 0 && amount > 0) {
-         municipal = parseFloat((amount * (config.porcentajeMunicipal / 100)).toFixed(2));
+      if (config.aplicarMunicipal && amount > 0) {
+        try {
+          const mConcepts = await municipalConceptsService.getConcepts();
+          if (mConcepts.success && config.concepto_municipal_id) {
+             const mConcepto = mConcepts.data.find(c => c.id === config.concepto_municipal_id);
+             if (mConcepto) {
+                 this.retentionConfig.porcentajeMunicipal = parseFloat(mConcepto.porcentaje) || 0;
+                 this.retentionConfig.conceptoMunicipalNombre = mConcepto.descripcion;
+             }
+          } else if (!config.concepto_municipal_id) {
+             this.retentionConfig.conceptoMunicipalNombre = '';
+          }
+        } catch(e) { console.error("Error calculando Municipal", e); }
+        
+        if (this.retentionConfig.porcentajeMunicipal > 0) {
+           municipal = parseFloat((amount * (this.retentionConfig.porcentajeMunicipal / 100)).toFixed(2));
+        }
       }
       
       this.retencionesResult = { iva, islr, municipal };
@@ -2299,6 +2327,13 @@ export default {
       try {
         // Clonar para no mutar el original en caso de error
         const payload = JSON.parse(JSON.stringify(this.formData));
+
+        if (this.retentionConfig.aplicarIslr && this.retentionConfig.conceptoIslr) {
+           payload.islr_concept_id = this.retentionConfig.conceptoIslr;
+        }
+        if (this.retentionConfig.aplicarMunicipal && this.retentionConfig.concepto_municipal_id) {
+           payload.concepto_municipal_id = this.retentionConfig.concepto_municipal_id;
+        }
 
         // Limpiar campos internos que no deben persistirse en la BD.
         // - _key: identificador temporal para v-for

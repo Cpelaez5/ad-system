@@ -612,6 +612,10 @@ class ExportService {
   async exportarComprobanteIVA(invoice, companyInfo) {
     return await retentionPdfService.generarComprobanteIVA(invoice, companyInfo);
   }
+
+  async exportarComprobanteMunicipal(invoice, companyInfo) {
+    return await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo);
+  }
 }
 
 export default new ExportService();

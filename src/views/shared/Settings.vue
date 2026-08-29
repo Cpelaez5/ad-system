@@ -416,6 +416,34 @@
       </v-col>
     </v-row>
 
+    <!-- ─── Módulos y Fiscal ──────────────────────────────────────── -->
+    <v-row>
+      <v-col cols="12">
+        <v-card class="settings-card" rounded="xl" elevation="0">
+          <div class="settings-card-header bg-secondary">
+            <v-icon color="white" class="mr-2">mdi-office-building-marker</v-icon>
+            <span>Módulos Fiscales</span>
+          </div>
+          <v-card-text class="pa-6">
+            <div class="pref-row">
+              <div class="d-flex align-center ga-3">
+                <div class="currency-icon-wrap" style="background: linear-gradient(135deg, #A81C22, #c0392b);">
+                  <v-icon size="20" color="white">mdi-domain</v-icon>
+                </div>
+                <div>
+                  <p class="font-weight-semibold mb-0 text-high-emphasis">Retenciones Municipales (Alcaldía)</p>
+                  <p class="text-caption text-grey ma-0">Configura tus Códigos de Actividad Económica y Porcentajes aplicables.</p>
+                </div>
+              </div>
+              <v-btn color="secondary" variant="flat" rounded="lg" to="/municipal-settings" prepend-icon="mdi-cog">
+                Configurar
+              </v-btn>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
     <!-- ═══════════════════════════════════════════════ -->
     <!-- BARRA DE ACCIÓN — GUARDAR                       -->
     <!-- ═══════════════════════════════════════════════ -->

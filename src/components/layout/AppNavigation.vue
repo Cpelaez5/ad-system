@@ -100,7 +100,10 @@
 
     <!-- Menú de usuario (siempre visible, flex-shrink: 0) -->
     <v-btn id="user-menu-btn" color="primary" variant="text" @click="handleUserButtonClick" style="flex-shrink: 0;">
-      <v-icon>mdi-account-circle</v-icon>
+      <v-badge v-if="isClientProfileIncomplete" dot color="error">
+        <v-icon>mdi-account-circle</v-icon>
+      </v-badge>
+      <v-icon v-else>mdi-account-circle</v-icon>
       <span class="ml-2 d-none d-md-inline">{{ currentUser?.firstName || 'Usuario' }}</span>
     </v-btn>
 
@@ -123,7 +126,10 @@
           <v-list-item-title>Facturación</v-list-item-title>
         </v-list-item>
         <v-list-item @click="goToProfile">
-          <v-list-item-title>Mi Perfil</v-list-item-title>
+          <v-list-item-title>
+            Mi Perfil
+            <v-icon v-if="isClientProfileIncomplete" color="error" size="small" class="ml-1" title="Faltan datos por completar">mdi-alert-circle</v-icon>
+          </v-list-item-title>
         </v-list-item>
         <v-list-item @click="goToSettings">
           <v-list-item-title>Configuración</v-list-item-title>
@@ -147,6 +153,7 @@ import TrialBanner from './TrialBanner.vue';
 import ExchangeRateChip from '@/components/common/ExchangeRateChip.vue';
 import { supabase } from '@/lib/supabaseClient';
 import userSettingsService from '@/services/user-settings-service.js';
+import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
 
 export default {
 	name: 'AppNavigation',
@@ -154,6 +161,7 @@ export default {
 	emits: ['banner-visibility-change'],
 	data() {
 		return {
+			currentUser: this.getCurrentUserFromStorage(),
 			drawer: null, // Controla el sidebar en mobile
 			bcvRate: null,
 			bcvLoading: false,
@@ -170,16 +178,20 @@ export default {
 		}
 	},
 	computed: {
-		currentUser() {
-			try {
-				return JSON.parse(localStorage.getItem('currentUser') || '{}')
-			} catch (error) {
-				console.error('Error obteniendo usuario:', error)
-				return {}
-			}
+		isClientProfileIncomplete() {
+			if (this.currentUser?.role !== 'cliente') return false;
+			const client = this.currentUser?.client;
+			if (!client) return false;
+			const estado = client.estado || venezuelaLocationsService.getStateByMunicipality(client.municipio || client.municipio_id);
+			const municipio = client.municipio || client.municipio_id;
+			return !client.activity_type || 
+						 !client.licencia_actividad_economica || 
+						 !estado || 
+						 !municipio;
 		}
 	},
 	async mounted() {
+		this.currentUser = this.getCurrentUserFromStorage();
 		await this.loadBCVRate();
 		await this.loadUserPlan();
 		// Actualizar cada 10 minutos para reducir spam en consola
@@ -193,6 +205,13 @@ export default {
 		// Escuchar cambios de configuración en tiempo real
 		window.addEventListener('ad-settings-changed', this.onSettingsChanged);
 
+		// Escuchar actualizaciones del perfil de usuario en tiempo real
+		this.onUserUpdated = (event) => {
+			this.currentUser = event?.detail || this.getCurrentUserFromStorage();
+		};
+		window.addEventListener('ad-user-updated', this.onUserUpdated);
+		window.addEventListener('storage', this.onUserUpdated);
+
 		// Detectar cambios en el sidebar
 		this.setupSidebarObserver();
 	},
@@ -200,8 +219,12 @@ export default {
 		if (this.bcvInterval) {
 			clearInterval(this.bcvInterval);
 		}
-		// Desconectar listeners de configuración
+		// Desconectar listeners de configuración y usuario
 		window.removeEventListener('ad-settings-changed', this.onSettingsChanged);
+		if (this.onUserUpdated) {
+			window.removeEventListener('ad-user-updated', this.onUserUpdated);
+			window.removeEventListener('storage', this.onUserUpdated);
+		}
 		// Desconectar observers si existen
 		if (this.sidebarObserver && typeof this.sidebarObserver.disconnect === 'function') {
 			try { this.sidebarObserver.disconnect(); } catch (e) { /* ignore */ }
@@ -211,6 +234,15 @@ export default {
 		}
 	},
 	methods: {
+    getCurrentUserFromStorage() {
+      try {
+        return JSON.parse(localStorage.getItem('currentUser') || '{}')
+      } catch (error) {
+        console.error('Error obteniendo usuario de localStorage:', error)
+        return {}
+      }
+    },
+
     // Carga las preferencias de tasas desde el servicio de configuración
     loadRatePreferences() {
       const settings = userSettingsService.getSettings()

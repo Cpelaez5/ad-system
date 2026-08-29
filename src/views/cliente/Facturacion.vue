@@ -547,6 +547,9 @@
                 <v-list-item v-if="(item.retenciones && item.retenciones.iva > 0) || (item.financial && item.financial.ivaRetention > 0)" @click="downloadIVA(item)" prepend-icon="mdi-file-certificate">
                   <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
                 </v-list-item>
+                <v-list-item v-if="(item.retenciones && item.retenciones.municipal > 0) || (item.financial && item.financial.municipalRetention > 0)" @click="downloadMunicipal(item)" prepend-icon="mdi-file-document-outline">
+                  <v-list-item-title>Descargar Comprobante Municipal (PDF)</v-list-item-title>
+                </v-list-item>
               </v-list>
             </v-menu>
             <v-btn
@@ -848,6 +851,9 @@
               </v-list-item>
               <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.iva > 0) || (viewingInvoice.financial && viewingInvoice.financial.ivaRetention > 0)" @click="downloadIVA(viewingInvoice)" prepend-icon="mdi-file-certificate">
                 <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
+              </v-list-item>
+              <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.municipal > 0) || (viewingInvoice.financial && viewingInvoice.financial.municipalRetention > 0)" @click="downloadMunicipal(viewingInvoice)" prepend-icon="mdi-file-document-outline">
+                <v-list-item-title>Descargar Comprobante Municipal (PDF)</v-list-item-title>
               </v-list-item>
             </v-list>
           </v-menu>
@@ -1829,11 +1835,17 @@ export default {
               p_aplicar_iva: formData.financial?.ivaRetention > 0,
               p_aplicar_islr: formData.financial?.islrRetention > 0,
               p_aplicar_municipal: formData.financial?.municipalRetention > 0,
+              p_comprobante_iva: formData.financial?.ivaRetentionNumber || null,
+              p_comprobante_islr: formData.financial?.islrRetentionNumber || null,
+              p_comprobante_municipal: formData.financial?.municipalRetentionNumber || null,
               p_factura: formData
             };
             
             if (formData.islr_concept_id) {
               rpcPayload.p_islr_concept_id = formData.islr_concept_id;
+            }
+            if (formData.concepto_municipal_id) {
+              rpcPayload.p_concepto_municipal_id = formData.concepto_municipal_id;
             }
 
             const rpcData = await retentionRpcService.registrarCompra(rpcPayload);
@@ -2317,20 +2329,27 @@ export default {
       this.showExportDialog = true;
     },
 
+    _buildCompanyInfo() {
+      const clientProfile = this.currentUser?.client || {};
+      const orgProfile = Array.isArray(this.currentUser?.organization) 
+        ? this.currentUser.organization[0] 
+        : (this.currentUser?.organization || {});
+        
+      return {
+        name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
+        rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
+        address: clientProfile.address || orgProfile.address || 'DIRECCIÓN NO REGISTRADA',
+        phone: clientProfile.phone || orgProfile.phone || '',
+        licencia_actividad_economica: clientProfile.licencia_actividad_economica || '',
+        municipio: clientProfile.municipio_id || clientProfile.municipio || '',
+        estado: clientProfile.estado || '',
+        activity_type: clientProfile.activity_type || ''
+      };
+    },
+
     async downloadISLR(invoice) {
       try {
-        const clientProfile = this.currentUser?.client || {};
-        const orgProfile = Array.isArray(this.currentUser?.organization) 
-          ? this.currentUser.organization[0] 
-          : (this.currentUser?.organization || {});
-          
-        const companyInfo = {
-          name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
-          rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
-          address: clientProfile.address || orgProfile.address || 'DIRECCIÓN NO REGISTRADA',
-          phone: clientProfile.phone || orgProfile.phone || ''
-        };
-
+        const companyInfo = this._buildCompanyInfo();
         await retentionPdfService.generarComprobanteISLR(invoice, companyInfo);
         this.$root?.showSnackbar?.('Comprobante ISLR exportado exitosamente', 'success');
       } catch (error) {
@@ -2341,23 +2360,23 @@ export default {
 
     async downloadIVA(invoice) {
       try {
-        const clientProfile = this.currentUser?.client || {};
-        const orgProfile = Array.isArray(this.currentUser?.organization) 
-          ? this.currentUser.organization[0] 
-          : (this.currentUser?.organization || {});
-          
-        const companyInfo = {
-          name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
-          rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
-          address: clientProfile.address || orgProfile.address || 'DIRECCIÓN NO REGISTRADA',
-          phone: clientProfile.phone || orgProfile.phone || ''
-        };
-
+        const companyInfo = this._buildCompanyInfo();
         await retentionPdfService.generarComprobanteIVA(invoice, companyInfo);
         this.$root?.showSnackbar?.('Comprobante IVA exportado exitosamente', 'success');
       } catch (error) {
         console.error('Error exportando comprobante IVA:', error);
         this.$root?.showSnackbar?.('Error al exportar comprobante IVA', 'error');
+      }
+    },
+
+    async downloadMunicipal(invoice) {
+      try {
+        const companyInfo = this._buildCompanyInfo();
+        await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo);
+        this.$root?.showSnackbar?.('Comprobante Municipal exportado exitosamente', 'success');
+      } catch (error) {
+        console.error('Error exportando comprobante Municipal:', error);
+        this.$root?.showSnackbar?.('Error al exportar comprobante Municipal', 'error');
       }
     },
 

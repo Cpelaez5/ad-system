@@ -15,6 +15,7 @@
 import { jsPDF } from 'jspdf'
 import sealService from '@/services/seal-service.js'
 import { supabase } from '@/lib/supabaseClient'
+import venezuelaLocationsService from '@/services/venezuelaLocationsService.js'
 import systemLogo from '/ADSystem/logo.png'
 import watermarkLogo from '/ADSystem/png/svg_logo_ADADAD_3000x3000.png'
 
@@ -172,12 +173,69 @@ function drawCorporateHeaderBand(doc, pageWidth) {
   doc.rect(0, 5.3, pageWidth, 0.6, 'F')
 }
 
+/**
+ * Dibuja una caja de dirección fiscal con auto-envoltura y altura dinámica (1 o 2 líneas).
+ * Evita desbordes de texto y solapamientos con las siguientes filas o tablas.
+ * @returns {number} Altura ocupada por la caja en mm
+ */
+function drawAddressBox(doc, x, y, width, label, addressText) {
+  const rawText = String(addressText || 'DIRECCIÓN FISCAL NO REGISTRADA')
+  // Normalizar saltos de línea a coma y espacio para mantener fluidez visual
+  const clean = rawText
+    .replace(/[\r\n]+/g, ', ')
+    .replace(/\s*,\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(6.5)
+  const maxTextWidth = width - 6
+  const lines = doc.splitTextToSize(clean, maxTextWidth)
+
+  // Manejar hasta 2 líneas de dirección
+  const displayLines = lines.slice(0, 2)
+  if (lines.length > 2) {
+    let last = displayLines[1]
+    if (last.length > 3) last = last.substring(0, last.length - 3) + '...'
+    displayLines[1] = last
+  }
+
+  const isMultiLine = displayLines.length > 1
+  const boxHeight = isMultiLine ? 10.5 : 7.5
+
+  // 1. Dibujar el recuadro contenedor
+  drawBox(doc, x, y, width, boxHeight)
+
+  // 2. Label superior pequeño
+  doc.setFontSize(6)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(...COLORS.darkGrey)
+  doc.text(label, x + 3, y + 2.8)
+
+  // 3. Texto de la dirección
+  doc.setFontSize(6.5)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...COLORS.black)
+
+  if (!isMultiLine) {
+    doc.text(displayLines[0], x + 3, y + 6)
+  } else {
+    doc.text(displayLines[0], x + 3, y + 5.8)
+    doc.text(displayLines[1], x + 3, y + 9.0)
+  }
+
+  return boxHeight
+}
+
 /** Resuelve la información del Agente y Sujeto según el flujo (COMPRA o VENTA) */
-function resolveParties(invoice, companyInfo) {
+async function resolveParties(invoice, companyInfo = {}, retData = null) {
   const tenantName = companyInfo?.name || companyInfo?.companyName || invoice.organization?.name || 'EMPRESA AGENTE'
   const tenantRif = companyInfo?.rif || invoice.organization?.rif || 'J-00000000-0'
   const tenantDir = companyInfo?.address || companyInfo?.direccion || invoice.organization?.address || 'DIRECCIÓN FISCAL NO REGISTRADA'
   const tenantPhone = companyInfo?.phone || invoice.organization?.phone || ''
+  const tenantLicencia = companyInfo?.licencia_actividad_economica || companyInfo?.licencia || invoice.client?.licencia_actividad_economica || ''
+  const rawTenantMun = companyInfo?.municipio || companyInfo?.municipio_id || invoice.client?.municipio_id || invoice.client?.municipio || ''
+  const tenantMunicipio = venezuelaLocationsService.getCleanMunicipalityName(rawTenantMun)
 
   let agente = {}
   let sujeto = {}
@@ -188,27 +246,92 @@ function resolveParties(invoice, companyInfo) {
       name: tenantName,
       rif: tenantRif,
       address: tenantDir,
-      phone: tenantPhone
+      phone: tenantPhone,
+      licencia: tenantLicencia,
+      municipio: tenantMunicipio
     }
+    const rawSujetoMun = invoice.issuer?.municipio_id || invoice.issuer?.municipio || retData?.municipio_id || ''
     sujeto = {
-      name: invoice.issuer?.razon_social || invoice.issuer?.nombre || invoice.issuer?.companyName || 'PROVEEDOR NO REGISTRADO',
-      rif: invoice.issuer?.rif || 'J-00000000-0',
+      name: invoice.issuer?.razon_social || invoice.issuer?.nombre || invoice.issuer?.companyName || retData?.proveedor_nombre || 'PROVEEDOR NO REGISTRADO',
+      rif: invoice.issuer?.rif || retData?.proveedor_rif || 'J-00000000-0',
       address: invoice.issuer?.direccion || invoice.issuer?.address || 'DIRECCIÓN FISCAL NO REGISTRADA',
-      phone: invoice.issuer?.telefono || invoice.issuer?.phone || ''
+      phone: invoice.issuer?.telefono || invoice.issuer?.phone || '',
+      licencia: invoice.issuer?.licencia_actividad_economica || invoice.issuer?.licencia || retData?.licencia_actividad || '',
+      municipio: venezuelaLocationsService.getCleanMunicipalityName(rawSujetoMun)
+    }
+
+    // Fallback: Si faltan datos clave del proveedor (dirección, licencia, etc.), consultar tabla 'proveedores'
+    const needsLookup = (!sujeto.address || sujeto.address === 'DIRECCIÓN FISCAL NO REGISTRADA' || !sujeto.licencia || sujeto.municipio === 'NO REGISTRADO')
+    if (needsLookup) {
+      try {
+        const provId = invoice.issuer?.id || invoice.issuer_id || invoice.provider_id
+        const provRif = sujeto.rif && sujeto.rif !== 'J-00000000-0' ? sujeto.rif : (invoice.issuer?.rif || retData?.proveedor_rif)
+        
+        let provData = null
+        if (provId) {
+          const { data } = await supabase.from('proveedores').select('*').eq('id', provId).maybeSingle()
+          provData = data
+        }
+        if (!provData && provRif) {
+          const { data } = await supabase.from('proveedores').select('*').eq('rif', provRif).maybeSingle()
+          provData = data
+        }
+
+        if (provData) {
+          if (!sujeto.name || sujeto.name === 'PROVEEDOR NO REGISTRADO') sujeto.name = provData.nombre || provData.razon_social || sujeto.name
+          if (!sujeto.rif || sujeto.rif === 'J-00000000-0') sujeto.rif = provData.rif || sujeto.rif
+          if (!sujeto.address || sujeto.address === 'DIRECCIÓN FISCAL NO REGISTRADA') sujeto.address = provData.direccion || provData.address || 'DIRECCIÓN FISCAL NO REGISTRADA'
+          if (!sujeto.phone) sujeto.phone = provData.telefono || provData.phone || ''
+          if (!sujeto.licencia) sujeto.licencia = provData.licencia_actividad_economica || provData.licencia || ''
+          if (sujeto.municipio === 'NO REGISTRADO' && (provData.municipio_id || provData.municipio)) {
+            sujeto.municipio = venezuelaLocationsService.getCleanMunicipalityName(provData.municipio_id || provData.municipio)
+          }
+        }
+      } catch (e) {
+        console.warn('Error fetching proveedor data fallback in resolveParties:', e)
+      }
     }
   } else {
     // VENTA: El Cliente es el Agente que retiene; el usuario/tenant es el Sujeto Retenido
+    const rawClienteMun = invoice.client?.municipio_id || invoice.client?.municipio || ''
     agente = {
       name: invoice.client?.razon_social || invoice.client?.nombre || invoice.client?.companyName || 'CLIENTE AGENTE',
       rif: invoice.client?.rif || 'J-00000000-0',
       address: invoice.client?.direccion || invoice.client?.address || 'DIRECCIÓN FISCAL NO REGISTRADA',
-      phone: invoice.client?.telefono || invoice.client?.phone || ''
+      phone: invoice.client?.telefono || invoice.client?.phone || '',
+      licencia: invoice.client?.licencia_actividad_economica || '',
+      municipio: venezuelaLocationsService.getCleanMunicipalityName(rawClienteMun)
     }
     sujeto = {
       name: tenantName,
       rif: tenantRif,
       address: tenantDir,
-      phone: tenantPhone
+      phone: tenantPhone,
+      licencia: tenantLicencia,
+      municipio: tenantMunicipio
+    }
+
+    // Fallback: Si faltan datos del cliente en VENTA, consultar tabla 'clients'
+    const needsClientLookup = (!agente.address || agente.address === 'DIRECCIÓN FISCAL NO REGISTRADA' || !agente.licencia)
+    if (needsClientLookup) {
+      try {
+        const cliId = invoice.client_id || invoice.client?.id
+        if (cliId) {
+          const { data: cliData } = await supabase.from('clients').select('*').eq('id', cliId).maybeSingle()
+          if (cliData) {
+            if (!agente.name || agente.name === 'CLIENTE AGENTE') agente.name = cliData.company_name || cliData.name || agente.name
+            if (!agente.rif || agente.rif === 'J-00000000-0') agente.rif = cliData.rif || agente.rif
+            if (!agente.address || agente.address === 'DIRECCIÓN FISCAL NO REGISTRADA') agente.address = cliData.address || 'DIRECCIÓN FISCAL NO REGISTRADA'
+            if (!agente.phone) agente.phone = cliData.phone || ''
+            if (!agente.licencia) agente.licencia = cliData.licencia_actividad_economica || ''
+            if (agente.municipio === 'NO REGISTRADO' && (cliData.municipio_id || cliData.municipio)) {
+              agente.municipio = venezuelaLocationsService.getCleanMunicipalityName(cliData.municipio_id || cliData.municipio)
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Error fetching client data fallback in resolveParties:', e)
+      }
     }
   }
 
@@ -242,6 +365,8 @@ async function fetchRetentionData(invoiceId, tipo) {
         factura_numero,
         factura_control,
         factura_fecha,
+        licencia_actividad,
+        municipio_id,
         concepto_islr_id,
         concepto_islr_nombre,
         concepto_islr:concepto_islr_id (
@@ -423,7 +548,7 @@ class RetentionPdfService {
     y += compBoxHeight + 3
 
     // 7. Cajas de Identificación de Agente y Sujeto
-    const { agente, sujeto } = resolveParties(invoice, companyInfo)
+    const { agente, sujeto } = await resolveParties(invoice, companyInfo, retData)
 
     const col1Width = contentWidth * 0.65
     const col2Width = contentWidth * 0.35
@@ -454,17 +579,8 @@ class RetentionPdfService {
     y += partyRowHeight
 
     // Fila 2: Dirección Fiscal del Agente
-    drawBox(doc, margin, y, contentWidth, partyRowHeight - 1.5)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('DIRECCION FISCAL DEL AGENTE DE RETENCION:', margin + 3, y + 2.8)
-    doc.setFontSize(6.5)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.black)
-    doc.text(String(agente.address || '').substring(0, 150), margin + 3, y + 6)
-
-    y += partyRowHeight - 1.5 + 2
+    const agenteDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL AGENTE DE RETENCION:', agente.address)
+    y += agenteDirHeight + 2
 
     // Fila 3: Sujeto Retenido (Proveedor / Beneficiario)
     drawBox(doc, margin, y, col1Width, partyRowHeight)
@@ -488,7 +604,11 @@ class RetentionPdfService {
     doc.setTextColor(...COLORS.primary)
     doc.text(String(sujeto.rif || '').toUpperCase(), margin + col1Width + 3, y + 7)
 
-    y += partyRowHeight + 3
+    y += partyRowHeight
+
+    // Fila 4: Dirección Fiscal del Sujeto Retenido
+    const sujetoDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL SUJETO A RETENCION:', sujeto.address)
+    y += sujetoDirHeight + 2
 
     // 8. Tabla de Operaciones de IVA (14 Columnas) — anchos optimizados
     const columns = [
@@ -810,7 +930,7 @@ class RetentionPdfService {
     y += compBoxHeight + 3.5
 
     // 6. Cajas de Identificación de Agente y Sujeto
-    const { agente, sujeto } = resolveParties(invoice, companyInfo)
+    const { agente, sujeto } = await resolveParties(invoice, companyInfo, retData)
     const col1Width = contentWidth * 0.65
     const col2Width = contentWidth * 0.35
     const partyRowHeight = 9
@@ -840,17 +960,8 @@ class RetentionPdfService {
     y += partyRowHeight
 
     // Agente - Dirección
-    drawBox(doc, margin, y, contentWidth, partyRowHeight - 1.5)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('DIRECCION FISCAL DEL AGENTE DE RETENCION:', margin + 3, y + 2.8)
-    doc.setFontSize(6.5)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.black)
-    doc.text(String(agente.address || '').substring(0, 150), margin + 3, y + 6)
-
-    y += partyRowHeight - 1.5 + 2
+    const agenteDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL AGENTE DE RETENCION:', agente.address)
+    y += agenteDirHeight + 2
 
     // Sujeto Retenido - Nombre
     drawBox(doc, margin, y, col1Width, partyRowHeight)
@@ -877,17 +988,8 @@ class RetentionPdfService {
     y += partyRowHeight
 
     // Sujeto Retenido - Dirección
-    drawBox(doc, margin, y, contentWidth, partyRowHeight - 1.5)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('DIRECCION FISCAL DEL PROVEEDOR / BENEFICIARIO:', margin + 3, y + 2.8)
-    doc.setFontSize(6.5)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.black)
-    doc.text(String(sujeto.address || '').substring(0, 150), margin + 3, y + 6)
-
-    y += partyRowHeight - 1.5 + 3.5
+    const sujetoDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL PROVEEDOR / BENEFICIARIO:', sujeto.address)
+    y += sujetoDirHeight + 3
 
     // 7. Tabla de Operaciones de ISLR (11 Columnas) — anchos rebalanceados y optimizados
     const islrColumns = [
@@ -1115,6 +1217,420 @@ class RetentionPdfService {
 
     // Descargar PDF
     const filename = `Comprobante_Retencion_ISLR_${invoice.invoiceNumber || 'Borrador'}.pdf`
+    doc.save(filename)
+    return { success: true, filename }
+  }
+  // ==========================================
+  // 3. COMPROBANTE DE RETENCION MUNICIPAL
+  // ==========================================
+  async generarComprobanteMunicipal(invoice, companyInfo = {}) {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    })
+
+    const pageWidth = doc.internal.pageSize.getWidth()   // 297 mm
+    const pageHeight = doc.internal.pageSize.getHeight() // 210 mm
+    const margin = 10
+    const contentWidth = pageWidth - (margin * 2)
+
+    // Consultar datos reales de la retención ISLR
+    const retData = await fetchRetentionData(invoice.id, 'MUNICIPAL')
+
+    // 1. Marca de agua
+    await drawWatermark(doc, pageWidth, pageHeight)
+
+    // 2. Franja superior institucional
+    drawCorporateHeaderBand(doc, pageWidth)
+
+    let y = 11
+
+    // 3. Logo corporativo
+    try {
+      const logoInfo = await getBase64ImageFromURL(systemLogo)
+      if (logoInfo && logoInfo.dataURL) {
+        const logoHeight = 6.5
+        const ratio = logoInfo.width / logoInfo.height
+        doc.addImage(logoInfo.dataURL, 'PNG', margin, y - 2, logoHeight * ratio, logoHeight)
+      }
+    } catch (e) {}
+
+    // 4. Título Principal
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(...COLORS.secondary)
+    doc.text('COMPROBANTE DE RETENCIÓN DEL IMPUESTO MUNICIPAL', pageWidth / 2, y, { align: 'center' })
+    y += 4.5
+
+    // Subtítulo legal
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6.5)
+    doc.setTextColor(...COLORS.darkGrey)
+    doc.text('(Excepto sueldos, salarios y demás remuneraciones similares a personas naturales residentes / Ordenanzas Municipales)', pageWidth / 2, y, { align: 'center' })
+    y += 5.5
+
+    // 5. Metadatos de Comprobante (Cajas superiores)
+    const numComprobante = retData?.numero_comprobante || invoice.municipal_retention_number || invoice.retention_number || (() => {
+      const { periodCode } = getYearMonth(invoice.issueDate)
+      const rawNum = invoice.invoiceNumber ? String(invoice.invoiceNumber).replace(/\D/g, '') : '1'
+      return `ISLR-${periodCode}-${rawNum.padStart(6, '0')}`
+    })()
+
+    const { year, month } = getYearMonth(invoice.issueDate)
+    const formattedDate = formatDate(invoice.issueDate)
+
+    const boxY = y
+    const compBoxWidth = 130
+    const compBoxHeight = 10
+    const rightBoxWidth = (contentWidth - compBoxWidth - 6) / 2
+
+    // Caja 1: Número de Comprobante
+    drawBox(doc, margin, boxY, compBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.black)
+    doc.text('NÚMERO DE COMPROBANTE:', margin + 3, boxY + 6.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(...COLORS.primary)
+    doc.text(numComprobante, margin + 45, boxY + 6.5)
+
+    // Caja 2: Fecha del Comprobante
+    const fechaX = margin + compBoxWidth + 3
+    drawBox(doc, fechaX, boxY, rightBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.black)
+    doc.text('FECHA COMPROBANTE', fechaX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
+    doc.setFontSize(8)
+    doc.setTextColor(...COLORS.secondary)
+    doc.text(formattedDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+
+    // Caja 3: Período Fiscal
+    const periodX = fechaX + rightBoxWidth + 3
+    drawBox(doc, periodX, boxY, rightBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.black)
+    doc.text('PERIODO FISCAL', periodX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.text(`AÑO: ${year}   MES: ${month}`, periodX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+
+    y += compBoxHeight + 3.5
+
+    // 6. Cajas de Identificación de Agente y Sujeto
+    const { agente, sujeto } = await resolveParties(invoice, companyInfo, retData)
+    const col1Width = contentWidth * 0.65
+    const col2Width = contentWidth * 0.35
+    const partyRowHeight = 8.5
+
+    // ── AGENTE DE RETENCIÓN ──
+    // Fila 1: Agente - Nombre y RIF
+    drawBox(doc, margin, y, col1Width, partyRowHeight)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.darkGrey)
+    doc.text('NOMBRE O RAZON SOCIAL DEL AGENTE DE RETENCION:', margin + 3, y + 3)
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.secondary)
+    doc.text(String(agente.name || '').toUpperCase().substring(0, 70), margin + 3, y + 7)
+
+    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.darkGrey)
+    doc.text('N° DE R.I.F.:', margin + col1Width + 3, y + 3)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.primary)
+    doc.text(String(agente.rif || '').toUpperCase(), margin + col1Width + 3, y + 7)
+
+    y += partyRowHeight
+
+    // Fila 2: Agente - Dirección Fiscal
+    const agenteDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL AGENTE DE RETENCION:', agente.address)
+    y += agenteDirHeight
+
+    // Fila 3: Agente - Licencia y Municipio
+    drawBox(doc, margin, y, col1Width, partyRowHeight - 1.5)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.darkGrey)
+    doc.text('LICENCIA DE ACTIVIDAD ECONÓMICA DEL AGENTE:', margin + 3, y + 2.8)
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.black)
+    doc.text(String(agente.licencia || 'NO REGISTRADA').toUpperCase(), margin + 3, y + 6)
+
+    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight - 1.5)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.darkGrey)
+    doc.text('MUNICIPIO DEL AGENTE:', margin + col1Width + 3, y + 2.8)
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.black)
+    doc.text(String(agente.municipio || 'NO REGISTRADO').toUpperCase(), margin + col1Width + 3, y + 6)
+
+    y += partyRowHeight - 1.5 + 2
+
+    // ── SUJETO RETENIDO ──
+    // Fila 4: Sujeto Retenido - Nombre y RIF
+    drawBox(doc, margin, y, col1Width, partyRowHeight)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.darkGrey)
+    doc.text('NOMBRE O RAZON SOCIAL DEL SUJETO RETENIDO / BENEFICIARIO:', margin + 3, y + 3)
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.secondary)
+    doc.text(String(sujeto.name || '').toUpperCase().substring(0, 70), margin + 3, y + 7)
+
+    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.darkGrey)
+    doc.text('N° DE R.I.F.:', margin + col1Width + 3, y + 3)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.primary)
+    doc.text(String(sujeto.rif || '').toUpperCase(), margin + col1Width + 3, y + 7)
+
+    y += partyRowHeight
+
+    // Fila 5: Sujeto Retenido - Dirección
+    const sujetoDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL SUJETO RETENIDO / BENEFICIARIO:', sujeto.address)
+    y += sujetoDirHeight
+
+    // Fila 6: Sujeto Retenido - Licencia y Municipio
+    drawBox(doc, margin, y, col1Width, partyRowHeight - 1.5)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.darkGrey)
+    doc.text('LICENCIA DE ACTIVIDAD ECONÓMICA DEL SUJETO:', margin + 3, y + 2.8)
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.black)
+    const sujetoLicencia = sujeto.licencia || retData?.licencia_actividad || 'NO REGISTRADA'
+    doc.text(String(sujetoLicencia).toUpperCase(), margin + 3, y + 6)
+
+    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight - 1.5)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.darkGrey)
+    doc.text('MUNICIPIO DEL SUJETO:', margin + col1Width + 3, y + 2.8)
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.black)
+    const sujetoMunicipio = sujeto.municipio && sujeto.municipio !== 'NO REGISTRADO'
+      ? sujeto.municipio
+      : venezuelaLocationsService.getCleanMunicipalityName(retData?.municipio_id || sujeto.municipio)
+    doc.text(String(sujetoMunicipio || 'NO REGISTRADO').toUpperCase(), margin + col1Width + 3, y + 6)
+    
+    y += partyRowHeight - 1.5 + 3
+
+    // 7. Tabla de Operaciones de Retención Municipal (10 Columnas) — suma exactamente contentWidth = 277mm
+    const munColumns = [
+      { id: 'op', label: 'Op.', width: 7, align: 'center' },
+      { id: 'date', label: 'Fecha de\nFactura', width: 20, align: 'center' },
+      { id: 'invoiceNum', label: 'Número de Factura', width: 40, align: 'center' },
+      { id: 'controlNum', label: 'Número Control Factura', width: 40, align: 'center' },
+      { id: 'nc', label: 'N° Nota\nCrédito', width: 16, align: 'center' },
+      { id: 'opType', label: 'Tipo\nTrans.', width: 14, align: 'center' },
+      { id: 'totalSales', label: 'Total Factura\n(con IVA)', width: 35, align: 'right' },
+      { id: 'base', label: 'Base Imponible\nAct. Económica', width: 38, align: 'right' },
+      { id: 'aliquot', label: '%\nAlic.', width: 17, align: 'center' },
+      { id: 'retAmount', label: 'Impuesto Municipal\nRetenido (Bs)', width: 50, align: 'right' }
+    ]
+
+    // Dibujar Headers de la tabla
+    const tableHeaderY = y
+    const tableHeaderHeight = 9
+    let curX2 = margin
+
+    doc.setFillColor(...COLORS.tableHeaderBg)
+    doc.rect(margin, tableHeaderY, contentWidth, tableHeaderHeight, 'F')
+    doc.setLineWidth(0.3)
+    doc.setDrawColor(...COLORS.tableBorder)
+    doc.rect(margin, tableHeaderY, contentWidth, tableHeaderHeight, 'S')
+
+    doc.setFontSize(5.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.black)
+
+    munColumns.forEach(col => {
+      doc.line(curX2, tableHeaderY, curX2, tableHeaderY + tableHeaderHeight)
+      const lines = col.label.split('\n')
+      const textY = lines.length > 1 ? tableHeaderY + 3.5 : tableHeaderY + 5.5
+      lines.forEach((line, lIdx) => {
+        const lineY = textY + (lIdx * 2.8)
+        if (col.align === 'center') {
+          doc.text(line, curX2 + (col.width / 2), lineY, { align: 'center' })
+        } else if (col.align === 'right') {
+          doc.text(line, curX2 + col.width - 1.5, lineY, { align: 'right' })
+        } else {
+          doc.text(line, curX2 + 1.5, lineY)
+        }
+      })
+      curX2 += col.width
+    })
+
+    y += tableHeaderHeight
+
+    // Datos Financieros de Retención Municipal
+    const finMun = invoice.financial || {}
+    const baseMun = retData ? parseFloat(retData.base_imponible || 0) : parseFloat(finMun.taxableSales || 0)
+    const retencionMun = retData ? parseFloat(retData.monto_retenido || 0) : parseFloat(invoice.retenciones?.municipal || finMun.municipalRetention || 0)
+    const alicuotaMun = retData ? parseFloat(retData.porcentaje_retencion || 0) : (baseMun > 0 && retencionMun > 0 ? Number(((retencionMun / baseMun) * 100).toFixed(2)) : 0)
+    const totalFacturaMun = parseFloat(finMun.totalSales || (baseMun + (finMun.taxDebit || 0)))
+
+    const factNum2 = retData?.factura_numero || invoice.invoiceNumber || '000001'
+    const factControl2 = retData?.factura_control || invoice.controlNumber || '00-000001'
+
+    const munRowData = [
+      '1',
+      formattedDate,
+      factNum2,
+      factControl2,
+      '',
+      '01-Reg',
+      formatNumber(totalFacturaMun),
+      formatNumber(baseMun),
+      `${alicuotaMun}%`,
+      formatNumber(retencionMun)
+    ]
+
+    // Dibujar Fila de Datos
+    const dataRowHeight = 7
+    doc.setLineWidth(0.2)
+    doc.setDrawColor(...COLORS.tableBorder)
+    doc.rect(margin, y, contentWidth, dataRowHeight, 'S')
+    drawTableRow(doc, munColumns, munRowData, margin, y, dataRowHeight, { fontSize: 6, highlightLastCol: true })
+
+    y += dataRowHeight
+
+    // Filas vacías adicionales para estética de formulario
+    for (let r = 0; r < 2; r++) {
+      let curXEmpty = margin
+      doc.rect(margin, y, contentWidth, 5, 'S')
+      munColumns.forEach(col => {
+        doc.line(curXEmpty, y, curXEmpty, y + 5)
+        curXEmpty += col.width
+      })
+      y += 5
+    }
+
+    // Fila de TOTALES
+    const totalRowHeight = 7
+    doc.setFillColor(...COLORS.totalBg)
+    doc.rect(margin, y, contentWidth, totalRowHeight, 'F')
+    doc.setLineWidth(0.3)
+    doc.setDrawColor(...COLORS.boxBorder)
+    doc.rect(margin, y, contentWidth, totalRowHeight, 'S')
+
+    const munLeftColsWidth = munColumns.slice(0, 6).reduce((acc, c) => acc + c.width, 0)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(...COLORS.black)
+    doc.text('TOTALES', margin + munLeftColsWidth - 4, y + 4.5, { align: 'right' })
+
+    let munTotalX = margin + munLeftColsWidth
+    const munTotalsValues = [
+      formatNumber(totalFacturaMun),
+      formatNumber(baseMun),
+      '',
+      formatNumber(retencionMun)
+    ]
+
+    munColumns.slice(6).forEach((col, idx) => {
+      doc.line(munTotalX, y, munTotalX, y + totalRowHeight)
+      const val = munTotalsValues[idx]
+      if (val) {
+        if (idx === 3) {
+          doc.setTextColor(...COLORS.highlightRed)
+        } else {
+          doc.setTextColor(...COLORS.black)
+        }
+        doc.setFontSize(6)
+        doc.text(val, munTotalX + col.width - 1.5, y + 4.5, { align: 'right' })
+      }
+      munTotalX += col.width
+    })
+
+    y += totalRowHeight + 6
+
+    // 8. Resumen Financiero
+    const munSummaryX = pageWidth - margin - 95
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.black)
+
+    const munSummaryLines = [
+      { label: 'Total Factura (con IVA):', val: formatNumber(totalFacturaMun) },
+      { label: 'Base Imponible Act. Económica:', val: formatNumber(baseMun) },
+      { label: 'Alícuota Aplicada (%):', val: `${alicuotaMun}%` },
+      { label: 'Impuesto Municipal Retenido:', val: formatNumber(retencionMun), isRed: true, isBold: true },
+      { label: 'Total Neto a Pagar:', val: formatNumber(totalFacturaMun - retencionMun), isBold: true }
+    ]
+
+    munSummaryLines.forEach((sLine, sIdx) => {
+      const lineY = y + (sIdx * 4.2)
+      doc.setFont('helvetica', sLine.isBold ? 'bold' : 'normal')
+      doc.setTextColor(...COLORS.black)
+      doc.text(sLine.label, munSummaryX, lineY)
+      if (sLine.isRed) doc.setTextColor(...COLORS.highlightRed)
+      doc.setFont('helvetica', 'bold')
+      doc.text(sLine.val, pageWidth - margin - 3, lineY, { align: 'right' })
+    })
+
+    // 9. Sello Digital y Firmas (aislado por cliente)
+    const signAreaY = pageHeight - 35
+    const signWidth = 75
+
+    const effectiveClientId = retData?.client_id || invoice?.clientId || invoice?.client_id || null
+    const sealConfig = await sealService.getSealConfig(effectiveClientId)
+    const activeSealUrl = sealConfig?.combinedUrl || sealConfig?.sealUrl || sealConfig?.signatureUrl
+
+    if (activeSealUrl) {
+      try {
+        const sealImg = await getBase64ImageFromURL(activeSealUrl)
+        if (sealImg && sealImg.dataURL) {
+          const sealHeight = 22
+          const sealRatio = sealImg.width / sealImg.height
+          const sealWidth = Math.min(35, sealHeight * sealRatio)
+          const sealX = margin + 15
+          doc.addImage(sealImg.dataURL, 'PNG', sealX, signAreaY - 18, sealWidth, sealHeight)
+        }
+      } catch (sealErr) {
+        console.warn('Could not embed seal image', sealErr)
+      }
+    }
+
+    // Línea de firma Agente
+    doc.setLineWidth(0.4)
+    doc.setDrawColor(...COLORS.black)
+    doc.line(margin + 5, signAreaY, margin + 5 + signWidth, signAreaY)
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLORS.black)
+    doc.text('Firma y Sello del Agente de Retención', margin + 5 + (signWidth / 2), signAreaY + 4, { align: 'center' })
+
+    // Línea de firma Sujeto Retenido
+    const rightSignX = pageWidth - margin - signWidth - 5
+    doc.line(rightSignX, signAreaY, rightSignX + signWidth, signAreaY)
+    doc.text('Firma y Sello del Sujeto Retenido / Beneficiario', rightSignX + (signWidth / 2), signAreaY + 4, { align: 'center' })
+
+    // 10. Footer Institucional
+    doc.setFontSize(5.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...COLORS.grey)
+    doc.text('AD System • Comprobante Fiscal de Retención del Impuesto sobre Actividades Económicas emitido según Ordenanza Municipal', pageWidth / 2, pageHeight - 5, { align: 'center' })
+
+    // Descargar PDF
+    const filename = `Comprobante_Retencion_MUNICIPAL_${invoice.invoiceNumber || 'Borrador'}.pdf`
     doc.save(filename)
     return { success: true, filename }
   }

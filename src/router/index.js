@@ -16,6 +16,7 @@ const ClienteVentas = () => import('../views/cliente/Ventas.vue')
 const ClienteArchivo = () => import('../views/cliente/Archivo.vue')
 const ClienteFacturacion = () => import('../views/cliente/Facturacion.vue')
 const Settings = () => import('../views/shared/Settings.vue')
+const MunicipalSettings = () => import('../views/shared/MunicipalSettings.vue')
 
 // Vistas para contador y admin
 const ContadorArea = () => import('../views/contador/ContadorArea.vue')
@@ -271,6 +272,12 @@ const routes = [
     meta: { requiresAuth: true, title: 'Configuración' }
   },
   {
+    path: '/municipal-settings',
+    name: 'MunicipalSettings',
+    component: MunicipalSettings,
+    meta: { requiresAuth: true, title: 'Retenciones Municipales' }
+  },
+  {
     path: '/pricing',
     name: 'Pricing',
     component: Pricing,
@@ -381,6 +388,35 @@ router.beforeEach(async (to, from, next) => {
             }
           }
 
+          // Verificar si el cliente tiene perfil fiscal incompleto y está intentando acceder a módulos operativos
+          if (userRole === 'cliente') {
+            const client = currentUser.client || {};
+            const hasActivity = Boolean(client.activity_type && String(client.activity_type).trim());
+            const hasLicencia = Boolean(client.licencia_actividad_economica && String(client.licencia_actividad_economica).trim());
+            const hasMunicipio = Boolean(client.municipio || client.municipio_id);
+            const hasEstado = Boolean(client.estado || hasMunicipio);
+
+            const isFiscalIncomplete = !hasActivity || !hasLicencia || !hasMunicipio || !hasEstado;
+
+            // Rutas operativas que requieren perfil fiscal obligatorio
+            const operationalRoutes = [
+              '/cliente/facturacion',
+              '/cliente/compras',
+              '/cliente/gastos',
+              '/cliente/proveedores',
+              '/cliente/inventario',
+              '/facturacion',
+              '/compras',
+              '/proveedores'
+            ];
+
+            if (isFiscalIncomplete && operationalRoutes.some(route => to.path.startsWith(route)) && to.path !== '/cliente/mi-area') {
+              console.log('🚫 Perfil fiscal incompleto, redirigiendo a /cliente/mi-area');
+              next({ path: '/cliente/mi-area', query: { required: 'fiscal' } });
+              return;
+            }
+          }
+
           // Redirigir clientes desde /dashboard a /cliente/dashboard
           if (to.path === '/dashboard' && userRole === 'cliente') {
             console.log('🔄 Redirigiendo cliente a su dashboard')
@@ -412,7 +448,11 @@ router.beforeEach(async (to, from, next) => {
           }
         } catch (error) {
           console.error('❌ Error al verificar roles:', error)
-          next('/dashboard')
+          if (to.path !== '/login') {
+            next('/login')
+          } else {
+            next()
+          }
           return
         }
 

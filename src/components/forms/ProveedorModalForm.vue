@@ -244,10 +244,11 @@
                     type="number"
                     min="0"
                     max="100"
+                    :rules="[rules.validMunicipalRate]"
                     variant="outlined"
                     density="comfortable"
                     suffix="%"
-                    hint="Según actividad económica"
+                    hint="Según actividad económica (0% a 100%)"
                     persistent-hint
                     prepend-inner-icon="mdi-city-variant-outline"
                     class="mb-3"
@@ -381,6 +382,12 @@ export default {
       saving: false,
       conceptosIslr: [],
       municipios: [],
+      rules: {
+        required: v => !!v || 'Campo requerido',
+        validRif: v => !v || /^[JjGgVvEePpCc][-]?\d{6,9}[-]?\d?$/.test(v) || 'Formato de RIF inválido (ej: J-12345678-9)',
+        validEmail: v => !v || /.+@.+\..+/.test(v) || 'Correo electrónico inválido',
+        validMunicipalRate: v => v === null || v === '' || (Number(v) >= 0 && Number(v) <= 100) || 'La alícuota debe estar entre 0% y 100%'
+      },
       formData: {
         id: null,
         nombre: '',
@@ -530,11 +537,17 @@ export default {
 
       this.saving = true
       try {
+        const payload = {
+          ...this.formData,
+          municipal_rate: Math.min(100, Math.max(0, parseFloat(this.formData.municipal_rate) || 0)),
+          iva_retention_rate: Math.min(100, Math.max(0, parseFloat(this.formData.iva_retention_rate) || 0))
+        }
+
         let res
         if (this.isEdit) {
-          res = await proveedorService.updateProveedor(this.formData.id, this.formData)
+          res = await proveedorService.updateProveedor(this.formData.id, payload)
         } else {
-          res = await proveedorService.createProveedor(this.formData)
+          res = await proveedorService.createProveedor(payload)
         }
 
         if (res.success) {

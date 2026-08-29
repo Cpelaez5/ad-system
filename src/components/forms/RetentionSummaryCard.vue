@@ -55,7 +55,8 @@
             </template>
             <v-list-item-title>Retención Municipal</v-list-item-title>
             <template v-slot:append>
-              <span class="text-caption">{{ proveedor?.municipal_rate || 0 }}%</span>
+              <span class="text-caption" v-if="conceptoMunicipalNombre">{{ conceptoMunicipalNombre }}</span>
+              <span class="text-caption" v-else>{{ proveedor?.municipal_rate || 0 }}%</span>
             </template>
           </v-list-item>
         </v-list>
@@ -85,6 +86,10 @@ export default {
       default: true
     },
     conceptoIslrNombre: {
+      type: String,
+      default: ''
+    },
+    conceptoMunicipalNombre: {
       type: String,
       default: ''
     }

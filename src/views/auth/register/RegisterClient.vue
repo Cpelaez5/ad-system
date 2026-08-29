@@ -69,14 +69,20 @@
 
 
 
-        <div class="form-group">
-          <label class="form-label">Tipo de Actividad Económica</label>
-          <select v-model="form.activity_type" class="form-input" required>
-            <option value="" disabled selected>Selecciona una actividad</option>
-            <option value="goods">Comercio / Venta de Productos</option>
-            <option value="manufacturing">Fabricación / Manufactura</option>
-            <option value="services">Prestación de Servicios</option>
-          </select>
+        <div class="form-row">
+          <div class="form-group half">
+            <label class="form-label">Tipo de Actividad Económica</label>
+            <select v-model="form.activity_type" class="form-input" required>
+              <option value="" disabled selected>Selecciona una actividad</option>
+              <option value="goods">Comercio / Venta de Productos</option>
+              <option value="manufacturing">Fabricación / Manufactura</option>
+              <option value="services">Prestación de Servicios</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label class="form-label">N° Licencia Actividad Económica</label>
+            <input v-model="form.licencia_actividad_economica" type="text" class="form-input" placeholder="Ej: 12345" />
+          </div>
         </div>
 
         <div class="form-group">
@@ -126,9 +132,8 @@ export default {
         rif: '',
         phone: '',
         activity_type: '',
-        address: '',
-
-      }
+        licencia_actividad_economica: '',
+        address: '',      }
     }
   },
   computed: {
@@ -162,9 +167,8 @@ export default {
           this.form.rif = data.rif || '';
           this.form.phone = data.phone || '';
           this.form.activity_type = data.activity_type || '';
-          this.form.address = data.address || '';
-
-        }
+          this.form.licencia_actividad_economica = data.licencia_actividad_economica || '';
+          this.form.address = data.address || '';        }
       } catch (e) { console.log('Info: No se cargaron datos previos.'); }
     },
     async handleSubmit() {
@@ -188,6 +192,7 @@ export default {
             rif: this.form.rif,
             phone: this.form.phone,
             activity_type: this.form.activity_type,
+            licencia_actividad_economica: this.form.licencia_actividad_economica,
             address: this.form.address,
 
             organization_id: this.invitation.organization_id
