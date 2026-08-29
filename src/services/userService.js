@@ -698,8 +698,51 @@ const userService = {
           message: 'Ocurrió un error inesperado.'
         };
       }
+    },
+
+    /**
+     * Elimina en cascada a un usuario y todos sus datos asociados (facturas, empresas, credenciales).
+     * EXCLUSIVO PARA SUPER ADMIN.
+     * @param {string} userId - UUID del usuario a eliminar
+     * @returns {Promise<{ success: boolean, message?: string, error?: string }>}
+     */
+    async deleteUserCascade(userId) {
+      try {
+        if (!userId) throw new Error('ID de usuario no proporcionado.');
+
+        const { data, error } = await supabase.rpc('delete_user_cascade', {
+          target_user_id: userId
+        });
+
+        if (error) {
+          console.error('❌ Error ejecutando delete_user_cascade:', error);
+          return {
+            success: false,
+            error: error.message || 'No se pudo eliminar el usuario'
+          };
+        }
+
+        if (data && data.success === false) {
+          return {
+            success: false,
+            error: data.error || 'Error al eliminar usuario'
+          };
+        }
+
+        return {
+          success: true,
+          message: data?.message || 'Usuario y todos sus registros asociados eliminados exitosamente'
+        };
+      } catch (e) {
+        console.error('❌ Error inesperado en deleteUserCascade:', e);
+        return {
+          success: false,
+          error: e.message || 'Error inesperado al procesar la eliminación'
+        };
+      }
     }
   };
 
 
   export default userService;
+

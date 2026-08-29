@@ -1820,9 +1820,11 @@ export default {
       // Debounce de 500ms
       this.comprobanteCheckTimers[tipo] = setTimeout(async () => {
         try {
+          const clientId = this.currentUser?.client?.id || this.currentUser?.client_id;
           const tipoDb = tipo === 'iva' ? 'IVA' : tipo === 'islr' ? 'ISLR' : 'MUNICIPAL';
           const { data, error } = await supabase.rpc('validar_comprobante_unico', {
             p_org_id: this.currentUser?.organization_id,
+            p_client_id: clientId || null,
             p_tipo: tipoDb,
             p_numero: numero.trim()
           });

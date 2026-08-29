@@ -128,11 +128,11 @@
                 </button>
                 <button 
                   class="btn-action btn-delete animate-micro-bounce"
-                  @click="deleteUser(user)"
-                  v-if="hasPermission('users.delete')"
-                  title="Eliminar usuario"
+                  @click="confirmDeleteUser(user)"
+                  v-if="isSuperAdmin && user.role !== 'super_admin'"
+                  title="Eliminar usuario y empresa en cascada (Exclusivo Super Admin)"
                 >
-                  <i class="mdi mdi-delete"></i>
+                  <i class="mdi mdi-delete-forever"></i>
                 </button>
               </td>
             </tr>
@@ -366,6 +366,73 @@
         </form>
       </div>
     </div>
+
+    <!-- Modal de Confirmación de Eliminación en Cascada (Exclusivo Super Admin) -->
+    <div v-if="showDeleteModal" class="modal-overlay animate-fade-in" @click="closeDeleteModal">
+      <div class="modal-content delete-modal-content animate-scale-in" @click.stop>
+        <div class="modal-header delete-modal-header">
+          <div class="delete-header-content">
+            <i class="mdi mdi-alert-octagon delete-main-icon"></i>
+            <div>
+              <h2>Eliminar Cuenta y Registros</h2>
+              <span class="delete-role-badge">Exclusivo Super Admin</span>
+            </div>
+          </div>
+          <button class="btn-close animate-micro-rotate" @click="closeDeleteModal" :disabled="deletingUser">
+            <i class="mdi mdi-close"></i>
+          </button>
+        </div>
+
+        <div class="modal-body delete-modal-body" v-if="userToDelete">
+          <div class="warning-callout">
+            <i class="mdi mdi-alert-outline"></i>
+            <div>
+              <strong>¡Acción Destructiva Irreversible!</strong>
+              <p>Esta operación eliminará por completo la cuenta y liberará los datos para un nuevo registro.</p>
+            </div>
+          </div>
+
+          <div class="delete-user-card">
+            <div class="delete-detail-row">
+              <span class="delete-detail-label">Usuario:</span>
+              <span class="delete-detail-value font-weight-bold">{{ userToDelete.username }}</span>
+            </div>
+            <div class="delete-detail-row">
+              <span class="delete-detail-label">Nombre:</span>
+              <span class="delete-detail-value">{{ userToDelete.firstName }} {{ userToDelete.lastName }}</span>
+            </div>
+            <div class="delete-detail-row">
+              <span class="delete-detail-label">Correo Electrónico:</span>
+              <span class="delete-detail-value text-primary font-weight-bold">{{ userToDelete.email }}</span>
+            </div>
+            <div class="delete-detail-row">
+              <span class="delete-detail-label">Rol:</span>
+              <span class="delete-detail-value">{{ getRoleName(userToDelete.role) }}</span>
+            </div>
+            <div class="delete-detail-row" v-if="userToDelete.organization || userToDelete.client">
+              <span class="delete-detail-label">Empresa / Negocio:</span>
+              <span class="delete-detail-value">{{ userToDelete.organization?.name || userToDelete.client?.company_name || 'N/A' }}</span>
+            </div>
+          </div>
+
+          <p class="delete-note">
+            Se eliminarán en cascada todas sus <strong>facturas</strong>, <strong>retenciones</strong>, <strong>documentos fiscales</strong>, <strong>inventarios</strong> y <strong>credenciales de autenticación</strong>. El correo y RIF quedarán liberados para registrarse nuevamente desde cero como si fuera la primera vez.
+          </p>
+        </div>
+
+        <div class="modal-actions delete-modal-actions">
+          <button type="button" class="btn-secondary" @click="closeDeleteModal" :disabled="deletingUser">
+            Cancelar
+          </button>
+          <button type="button" class="btn-danger" @click="executeDeleteUserCascade" :disabled="deletingUser">
+            <span v-if="!deletingUser">
+              <i class="mdi mdi-delete-forever"></i> Eliminar Definitivamente
+            </span>
+            <span v-else class="loading-spinner">Eliminando cuenta...</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -388,6 +455,10 @@ export default {
       showModal: false,
       showDetailsModal: false,
       showTrialModal: false,
+      showDeleteModal: false,
+      userToDelete: null,
+      deletingUser: false,
+      currentUser: null,
       trialForm: {
         userId: null,
         plan_id: 'free_trial',
@@ -407,7 +478,19 @@ export default {
       }
     }
   },
+  computed: {
+    isSuperAdmin() {
+      return this.currentUser?.role === 'super_admin'
+    }
+  },
   async mounted() {
+    try {
+      this.currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+      if (!this.currentUser || !this.currentUser.role) {
+        const fresh = await userService.getCurrentUser()
+        if (fresh) this.currentUser = fresh
+      }
+    } catch (e) {}
     await this.loadData()
   },
   methods: {
@@ -644,6 +727,46 @@ export default {
       // En un sistema real, esto vendría del usuario autenticado
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
       return userService.hasPermission(currentUser.role, permission)
+    },
+
+    confirmDeleteUser(user) {
+      if (!this.isSuperAdmin) {
+        alert('Solo el Super Administrador puede eliminar usuarios en cascada.')
+        return
+      }
+      if (user.role === 'super_admin') {
+        alert('No está permitido eliminar a un Super Administrador.')
+        return
+      }
+      this.userToDelete = user
+      this.showDeleteModal = true
+    },
+
+    closeDeleteModal() {
+      if (this.deletingUser) return
+      this.showDeleteModal = false
+      this.userToDelete = null
+    },
+
+    async executeDeleteUserCascade() {
+      if (!this.userToDelete) return
+      this.deletingUser = true
+
+      try {
+        const res = await userService.deleteUserCascade(this.userToDelete.id)
+        if (res.success) {
+          alert(res.message || 'Usuario y empresa eliminados exitosamente.')
+          this.closeDeleteModal()
+          await this.loadData()
+        } else {
+          alert('Error al eliminar: ' + (res.error || 'No se pudo completar la operación.'))
+        }
+      } catch (err) {
+        console.error('Error al eliminar usuario en cascada:', err)
+        alert('Error inesperado: ' + (err.message || 'Ocurrió un fallo.'))
+      } finally {
+        this.deletingUser = false
+      }
     }
   }
 }
@@ -1170,5 +1293,136 @@ export default {
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
+}
+
+/* Delete Modal Styles (Exclusivo Super Admin) */
+.delete-modal-content {
+  border: 1px solid #ffcdd2;
+  max-width: 580px;
+}
+
+.delete-modal-header {
+  background: #fff5f5;
+  border-bottom: 1px solid #ffebee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+}
+
+.delete-header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.delete-header-content h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #c62828;
+}
+
+.delete-main-icon {
+  font-size: 32px;
+  color: #d32f2f;
+}
+
+.delete-role-badge {
+  background: #d32f2f;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.delete-modal-body {
+  padding: 20px;
+}
+
+.warning-callout {
+  display: flex;
+  gap: 12px;
+  background: #fff3e0;
+  border-left: 4px solid #ff9800;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  color: #e65100;
+  align-items: flex-start;
+}
+
+.warning-callout i {
+  font-size: 22px;
+}
+
+.warning-callout p {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: #5d4037;
+}
+
+.delete-user-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 14px 16px;
+  border: 1px solid #e9ecef;
+  margin-bottom: 16px;
+}
+
+.delete-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed #dee2e6;
+  font-size: 14px;
+}
+
+.delete-detail-row:last-child {
+  border-bottom: none;
+}
+
+.delete-detail-label {
+  color: #6c757d;
+  font-weight: 600;
+}
+
+.delete-detail-value {
+  color: #212529;
+}
+
+.delete-note {
+  font-size: 13px;
+  color: #6c757d;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.btn-danger {
+  background: #d32f2f;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b71c1c;
+  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.3);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>
