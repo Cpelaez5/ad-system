@@ -258,9 +258,11 @@ describe('Retenciones — Lógica de correlativos', () => {
 
       ctx.comprobanteCheckTimers[tipo] = setTimeout(async () => {
         try {
+          const clientId = ctx.currentUser?.client?.id || ctx.currentUser?.client_id;
           const tipoDb = tipo === 'iva' ? 'IVA' : tipo === 'islr' ? 'ISLR' : 'MUNICIPAL';
           const { data, error } = await mockRpc('validar_comprobante_unico', {
             p_org_id: ctx.currentUser?.organization_id,
+            p_client_id: clientId || null,
             p_tipo: tipoDb,
             p_numero: numero.trim()
           });
@@ -274,7 +276,7 @@ describe('Retenciones — Lógica de correlativos', () => {
 
     function createCtx() {
       return {
-        currentUser: { organization_id: 'org-456' },
+        currentUser: { organization_id: 'org-456', client_id: 'client-123' },
         comprobanteDuplicado: { iva: false, islr: false, municipal: false },
         comprobanteCheckTimers: { iva: null, islr: null, municipal: null }
       };
@@ -293,6 +295,7 @@ describe('Retenciones — Lógica de correlativos', () => {
 
       expect(mockRpc).toHaveBeenCalledWith('validar_comprobante_unico', {
         p_org_id: 'org-456',
+        p_client_id: 'client-123',
         p_tipo: 'IVA',
         p_numero: '20260800000001'
       });

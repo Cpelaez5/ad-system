@@ -11,6 +11,8 @@
       :enable-time-picker="enableTimePicker"
       :time-picker="timePicker"
       :month-picker="monthPicker"
+      :min-date="computedMinDate"
+      :max-date="computedMaxDate"
       :auto-apply="autoApply"
       :close-on-auto-apply="closeOnAutoApply"
       :preview-format="previewFormat"
@@ -135,12 +137,48 @@ export default {
     rules: {
       type: Array,
       default: () => []
+    },
+    min: {
+      type: [Date, String],
+      default: null
+    },
+    max: {
+      type: [Date, String],
+      default: null
+    },
+    minDate: {
+      type: [Date, String],
+      default: null
+    },
+    maxDate: {
+      type: [Date, String],
+      default: null
     }
   },
   data() {
     return {
       selectedDate: this.modelValue,
       hasError: false
+    }
+  },
+  computed: {
+    computedMinDate() {
+      const val = this.minDate || this.min;
+      if (!val) return null;
+      if (typeof val === 'string' && val.includes('-')) {
+        const [y, m, d] = val.split('-').map(Number);
+        return new Date(y, m - 1, d, 0, 0, 0);
+      }
+      return val;
+    },
+    computedMaxDate() {
+      const val = this.maxDate || this.max;
+      if (!val) return null;
+      if (typeof val === 'string' && val.includes('-')) {
+        const [y, m, d] = val.split('-').map(Number);
+        return new Date(y, m - 1, d, 23, 59, 59);
+      }
+      return val;
     }
   },
   watch: {

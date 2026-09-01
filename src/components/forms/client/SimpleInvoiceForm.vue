@@ -747,6 +747,20 @@
       ══════════════════════════════════════════════════════════ -->
       <!-- Resumen de Retenciones (solo COMPRA) -->
       <div v-if="formData.flow === 'COMPRA'" class="mt-4 mx-3">
+        <!-- Fecha de Emisión del Comprobante de Retención -->
+        <v-row dense class="mb-1" v-if="retencionesResult && (retencionesResult.iva > 0 || retencionesResult.islr > 0 || retencionesResult.municipal > 0)">
+          <v-col cols="12" sm="6" md="4">
+            <CustomDatePicker
+              v-model="formData.financial.retentionDate"
+              label="Fecha de Emisión de Retención"
+              :min="formData.issueDate"
+              :max="todayDate"
+              hint="Fecha de emisión del comprobante (no puede ser futura ni anterior a la factura)"
+              persistent-hint
+            />
+          </v-col>
+        </v-row>
+
         <RetentionSummaryCard
           :proveedor="proveedor"
           :aplicarIva="retentionConfig.aplicarIva"
@@ -784,7 +798,7 @@
                         v-bind="props"
                         :color="editarComprobanteIva ? 'black' : 'grey'"
                         size="small"
-                        @mousedown.stop.prevent="editarComprobanteIva = !editarComprobanteIva"
+                        @mousedown.stop.prevent="editarComprobanteIva = !editarComprobanteIva; retentionCorrelativoManuallyEdited = true;"
                         style="cursor: pointer; pointer-events: auto;"
                       >
                         {{ editarComprobanteIva ? 'mdi-pencil' : 'mdi-pencil-off' }}
@@ -814,7 +828,7 @@
                         v-bind="props"
                         :color="editarComprobanteIslr ? 'black' : 'grey'"
                         size="small"
-                        @mousedown.stop.prevent="editarComprobanteIslr = !editarComprobanteIslr"
+                        @mousedown.stop.prevent="editarComprobanteIslr = !editarComprobanteIslr; retentionCorrelativoManuallyEdited = true;"
                         style="cursor: pointer; pointer-events: auto;"
                       >
                         {{ editarComprobanteIslr ? 'mdi-pencil' : 'mdi-pencil-off' }}
@@ -844,7 +858,7 @@
                         v-bind="props"
                         :color="editarComprobanteMunicipal ? 'black' : 'grey'"
                         size="small"
-                        @mousedown.stop.prevent="editarComprobanteMunicipal = !editarComprobanteMunicipal"
+                        @mousedown.stop.prevent="editarComprobanteMunicipal = !editarComprobanteMunicipal; retentionCorrelativoManuallyEdited = true;"
                         style="cursor: pointer; pointer-events: auto;"
                       >
                         {{ editarComprobanteMunicipal ? 'mdi-pencil' : 'mdi-pencil-off' }}
@@ -1104,6 +1118,7 @@ export default {
       editarComprobanteIva: false,
       editarComprobanteIslr: false,
       editarComprobanteMunicipal: false,
+      retentionCorrelativoManuallyEdited: false,
       comprobanteDuplicado: { iva: false, islr: false, municipal: false },
       comprobanteCheckTimers: { iva: null, islr: null, municipal: null },
 
@@ -1170,6 +1185,7 @@ export default {
           taxDebit: 0, ivaRetention: 0, islrRetention: 0,
           municipalRetention: 0, igtf: 0,
           ivaRetentionNumber: '', islrRetentionNumber: '', municipalRetentionNumber: '',
+          retentionDate: new Date().toISOString().split('T')[0],
           currency: 'VES', exchangeRate: 1, exchangeRateEur: null,
           paymentMethod: null, paymentReference: '',
           credit: null
@@ -1262,6 +1278,10 @@ export default {
       const rules = [v => !!v || 'El número es requerido'];
       if (this.isDuplicate) rules.push(() => 'Este número ya está registrado');
       return rules;
+    },
+
+    todayDate() {
+      return new Date().toISOString().split('T')[0];
     }
   },
 
@@ -1319,6 +1339,15 @@ export default {
     },
     'formData.issueDate'(date) {
       if (date) this.fetchExchangeRate(date);
+    },
+    'formData.financial.retentionDate'(newDate) {
+      if (newDate && this.retencionesResult && !this.retentionCorrelativoManuallyEdited) {
+        this.sugerirCorrelativosRetencion(
+          this.retencionesResult.iva,
+          this.retencionesResult.islr,
+          this.retencionesResult.municipal
+        );
+      }
     },
     'formData.documentType'(t) {
       this.formData.documentCategory = t === 'RECIBO' ? 'RECIBO' : 'FACTURA';
@@ -1380,10 +1409,15 @@ export default {
       immediate: true,
       handler(inv) {
         if (inv) {
+          const today = new Date().toISOString().split('T')[0];
           this.formData = {
             ...inv,
             expense_type: inv.expense_type || (inv.flow === 'COMPRA' ? 'COMPRA' : null),
             expense_category_id: inv.expense_category_id || null,
+            financial: {
+              ...(inv.financial || {}),
+              retentionDate: inv.financial?.retentionDate || today
+            },
             items: (inv.items || []).map(it => ({
               ...it,
               _key: ++_itemKey,
@@ -1761,11 +1795,11 @@ export default {
     async sugerirCorrelativosRetencion(iva, islr, municipal) {
       try {
         const clientId = this.currentUser?.client?.id || this.currentUser?.client_id;
-        const fecha = this.formData.issueDate || new Date().toISOString().split('T')[0];
+        const fecha = this.formData.financial.retentionDate || this.formData.issueDate || new Date().toISOString().split('T')[0];
         if (!clientId) return;
 
         // Solo sugerir si el campo no fue editado manualmente
-        if (iva > 0 && !this.editarComprobanteIva) {
+        if (iva > 0 && !this.editarComprobanteIva && !this.retentionCorrelativoManuallyEdited) {
           const { data } = await supabase.rpc('sugerir_correlativo_retencion', {
             p_org_id: this.currentUser?.organization_id,
             p_client_id: clientId,
@@ -1777,7 +1811,7 @@ export default {
           this.formData.financial.ivaRetentionNumber = '';
         }
 
-        if (islr > 0 && !this.editarComprobanteIslr) {
+        if (islr > 0 && !this.editarComprobanteIslr && !this.retentionCorrelativoManuallyEdited) {
           const { data } = await supabase.rpc('sugerir_correlativo_retencion', {
             p_org_id: this.currentUser?.organization_id,
             p_client_id: clientId,
@@ -1789,7 +1823,7 @@ export default {
           this.formData.financial.islrRetentionNumber = '';
         }
 
-        if (municipal > 0 && !this.editarComprobanteMunicipal) {
+        if (municipal > 0 && !this.editarComprobanteMunicipal && !this.retentionCorrelativoManuallyEdited) {
           const { data } = await supabase.rpc('sugerir_correlativo_retencion', {
             p_org_id: this.currentUser?.organization_id,
             p_client_id: clientId,
@@ -1807,6 +1841,7 @@ export default {
 
     // ── Validar duplicado de comprobante (debounced) ───────────────────────────
     checkComprobanteDuplicado(tipo, numero) {
+      this.retentionCorrelativoManuallyEdited = true;
       // Limpiar timer anterior
       if (this.comprobanteCheckTimers[tipo]) {
         clearTimeout(this.comprobanteCheckTimers[tipo]);

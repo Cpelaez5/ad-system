@@ -353,6 +353,7 @@ async function fetchRetentionData(invoiceId, tipo) {
       .select(`
         id,
         numero_comprobante,
+        fecha_comprobante,
         porcentaje_retencion,
         base_imponible,
         monto_retenido,
@@ -498,14 +499,16 @@ class RetentionPdfService {
     y += 5
 
     // 6. Cajas de Número de Comprobante, Fecha y Período Fiscal
+    const retentionDate = retData?.fecha_comprobante || invoice.retention_date || invoice.retentionDate || invoice.issueDate
     const numComprobante = retData?.numero_comprobante || invoice.iva_retention_number || invoice.retention_number || (() => {
-      const { periodCode } = getYearMonth(invoice.issueDate)
+      const { periodCode } = getYearMonth(retentionDate)
       const rawNum = invoice.invoiceNumber ? String(invoice.invoiceNumber).replace(/\D/g, '') : '1'
       return `${periodCode}${rawNum.padStart(8, '0')}`
     })()
 
-    const { year, month } = getYearMonth(invoice.issueDate)
-    const formattedDate = formatDate(invoice.issueDate)
+    const { year, month } = getYearMonth(retentionDate)
+    const formattedRetentionDate = formatDate(retentionDate)
+    const formattedFactDate = formatDate(retData?.factura_fecha || invoice.issueDate)
 
     const boxY = y
     const compBoxWidth = 130
@@ -532,7 +535,7 @@ class RetentionPdfService {
     doc.text('FECHA', fechaX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
     doc.setFontSize(8)
     doc.setTextColor(...COLORS.secondary)
-    doc.text(formattedDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+    doc.text(formattedRetentionDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
 
     // Caja 3: Período Fiscal
     const periodX = fechaX + rightBoxWidth + 3
@@ -677,7 +680,7 @@ class RetentionPdfService {
 
     const rowData = [
       '1',
-      formattedDate,
+      formattedFactDate,
       factNum,
       factControl,
       '',
@@ -880,14 +883,16 @@ class RetentionPdfService {
     y += 5.5
 
     // 5. Metadatos de Comprobante (Cajas superiores)
+    const retentionDate = retData?.fecha_comprobante || invoice.retention_date || invoice.retentionDate || invoice.issueDate
     const numComprobante = retData?.numero_comprobante || invoice.islr_retention_number || invoice.retention_number || (() => {
-      const { periodCode } = getYearMonth(invoice.issueDate)
+      const { periodCode } = getYearMonth(retentionDate)
       const rawNum = invoice.invoiceNumber ? String(invoice.invoiceNumber).replace(/\D/g, '') : '1'
       return `ISLR-${periodCode}-${rawNum.padStart(6, '0')}`
     })()
 
-    const { year, month } = getYearMonth(invoice.issueDate)
-    const formattedDate = formatDate(invoice.issueDate)
+    const { year, month } = getYearMonth(retentionDate)
+    const formattedRetentionDate = formatDate(retentionDate)
+    const formattedFactDate = formatDate(retData?.factura_fecha || invoice.issueDate)
 
     const boxY = y
     const compBoxWidth = 130
@@ -914,7 +919,7 @@ class RetentionPdfService {
     doc.text('FECHA COMPROBANTE', fechaX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
     doc.setFontSize(8)
     doc.setTextColor(...COLORS.secondary)
-    doc.text(formattedDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+    doc.text(formattedRetentionDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
 
     // Caja 3: Período Fiscal
     const periodX = fechaX + rightBoxWidth + 3
@@ -1066,7 +1071,7 @@ class RetentionPdfService {
 
     const islrRowData = [
       '1',
-      formattedDate,
+      formattedFactDate,
       factNum2,
       factControl2,
       '',
@@ -1271,14 +1276,16 @@ class RetentionPdfService {
     y += 5.5
 
     // 5. Metadatos de Comprobante (Cajas superiores)
+    const retentionDate = retData?.fecha_comprobante || invoice.retention_date || invoice.retentionDate || invoice.issueDate
     const numComprobante = retData?.numero_comprobante || invoice.municipal_retention_number || invoice.retention_number || (() => {
-      const { periodCode } = getYearMonth(invoice.issueDate)
+      const { periodCode } = getYearMonth(retentionDate)
       const rawNum = invoice.invoiceNumber ? String(invoice.invoiceNumber).replace(/\D/g, '') : '1'
-      return `ISLR-${periodCode}-${rawNum.padStart(6, '0')}`
+      return `MUN-${periodCode}-${rawNum.padStart(6, '0')}`
     })()
 
-    const { year, month } = getYearMonth(invoice.issueDate)
-    const formattedDate = formatDate(invoice.issueDate)
+    const { year, month } = getYearMonth(retentionDate)
+    const formattedRetentionDate = formatDate(retentionDate)
+    const formattedFactDate = formatDate(retData?.factura_fecha || invoice.issueDate)
 
     const boxY = y
     const compBoxWidth = 130
@@ -1305,7 +1312,7 @@ class RetentionPdfService {
     doc.text('FECHA COMPROBANTE', fechaX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
     doc.setFontSize(8)
     doc.setTextColor(...COLORS.secondary)
-    doc.text(formattedDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+    doc.text(formattedRetentionDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
 
     // Caja 3: Período Fiscal
     const periodX = fechaX + rightBoxWidth + 3
@@ -1492,7 +1499,7 @@ class RetentionPdfService {
 
     const munRowData = [
       '1',
-      formattedDate,
+      formattedFactDate,
       factNum2,
       factControl2,
       '',
