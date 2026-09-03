@@ -260,36 +260,33 @@ async function resolveParties(invoice, companyInfo = {}, retData = null) {
       municipio: venezuelaLocationsService.getCleanMunicipalityName(rawSujetoMun)
     }
 
-    // Fallback: Si faltan datos clave del proveedor (dirección, licencia, etc.), consultar tabla 'proveedores'
-    const needsLookup = (!sujeto.address || sujeto.address === 'DIRECCIÓN FISCAL NO REGISTRADA' || !sujeto.licencia || sujeto.municipio === 'NO REGISTRADO')
-    if (needsLookup) {
-      try {
-        const provId = invoice.issuer?.id || invoice.issuer_id || invoice.provider_id
-        const provRif = sujeto.rif && sujeto.rif !== 'J-00000000-0' ? sujeto.rif : (invoice.issuer?.rif || retData?.proveedor_rif)
-        
-        let provData = null
-        if (provId) {
-          const { data } = await supabase.from('proveedores').select('*').eq('id', provId).maybeSingle()
-          provData = data
-        }
-        if (!provData && provRif) {
-          const { data } = await supabase.from('proveedores').select('*').eq('rif', provRif).maybeSingle()
-          provData = data
-        }
-
-        if (provData) {
-          if (!sujeto.name || sujeto.name === 'PROVEEDOR NO REGISTRADO') sujeto.name = provData.nombre || provData.razon_social || sujeto.name
-          if (!sujeto.rif || sujeto.rif === 'J-00000000-0') sujeto.rif = provData.rif || sujeto.rif
-          if (!sujeto.address || sujeto.address === 'DIRECCIÓN FISCAL NO REGISTRADA') sujeto.address = provData.direccion || provData.address || 'DIRECCIÓN FISCAL NO REGISTRADA'
-          if (!sujeto.phone) sujeto.phone = provData.telefono || provData.phone || ''
-          if (!sujeto.licencia) sujeto.licencia = provData.licencia_actividad_economica || provData.licencia || ''
-          if (sujeto.municipio === 'NO REGISTRADO' && (provData.municipio_id || provData.municipio)) {
-            sujeto.municipio = venezuelaLocationsService.getCleanMunicipalityName(provData.municipio_id || provData.municipio)
-          }
-        }
-      } catch (e) {
-        console.warn('Error fetching proveedor data fallback in resolveParties:', e)
+    // Consultar tabla 'proveedores' para reflejar siempre los datos fiscales más recientes (dirección, licencia, municipio)
+    try {
+      const provId = invoice.issuer?.id || invoice.issuer_id || invoice.provider_id
+      const provRif = sujeto.rif && sujeto.rif !== 'J-00000000-0' ? sujeto.rif : (invoice.issuer?.rif || retData?.proveedor_rif)
+      
+      let provData = null
+      if (provId) {
+        const { data } = await supabase.from('proveedores').select('*').eq('id', provId).maybeSingle()
+        provData = data
       }
+      if (!provData && provRif) {
+        const { data } = await supabase.from('proveedores').select('*').eq('rif', provRif).maybeSingle()
+        provData = data
+      }
+
+      if (provData) {
+        if (!sujeto.name || sujeto.name === 'PROVEEDOR NO REGISTRADO') sujeto.name = provData.nombre || provData.razon_social || sujeto.name
+        if (!sujeto.rif || sujeto.rif === 'J-00000000-0') sujeto.rif = provData.rif || sujeto.rif
+        if (provData.direccion || provData.address) sujeto.address = provData.direccion || provData.address
+        if (provData.telefono || provData.phone) sujeto.phone = provData.telefono || provData.phone
+        if (provData.licencia_actividad_economica || provData.licencia) sujeto.licencia = provData.licencia_actividad_economica || provData.licencia
+        if (provData.municipio_id || provData.municipio) {
+          sujeto.municipio = venezuelaLocationsService.getCleanMunicipalityName(provData.municipio_id || provData.municipio)
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching proveedor data fallback in resolveParties:', e)
     }
   } else {
     // VENTA: El Cliente es el Agente que retiene; el usuario/tenant es el Sujeto Retenido
@@ -1229,6 +1226,41 @@ class RetentionPdfService {
   // 3. COMPROBANTE DE RETENCION MUNICIPAL
   // ==========================================
   async generarComprobanteMunicipal(invoice, companyInfo = {}) {
+    // 1. Municipio del tenant
+    const tenantMunicipio = companyInfo?.municipio || companyInfo?.municipio_id || invoice.client?.municipio_id || invoice.client?.municipio || ''
+
+    // 2. Municipio del emisor (consultando proveedor activo si existe para tener el dato actualizado)
+    let issuerMunicipio = invoice.issuer?.municipio_id || invoice.issuer?.municipio || ''
+    const provId = invoice.issuer?.id || invoice.issuer_id || invoice.provider_id
+    const provRif = invoice.issuer?.rif
+
+    if (provId || provRif) {
+      try {
+        let provQuery = supabase.from('proveedores').select('municipio_id, estado')
+        if (provId) {
+          provQuery = provQuery.eq('id', provId)
+        } else {
+          provQuery = provQuery.eq('rif', provRif)
+        }
+        const { data: provData } = await provQuery.maybeSingle()
+        if (provData?.municipio_id) {
+          issuerMunicipio = provData.municipio_id
+        }
+      } catch (e) {
+        console.warn('No se pudo consultar municipio actualizado del proveedor:', e)
+      }
+    }
+
+    // Validación defensiva: el comprobante municipal solo aplica si ambas partes están en el mismo municipio
+    if (!venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio)) {
+      const tenantNombre = venezuelaLocationsService.getCleanMunicipalityName(tenantMunicipio)
+      const issuerNombre = venezuelaLocationsService.getCleanMunicipalityName(issuerMunicipio)
+      throw {
+        code: 'MUNICIPAL_MISMATCH',
+        message: `No se puede generar comprobante municipal: la empresa está en ${tenantNombre} y el proveedor en ${issuerNombre}. La retención municipal solo aplica dentro del mismo municipio.`
+      }
+    }
+
     const doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
@@ -1240,7 +1272,7 @@ class RetentionPdfService {
     const margin = 10
     const contentWidth = pageWidth - (margin * 2)
 
-    // Consultar datos reales de la retención ISLR
+    // Consultar datos reales de la retención municipal
     const retData = await fetchRetentionData(invoice.id, 'MUNICIPAL')
 
     // 1. Marca de agua

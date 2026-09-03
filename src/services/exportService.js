@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import dayjs from 'dayjs';
 import retentionPdfService from '@/services/retention-pdf-service.js';
+import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
 
 class ExportService {
   constructor() {
@@ -614,6 +615,17 @@ class ExportService {
   }
 
   async exportarComprobanteMunicipal(invoice, companyInfo) {
+    // Validar coincidencia de municipio antes de delegar al servicio PDF
+    const tenantMunicipio = companyInfo?.municipio || companyInfo?.municipio_id || '';
+    const issuerMunicipio = invoice.issuer?.municipio_id || invoice.issuer?.municipio || '';
+    if (!venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio)) {
+      const tenantNombre = venezuelaLocationsService.getCleanMunicipalityName(tenantMunicipio);
+      const issuerNombre = venezuelaLocationsService.getCleanMunicipalityName(issuerMunicipio);
+      throw {
+        code: 'MUNICIPAL_MISMATCH',
+        message: `No se puede exportar comprobante municipal: la empresa está en ${tenantNombre} y el proveedor en ${issuerNombre}.`
+      };
+    }
     return await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo);
   }
 }

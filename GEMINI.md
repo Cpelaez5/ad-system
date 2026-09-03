@@ -33,6 +33,8 @@
 13. **Inmutabilidad de Correlativos Históricos:** Los correlativos fiscales emitidos (`numero_comprobante`) son inmutables y nunca deben modificarse. Toda corrección histórica en `retenciones` debe ser idempotente (`WHERE corregido_en IS NULL`), registrar el valor previo en `base_imponible_original`, registrar `corregido_en` y `corregido_motivo`, y preservar los números fiscales.
 14. **Desacople de Fecha de Comprobante vs Fecha de Factura:** En el objeto `financial` se maneja `retentionDate` (default fecha de hoy, `:max="today"`). En la tabla `retenciones` se almacena en `fecha_comprobante`. En modo edición, el fallback estricto para facturas históricas es `inv.financial?.retentionDate || today` (nunca `issueDate` para no distorsionar el período fiscal `YYYYMM` de la retención).
 15. **Normativa SENIAT en Comprobantes de Retención de IVA:** En la tabla de 14 columnas reglamentaria (Providencia SNAT/2015/0049), la columna `% Alíc.` corresponde a la **alícuota legal del IVA (16%)** que grava la Base Imponible, mientras que el porcentaje de retención del contribuyente especial (75% o 100%) determina el `monto_retenido`.
+16. **Validación Territorial de Retención Municipal:** El comprobante de retención municipal en PDF solo se puede emitir si la empresa compradora y el proveedor residen en el mismo municipio (`venezuelaLocationsService.areSameMunicipality`). Si difieren o alguno no tiene municipio registrado, la exportación se bloquea con aviso amigable (`MUNICIPAL_MISMATCH`).
+17. **Lookup Dinámico de Datos de Proveedor en Retenciones:** Dado que `invoices.issuer` guarda un snapshot JSONB histórico, la validación y generación de comprobantes de retención consulta en vivo la tabla `proveedores` por `id` o `rif` para obtener el municipio y datos fiscales más recientes del emisor.
 
 ## Contexto de negocio: Cashea (multi-moneda)
 - Cashea es un método de pago a crédito: 1 inicial + N cuotas.
@@ -52,8 +54,8 @@
 - [x] Migración de perfiles múltiples creada (`20260824_ai_provider_profiles.sql`)
 - [x] Migración de corrección de base imponible y desacople de fecha creada y aplicada (`20260831_fix_retention_base_imponible_and_date.sql`)
 - [x] Estructura del Patrón Adaptador (`providers/`) creada
-- [ ] Bucket `temp_ocr` configurado en Supabase Dashboard
-- [ ] Edge Function `gemini-ocr/index.ts` refactorizada con Factory
+- [x] Bucket `temp_ocr` configurado en Supabase Dashboard
+- [x] Edge Function `gemini-ocr/index.ts` refactorizada con Factory
 - [x] Servicio Vue `geminiOcrService.js` implementado
 - [x] Vista `AiSettings.vue` implementada
 - [x] Soporte de `retentionDate` y corrección de alícuota en PDF fiscal implementado

@@ -3,7 +3,7 @@
     
     
     <!-- Sistema de notificaciones -->
-    <NotificationSystem />
+    <NotificationSystem ref="notificationSystem" />
     
     <!-- Barra de navegación principal -->
     <AppNavigation 
@@ -77,6 +77,15 @@ export default {
     onSettingsChanged(event) {
       const settings = event.detail;
       this.$vuetify.theme.change(settings.forceDarkMode ? 'dark' : 'light');
+    },
+    showSnackbar(message, color = 'info') {
+      const notify = this.$refs.notificationSystem;
+      if (notify) {
+        if (color === 'success') notify.success('Éxito', message);
+        else if (color === 'error') notify.error('Error', message);
+        else if (color === 'warning') notify.warning('Atención', message);
+        else notify.info('Información', message);
+      }
     }
   },
   async mounted() {

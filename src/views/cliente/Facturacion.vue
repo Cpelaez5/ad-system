@@ -547,7 +547,7 @@
                 <v-list-item v-if="(item.retenciones && item.retenciones.iva > 0) || (item.financial && item.financial.ivaRetention > 0)" @click="downloadIVA(item)" prepend-icon="mdi-file-certificate">
                   <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
                 </v-list-item>
-                <v-list-item v-if="(item.retenciones && item.retenciones.municipal > 0) || (item.financial && item.financial.municipalRetention > 0)" @click="downloadMunicipal(item)" prepend-icon="mdi-file-document-outline">
+                <v-list-item v-if="canDownloadMunicipal(item)" @click="downloadMunicipal(item)" prepend-icon="mdi-file-document-outline">
                   <v-list-item-title>Descargar Comprobante Municipal (PDF)</v-list-item-title>
                 </v-list-item>
               </v-list>
@@ -852,7 +852,7 @@
               <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.iva > 0) || (viewingInvoice.financial && viewingInvoice.financial.ivaRetention > 0)" @click="downloadIVA(viewingInvoice)" prepend-icon="mdi-file-certificate">
                 <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
               </v-list-item>
-              <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.municipal > 0) || (viewingInvoice.financial && viewingInvoice.financial.municipalRetention > 0)" @click="downloadMunicipal(viewingInvoice)" prepend-icon="mdi-file-document-outline">
+              <v-list-item v-if="canDownloadMunicipal(viewingInvoice)" @click="downloadMunicipal(viewingInvoice)" prepend-icon="mdi-file-document-outline">
                 <v-list-item-title>Descargar Comprobante Municipal (PDF)</v-list-item-title>
               </v-list-item>
             </v-list>
@@ -1144,6 +1144,14 @@
       @saved="onCasheaSaved"
     />
 
+    <!-- ── Sistema de Notificaciones Snackbar ─────────────────── -->
+    <AppSnackbar
+      v-model="snackbar.show"
+      :type="snackbar.type"
+      :message="snackbar.message"
+      :timeout="snackbar.timeout"
+    />
+
     </template>
   </v-container>
 </template>
@@ -1166,10 +1174,15 @@ import userService from '@/services/userService.js';
 import { generateReceiptPdf } from '@/services/receipt-pdf-service.js';
 import retentionPdfService from '@/services/retention-pdf-service.js';
 import dayjs from 'dayjs';
+import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
+import AppSnackbar from '@/components/common/AppSnackbar.vue';
+import { supabase } from '@/lib/supabaseClient';
+import proveedorService from '@/services/proveedorService.js';
 
 export default {
   name: 'FacturacionCliente',
   components: {
+    AppSnackbar,
     ClientInvoiceForm,
     SimpleInvoiceForm,
     CasheaInstallmentsModal,
@@ -1180,6 +1193,13 @@ export default {
   },
   data() {
     return {
+      snackbar: {
+        show: false,
+        message: '',
+        type: 'info',
+        timeout: 5000
+      },
+      proveedoresMap: {},
       initialLoading: true,
       loading: true,
       invoices: [],
@@ -1463,10 +1483,32 @@ export default {
     } catch (e) { console.error('Error cargando tasa inicial:', e); }
 
     await this.loadUser();
+    await this.loadProveedores();
     await this.loadInvoices();
     this.initialLoading = false;
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ad-proveedor-changed', this.loadProveedores);
+    }
+  },
+  beforeUnmount() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('ad-proveedor-changed', this.loadProveedores);
+    }
   },
   methods: {
+    async loadProveedores() {
+      try {
+        const list = await proveedorService.getProveedores({ onlyActive: true });
+        const map = {};
+        (list || []).forEach(p => {
+          if (p.id) map[p.id] = p.municipio_id || p.municipio || '';
+          if (p.rif) map[p.rif] = p.municipio_id || p.municipio || '';
+        });
+        this.proveedoresMap = map;
+      } catch (e) {
+        console.warn('Error cargando mapa de proveedores en Facturacion:', e);
+      }
+    },
     async loadUser() {
       try {
         this.currentUser = await userService.getCurrentUser();
@@ -2347,14 +2389,26 @@ export default {
       };
     },
 
+    showNotification(message, type = 'info', timeout = 5000) {
+      this.snackbar = {
+        show: true,
+        message,
+        type,
+        timeout
+      };
+      if (this.$root?.showSnackbar) {
+        this.$root.showSnackbar(message, type);
+      }
+    },
+
     async downloadISLR(invoice) {
       try {
         const companyInfo = this._buildCompanyInfo();
         await retentionPdfService.generarComprobanteISLR(invoice, companyInfo);
-        this.$root?.showSnackbar?.('Comprobante ISLR exportado exitosamente', 'success');
+        this.showNotification('Comprobante ISLR exportado exitosamente', 'success');
       } catch (error) {
         console.error('Error exportando comprobante ISLR:', error);
-        this.$root?.showSnackbar?.('Error al exportar comprobante ISLR', 'error');
+        this.showNotification('Error al exportar comprobante ISLR', 'error');
       }
     },
 
@@ -2362,31 +2416,101 @@ export default {
       try {
         const companyInfo = this._buildCompanyInfo();
         await retentionPdfService.generarComprobanteIVA(invoice, companyInfo);
-        this.$root?.showSnackbar?.('Comprobante IVA exportado exitosamente', 'success');
+        this.showNotification('Comprobante IVA exportado exitosamente', 'success');
       } catch (error) {
         console.error('Error exportando comprobante IVA:', error);
-        this.$root?.showSnackbar?.('Error al exportar comprobante IVA', 'error');
+        this.showNotification('Error al exportar comprobante IVA', 'error');
       }
+    },
+
+    /**
+     * Determina si se debe mostrar la opción de descargar el comprobante municipal.
+     * Solo es visible si:
+     * 1. La factura tiene retención municipal registrada.
+     * 2. El proveedor y la empresa cliente residen en el MISMO municipio.
+     */
+    canDownloadMunicipal(invoice) {
+      if (!invoice) return false;
+
+      // 1. Debe existir retención municipal en la factura
+      const hasRetention = (invoice.retenciones && Number(invoice.retenciones.municipal) > 0) || 
+                           (invoice.financial && Number(invoice.financial.municipalRetention) > 0);
+      if (!hasRetention) return false;
+
+      // 2. Municipio de la empresa cliente
+      const companyInfo = this._buildCompanyInfo();
+      const tenantMunicipio = companyInfo.municipio;
+      if (!tenantMunicipio) return false;
+
+      // 3. Municipio del proveedor (con fallback al mapa reactivo en memoria por si fue actualizado)
+      const provId = invoice.issuer?.id || invoice.issuer_id || invoice.provider_id;
+      const provRif = invoice.issuer?.rif;
+      const issuerMunicipio = (provId && this.proveedoresMap?.[provId]) || 
+                              (provRif && this.proveedoresMap?.[provRif]) || 
+                              invoice.issuer?.municipio_id || 
+                              invoice.issuer?.municipio || '';
+      if (!issuerMunicipio) return false;
+
+      // 4. Solo mostrar si ambos están en el mismo municipio
+      return venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio);
     },
 
     async downloadMunicipal(invoice) {
       try {
         const companyInfo = this._buildCompanyInfo();
+
+        // 1. Municipio del tenant
+        const tenantMunicipio = companyInfo.municipio;
+
+        // 2. Municipio del emisor (consultando proveedor en BD si existe para tener el dato más reciente)
+        let issuerMunicipio = invoice.issuer?.municipio_id || invoice.issuer?.municipio || '';
+        const provId = invoice.issuer?.id || invoice.issuer_id || invoice.provider_id;
+        const provRif = invoice.issuer?.rif;
+
+        if (provId || provRif) {
+          try {
+            let provQuery = supabase.from('proveedores').select('municipio_id, estado');
+            if (provId) {
+              provQuery = provQuery.eq('id', provId);
+            } else {
+              provQuery = provQuery.eq('rif', provRif);
+            }
+            const { data: provData } = await provQuery.maybeSingle();
+            if (provData?.municipio_id) {
+              issuerMunicipio = provData.municipio_id;
+            }
+          } catch (e) {
+            console.warn('No se pudo verificar municipio actualizado en BD:', e);
+          }
+        }
+
+        // 3. Validar que proveedor y cliente estén en el mismo municipio
+        if (!venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio)) {
+          const tenantNombre = venezuelaLocationsService.getCleanMunicipalityName(tenantMunicipio);
+          const issuerNombre = venezuelaLocationsService.getCleanMunicipalityName(issuerMunicipio);
+          this.showNotification(
+            `No se puede generar comprobante municipal: tu empresa está en ${tenantNombre} y el proveedor en ${issuerNombre}. La retención municipal solo aplica dentro del mismo municipio.`,
+            'warning'
+          );
+          return;
+        }
+
         await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo);
-        this.$root?.showSnackbar?.('Comprobante Municipal exportado exitosamente', 'success');
+        this.showNotification('Comprobante Municipal exportado exitosamente', 'success');
       } catch (error) {
         console.error('Error exportando comprobante Municipal:', error);
-        this.$root?.showSnackbar?.('Error al exportar comprobante Municipal', 'error');
+        this.showNotification('Error al exportar comprobante Municipal', 'error');
       }
     },
 
     /** Descarga un recibo PDF individual de la factura */
     async downloadReceiptPdf(invoice) {
       try {
-        await generateReceiptPdf(invoice)
+        await generateReceiptPdf(invoice);
+        this.showNotification('Recibo PDF descargado exitosamente', 'success');
       } catch (error) {
-        console.error('Error generando recibo PDF:', error)
-        this.$root?.showSnackbar?.('Error al generar el recibo PDF', 'error')
+        console.error('Error generando recibo PDF:', error);
+        this.showNotification('Error al generar el recibo PDF', 'error');
       }
     }
   }

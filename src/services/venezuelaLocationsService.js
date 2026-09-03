@@ -106,7 +106,8 @@ class VenezuelaLocationsService {
   getCleanMunicipalityName(idOrName) {
     if (!idOrName) return 'NO REGISTRADO'
 
-    const key = String(idOrName).trim().toLowerCase()
+    const trimmed = String(idOrName).trim()
+    const key = trimmed.toLowerCase()
 
     // 1. Si es UUID o slug mapeado
     if (LEGACY_MUNICIPIOS_MAP[key]) {
@@ -119,17 +120,17 @@ class VenezuelaLocationsService {
     }
 
     // 3. Si ya es un nombre legible con estado, retornarlo
-    if (idOrName.includes('(') || idOrName.includes('-')) {
-      return String(idOrName).trim()
+    if (trimmed.includes('(') || trimmed.includes('-')) {
+      return trimmed
     }
 
     // 4. Buscar estado correspondiente para enriquecer el nombre
-    const state = this.getStateByMunicipality(idOrName)
+    const state = this.getStateByMunicipality(trimmed)
     if (state) {
-      return `${idOrName} (${state})`
+      return `${trimmed} (${state})`
     }
 
-    return String(idOrName).trim()
+    return trimmed
   }
 
   /**
@@ -140,7 +141,48 @@ class VenezuelaLocationsService {
    */
   isValidMunicipality(stateName, municipalityName) {
     const municipalities = this.getMunicipalities(stateName)
-    return municipalities.some(m => m.toLowerCase() === String(municipalityName).trim().toLowerCase())
+    return municipalities.includes(municipalityName)
+  }
+
+  /**
+   * Normaliza un identificador de municipio (UUID, slug o nombre) a su clave canónica
+   * para poder hacer comparaciones de igualdad.
+   * @param {string} idOrName - UUID, slug o nombre del municipio.
+   * @returns {string} Clave canónica normalizada en minúsculas, o '' si no se puede resolver.
+   */
+  _normalizeMunicipalityKey(idOrName) {
+    if (!idOrName) return ''
+    const trimmed = String(idOrName).trim()
+    const key = trimmed.toLowerCase()
+
+    // 1. Si es UUID o slug mapeado, usar el nombre formal
+    if (LEGACY_MUNICIPIOS_MAP[key]) {
+      return LEGACY_MUNICIPIOS_MAP[key].toLowerCase()
+    }
+
+    // 2. Si es un UUID no reconocido, no se puede comparar
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)) {
+      return ''
+    }
+
+    // 3. Obtener el nombre limpio con estado para normalización consistente
+    const cleanName = this.getCleanMunicipalityName(trimmed)
+    return cleanName ? cleanName.toLowerCase() : key
+  }
+
+  /**
+   * Compara dos identificadores de municipio y determina si representan el mismo municipio.
+   * Acepta UUIDs, slugs y nombres de municipio en cualquier combinación.
+   * @param {string} municipio1 - ID, UUID, slug o nombre del primer municipio.
+   * @param {string} municipio2 - ID, UUID, slug o nombre del segundo municipio.
+   * @returns {boolean} true si ambos representan el mismo municipio.
+   */
+  areSameMunicipality(municipio1, municipio2) {
+    if (!municipio1 || !municipio2) return false
+    const key1 = this._normalizeMunicipalityKey(municipio1)
+    const key2 = this._normalizeMunicipalityKey(municipio2)
+    if (!key1 || !key2) return false
+    return key1 === key2
   }
 }
 
