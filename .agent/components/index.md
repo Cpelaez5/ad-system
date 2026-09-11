@@ -87,6 +87,18 @@
 />
 ```
 
+### NumericInput.vue ✅
+**Uso**: Entrada numérica y financiera con soporte First-Mobile, conservación de ceros intermedios y soporte de coma/punto
+```vue
+<NumericInput
+  v-model="formData.financial.taxableSales"
+  label="Base Imponible"
+  prefix="Bs."
+  :max-decimals="2"
+/>
+```
+📄 [Documentación](./README_NumericInput.md)
+
 ---
 
 ## Componentes de Feedback

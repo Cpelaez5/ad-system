@@ -81,7 +81,24 @@
           </div>
           <div class="form-group half">
             <label class="form-label">N° Licencia Actividad Económica</label>
-            <input v-model="form.licencia_actividad_economica" type="text" class="form-input" placeholder="Ej: 12345" />
+            <input v-model="form.licencia_actividad_economica" type="text" class="form-input" placeholder="Ej: 12345" required />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label class="form-label">Estado</label>
+            <select v-model="form.estado" class="form-input" required @change="onEstadoChange">
+              <option value="" disabled selected>Selecciona un estado</option>
+              <option v-for="st in states" :key="st" :value="st">{{ st }}</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label class="form-label">Municipio</label>
+            <select v-model="form.municipio" class="form-input" required :disabled="!form.estado">
+              <option value="" disabled selected>{{ form.estado ? 'Selecciona un municipio' : 'Primero selecciona un estado' }}</option>
+              <option v-for="mun in municipalities" :key="mun" :value="mun">{{ mun }}</option>
+            </select>
           </div>
         </div>
 
@@ -112,6 +129,7 @@
 
 <script>
 import { analyticsService } from '@/services/analyticsService'
+import venezuelaLocationsService from '@/services/venezuelaLocationsService'
 
 export default {
   name: 'RegisterClient',
@@ -122,6 +140,8 @@ export default {
     return {
       step: 1,
       cargando: false,
+      states: venezuelaLocationsService.getStates(),
+      municipalities: [],
       form: {
         first_name: '',
         last_name: '',
@@ -133,7 +153,10 @@ export default {
         phone: '',
         activity_type: '',
         licencia_actividad_economica: '',
-        address: '',      }
+        estado: '',
+        municipio: '',
+        address: ''
+      }
     }
   },
   computed: {
@@ -147,6 +170,12 @@ export default {
     }
   },
   methods: {
+    onEstadoChange() {
+      this.municipalities = this.form.estado ? venezuelaLocationsService.getMunicipalities(this.form.estado) : [];
+      if (this.form.municipio && !venezuelaLocationsService.isValidMunicipality(this.form.estado, this.form.municipio)) {
+        this.form.municipio = '';
+      }
+    },
     validateStep1() {
       if (!this.form.first_name || !this.form.last_name || !this.form.email || !this.form.password) {
         alert('Por favor completa todos los campos');
@@ -168,12 +197,18 @@ export default {
           this.form.phone = data.phone || '';
           this.form.activity_type = data.activity_type || '';
           this.form.licencia_actividad_economica = data.licencia_actividad_economica || '';
-          this.form.address = data.address || '';        }
+          this.form.address = data.address || '';
+          this.form.municipio = data.municipio_id || data.municipio || '';
+          this.form.estado = data.estado || venezuelaLocationsService.getStateByMunicipality(this.form.municipio) || '';
+          if (this.form.estado) {
+            this.municipalities = venezuelaLocationsService.getMunicipalities(this.form.estado);
+          }
+        }
       } catch (e) { console.log('Info: No se cargaron datos previos.'); }
     },
     async handleSubmit() {
-      if (!this.form.company_name || !this.form.rif || !this.form.address || !this.form.activity_type) {
-        alert('Por favor completa los datos del negocio');
+      if (!this.form.company_name || !this.form.rif || !this.form.address || !this.form.activity_type || !this.form.licencia_actividad_economica || !this.form.estado || !this.form.municipio) {
+        alert('Por favor completa todos los datos del negocio, incluyendo actividad, licencia, estado y municipio');
         return;
       }
       
@@ -193,6 +228,8 @@ export default {
             phone: this.form.phone,
             activity_type: this.form.activity_type,
             licencia_actividad_economica: this.form.licencia_actividad_economica,
+            estado: this.form.estado,
+            municipio: this.form.municipio,
             address: this.form.address,
 
             organization_id: this.invitation.organization_id

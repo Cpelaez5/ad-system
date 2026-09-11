@@ -1867,8 +1867,9 @@ export default {
         if (formData.id) {
           savedResult = await invoiceService.updateInvoice(formData.id, formData);
         } else {
-          // Fase 2: Si es una compra y tiene retenciones, usar RPC seguro
-          if (formData.flow === 'COMPRA' && formData.expense_type === 'COMPRA') {
+          // Fase 2: Si es un egreso (compra o gasto) y tiene retenciones, usar RPC seguro
+          const hasRetentions = (formData.financial?.ivaRetention > 0) || (formData.financial?.islrRetention > 0) || (formData.financial?.municipalRetention > 0);
+          if (formData.flow === 'COMPRA' && (formData.expense_type === 'COMPRA' || formData.expense_type === 'GASTO' || hasRetentions)) {
             
             // Construir el payload que espera el RPC
             const rpcPayload = {

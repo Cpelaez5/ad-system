@@ -553,9 +553,17 @@ export default {
     await this.loadSealConfig();
 
     if (this.$route.query.required === 'fiscal') {
+      const missing = [];
+      if (!this.form.activity_type) missing.push('Tipo de Actividad');
+      if (!this.form.licencia_actividad_economica) missing.push('N° Licencia');
+      if (!this.form.estado) missing.push('Estado');
+      if (!this.form.municipio) missing.push('Municipio');
+
+      const fieldsText = missing.length > 0 ? missing.join(', ') : 'Tipo de Actividad, Licencia, Estado y Municipio';
+
       this.snackbar = {
         show: true,
-        text: '⚠️ Completa tus datos fiscales (Tipo de Actividad, Licencia, Estado y Municipio) para continuar.',
+        text: `⚠️ Completa tus datos fiscales pendientes (${fieldsText}) para continuar.`,
         color: 'warning'
       };
     }

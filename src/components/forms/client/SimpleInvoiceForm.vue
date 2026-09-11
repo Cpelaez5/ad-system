@@ -583,11 +583,9 @@
 
               <!-- Precio -->
               <v-col cols="6" sm="2">
-                <v-text-field
-                  v-model.number="item.unitPrice"
+                <NumericInput
+                  v-model="item.unitPrice"
                   label="Precio"
-                  type="number"
-                  step="0.01"
                   :prefix="currencySymbol"
                   variant="outlined"
                   density="compact"
@@ -645,10 +643,9 @@
 
         <v-row dense align="stretch">
           <v-col cols="12" sm="6" md="3">
-            <v-text-field
-              v-model.number="formData.financial.taxableSales"
+            <NumericInput
+              v-model="formData.financial.taxableSales"
               label="Subtotal (base)"
-              type="number"
               :prefix="currencySymbol"
               variant="outlined"
               density="compact"
@@ -657,13 +654,13 @@
               :bg-color="manualMode ? 'white' : 'grey-lighten-4'"
               :append-inner-icon="getAiIcon('taxableSales')"
               :color="getAiColor('taxableSales')"
+              @update:model-value="onTaxableSalesChange"
             />
           </v-col>
           <v-col cols="12" sm="6" md="3">
-            <v-text-field
-              v-model.number="formData.financial.taxDebit"
+            <NumericInput
+              v-model="formData.financial.taxDebit"
               label="IVA (16%)"
-              type="number"
               :prefix="currencySymbol"
               variant="outlined"
               density="compact"
@@ -672,13 +669,13 @@
               :bg-color="manualMode ? 'white' : 'grey-lighten-4'"
               :append-inner-icon="getAiIcon('taxDebit')"
               :color="getAiColor('taxDebit')"
+              @update:model-value="onTaxDebitChange"
             />
           </v-col>
           <v-col cols="12" sm="6" md="3">
-            <v-text-field
-              v-model.number="formData.financial.nonTaxableSales"
+            <NumericInput
+              v-model="formData.financial.nonTaxableSales"
               label="Monto exento"
-              type="number"
               :prefix="currencySymbol"
               variant="outlined"
               density="compact"
@@ -687,29 +684,49 @@
               :bg-color="manualMode ? 'white' : 'grey-lighten-4'"
               :append-inner-icon="getAiIcon('nonTaxableSales')"
               :color="getAiColor('nonTaxableSales')"
+              @update:model-value="onNonTaxableSalesChange"
             />
           </v-col>
           <v-col cols="12" sm="6" md="3" class="d-flex">
             <!-- Display personalizado para el TOTAL con Vuetify -->
             <v-sheet 
-              class="rounded-lg px-4 py-3 d-flex flex-column justify-center w-100" 
+              class="rounded-lg px-4 py-2 d-flex flex-column justify-center w-100 position-relative" 
               :class="{ 'elevation-2': !manualMode, 'elevation-0 border': manualMode }"
               color="blue-darken-4"
               min-height="64"
               :border="getAiColor('totalSales') ? getAiColor('totalSales') : (manualMode ? 'info' : false)"
             >
-              <span class="text-overline text-white opacity-70 mb-0 pb-0" style="line-height: 1.2;">
-                TOTAL
-                <v-icon v-if="getAiIcon('totalSales')" :color="getAiColor('totalSales')" size="12" class="ml-1" :title="getAiTooltip('totalSales')">{{ getAiIcon('totalSales') }}</v-icon>
-                <v-icon v-if="manualMode" size="10" class="ml-1 opacity-70">mdi-pencil</v-icon>
-              </span>
+              <div class="d-flex align-center justify-space-between mb-0 pb-0">
+                <span class="text-overline text-white opacity-70" style="line-height: 1.2;">
+                  TOTAL
+                  <v-icon v-if="getAiIcon('totalSales')" :color="getAiColor('totalSales')" size="12" class="ml-1" :title="getAiTooltip('totalSales')">{{ getAiIcon('totalSales') }}</v-icon>
+                  <v-icon v-if="manualMode" size="10" class="ml-1 opacity-70">mdi-pencil</v-icon>
+                </span>
+                <v-btn
+                  v-if="hasManualTotalDiscrepancy"
+                  size="x-small"
+                  variant="flat"
+                  color="warning"
+                  density="compact"
+                  class="font-weight-bold ml-1 px-1 text-none"
+                  style="font-size: 10px; height: 20px;"
+                  title="El total difiere de la suma de Base + IVA + Exento. Clic para volver a sumar automáticamente."
+                  @click="recalculateTotalFromParts"
+                >
+                  <v-icon start size="10">mdi-refresh</v-icon>
+                  Auto-sumar
+                </v-btn>
+              </div>
+
               <div class="d-flex align-baseline mb-1">
                 <span class="text-caption font-weight-bold text-white opacity-80 mr-1">{{ currencySymbol }}</span>
                 <input 
                   v-if="manualMode"
-                  type="number"
-                  step="0.01"
-                  v-model.number="formData.financial.totalSales"
+                  type="text"
+                  inputmode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  :value="formData.financial.totalSales"
+                  @input="onManualTotalInput($event.target.value)"
                   class="text-h6 font-weight-bold text-white flex-grow-1"
                   style="background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.3); outline: none;"
                 />
@@ -719,26 +736,92 @@
           </v-col>
         </v-row>
 
-        <!-- Tasa de cambio — USD y EUR -->
-        <div v-if="formData.financial.currency === 'USD'" class="mt-2 d-flex align-center ga-2">
-          <v-icon color="info" size="16">mdi-swap-horizontal</v-icon>
-          <span class="text-caption d-flex align-center">
-            Tasa oficial BCV: <strong>{{ formData.financial.exchangeRate }} Bs/USD</strong>
-            <v-icon v-if="getAiIcon('exchangeRate')" :color="getAiColor('exchangeRate')" size="12" class="ml-1" :title="getAiTooltip('exchangeRate')">{{ getAiIcon('exchangeRate') }}</v-icon>
-          </span>
-          <span class="text-caption text-grey ml-2">
-            Equivalente: ≈ <strong class="text-info">{{ formatNumber(formData.financial.totalSales * formData.financial.exchangeRate) }} Bs.</strong>
-          </span>
-        </div>
-        <div v-else-if="formData.financial.currency === 'EUR'" class="mt-2 d-flex align-center ga-2">
-          <v-icon color="warning" size="16">mdi-currency-eur</v-icon>
-          <span class="text-caption">
-            Tasa oficial BCV: <strong v-if="formData.financial.exchangeRateEur">{{ formData.financial.exchangeRateEur }} Bs/EUR</strong>
-            <span v-else class="text-grey">Cargando tasa...</span>
-          </span>
-          <span v-if="formData.financial.exchangeRateEur" class="text-caption text-grey ml-2">
-            Equivalente: ≈ <strong class="text-warning">{{ formatNumber(formData.financial.totalSales * formData.financial.exchangeRateEur) }} Bs.</strong>
-          </span>
+        <!-- Tasa de cambio — USD y EUR (Multi-Moneda First-Mobile) -->
+        <div v-if="formData.financial.currency === 'USD' || formData.financial.currency === 'EUR'" class="mt-3 pa-3 bg-grey-lighten-5 rounded-lg border">
+          <div class="d-flex flex-wrap align-center justify-space-between ga-2">
+            <!-- Tasa y Fuente -->
+            <div class="d-flex align-center flex-wrap ga-2">
+              <v-icon :color="formData.financial.currency === 'USD' ? 'info' : 'warning'" size="18">
+                {{ formData.financial.currency === 'USD' ? 'mdi-currency-usd' : 'mdi-currency-eur' }}
+              </v-icon>
+              
+              <span class="text-caption font-weight-medium">
+                Tasa de cambio:
+              </span>
+
+              <!-- Vista / Edición de Tasa -->
+              <div v-if="!isEditingExchangeRate" class="d-flex align-center ga-1">
+                <v-chip size="small" variant="flat" :color="formData.financial.currency === 'USD' ? 'blue-lighten-5' : 'amber-lighten-5'" class="font-weight-bold text-body-2">
+                  {{ formatExchangeRate(currentExchangeRateValue) }} Bs/{{ formData.financial.currency }}
+                </v-chip>
+                <v-btn
+                  icon="mdi-pencil"
+                  size="x-small"
+                  variant="text"
+                  color="primary"
+                  title="Editar tasa manualmente"
+                  @click="isEditingExchangeRate = true"
+                />
+              </div>
+              <div v-else class="d-flex align-center ga-1" style="width: 210px; max-width: 100%;">
+                <NumericInput
+                  v-model="activeExchangeRateModel"
+                  placeholder="0,0000"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  :max-decimals="4"
+                  class="flex-grow-1"
+                  @update:model-value="onManualExchangeRateChange"
+                />
+                <v-btn
+                  icon="mdi-check"
+                  size="small"
+                  color="success"
+                  variant="flat"
+                  title="Guardar tasa"
+                  @click="isEditingExchangeRate = false"
+                />
+              </div>
+
+              <!-- Indicador de fecha/origen de la tasa -->
+              <span class="text-caption text-grey font-italic">
+                ({{ rateSourceLabel }})
+              </span>
+            </div>
+
+            <!-- Accesos rápidos de Tasa (First Mobile) -->
+            <div class="d-flex align-center ga-1 flex-wrap">
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                color="secondary"
+                prepend-icon="mdi-calendar"
+                title="Aplicar tasa oficial BCV de la fecha de la factura"
+                @click="applyInvoiceDateRate"
+              >
+                Tasa Fecha Factura
+              </v-btn>
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                color="info"
+                prepend-icon="mdi-clock-outline"
+                title="Aplicar tasa oficial BCV del día actual de registro"
+                @click="applyTodayRate"
+              >
+                Tasa de Hoy
+              </v-btn>
+            </div>
+          </div>
+
+          <!-- Equivalente en Bolívares -->
+          <div class="mt-2 text-caption d-flex align-center">
+            <span class="text-grey mr-1">Equivalente en Bolívares:</span>
+            <strong class="text-primary text-body-2 font-weight-bold">
+              ≈ Bs. {{ formatNumber(equivalentInBs) }}
+            </strong>
+          </div>
         </div>
       </div>
 
@@ -880,10 +963,9 @@
         </div>
         <v-row dense>
           <v-col cols="12" sm="4">
-            <v-text-field
-              v-model.number="formData.financial.ivaRetention"
+            <NumericInput
+              v-model="formData.financial.ivaRetention"
               label="Retención IVA"
-              type="number"
               prefix="Bs."
               variant="outlined"
               density="comfortable"
@@ -901,10 +983,9 @@
             />
           </v-col>
           <v-col cols="12" sm="4">
-            <v-text-field
-              v-model.number="formData.financial.islrRetention"
+            <NumericInput
+              v-model="formData.financial.islrRetention"
               label="Retención ISLR"
-              type="number"
               prefix="Bs."
               variant="outlined"
               density="comfortable"
@@ -922,10 +1003,9 @@
             />
           </v-col>
           <v-col cols="12" sm="4">
-            <v-text-field
-              v-model.number="formData.financial.municipalRetention"
+            <NumericInput
+              v-model="formData.financial.municipalRetention"
               label="Retención Municipal"
-              type="number"
               prefix="Bs."
               variant="outlined"
               density="comfortable"
@@ -1054,8 +1134,31 @@ import ProveedorAutocomplete from '@/components/forms/ProveedorAutocomplete.vue'
 import ProveedorModalForm from '@/components/forms/ProveedorModalForm.vue';
 import RetentionSummaryCard from '@/components/forms/RetentionSummaryCard.vue';
 import RetentionAdjustSheet from '@/components/forms/RetentionAdjustSheet.vue';
+import NumericInput from '@/components/common/NumericInput.vue';
 import { supabase } from '@/lib/supabaseClient';
 import { municipalConceptsService } from '@/services/municipalConceptsService.js';
+
+export function normalizeDateToYMD(dateInput) {
+  if (!dateInput) return '';
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput.getTime())) return '';
+    const year = dateInput.getFullYear();
+    const month = String(dateInput.getMonth() + 1).padStart(2, '0');
+    const day = String(dateInput.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  const str = String(dateInput).trim();
+  if (str.includes('T')) return str.split('T')[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return str;
+}
 
 let _itemKey = 0;
 
@@ -1064,7 +1167,7 @@ export default {
   components: { 
     AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete, 
     ExpenseCategorySelector, ProveedorAutocomplete, ProveedorModalForm,
-    RetentionSummaryCard, RetentionAdjustSheet
+    RetentionSummaryCard, RetentionAdjustSheet, NumericInput
   },
 
   props: {
@@ -1082,9 +1185,18 @@ export default {
       myDataExpanded: false,
       notesExpanded:  false,
       manualMode:     false,
+      manualTotalOverride: false,
+      isEditingExchangeRate: false,
+      rateSourceLabel: 'BCV oficial',
       saving:         false,
       savingStep:     '',
       showFlowError:  false,
+      snackbar: {
+        show: false,
+        message: '',
+        type: 'info',
+        timeout: 4000
+      },
 
       // OCR
       extracting:  false,
@@ -1282,6 +1394,52 @@ export default {
 
     todayDate() {
       return new Date().toISOString().split('T')[0];
+    },
+
+    currentExchangeRateValue() {
+      if (this.formData.financial.currency === 'USD') {
+        return this.formData.financial.exchangeRate || 1;
+      }
+      if (this.formData.financial.currency === 'EUR') {
+        return this.formData.financial.exchangeRateEur || 1;
+      }
+      return 1;
+    },
+
+    activeExchangeRateModel: {
+      get() {
+        return this.currentExchangeRateValue;
+      },
+      set(val) {
+        const num = parseFloat(val) || 0;
+        if (this.formData.financial.currency === 'USD') {
+          this.formData.financial.exchangeRate = num;
+        } else if (this.formData.financial.currency === 'EUR') {
+          this.formData.financial.exchangeRateEur = num;
+        }
+      }
+    },
+
+    equivalentInBs() {
+      const total = parseFloat(this.formData.financial.totalSales) || 0;
+      const directRate = this.formData.financial.currency === 'USD'
+        ? this.formData.financial.exchangeRate
+        : this.formData.financial.currency === 'EUR'
+          ? this.formData.financial.exchangeRateEur
+          : 1;
+      const rate = parseFloat(this.currentExchangeRateValue ?? directRate) || directRate || 1;
+      return total * rate;
+    },
+
+    hasManualTotalDiscrepancy() {
+      if (!this.manualMode) return false;
+      const base = parseFloat(this.formData.financial.taxableSales) || 0;
+      const exento = parseFloat(this.formData.financial.nonTaxableSales) || 0;
+      const iva = parseFloat(this.formData.financial.taxDebit) || 0;
+      const igtf = parseFloat(this.formData.financial.igtf) || 0;
+      const calculated = parseFloat((base + exento + iva + igtf).toFixed(2));
+      const current = parseFloat(Number(this.formData.financial.totalSales || 0).toFixed(2));
+      return Math.abs(calculated - current) >= 0.01;
     }
   },
 
@@ -1381,28 +1539,30 @@ export default {
       }
     },
     'formData.financial.taxableSales'() {
-      if (!this.manualMode && !this.isMappingOcr) this.calculateFromBase();
+      if (!this.manualMode && !this.isMappingOcr) {
+        this.calculateFromBase();
+      } else if (this.manualMode && !this.isMappingOcr) {
+        this.calculateTotals();
+      }
     },
     'formData.financial.nonTaxableSales'() {
-      if (!this.manualMode && !this.isMappingOcr) this.calculateTotals();
+      if (!this.isMappingOcr) this.calculateTotals();
     },
     'formData.financial.taxDebit'() {
-      if (!this.manualMode && !this.isMappingOcr) this.calculateTotals();
+      if (!this.isMappingOcr) this.calculateTotals();
+    },
+    'formData.financial.currency'(cur) {
+      if (cur === 'USD' || cur === 'EUR') {
+        this.fetchExchangeRate(this.formData.issueDate);
+      }
     },
     manualMode(val) {
+      this.manualTotalOverride = false;
       if (!val) {
         // Al salir del modo manual, recalcular todo automáticamente
         this.calculateFromBase();
       } else {
-        // Congelar el total actual para que los watchers no lo sobreescriban
-        this._manualTotalSnapshot = this.formData.financial.totalSales;
-        this.showSnackbar('Modo manual: Ahora puedes editar los totales directamente.', 'info');
-        // Restaurar el total después de un tick (por si un watcher encadenado lo cambió)
-        this.$nextTick(() => {
-          if (this.manualMode && this._manualTotalSnapshot !== undefined) {
-            this.formData.financial.totalSales = this._manualTotalSnapshot;
-          }
-        });
+        this.showSnackbar('Modo manual activo: los totales se sumarán automáticamente a menos que edites el total directamente.', 'info');
       }
     },
     invoice: {
@@ -1465,6 +1625,29 @@ export default {
     formatNumber(n) {
       if (n == null || isNaN(n)) return '0,00';
       return Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+
+    formatExchangeRate(n) {
+      if (n == null || isNaN(n)) return '0,00';
+      return Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    },
+
+    normalizeDateToYMD(dateInput) {
+      return normalizeDateToYMD(dateInput);
+    },
+
+    formatDateReadable(dateInput) {
+      if (!dateInput) return '';
+      const ymd = this.normalizeDateToYMD ? this.normalizeDateToYMD(dateInput) : normalizeDateToYMD(dateInput);
+      const parts = ymd.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      return String(dateInput);
+    },
+
+    showSnackbar(message, type = 'info', timeout = 4000) {
+      this.snackbar = { show: true, message, type, timeout };
     },
 
     // ── Cashea y Cuotas ────────────────────────────────────────────────────────
@@ -1618,26 +1801,57 @@ export default {
     },
 
     // ── Tasa de cambio ────────────────────────────────────────────────────────
-    async fetchExchangeRate(date) {
+    async fetchExchangeRate(rawDate, isManualToday = false, isUserClick = false) {
+      if (!rawDate) return;
+      const date = this.normalizeDateToYMD ? this.normalizeDateToYMD(rawDate) : normalizeDateToYMD(rawDate);
       if (!date) return;
       try {
         const today = new Date().toISOString().split('T')[0];
         let r;
         
-        // Si la factura es de hoy, usamos la tasa EN VIVO, de lo contrario la histórica
-        if (date === today) {
+        // Si se fuerza hoy o la fecha de la factura es de hoy, usamos la tasa EN VIVO
+        if (isManualToday || date === today) {
           r = await bcvService.getCurrentRate();
+          this.rateSourceLabel = 'BCV oficial hoy';
+          if (isUserClick) {
+            this.showSnackbar('Tasa oficial BCV del día de hoy aplicada', 'success');
+          }
         } else {
           r = await bcvService.getRateForDate(date);
           
-          // Fallback robusto si la API para fecha específica falla
-          if (!r.success) {
-            console.warn(`⚠️ No se encontró la tasa para la fecha ${date}. Aplicando tasa actual.`);
-            r = await bcvService.getCurrentRate();
+          if (r && r.success && r.data) {
+            this.isEditingExchangeRate = false;
+            if (r.data.approximate) {
+              const fechaCercana = this.formatDateReadable(r.data.closestDate);
+              const fechaSolicitada = this.formatDateReadable(date);
+              this.rateSourceLabel = `BCV al ${fechaCercana}`;
+              this.showSnackbar(
+                `No hubo actualización del BCV el ${fechaSolicitada} (fin de semana o feriado). Se aplicó la tasa vigente de esa semana (${fechaCercana}).`,
+                'info',
+                6000
+              );
+            } else {
+              const fechaFormateada = this.formatDateReadable(date);
+              this.rateSourceLabel = `BCV al ${fechaFormateada}`;
+              if (isUserClick) {
+                this.showSnackbar(`Tasa oficial del BCV aplicada para el ${fechaFormateada}`, 'success');
+              }
+            }
+          } else {
+            // No se encontró tasa para esa fecha ni en la semana en la BD
+            const fechaFormateada = this.formatDateReadable(date);
+            this.showSnackbar(
+              `No se encontró tasa oficial registrada para el ${fechaFormateada} ni en su semana. Puedes ingresar la tasa manualmente con el lápiz ✏️.`,
+              'warning',
+              6000
+            );
+            this.rateSourceLabel = 'Sin registro oficial para esta fecha';
+            this.isEditingExchangeRate = true;
+            return;
           }
         }
 
-        if (r.success && r.data) {
+        if (r && r.success && r.data) {
           // Guardar tasa USD (siempre disponible)
           if (r.data.dollar) {
             this.formData.financial.exchangeRate = r.data.dollar;
@@ -1649,7 +1863,28 @@ export default {
         }
       } catch (e) {
         console.warn('⚠️ No se pudo obtener tasa BCV:', e);
+        this.rateSourceLabel = 'Tasa no disponible';
       }
+    },
+
+    async applyInvoiceDateRate() {
+      await this.fetchExchangeRate(this.formData.issueDate, false, true);
+    },
+
+    async applyTodayRate() {
+      const today = new Date().toISOString().split('T')[0];
+      await this.fetchExchangeRate(today, true, true);
+      this.isEditingExchangeRate = false;
+    },
+
+    onManualExchangeRateChange(val) {
+      const num = parseFloat(val) || 0;
+      if (this.formData.financial.currency === 'USD') {
+        this.formData.financial.exchangeRate = num;
+      } else if (this.formData.financial.currency === 'EUR') {
+        this.formData.financial.exchangeRateEur = num;
+      }
+      this.rateSourceLabel = 'Tasa manual personalizada';
     },
 
     // ── Verificar duplicado ────────────────────────────────────────────────────
@@ -1715,14 +1950,43 @@ export default {
     },
 
     calculateTotals() {
-      if (this.manualMode) return;
       const base   = parseFloat(this.formData.financial.taxableSales) || 0;
       const exento = parseFloat(this.formData.financial.nonTaxableSales) || 0;
       const iva    = parseFloat(this.formData.financial.taxDebit) || 0;
       const igtf   = parseFloat(this.formData.financial.igtf) || 0;
-      this.formData.financial.totalSales = parseFloat((base + exento + iva + igtf).toFixed(2));
+      
+      if (!this.manualTotalOverride) {
+        this.formData.financial.totalSales = parseFloat((base + exento + iva + igtf).toFixed(2));
+      }
       
       this.calcularRetenciones();
+    },
+
+    recalculateTotalFromParts() {
+      this.manualTotalOverride = false;
+      this.calculateTotals();
+    },
+
+    onManualTotalInput(val) {
+      this.manualTotalOverride = true;
+      const parsed = parseFloat(val);
+      this.formData.financial.totalSales = isNaN(parsed) ? 0 : parsed;
+      this.calcularRetenciones();
+    },
+
+    onTaxableSalesChange(val) {
+      this.formData.financial.taxableSales = val;
+      this.calculateTotals();
+    },
+
+    onTaxDebitChange(val) {
+      this.formData.financial.taxDebit = val;
+      this.calculateTotals();
+    },
+
+    onNonTaxableSalesChange(val) {
+      this.formData.financial.nonTaxableSales = val;
+      this.calculateTotals();
     },
     
     // ── Retenciones ───────────────────────────────────────────────────────────

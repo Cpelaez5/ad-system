@@ -193,22 +193,48 @@ class BCVService {
   // ═══════════════════════════════════════════
 
   /**
-   * Obtiene tasa para una fecha específica (YYYY-MM-DD).
-   * Estrategia: DB → Edge Function (solo tasa actual) → fallback
+   * Normaliza cualquier entrada de fecha (Date object, ISO string, etc.) a formato YYYY-MM-DD
    */
-  async getRateForDate(date) {
+  normalizeDate(dateInput) {
+    if (!dateInput) return null;
+    if (dateInput instanceof Date) {
+      if (isNaN(dateInput.getTime())) return null;
+      const year = dateInput.getFullYear();
+      const month = String(dateInput.getMonth() + 1).padStart(2, '0');
+      const day = String(dateInput.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    const str = String(dateInput).trim();
+    if (str.includes('T')) return str.split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+      const year = parsed.getFullYear();
+      const month = String(parsed.getMonth() + 1).padStart(2, '0');
+      const day = String(parsed.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    return str;
+  }
+
+  /**
+   * Obtiene tasa para una fecha específica (YYYY-MM-DD o Date).
+   * Estrategia: DB → Edge Function (solo tasa actual) → fallback semana
+   */
+  async getRateForDate(rawDate) {
+    const date = this.normalizeDate(rawDate);
     if (!date) return { success: false, error: 'Fecha inválida' };
     console.log(`🌐 BCV: Buscando tasa para ${date}...`);
 
     try {
-      // 1. Buscar en Base de Datos
+      // 1. Buscar en Base de Datos por fecha exacta
       const dbRate = await this.getRateFromDB(date);
       if (dbRate) {
         console.log('🗄️ BCV: Tasa encontrada en DB:', dbRate);
         return { success: true, data: dbRate };
       }
 
-      // 2. Si es la fecha de hoy, usar la Edge Function
+      // 2. Si es la fecha de hoy, usar la consulta actual
       const today = new Date().toISOString().split('T')[0];
       if (date === today) {
         const currentRate = await this.getCurrentRate();
@@ -217,11 +243,11 @@ class BCVService {
         }
       }
 
-      // 3. Si no se encontró, intentar obtener la más cercana de DB
+      // 3. Si no se encontró exacta (ej: fin de semana o feriado), buscar la más cercana de esa semana en DB
       const closestRate = await this.getClosestRateFromDB(date);
       if (closestRate) {
-        console.log(`📊 BCV: Usando tasa más cercana (${closestRate.date}) como aproximación`);
-        return { success: true, data: { ...closestRate, approximate: true } };
+        console.log(`📊 BCV: Usando tasa de esa semana (${closestRate.closestDate}) para fecha ${date}`);
+        return { success: true, data: closestRate };
       }
 
     } catch (error) {
@@ -235,22 +261,25 @@ class BCVService {
   // MÉTODOS DE BASE DE DATOS
   // ═══════════════════════════════════════════
 
-  /** Obtiene tasa de una fecha exacta desde la DB */
+  /** Obtiene tasas de una fecha exacta desde la DB (USD, EUR, etc.) */
   async getRateFromDB(date) {
     const { data, error } = await supabase
       .from('exchange_rates')
       .select('*')
-      .eq('date', date)
-      .eq('currency', 'USD')
-      .single();
+      .eq('date', date);
 
-    if (error || !data) return null;
+    if (error || !data || data.length === 0) return null;
 
-    return {
-      dollar: parseFloat(data.rate),
-      date: data.date,
-      source: 'DB'
-    };
+    const res = { date, source: 'DB' };
+    data.forEach(row => {
+      const val = parseFloat(row.rate);
+      if (row.currency === 'USD') res.dollar = val;
+      if (row.currency === 'EUR') res.euro = val;
+      if (row.currency === 'CNY') res.yuan = val;
+      if (row.currency === 'TRY') res.lira = val;
+      if (row.currency === 'RUB') res.rublo = val;
+    });
+    return res;
   }
 
   /** Obtiene la última tasa guardada en DB (sin importar fecha) */
@@ -300,24 +329,36 @@ class BCVService {
     };
   }
 
-  /** Busca la tasa más cercana a una fecha dada */
+  /** Busca la tasa más cercana a una fecha dada (ej: fin de semana o feriado en la misma semana) */
   async getClosestRateFromDB(date) {
-    // Intentar la más reciente anterior
-    const { data, error } = await supabase
+    const { data: latestDateRow, error } = await supabase
       .from('exchange_rates')
-      .select('*')
+      .select('date')
       .lte('date', date)
-      .eq('currency', 'USD')
       .order('date', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error || !data) return null;
+    if (error || !latestDateRow) return null;
+
+    const requestedTime = new Date(date).getTime();
+    const foundTime = new Date(latestDateRow.date).getTime();
+    const diffDays = Math.round((requestedTime - foundTime) / (1000 * 60 * 60 * 24));
+
+    // Si la fecha encontrada es de hace más de 7 días, no corresponde a esa semana
+    if (diffDays > 7) {
+      return null;
+    }
+
+    const fullRate = await this.getRateFromDB(latestDateRow.date);
+    if (!fullRate) return null;
 
     return {
-      dollar: parseFloat(data.rate),
-      date: data.date,
-      source: 'DB-Closest'
+      ...fullRate,
+      requestedDate: date,
+      closestDate: latestDateRow.date,
+      approximate: latestDateRow.date !== date,
+      diffDays
     };
   }
 

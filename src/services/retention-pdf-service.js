@@ -497,7 +497,12 @@ class RetentionPdfService {
 
     // 6. Cajas de Número de Comprobante, Fecha y Período Fiscal
     const retentionDate = retData?.fecha_comprobante || invoice.retention_date || invoice.retentionDate || invoice.issueDate
-    const numComprobante = retData?.numero_comprobante || invoice.iva_retention_number || invoice.retention_number || (() => {
+    const numComprobante = retData?.numero_comprobante 
+      || invoice.financial?.ivaRetentionNumber 
+      || invoice.financial?.iva_retention_number 
+      || invoice.iva_retention_number 
+      || invoice.retention_number 
+      || (() => {
       const { periodCode } = getYearMonth(retentionDate)
       const rawNum = invoice.invoiceNumber ? String(invoice.invoiceNumber).replace(/\D/g, '') : '1'
       return `${periodCode}${rawNum.padStart(8, '0')}`
@@ -881,7 +886,12 @@ class RetentionPdfService {
 
     // 5. Metadatos de Comprobante (Cajas superiores)
     const retentionDate = retData?.fecha_comprobante || invoice.retention_date || invoice.retentionDate || invoice.issueDate
-    const numComprobante = retData?.numero_comprobante || invoice.islr_retention_number || invoice.retention_number || (() => {
+    const numComprobante = retData?.numero_comprobante 
+      || invoice.financial?.islrRetentionNumber 
+      || invoice.financial?.islr_retention_number 
+      || invoice.islr_retention_number 
+      || invoice.retention_number 
+      || (() => {
       const { periodCode } = getYearMonth(retentionDate)
       const rawNum = invoice.invoiceNumber ? String(invoice.invoiceNumber).replace(/\D/g, '') : '1'
       return `ISLR-${periodCode}-${rawNum.padStart(6, '0')}`
@@ -1309,7 +1319,12 @@ class RetentionPdfService {
 
     // 5. Metadatos de Comprobante (Cajas superiores)
     const retentionDate = retData?.fecha_comprobante || invoice.retention_date || invoice.retentionDate || invoice.issueDate
-    const numComprobante = retData?.numero_comprobante || invoice.municipal_retention_number || invoice.retention_number || (() => {
+    const numComprobante = retData?.numero_comprobante 
+      || invoice.financial?.municipalRetentionNumber 
+      || invoice.financial?.municipal_retention_number 
+      || invoice.municipal_retention_number 
+      || invoice.retention_number 
+      || (() => {
       const { periodCode } = getYearMonth(retentionDate)
       const rawNum = invoice.invoiceNumber ? String(invoice.invoiceNumber).replace(/\D/g, '') : '1'
       return `MUN-${periodCode}-${rawNum.padStart(6, '0')}`
