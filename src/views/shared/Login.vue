@@ -210,7 +210,7 @@ export default {
           
           window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }))
           if (result.user.role === 'cliente') {
-            this.$router.push('/cliente/dashboard')
+            this.$router.push('/cliente/inicio')
           } else {
             this.$router.push('/dashboard')
           }
@@ -274,7 +274,7 @@ export default {
        try {
          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
          if (currentUser.role === 'cliente') {
-           this.$router.push('/cliente/dashboard')
+           this.$router.push('/cliente/inicio')
          } else {
            this.$router.push('/dashboard')
          }

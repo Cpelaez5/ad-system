@@ -12,6 +12,7 @@ const Register = () => import('@/views/auth/Register.vue')
 const SetPassword = () => import('@/views/auth/SetPassword.vue')
 
 // Vistas para cliente
+const ClienteInicio = () => import('../views/cliente/Inicio.vue')
 const ClienteMiArea = () => import('../views/cliente/ClienteMiArea.vue')
 const ClienteDashboard = () => import('../views/cliente/Dashboard.vue')
 const ClienteCompras = () => import('../views/cliente/Compras.vue')
@@ -72,6 +73,12 @@ const routes = [
     name: 'VentasOrganizacion',
     component: VentasOrganizacion,
     meta: { requiresAuth: true, title: 'Ventas de la Organización', roles: ['admin', 'contador'] }
+  },
+  {
+    path: '/cliente/inicio',
+    name: 'ClienteInicio',
+    component: ClienteInicio,
+    meta: { requiresAuth: true, title: 'Inicio', roles: ['cliente'] }
   },
   {
     path: '/cliente/mi-area',
@@ -412,9 +419,9 @@ router.beforeEach(async (to, from, next) => {
         }
       }
 
-      // Redirigir clientes desde /dashboard a /cliente/dashboard
+      // Redirigir clientes desde /dashboard a /cliente/inicio
       if (to.path === '/dashboard' && userRole === 'cliente') {
-        next('/cliente/dashboard')
+        next('/cliente/inicio')
         return
       }
 
@@ -432,7 +439,7 @@ router.beforeEach(async (to, from, next) => {
         )
         // Redirigir según el rol del usuario
         if (userRole === 'cliente') {
-          next('/cliente/dashboard')
+          next('/cliente/inicio')
         } else if (userRole === 'contador' || userRole === 'admin' || userRole === 'super_admin') {
           next('/dashboard')
         } else {
