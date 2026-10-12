@@ -82,3 +82,36 @@ h1 *, h2 *, h3 *, h4 *, h5 *, h6 *, p *, span *, div *, a *, button *, input *, 
 .v-application .v-application--wrap * {
   font-family: 'Montserrat', sans-serif !important;
 }
+
+/* ========================================================================
+   IDENTIDAD TIPOGRÁFICA AD System: Montserrat para títulos/etiquetas de
+   interfaz (ya forzado arriba), Open Sans para texto de cuerpo/lectura.
+   Este bloque va DESPUÉS a propósito: con la misma especificidad y ambos
+   !important, gana la regla que aparece más abajo en el archivo, así que
+   solo "recupera" Open Sans en los contenedores de texto de lectura sin
+   tocar botones, títulos de tarjeta, menús ni navegación (que se quedan en
+   Montserrat). No reestructura ninguna vista, solo cambia la tipografía.
+   ======================================================================== */
+p, p *,
+.v-card-text, .v-card-text *,
+.v-card-subtitle, .v-card-subtitle *,
+.v-list-item-subtitle, .v-list-item-subtitle *,
+.v-alert, .v-alert *,
+.v-field__input, .v-field__input *,
+.v-messages, .v-messages *,
+.v-tooltip, .v-tooltip *,
+.text-body-1, .text-body-2 {
+  font-family: 'Open Sans', sans-serif !important;
+}
+
+/* Accesibilidad de contraste (AA): el dorado de marca (#E0B04F) nunca debe
+   usarse como color de TEXTO — su contraste sobre blanco es ~2:1 (falla
+   AA). Se conserva como fondo/ícono/borde. Ver sistema-diseno.md. El
+   selector de ícono tiene más especificidad y se pinta después, así que
+   los íconos sí se quedan dorados. */
+.text-warning {
+  color: #1F355C !important;
+}
+.v-icon.text-warning {
+  color: #E0B04F !important;
+}
