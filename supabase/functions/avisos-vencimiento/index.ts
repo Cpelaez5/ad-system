@@ -159,6 +159,36 @@ Deno.serve(async (req: Request) => {
     const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "AD System <onboarding@resend.dev>";
     const APP_URL = Deno.env.get("APP_URL") || "https://adsystemapp.com";
 
+    // ─── Modo prueba: correo de ejemplo a una sola dirección, sin tocar la BD ──
+    let body: { modo?: string; para?: string } = {};
+    try { body = await req.json(); } catch { /* sin body: ejecución normal */ }
+    if (body?.modo === "prueba" && typeof body.para === "string" && body.para.includes("@")) {
+      const nombre = "Carlos";
+      const itemsPrueba = [
+        { nombre: "Tu RIF", dias_antes: 7 },
+        { nombre: "La licencia de actividad económica", dias_antes: 30 },
+      ];
+      const mensajes = [
+        ...itemsPrueba.map((i) => mensajeDocumentoFiscal(nombre, i)),
+        mensajeFactura(nombre, { invoice_number: "INV-PRUEBA", dias_antes: 3 }),
+      ];
+      const html = buildAvisoHtml({
+        nombreCliente: nombre,
+        mensajes,
+        appUrl: `${APP_URL.replace(/\/$/, "")}/cliente/fiscal-360`,
+      });
+      const resp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM_EMAIL, to: [body.para], subject: `[Prueba] ${construirAsunto(mensajes)}`, html }),
+      });
+      const resultado = await resp.json().catch(() => ({}));
+      return new Response(JSON.stringify({ success: resp.ok, modo: "prueba", resend: resp.ok ? { id: resultado?.id } : { error: resultado?.message } }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: resp.ok ? 200 : 502,
+      });
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       SERVICE_ROLE_KEY
