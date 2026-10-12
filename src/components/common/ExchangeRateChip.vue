@@ -19,6 +19,15 @@
 
         <!-- Data State -->
         <template v-else>
+          <!-- Etiqueta visible (ej. "Dólar BCV hoy:") para que se entienda qué tasa es -->
+          <span
+            v-if="label"
+            class="text-caption mr-2"
+            style="color: rgba(255,255,255,0.85);"
+          >
+            {{ label }}
+          </span>
+
           <!-- Icono Moneda -->
           <v-icon size="20" class="mr-2" :class="iconClass">{{ currencyIcon }}</v-icon>
 
@@ -54,6 +63,8 @@
 </template>
 
 <script>
+import { formatTasa } from '@/utils/formatMoney.js';
+
 export default {
   name: 'ExchangeRateChip',
   props: {
@@ -61,6 +72,11 @@ export default {
       type: String,
       required: true,
       validator: (v) => ['USD', 'EUR', 'CNY', 'TRY', 'RUB'].includes(v)
+    },
+    /** Etiqueta visible antes del valor, ej. "Dólar BCV hoy:" (ver sistema-diseno.md). */
+    label: {
+      type: String,
+      default: null
     },
     rateValue: {
       type: Number,
@@ -122,7 +138,9 @@ export default {
     displayValue() {
       if (this.error) return 'Error';
       if (!this.rateValue) return '---';
-      return this.rateValue;
+      // Siempre en bolívares (la tasa de cualquier moneda se cotiza en Bs),
+      // 2 decimales, separadores venezolanos: "Bs 36,50".
+      return formatTasa(this.rateValue);
     },
     trendColor() {
       if (this.trend === 'up') return 'red-accent-2';

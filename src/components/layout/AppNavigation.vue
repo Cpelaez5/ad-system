@@ -11,9 +11,11 @@
     elevation="0"
     class="app-bar border-b"
   >
-    <!-- Menú Hamburguesa (Solo Móvil) -->
-    <v-app-bar-nav-icon 
-      class="d-lg-none" 
+    <!-- Menú Hamburguesa: no aplica al cliente (móvil usa barra inferior,
+         escritorio usa el drawer permanente sin botón para ocultarlo) -->
+    <v-app-bar-nav-icon
+      v-if="!isCliente"
+      class="d-lg-none"
       @click="drawer = !drawer"
     ></v-app-bar-nav-icon>
 
@@ -27,12 +29,32 @@
 
     <v-spacer />
 
-    <!-- Versión tablet/desktop SM+ (≥600px): chips completos -->
+    <!-- Versión móvil (<600px): solo la píldora del dólar, con etiqueta -->
+    <div class="bcv-rate-display-mobile mr-2 d-flex d-sm-none align-center">
+      <ExchangeRateChip
+        v-if="showUsdRate"
+        currency="USD"
+        label="Dólar BCV hoy:"
+        :rate-value="bcvRate?.dollar"
+        :trend="bcvRate?.trend"
+        :previous-rate="bcvRate?.previousRate"
+        :loading="bcvLoading"
+        :error="bcvError"
+        color="#1F355C"
+        variant="flat"
+        size="small"
+        class="bcv-chip-compact"
+        @click="refreshBCVRate"
+      />
+    </div>
+
+    <!-- Versión tablet/desktop SM+ (≥600px): chips completos con etiqueta -->
     <div class="bcv-rate-display mr-4 d-none d-sm-flex align-center ga-2">
       <!-- Chip Dólar -->
       <ExchangeRateChip
         v-if="showUsdRate"
         currency="USD"
+        label="Dólar BCV hoy:"
         :rate-value="bcvRate?.dollar"
         :trend="bcvRate?.trend"
         :previous-rate="bcvRate?.previousRate"
@@ -47,6 +69,7 @@
       <ExchangeRateChip
         v-if="showEurRate && !bcvLoading && bcvRate?.euro"
         currency="EUR"
+        label="Euro BCV hoy:"
         :rate-value="bcvRate?.euro"
         :trend="bcvRate?.trendEur"
         :previous-rate="bcvRate?.previousRateEur"
@@ -62,6 +85,7 @@
       <ExchangeRateChip
         v-if="showCnyRate && !bcvLoading && bcvRate?.yuan"
         currency="CNY"
+        label="Yuan BCV hoy:"
         :rate-value="bcvRate?.yuan"
         :loading="bcvLoading"
         :error="bcvError"
@@ -75,6 +99,7 @@
       <ExchangeRateChip
         v-if="showTryRate && !bcvLoading && bcvRate?.lira"
         currency="TRY"
+        label="Lira BCV hoy:"
         :rate-value="bcvRate?.lira"
         :loading="bcvLoading"
         :error="bcvError"
@@ -88,6 +113,7 @@
       <ExchangeRateChip
         v-if="showRubRate && !bcvLoading && bcvRate?.rublo"
         currency="RUB"
+        label="Rublo BCV hoy:"
         :rate-value="bcvRate?.rublo"
         :loading="bcvLoading"
         :error="bcvError"
@@ -98,13 +124,15 @@
       />
     </div>
 
-    <!-- Menú de usuario (siempre visible, flex-shrink: 0) -->
+    <!-- Menú de usuario (siempre visible, flex-shrink: 0). El chevron deja
+         claro que es un menú desplegable (hallazgo #13 de audit-ux.md). -->
     <v-btn id="user-menu-btn" color="primary" variant="text" @click="handleUserButtonClick" style="flex-shrink: 0;">
       <v-badge v-if="isClientProfileIncomplete" dot color="error">
         <v-icon>mdi-account-circle</v-icon>
       </v-badge>
       <v-icon v-else>mdi-account-circle</v-icon>
       <span class="ml-2 d-none d-md-inline">{{ currentUser?.firstName || 'Usuario' }}</span>
+      <v-icon size="18" class="ml-1">mdi-chevron-down</v-icon>
     </v-btn>
 
     <v-menu activator="#user-menu-btn">
@@ -144,12 +172,17 @@
 
   <!-- Navegación lateral (extraída a componente Sidebar.vue) -->
   <Sidebar v-model="drawer" />
+
+  <!-- Barra inferior del cliente en móvil (<600px); no renderiza nada en
+       otros roles o tamaños, ver ClienteBottomNav.vue -->
+  <ClienteBottomNav />
 </template>
 
 <script>
 import bcvService from '@/services/bcvService.js';
 import Sidebar from './Sidebar.vue';
 import TrialBanner from './TrialBanner.vue';
+import ClienteBottomNav from './ClienteBottomNav.vue';
 import ExchangeRateChip from '@/components/common/ExchangeRateChip.vue';
 import { supabase } from '@/lib/supabaseClient';
 import userSettingsService from '@/services/user-settings-service.js';
@@ -157,7 +190,7 @@ import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
 
 export default {
 	name: 'AppNavigation',
-	components: { Sidebar, TrialBanner, ExchangeRateChip },
+	components: { Sidebar, TrialBanner, ClienteBottomNav, ExchangeRateChip },
 	emits: ['banner-visibility-change'],
 	data() {
 		return {
@@ -178,6 +211,9 @@ export default {
 		}
 	},
 	computed: {
+		isCliente() {
+			return this.currentUser?.role === 'cliente';
+		},
 		isClientProfileIncomplete() {
 			if (this.currentUser?.role !== 'cliente') return false;
 			const client = this.currentUser?.client;
@@ -515,5 +551,6 @@ export default {
 .v-btn { pointer-events: auto !important; cursor: pointer !important; z-index: 1001 !important; }
 .v-menu { z-index: 2000 !important; }
 
+.bcv-rate-display-mobile .v-chip { font-size: 0.75rem; }
+
 </style>
-*** End Patch

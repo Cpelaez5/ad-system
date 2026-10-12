@@ -1,9 +1,11 @@
 <template>
   <v-navigation-drawer
+    v-if="!(isCliente && $vuetify.display.xs)"
     v-model="drawer"
-    :expand-on-hover="$vuetify.display.lgAndUp"
-    :rail="$vuetify.display.lgAndUp"
-    :temporary="$vuetify.display.mdAndDown"
+    :expand-on-hover="!isCliente && $vuetify.display.lgAndUp"
+    :rail="!isCliente && $vuetify.display.lgAndUp"
+    :permanent="isCliente && !$vuetify.display.xs"
+    :temporary="!isCliente && $vuetify.display.mdAndDown"
     color="#010101"
     class="animate-slide-in-left"
     theme="dark"
@@ -14,11 +16,11 @@
     <template v-slot:prepend>
       <div class="sidebar-header">
         <div class="logo-container">
-          <img
-            src="/ADSystem/png/icono.png"
-            alt="Logo"
+          <LogoAdSystem
+            variante="icono"
+            tono="blanco"
+            :alto="logoAlto"
             class="logo-icon animate-micro-rotate"
-            style="filter: brightness(0) invert(1);"
           />
         </div>
       </div>
@@ -36,73 +38,37 @@
         title="Dashboard"
         value="dashboard"
       ></v-list-item>
-      <v-list-item
-        v-if="isCliente"
-        :to="{ name: 'ClienteDashboard' }"
-        prepend-icon="mdi-view-dashboard"
-        title="Dashboard"
-        value="cliente-dashboard"
-      ></v-list-item>
-
-      <!-- Cliente: Mi Área, Compras, Gastos, Archivo -->
+      <!--
+        Cliente: menú con los "nombres llanos" de docs/mvp/diseno/fase2-spec.md §1.
+        Siempre con texto visible (el drawer de cliente nunca es "rail"),
+        por eso aquí no hace falta la variante contraída de otros roles.
+      -->
       <template v-if="isCliente">
-
-
-      
-        <!-- En modo contraído: solo ícono de Facturación → va directo a Todas -->
         <v-list-item
-          v-if="!isExpanded"
-          :to="{ name: 'ClienteFacturacion', query: { tab: 'all' } }"
-          prepend-icon="mdi-receipt"
-          title="Facturación"
-          value="cliente-facturacion-rail"
+          to="/cliente/inicio"
+          prepend-icon="mdi-home-variant"
+          title="Inicio"
+          value="cliente-inicio"
         ></v-list-item>
 
-        <!-- En modo expandido: dropdown con sub-pestañas -->
-        <v-list-group v-else value="cliente-facturacion-group">
-          <template #activator="{ props }">
-            <v-list-item
-              v-bind="props"
-              prepend-icon="mdi-receipt"
-              title="Facturación"
-              value="cliente-facturacion-activator"
-              @click.stop="$router.push({ name: 'ClienteFacturacion', query: { tab: 'all' } })"
-            ></v-list-item>
-          </template>
+        <v-list-item
+          :to="{ name: 'ClienteFacturacion', query: { tab: 'all' } }"
+          prepend-icon="mdi-receipt"
+          title="Mis movimientos"
+          value="cliente-facturacion"
+        ></v-list-item>
 
-          <v-list-item
-            :to="{ name: 'ClienteFacturacion', query: { tab: 'all' } }"
-            prepend-icon="mdi-view-list"
-            title="Todas"
-            value="cliente-facturacion-todas"
-          ></v-list-item>
-
-          <v-list-item
-            :to="{ name: 'ClienteVentas' }"
-            prepend-icon="mdi-cash-plus"
-            title="Ventas"
-            value="cliente-ventas"
-          ></v-list-item>
-
-          <v-list-item
-            :to="{ name: 'ClienteCompras' }"
-            prepend-icon="mdi-cart"
-            title="Compras"
-            value="cliente-compras"
-          ></v-list-item>
-
-          <v-list-item
-            :to="{ name: 'ClienteGastos' }"
-            prepend-icon="mdi-cash-minus"
-            title="Gastos"
-            value="cliente-gastos"
-          ></v-list-item>
-        </v-list-group>
+        <v-list-item
+          :to="{ name: 'ClienteDashboard' }"
+          prepend-icon="mdi-chart-line"
+          title="¿Cómo voy?"
+          value="cliente-dashboard"
+        ></v-list-item>
 
         <v-list-item
           :to="{ name: 'ClienteFiscal360' }"
           prepend-icon="mdi-file-certificate"
-          title="Expediente Fiscal"
+          title="Mis papeles"
           value="cliente-fiscal-360"
         ></v-list-item>
 
@@ -110,23 +76,30 @@
           v-if="!isServicesCompany"
           :to="{ name: 'ClienteInventario' }"
           prepend-icon="mdi-package-variant-closed"
-          title="Inventario"
+          title="Mi mercancía"
           value="cliente-inventario"
         ></v-list-item>
 
         <v-list-item
           :to="{ name: 'ClienteProveedores' }"
           prepend-icon="mdi-truck-delivery-outline"
-          title="Proveedores"
+          title="Mis proveedores"
           value="cliente-proveedores"
         ></v-list-item>
 
-        <!-- <v-list-item
-          :to="{ name: 'ClienteFacturacionSuscripcion' }"
-          prepend-icon="mdi-credit-card-outline"
-          title="Mi Facturación"
-          value="cliente-facturacion-suscripcion"
-        ></v-list-item> -->
+        <v-list-item
+          :to="{ name: 'ClienteMiArea' }"
+          prepend-icon="mdi-domain"
+          title="Mi negocio"
+          value="cliente-mi-area"
+        ></v-list-item>
+
+        <v-list-item
+          :to="{ name: 'ClientePlanes' }"
+          prepend-icon="mdi-crown-outline"
+          title="Mi plan"
+          value="cliente-planes"
+        ></v-list-item>
       </template>
 
 
@@ -330,9 +303,11 @@
 <script>
 import bcvService from '@/services/bcvService.js';
 import userSettingsService from '@/services/user-settings-service.js';
+import LogoAdSystem from '@/components/ui/LogoAdSystem.vue';
 
 export default {
   name: "Sidebar",
+  components: { LogoAdSystem },
   props: {
     modelValue: {
       type: Boolean,
@@ -395,6 +370,14 @@ export default {
     },
     isServicesCompany() {
       return this.currentUser?.client?.activity_type === 'services';
+    },
+    // Tamaño del logo: fijo para el cliente (drawer siempre expandido con
+    // texto); más pequeño cuando el drawer de otros roles está en modo rail
+    // (colapsado por ícono) y no está en hover-expand.
+    logoAlto() {
+      if (this.isCliente) return 32;
+      const railColapsado = this.$vuetify.display.lgAndUp && !this.isExpanded;
+      return railColapsado ? 24 : 40;
     }
   },
   mounted() {
