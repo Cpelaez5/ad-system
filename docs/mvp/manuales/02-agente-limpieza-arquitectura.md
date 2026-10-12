@@ -8,10 +8,11 @@
 ## Tareas
 
 ### L1. Código muerto (verifica cada archivo con grep antes de borrarlo)
-- [ ] Borrar: `components/**/AppNavigation-old.vue`, `Sidebar-old.vue`, `TrialBanner-old.vue`, `views/cliente/DashboardOld.vue`, `views/cliente/InvoiceFormPage.vue`, `views/shared/SingUp.vue`, `AnimatedTable.vue`, `CountrySelector.vue`, `CurrencyConverter.vue`, `LoadingSpinner.vue`, `AnimatedForm.vue`, `components/sections/PricingSection.vue`, `services/userService.fixed.js`, `services/userService.new.js`, `countryConfig.js`, `localStorageService.js`, `src/test_export.js`.
-- [ ] Router: quitar el import `ClienteArchivo` y la ruta comentada; `/profile` → vista real o eliminar; ocultar `/ocr-demo` y `/test-form` con `import.meta.env.DEV`.
-- [ ] Raíz: mover a `scripts/legacy/` o borrar `debug_registration.js`, `test_*.{js,mjs,cjs,txt}`, `test-*.{js,mjs,cjs}`, `TEST_INVITATION.sql`, `INVITATION_SYSTEM.sql`, `supabase-schema.sql`, `supabase-seed-data.sql`.
-- [ ] `npm test` + `npm run build` en verde después de cada bloque.
+- [x] Borrar: `components/**/AppNavigation-old.vue`, `Sidebar-old.vue`, `TrialBanner-old.vue`, `views/cliente/DashboardOld.vue`, `views/cliente/InvoiceFormPage.vue`, `views/shared/SingUp.vue`, `AnimatedTable.vue`, `CountrySelector.vue`, `CurrencyConverter.vue`, `LoadingSpinner.vue`, `AnimatedForm.vue`, `components/sections/PricingSection.vue`, `services/userService.fixed.js`, `services/userService.new.js`, `countryConfig.js`, `localStorageService.js`, `src/test_export.js`.
+- [x] Router: quitar el import `ClienteArchivo` y la ruta comentada; ocultar `/ocr-demo` y `/test-form` con `import.meta.env.DEV`.
+- [ ] Router: `/profile` → vista real o eliminar.
+- [x] Raíz: mover a `scripts/legacy/` o borrar `debug_registration.js`, `test_*.{js,mjs,cjs,txt}`, `test-*.{js,mjs,cjs}`, `TEST_INVITATION.sql`, `INVITATION_SYSTEM.sql`, `supabase-schema.sql`, `supabase-seed-data.sql`.
+- [x] `npm test` + `npm run build` en verde después de cada bloque.
 
 ### L2. Formularios de factura
 - [ ] Confirmar con QA que `SimpleInvoiceForm` cubre ventas, compras y gastos con retenciones y Cashea. Luego quitar el `v-else` con `ClientInvoiceForm` y el flag `USE_SIMPLE_FORM` de `views/cliente/Facturacion.vue`.
