@@ -374,7 +374,8 @@ export default {
         // Calcular distribución de gastos (por tipo de factura COMPRA)
         const categoriasGastos = {}
         compras.forEach(inv => {
-          const categoria = inv.items?.[0]?.description || 'Otros'
+          // Agrupar por la categoría de gasto asignada (no por la descripción de la primera línea)
+          const categoria = inv.expenseCategory?.name || 'Sin categoría'
           const monto = parseFloat(inv.financial?.totalSales || 0)
           categoriasGastos[categoria] = (categoriasGastos[categoria] || 0) + monto
         })
