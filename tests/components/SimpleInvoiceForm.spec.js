@@ -51,7 +51,11 @@ describe('SimpleInvoiceForm - Watcher de Invoice en Modo Edición', () => {
 
     // Simulación directa del handler del watcher invoice
     const vm = {
-      formData: null
+      formData: null,
+      // C1: el handler llama a $nextTick(() => this.prefillFechaFiscal()) cuando
+      // la factura no trae fecha_fiscal. Se simula síncrono para el test.
+      $nextTick: (fn) => fn(),
+      prefillFechaFiscal: vi.fn()
     };
 
     const handler = SimpleInvoiceForm.watch.invoice.handler;
@@ -82,7 +86,9 @@ describe('SimpleInvoiceForm - Watcher de Invoice en Modo Edición', () => {
     };
 
     const vm = {
-      formData: null
+      formData: null,
+      $nextTick: (fn) => fn(),
+      prefillFechaFiscal: vi.fn()
     };
 
     const handler = SimpleInvoiceForm.watch.invoice.handler;
@@ -96,7 +102,8 @@ describe('SimpleInvoiceForm - Watcher de Invoice en Modo Edición', () => {
     const vm = {
       retencionesResult: { iva: 48, islr: 10, municipal: 5 },
       retentionCorrelativoManuallyEdited: false,
-      sugerirCorrelativosRetencion: vi.fn()
+      sugerirCorrelativosRetencion: vi.fn(),
+      prefillFechaFiscal: vi.fn()
     };
 
     const retentionDateWatcher = SimpleInvoiceForm.watch['formData.financial.retentionDate'];
@@ -109,7 +116,8 @@ describe('SimpleInvoiceForm - Watcher de Invoice en Modo Edición', () => {
     const vm = {
       retencionesResult: { iva: 48, islr: 10, municipal: 5 },
       retentionCorrelativoManuallyEdited: true,
-      sugerirCorrelativosRetencion: vi.fn()
+      sugerirCorrelativosRetencion: vi.fn(),
+      prefillFechaFiscal: vi.fn()
     };
 
     const retentionDateWatcher = SimpleInvoiceForm.watch['formData.financial.retentionDate'];
