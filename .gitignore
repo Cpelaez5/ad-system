@@ -4,3 +4,4 @@ node_modules
 # Sensible hasta cerrar Fase 0 (ver docs/mvp/README.md)
 docs/mvp/auditorias/
 docs/mvp/manuales/01-agente-seguridad-bd.md
+dist/
