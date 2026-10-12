@@ -27,6 +27,7 @@
 Las 17 decisiones de `GEMINI.md` (patrón adaptador de IA, schema OCR en inglés, `taxableAmount`, correlativos fiscales inmutables, `retentionDate` separado de `issueDate`, alícuota 16% en el PDF de retención IVA, retención municipal solo con el mismo municipio, lookup en vivo de proveedores, Cashea por cuota con tasa del día del pago).
 
 ## 5. Cómo trabajar
+0. **Varios agentes comparten la misma carpeta.** Prohibido `git stash`, `git reset`, `git checkout`, `git restore` sobre archivos ajenos y `git clean`. Si necesitas comparar con lo commiteado usa `git diff` o `git show HEAD:archivo`.
 1. Rama por tarea: `feat/<fase>-<tema>` o `fix/<tema>`. Nunca trabajes directo en `main`.
 2. Antes de tocar cálculos fiscales: `npm test` en verde y, si falta, un test que fije el comportamiento actual.
 3. Cambios pequeños y verificables. Un commit por cambio lógico, en español: `fix(seguridad): ...`, `feat(ux): ...`.

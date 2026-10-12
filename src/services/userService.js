@@ -64,10 +64,40 @@ const roles = {
   }
 };
 
+// Caché en memoria del usuario actual, para evitar relecturas redundantes
+// (p.ej. el router guard) dentro de la misma sesión de pestaña.
+// Se invalida en login/logout y cuando Supabase reporta un cambio de usuario.
+let cachedCurrentUser = null
+
+function setCurrentUserCache(user) {
+  cachedCurrentUser = user || null
+}
+
+function clearCurrentUserCache() {
+  cachedCurrentUser = null
+}
+
+try {
+  if (supabase?.auth?.onAuthStateChange) {
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        clearCurrentUserCache()
+      } else if (cachedCurrentUser && session?.user?.id && session.user.id !== cachedCurrentUser.id) {
+        // Cambió el usuario de la sesión (otra cuenta) sin pasar por logout()
+        clearCurrentUserCache()
+      }
+    })
+  }
+} catch {
+  // En entornos de test con un mock parcial de supabase, seguimos sin esta sincronización extra.
+}
+
 const userService = {
   // Autenticación con Supabase Auth y Multi-Tenancy
   async login(credentials) {
     try {
+      // Cualquier login (incluso de otra cuenta en la misma pestaña) invalida la caché previa.
+      clearCurrentUserCache()
       console.log('🔑 Iniciando proceso de login...', {
         email: credentials.email || credentials.usuario,
         hasPassword: !!credentials.password
@@ -339,6 +369,13 @@ const userService = {
   // Obtener usuario actual desde localStorage o Supabase
   async getCurrentUser(forceRefresh = false) {
     try {
+      // 0. Caché en memoria: evita incluso volver a leer/parsear localStorage
+      //    cuando varias partes de la app (p.ej. el router guard) lo piden
+      //    dentro de la misma navegación.
+      if (!forceRefresh && cachedCurrentUser) {
+        return cachedCurrentUser;
+      }
+
       // Primero intentar desde localStorage si no se fuerza la actualización
       if (!forceRefresh) {
         const storedUser = localStorage.getItem('currentUser');
@@ -355,6 +392,7 @@ const userService = {
                   user.client.estado = venezuelaLocationsService.getStateByMunicipality(user.client.municipio_id || user.client.municipio) || '';
                 }
                 console.log('✅ Usuario actual obtenido desde localStorage');
+                setCurrentUserCache(user);
                 return user;
               }
             }
@@ -437,6 +475,7 @@ const userService = {
         if (user.organization_id) {
           setCurrentOrganizationId(user.organization_id);
         }
+        setCurrentUserCache(user);
 
         console.log('✅ Usuario actual obtenido desde Supabase');
         return user;
@@ -588,6 +627,7 @@ const userService = {
         localStorage.removeItem('authToken');
         localStorage.removeItem('usuarioAutenticado');
         localStorage.removeItem('currentUser');
+        clearCurrentUserCache();
         userSettingsService.clearLocalCache();
         sealService.clearLocalCache();
 

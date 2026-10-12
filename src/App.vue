@@ -28,6 +28,13 @@
     
     <!-- Footer -->
     <AppFooter v-if="showFooter" />
+
+    <!-- Snackbar global: avisos no bloqueantes (p.ej. del router guard, errores globales) -->
+    <AppSnackbar
+      v-model="notificacionStore.visible"
+      :type="notificacionStore.tipo"
+      :message="notificacionStore.mensaje"
+    />
   </v-app>
 </template>
 
@@ -38,7 +45,9 @@ import NotificationSystem from './components/common/NotificationSystem.vue'
 import PageTransition from './components/common/PageTransition.vue'
 import SupportChat from './components/common/SupportChat.vue'
 import CookieConsent from './components/common/CookieConsent.vue'
+import AppSnackbar from './components/common/AppSnackbar.vue'
 import userSettingsService from '@/services/user-settings-service.js'
+import { useNotificacionStore } from '@/store/notificacionStore'
 // (Se elimina ThemeFavicon para usar solo los <link rel="icon"> de index.html)
 
 export default {
@@ -49,11 +58,13 @@ export default {
     NotificationSystem,
     PageTransition,
     SupportChat,
-    CookieConsent
+    CookieConsent,
+    AppSnackbar
   },
   data() {
     return {
-      isBannerVisible: false
+      isBannerVisible: false,
+      notificacionStore: useNotificacionStore()
     }
   },
   computed: {

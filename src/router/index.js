@@ -1,4 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { logger } from '@/utils/logger'
+import { useNotificacionStore } from '@/store/notificacionStore'
+import { resolveProfileRedirect } from './profileRedirect'
+import { isChunkLoadError, hasPendingChunkReload, markChunkReloadPending, clearChunkReloadFlag } from '@/utils/chunkReloadGuard'
 
 // Vistas compartidas (accesibles por todos los usuarios autenticados)
 import Dashboard from '@/views/shared/Dashboard.vue'
@@ -248,7 +252,7 @@ const routes = [
   {
     path: '/profile',
     name: 'Profile',
-    component: Dashboard, // Temporalmente usar Dashboard
+    redirect: resolveProfileRedirect,
     meta: { requiresAuth: true, title: 'Mi Perfil' }
   },
   {
@@ -303,180 +307,152 @@ const router = createRouter({
 
 // Guard de navegación para autenticación con Supabase Multi-Tenant
 router.beforeEach(async (to, from, next) => {
-  console.log('🔄 Router guard ejecutándose para:', to.path)
+  // Ruta pública, permitir acceso directo
+  if (!to.meta.requiresAuth) {
+    next()
+    return
+  }
 
-  // Verificar si la ruta requiere autenticación
-  if (to.meta.requiresAuth) {
-    try {
-      // 1. Verificar sesión de Supabase
-      const { supabase } = await import('@/lib/supabaseClient')
-      const { data: { session } } = await supabase.auth.getSession()
+  try {
+    // 1. Verificar sesión de Supabase
+    const { supabase } = await import('@/lib/supabaseClient')
+    const { data: { session } } = await supabase.auth.getSession()
 
-      if (session) {
-        console.log('✅ Sesión de Supabase activa encontrada')
-
-        // 2. Verificar que organization_id esté disponible
-        const organizationId = localStorage.getItem('current_organization_id')
-        if (!organizationId) {
-          console.log('⚠️ No hay organization_id, recargando datos del usuario...')
-
-          // Recargar datos del usuario para obtener organization_id
-          const { userService } = await import('@/services/userService')
-          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-
-          if (currentUser.id) {
-            try {
-              const userData = await userService.getUserById(currentUser.id)
-              if (userData.success && userData.data.organization) {
-                localStorage.setItem('current_organization_id', userData.data.organization.id)
-                console.log('✅ Organization ID recargado:', userData.data.organization.id)
-              }
-            } catch (error) {
-              console.warn('⚠️ Error al recargar datos del usuario:', error.message)
-            }
-          }
-        }
-
-        // 3. Verificar roles y redirecciones especiales
-        try {
-          const { default: userService } = await import('@/services/userService')
-          const currentUser = await userService.getCurrentUser()
-
-          if (!currentUser) {
-            console.log('❌ No se pudo obtener usuario actual')
-            next('/login')
-            return
-          }
-
-          const userRole = currentUser.role
-
-          // Si el usuario no tiene perfil en la tabla users, redirigir a una página de error o mostrar mensaje
-          if (currentUser.needsProfile) {
-            console.error('❌ El usuario no tiene perfil en la tabla users. Por favor, contacta al administrador.')
-            // Mostrar mensaje de error y redirigir al login
-            alert('Tu usuario no está registrado en el sistema. Por favor, contacta al administrador para crear tu perfil.')
-            next('/login')
-            return
-          }
-
-          // Verificar que el rol sea válido
-          const validRoles = ['super_admin', 'admin', 'contador', 'cliente']
-          if (!validRoles.includes(userRole)) {
-            console.error('❌ Rol de usuario no válido:', userRole)
-            alert(`Tu usuario tiene un rol no válido (${userRole}). Por favor, contacta al administrador.`)
-            next('/login')
-            return
-          }
-
-          // Redirigir a Welcome si es cliente, está en prueba y no ha visto la bienvenida
-          if (userRole === 'cliente' && currentUser.plan_id === 'free_trial' && !localStorage.getItem('welcome_seen') && to.path !== '/welcome') {
-            console.log('🔄 Redirigiendo a Welcome (Onboarding)');
-            next('/welcome');
-            return;
-          }
-
-          // Verificar si el periodo de prueba ha expirado
-          if (userRole === 'cliente' && currentUser.plan_id === 'free_trial' && currentUser.trial_end) {
-            const trialEnd = new Date(currentUser.trial_end);
-            const now = new Date();
-            // Si el trial expiró y no está yendo a renovar, bloquear
-            const allowedRoutes = ['/trial-expired', '/pricing', '/welcome', '/cliente/planes', '/cliente/checkout'];
-            if (now > trialEnd && !allowedRoutes.includes(to.path)) {
-              console.log('🚫 Trial expirado, redirigiendo a /trial-expired');
-              next('/trial-expired');
-              return;
-            }
-          }
-
-          // Verificar si el cliente tiene perfil fiscal incompleto y está intentando acceder a módulos operativos
-          if (userRole === 'cliente') {
-            const client = currentUser.client || {};
-            const hasActivity = Boolean(client.activity_type && String(client.activity_type).trim());
-            const hasLicencia = Boolean(client.licencia_actividad_economica && String(client.licencia_actividad_economica).trim());
-            const hasMunicipio = Boolean(client.municipio || client.municipio_id);
-            const hasEstado = Boolean(client.estado || hasMunicipio);
-
-            const isFiscalIncomplete = !hasActivity || !hasLicencia || !hasMunicipio || !hasEstado;
-
-            // Rutas operativas que requieren perfil fiscal obligatorio
-            const operationalRoutes = [
-              '/cliente/facturacion',
-              '/cliente/compras',
-              '/cliente/gastos',
-              '/cliente/proveedores',
-              '/cliente/inventario',
-              '/facturacion',
-              '/compras',
-              '/proveedores'
-            ];
-
-            if (isFiscalIncomplete && operationalRoutes.some(route => to.path.startsWith(route)) && to.path !== '/cliente/mi-area') {
-              console.log('🚫 Perfil fiscal incompleto, redirigiendo a /cliente/mi-area');
-              next({ path: '/cliente/mi-area', query: { required: 'fiscal' } });
-              return;
-            }
-          }
-
-          // Redirigir clientes desde /dashboard a /cliente/dashboard
-          if (to.path === '/dashboard' && userRole === 'cliente') {
-            console.log('🔄 Redirigiendo cliente a su dashboard')
-            next('/cliente/dashboard')
-            return
-          }
-
-          // Redirigir admin/contador desde /cliente/* a /dashboard
-          if (to.path.startsWith('/cliente/') && (userRole === 'admin' || userRole === 'contador' || userRole === 'super_admin')) {
-            console.log('🔄 Redirigiendo admin/contador a dashboard general')
-            next('/dashboard')
-            return
-          }
-
-          // Verificar roles si la ruta lo requiere
-          if (to.meta.roles && !to.meta.roles.includes(userRole)) {
-            console.log('❌ Usuario sin permisos para esta ruta:', userRole, 'vs', to.meta.roles)
-            // Redirigir según el rol del usuario
-            if (userRole === 'cliente') {
-              next('/cliente/dashboard')
-            } else if (userRole === 'contador' || userRole === 'admin') {
-              next('/dashboard')
-            } else if (userRole === 'super_admin') {
-              next('/dashboard')
-            } else {
-              next('/login')
-            }
-            return
-          }
-        } catch (error) {
-          console.error('❌ Error al verificar roles:', error)
-          if (to.path !== '/login') {
-            next('/login')
-          } else {
-            next()
-          }
-          return
-        }
-
-        next()
-      } else {
-        console.log('❌ No hay sesión de Supabase activa, redirigiendo a login')
-        // Limpiar localStorage obsoleto si no hay sesión
-        localStorage.removeItem('usuarioAutenticado')
-        localStorage.removeItem('currentUser')
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('current_organization_id')
-        next('/login')
-      }
-    } catch (error) {
-      console.error('❌ Error en router guard:', error)
+    if (!session) {
+      // Limpiar localStorage obsoleto si no hay sesión
       localStorage.removeItem('usuarioAutenticado')
       localStorage.removeItem('currentUser')
       localStorage.removeItem('authToken')
       localStorage.removeItem('current_organization_id')
       next('/login')
+      return
     }
-  } else {
-    // Ruta pública, permitir acceso
-    next()
+
+    // 2. Una sola obtención del usuario por navegación (cacheada en memoria por userService)
+    try {
+      const { default: userService } = await import('@/services/userService')
+      const currentUser = await userService.getCurrentUser()
+
+      if (!currentUser) {
+        next('/login')
+        return
+      }
+
+      // El organization_id ya viene en currentUser: lo sincronizamos a localStorage
+      // sin hacer una segunda consulta de red (antes se llamaba a getUserById aparte).
+      if (currentUser.organization_id && !localStorage.getItem('current_organization_id')) {
+        localStorage.setItem('current_organization_id', currentUser.organization_id)
+      }
+
+      const userRole = currentUser.role
+
+      // Si el usuario no tiene perfil en la tabla users
+      if (currentUser.needsProfile) {
+        logger.error('Router guard: usuario autenticado sin perfil en la tabla users', currentUser.id)
+        useNotificacionStore().mostrar(
+          'Tu cuenta no está registrada en el sistema. Contacta al administrador para activarla.',
+          'error'
+        )
+        next('/login')
+        return
+      }
+
+      // Verificar que el rol sea válido
+      const validRoles = ['super_admin', 'admin', 'contador', 'cliente']
+      if (!validRoles.includes(userRole)) {
+        logger.error('Router guard: rol de usuario no válido', userRole)
+        useNotificacionStore().mostrar(
+          'Tu cuenta tiene un rol no reconocido. Contacta al administrador.',
+          'error'
+        )
+        next('/login')
+        return
+      }
+
+      // Redirigir a Welcome si es cliente, está en prueba y no ha visto la bienvenida
+      if (userRole === 'cliente' && currentUser.plan_id === 'free_trial' && !localStorage.getItem('welcome_seen') && to.path !== '/welcome') {
+        next('/welcome')
+        return
+      }
+
+      // Verificar si el periodo de prueba ha expirado
+      if (userRole === 'cliente' && currentUser.plan_id === 'free_trial' && currentUser.trial_end) {
+        const trialEnd = new Date(currentUser.trial_end)
+        const now = new Date()
+        // Si el trial expiró y no está yendo a renovar, bloquear
+        const allowedRoutes = ['/trial-expired', '/pricing', '/welcome', '/cliente/planes', '/cliente/checkout']
+        if (now > trialEnd && !allowedRoutes.includes(to.path)) {
+          next('/trial-expired')
+          return
+        }
+      }
+
+      // Verificar si el cliente tiene perfil fiscal incompleto y está intentando acceder a módulos operativos
+      if (userRole === 'cliente') {
+        const client = currentUser.client || {}
+        const hasActivity = Boolean(client.activity_type && String(client.activity_type).trim())
+        const hasLicencia = Boolean(client.licencia_actividad_economica && String(client.licencia_actividad_economica).trim())
+        const hasMunicipio = Boolean(client.municipio || client.municipio_id)
+        const hasEstado = Boolean(client.estado || hasMunicipio)
+
+        const isFiscalIncomplete = !hasActivity || !hasLicencia || !hasMunicipio || !hasEstado
+
+        // Rutas operativas del rol cliente que requieren perfil fiscal obligatorio
+        const operationalRoutes = [
+          '/cliente/facturacion',
+          '/cliente/compras',
+          '/cliente/gastos',
+          '/cliente/proveedores',
+          '/cliente/inventario'
+        ]
+
+        if (isFiscalIncomplete && operationalRoutes.some(route => to.path.startsWith(route)) && to.path !== '/cliente/mi-area') {
+          next({ path: '/cliente/mi-area', query: { required: 'fiscal' } })
+          return
+        }
+      }
+
+      // Redirigir clientes desde /dashboard a /cliente/dashboard
+      if (to.path === '/dashboard' && userRole === 'cliente') {
+        next('/cliente/dashboard')
+        return
+      }
+
+      // Redirigir admin/contador desde /cliente/* a /dashboard
+      if (to.path.startsWith('/cliente/') && (userRole === 'admin' || userRole === 'contador' || userRole === 'super_admin')) {
+        next('/dashboard')
+        return
+      }
+
+      // Verificar roles si la ruta lo requiere
+      if (to.meta.roles && !to.meta.roles.includes(userRole)) {
+        useNotificacionStore().mostrar(
+          'Tu cuenta no tiene permiso para ver esa pantalla. Te llevamos a tu inicio.',
+          'warning'
+        )
+        // Redirigir según el rol del usuario
+        if (userRole === 'cliente') {
+          next('/cliente/dashboard')
+        } else if (userRole === 'contador' || userRole === 'admin' || userRole === 'super_admin') {
+          next('/dashboard')
+        } else {
+          next('/login')
+        }
+        return
+      }
+
+      next()
+    } catch (error) {
+      logger.error('Router guard: error al verificar roles', error)
+      next(to.path !== '/login' ? '/login' : undefined)
+    }
+  } catch (error) {
+    logger.error('Router guard: error inesperado', error)
+    localStorage.removeItem('usuarioAutenticado')
+    localStorage.removeItem('currentUser')
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('current_organization_id')
+    next('/login')
   }
 })
 
@@ -506,6 +482,23 @@ router.afterEach((to) => {
 
   // 3. Tracking de Analítica (Google Analytics, Meta Pixel, etc.)
   analyticsService.trackPageView(to.path)
+
+  // Navegación resuelta con éxito: ya no hace falta la marca de recarga por chunk.
+  clearChunkReloadFlag()
+})
+
+// Recuperación de errores de carga de chunk (típico justo después de un deploy en
+// Netlify: la pestaña abierta referencia archivos .js con hash viejo). Recargamos
+// la página UNA sola vez hacia la ruta destino; sessionStorage evita el bucle.
+router.onError((error, to) => {
+  if (isChunkLoadError(error) && !hasPendingChunkReload()) {
+    markChunkReloadPending()
+    const target = to?.fullPath || (window.location.pathname + window.location.search)
+    window.location.assign(target)
+    return
+  }
+
+  logger.error('Router: error de navegación', error)
 })
 
 export default router

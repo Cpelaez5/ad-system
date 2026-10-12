@@ -2,6 +2,8 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
+import { logger } from './utils/logger'
+import { useNotificacionStore } from './store/notificacionStore'
 
 // --- Detectar tokens de auth/recovery en la URL muy temprano ---
 try {
@@ -166,6 +168,19 @@ app.component('VueDatePicker', VueDatePicker)
 app.use(createPinia())
 app.use(router)
 app.use(vuetify)
+
+// Manejador global de errores no capturados por un try/catch local.
+// Registra el error real (logger.error siempre imprime, también en producción)
+// y avisa al usuario sin bloquear la pantalla. No se "traga" el error en
+// desarrollo: logger.error ya lo manda a la consola con el stack completo.
+app.config.errorHandler = (err, instance, info) => {
+  logger.error('Error global no capturado por la app', err, info)
+  try {
+    useNotificacionStore().mostrar('Algo salió mal. Intenta de nuevo.', 'error')
+  } catch (notifyError) {
+    logger.error('No se pudo mostrar el aviso del error global', notifyError)
+  }
+}
 
 // Montar la aplicación
 app.mount('#app')
