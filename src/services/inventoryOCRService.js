@@ -8,6 +8,7 @@
  */
 
 import BaseOCRService from './baseOcrService'
+import { callAiGenerate } from './ai/aiGenerateClient'
 
 const INVENTORY_PROMPT = `Analiza la siguiente imagen o texto que representa una lista de productos, inventario o nota de consumo.
 Extrae los items y sus cantidades en formato JSON estricto.
@@ -40,8 +41,6 @@ Reglas de Extracción:
 class InventoryOCRService extends BaseOCRService {
     constructor() {
         super()
-        this.apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY
-        this.apiUrl = 'https://api.deepseek.com/v1/chat/completions'
     }
 
     /**
@@ -66,7 +65,7 @@ class InventoryOCRService extends BaseOCRService {
             const compressedImage = await this.compressImage(imageFile)
             const base64 = await this.fileToBase64(compressedImage)
 
-            // 2. DeepSeek Vision
+            // 2. Visión vía Edge Function `ai-chat`
             try {
                 console.log('🤖 Consultando modelo de visión...')
                 const response = await this.callDeepSeekVision(base64)
@@ -86,34 +85,20 @@ class InventoryOCRService extends BaseOCRService {
         }
     }
 
+    // Nota: se conservan los nombres `analyzeTextWithDeepSeek`/`callDeepSeekVision`
+    // por compatibilidad con tests y llamadores; internamente usan la Edge Function
+    // `ai-chat` (el proveedor real lo decide el servidor).
     async analyzeTextWithDeepSeek(text) {
         try {
-            const response = await fetch(this.apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: `Analiza este texto de una lista de inventario y extrae JSON.
-                            
-                            ${INVENTORY_PROMPT}
-                            
-                            TEXTO:
-                            ${text.substring(0, 5000)}`
-                        }
-                    ],
-                    temperature: 0.1
-                })
-            })
+            const prompt = `Analiza este texto de una lista de inventario y extrae JSON.
 
-            if (!response.ok) throw new Error('API Error')
-            const data = await response.json()
-            return this.parseResponse(data.choices[0].message.content)
+${INVENTORY_PROMPT}
+
+TEXTO:
+${text.substring(0, 5000)}`
+
+            const response = await callAiGenerate({ prompt, responseFormat: 'json' })
+            return this.parseResponse(response)
 
         } catch (error) {
             console.error('Error análisis texto:', error)
@@ -122,45 +107,11 @@ class InventoryOCRService extends BaseOCRService {
     }
 
     async callDeepSeekVision(imageBase64) {
-        // Reutilizamos lógica de llamada, pero con prompt de inventario
-        // Copiamos la lógica porque el prompt es distinto
-        const response = await fetch(this.apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'deepseek-chat',
-                messages: [
-                    {
-                        role: 'user',
-                        content: [
-                            {
-                                type: 'image_url',
-                                image_url: {
-                                    url: `data:image/jpeg;base64,${imageBase64}`
-                                }
-                            },
-                            {
-                                type: 'text',
-                                text: INVENTORY_PROMPT
-                            }
-                        ]
-                    }
-                ],
-                temperature: 0.1,
-                max_tokens: 1000
-            })
+        return await callAiGenerate({
+            prompt: INVENTORY_PROMPT,
+            images: [{ mimeType: 'image/jpeg', base64: imageBase64 }],
+            responseFormat: 'json'
         })
-
-        if (!response.ok) {
-            const err = await response.json()
-            throw new Error(err.error?.message || 'API Error')
-        }
-
-        const data = await response.json()
-        return data.choices[0].message.content
     }
 
     parseResponse(text) {

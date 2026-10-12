@@ -11,6 +11,7 @@
 - Sitio: https://adsystemapp.com. Netlify **compila automáticamente en cada `git push` a `main`** (`npm run build`). Push a `main` = deploy.
 - Supabase `ybeippdhlvjzfgpbcoqy`. **Aún no hay clientes reales (pre-lanzamiento, oct-2026):** se pueden crear y borrar datos de prueba y aplicar migraciones. Aun así:
   - Todo cambio de esquema va como archivo en `supabase/migrations/` (versionado), nunca solo desde el SQL Editor.
+  - **Solo el orquestador (Claude principal) aplica migraciones y despliega Edge Functions**, siempre después de verificarlas. Los demás agentes (subagentes, Gemini) escriben el archivo y lo reportan; nunca lo aplican.
   - No borres usuarios ni datos existentes sin preguntar: la contadora puede estar usándolos para probar.
   - Antes del lanzamiento real se separará un proyecto de desarrollo (manual 01, S1).
 

@@ -8,6 +8,7 @@
  */
 
 import BaseOCRService from './baseOcrService'
+import { callAiGenerate } from './ai/aiGenerateClient'
 
 const FISCAL_PROMPT = `Analiza el siguiente documento legal/fiscal venezolano y extrae los datos en formato JSON estricto.
 
@@ -46,17 +47,13 @@ Reglas adicionales:
 class FiscalOCRService extends BaseOCRService {
     constructor() {
         super()
-        this.apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY
-        this.apiUrl = 'https://api.deepseek.com/v1/chat/completions'
     }
 
     /**
      * Analiza un documento fiscal
-     * Estrategia: OCR local (Tesseract) + Análisis de texto con DeepSeek
-     * Nota: DeepSeek deepseek-chat NO soporta contenido multimodal (image_url),
-     * por lo que usamos directamente el flujo de OCR + análisis de texto.
-     * 
-     * @param {File} file 
+     * Estrategia: OCR local (Tesseract) + Análisis de texto con la IA (Edge Function `ai-chat`)
+     *
+     * @param {File} file
      * @returns {Promise<Object>} Datos extraídos
      */
     async analyzeDocument(file) {
@@ -71,7 +68,7 @@ class FiscalOCRService extends BaseOCRService {
                 // Intentar primero extracción directa de texto del PDF
                 console.log('📑 Intentando extracción directa de texto del PDF...')
                 const directText = await this.extractTextFromPdf(file)
-                
+
                 if (directText && directText.length > 100) {
                     // PDF digital con texto suficiente — analizar directamente
                     console.log('✨ Texto extraído digitalmente del PDF (sin OCR). Longitud:', directText.length)
@@ -100,7 +97,7 @@ class FiscalOCRService extends BaseOCRService {
                 throw new Error('No se pudo extraer texto suficiente del documento. Intente con una imagen más nítida.')
             }
 
-            // 4. Análisis de Texto con DeepSeek
+            // 4. Análisis de Texto con la IA
             console.log('🧠 Analizando texto extraído con IA...')
             const response = await this.analyzeTextWithDeepSeek(text)
 
@@ -114,38 +111,19 @@ class FiscalOCRService extends BaseOCRService {
         }
     }
 
+    // Nota: se conserva el nombre `analyzeTextWithDeepSeek` por compatibilidad con
+    // los tests y llamadores existentes; internamente ya no llama a DeepSeek
+    // directamente, sino a la Edge Function `ai-chat` (el proveedor real lo decide el servidor).
     async analyzeTextWithDeepSeek(text) {
         try {
-            const response = await fetch(this.apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: `Analiza el siguiente texto extraído de un documento legal/fiscal y extrae los datos en JSON.
-                            
-                            ${FISCAL_PROMPT}
-                            
-                            TEXTO EXTRAÍDO:
-                            ${text.substring(0, 15000)}` // Limitar caracteres para no exceder tokens
-                        }
-                    ],
-                    temperature: 0.1
-                })
-            })
+            const prompt = `Analiza el siguiente texto extraído de un documento legal/fiscal y extrae los datos en JSON.
 
-            if (!response.ok) {
-                const error = await response.json()
-                throw new Error(`API Error: ${error.error?.message || response.statusText}`)
-            }
+${FISCAL_PROMPT}
 
-            const data = await response.json()
-            return data.choices[0].message.content
+TEXTO EXTRAÍDO:
+${text.substring(0, 15000)}` // Limitar caracteres para no exceder tokens
+
+            return await callAiGenerate({ prompt, responseFormat: 'json' })
 
         } catch (error) {
             console.error('Error en análisis de texto:', error)
@@ -155,43 +133,11 @@ class FiscalOCRService extends BaseOCRService {
 
     async callDeepSeekVision(imageBase64) {
         try {
-            const response = await fetch(this.apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: [
-                                {
-                                    type: 'image_url',
-                                    image_url: {
-                                        url: `data:image/jpeg;base64,${imageBase64}`
-                                    }
-                                },
-                                {
-                                    type: 'text',
-                                    text: FISCAL_PROMPT
-                                }
-                            ]
-                        }
-                    ],
-                    temperature: 0.1,
-                    max_tokens: 1000
-                })
+            return await callAiGenerate({
+                prompt: FISCAL_PROMPT,
+                images: [{ mimeType: 'image/jpeg', base64: imageBase64 }],
+                responseFormat: 'json'
             })
-
-            if (!response.ok) {
-                const error = await response.json()
-                throw new Error(`API Error: ${error.error?.message || response.statusText}`)
-            }
-
-            const data = await response.json()
-            return data.choices[0].message.content
 
         } catch (error) {
             console.warn('Error llamando a Vision API:', error.message)

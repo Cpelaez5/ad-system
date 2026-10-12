@@ -36,15 +36,42 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
   if (authError || !user) return errorResponse(401, 'UNAUTHORIZED', 'JWT inválido o expirado');
 
-  let body: { prompt?: string };
+  let body: {
+    prompt?: string;
+    images?: { mimeType?: string; base64?: string }[];
+    system?: string;
+    responseFormat?: string;
+  };
   try {
     body = await req.json();
   } catch {
     return errorResponse(400, 'INVALID_BODY', 'El body debe ser JSON válido');
   }
 
-  const { prompt } = body;
+  const { prompt, images, system, responseFormat } = body;
   if (!prompt) return errorResponse(400, 'MISSING_PROMPT', 'prompt es requerido');
+
+  // --- Validación básica de imágenes (visión) ---
+  const MAX_IMAGES = 4;
+  const MAX_IMAGE_BASE64_CHARS = 15 * 1024 * 1024 * 1.4; // ~15MB de archivo original en base64
+
+  if (images !== undefined) {
+    if (!Array.isArray(images) || images.length > MAX_IMAGES) {
+      return errorResponse(400, 'INVALID_BODY', `images debe ser un arreglo de hasta ${MAX_IMAGES} elementos`);
+    }
+    for (const img of images) {
+      if (!img || typeof img.mimeType !== 'string' || typeof img.base64 !== 'string' || !img.base64) {
+        return errorResponse(400, 'INVALID_BODY', 'Cada imagen requiere { mimeType, base64 }');
+      }
+      if (img.base64.length > MAX_IMAGE_BASE64_CHARS) {
+        return errorResponse(413, 'FILE_TOO_LARGE', 'Una de las imágenes excede el tamaño máximo permitido');
+      }
+    }
+  }
+
+  if (responseFormat !== undefined && responseFormat !== 'json') {
+    return errorResponse(400, 'INVALID_BODY', "responseFormat solo admite 'json'");
+  }
 
   const logEntry: Partial<AiUsageLog> = {
     user_id: user.id,
@@ -70,7 +97,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // --- 3. Procesar Chat usando el Patrón Adaptador ---
     const providerInstance = createProvider(settings.provider);
-    const { text, usage } = await providerInstance.generateText(prompt, apiKey, settings.model);
+    const { text, usage } = await providerInstance.generateText(prompt, apiKey, settings.model, {
+      images: images as { mimeType: string; base64: string }[] | undefined,
+      system,
+      responseFormat: responseFormat as 'json' | undefined,
+    });
 
     // --- 4. Logging de éxito ---
     logEntry.status            = 'success';
@@ -104,6 +135,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
                  : err.code === 'PROVIDER_ERROR'   ? 400
                  : err.code === 'NO_ACTIVE_PROFILE'? 400
                  : err.code === 'UNSUPPORTED_PROVIDER' ? 400
+                 : err.code === 'UNSUPPORTED_INPUT' ? 400
                  : err.code === 'TIMEOUT'          ? 504
                  : 500;
                  

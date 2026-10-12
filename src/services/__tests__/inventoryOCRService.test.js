@@ -3,6 +3,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+const invokeMock = vi.fn()
+vi.mock('@/lib/supabaseClient', () => ({
+  supabase: {
+    functions: {
+      invoke: (...args) => invokeMock(...args)
+    }
+  }
+}))
+
 import service from '@/services/inventoryOCRService'
 
 describe('InventoryOCRService', () => {
@@ -15,8 +25,6 @@ describe('InventoryOCRService', () => {
     vi.spyOn(service, 'compressImage').mockResolvedValue(new File([''], 'compressed.jpg'))
     vi.spyOn(service, 'fileToBase64').mockResolvedValue('base64StringMock')
     vi.spyOn(service, 'performLocalOCR').mockResolvedValue('Texto extraído fallback OCR')
-    
-    global.fetch = vi.fn()
   })
 
   afterEach(() => {
@@ -61,6 +69,41 @@ describe('InventoryOCRService', () => {
       
       visionSpy.mockRestore()
       textAnalyzeSpy.mockRestore()
+    })
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  // Suite 2: Integración real con la Edge Function `ai-chat`
+  // ═════════════════════════════════════════════════════════════
+  describe('callDeepSeekVision / analyzeTextWithDeepSeek (implementación real)', () => {
+    it('callDeepSeekVision envía la imagen en base64 a ai-chat y devuelve el texto', async () => {
+      invokeMock.mockResolvedValue({
+        data: { ok: true, data: { text: '{"items":[]}' } },
+        error: null
+      })
+
+      const result = await service.callDeepSeekVision('base64StringMock')
+
+      expect(invokeMock).toHaveBeenCalledWith('ai-chat', expect.objectContaining({
+        body: expect.objectContaining({
+          images: [{ mimeType: 'image/jpeg', base64: 'base64StringMock' }],
+          responseFormat: 'json'
+        })
+      }))
+      expect(result).toBe('{"items":[]}')
+    })
+
+    it('analyzeTextWithDeepSeek envía el texto a ai-chat y parsea la respuesta', async () => {
+      invokeMock.mockResolvedValue({
+        data: { ok: true, data: { text: '{"items":[{"name":"Azucar"}]}' } },
+        error: null
+      })
+
+      const result = await service.analyzeTextWithDeepSeek('Texto de inventario')
+
+      const [, options] = invokeMock.mock.calls[0]
+      expect(options.body.prompt).toContain('Texto de inventario')
+      expect(result).toEqual({ items: [{ name: 'Azucar' }] })
     })
   })
 })

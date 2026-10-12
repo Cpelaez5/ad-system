@@ -1,11 +1,13 @@
 /**
  * OCR Service - Extracción de datos de facturas
- * 
+ *
  * Estrategia Híbrida:
- * 1. Intenta usar DeepSeek Vision API directamente (si el modelo lo soporta)
- * 2. Si falla (ej. modelo no soporta imágenes), usa Tesseract.js para OCR local
- * 3. Envía el texto extraído a DeepSeek para análisis y estructuración JSON
+ * 1. Intenta usar la Edge Function `ai-chat` con visión (proveedor IA activo en servidor)
+ * 2. Si falla (ej. proveedor sin soporte de imágenes), usa Tesseract.js para OCR local
+ * 3. Envía el texto extraído a la misma Edge Function para análisis y estructuración JSON
  */
+
+import { callAiGenerate } from './ai/aiGenerateClient'
 
 // Prompt optimizado para extracción de facturas
 const INVOICE_EXTRACTION_PROMPT = `Analiza esta factura y extrae los siguientes datos en formato JSON estricto.
@@ -54,14 +56,10 @@ Reglas:
 
 class OCRService {
     constructor() {
-        this.activeProvider = import.meta.env.VITE_ACTIVE_AI_PROVIDER || 'deepseek'
-        this.deepseekApiKey = import.meta.env.VITE_DEEPSEEK_API_KEY
-        this.deepseekApiUrl = import.meta.env.VITE_DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions'
-        
-        this.nvidiaApiKey = import.meta.env.VITE_NVIDIA_API_KEY
-        this.nvidiaApiUrl = import.meta.env.VITE_NVIDIA_API_URL || '/api/ai'
-        this.nvidiaModel = import.meta.env.VITE_NVIDIA_MODEL || 'google/gemma-3n-e4b-it'
-        
+        // El proveedor de IA real ahora lo decide el servidor (Edge Function `ai-chat`
+        // + `ai_provider_profiles`). Esta etiqueta solo se usa para logs locales.
+        this.activeProvider = 'ai-chat'
+
         this.maxImageSize = 800 // Reducido para acelerar el procesamiento de la IA
     }
 
@@ -130,61 +128,12 @@ class OCRService {
     }
 
     /**
-     * Analiza texto extraído usando API (solo texto)
+     * Analiza texto extraído usando la IA (solo texto, vía Edge Function `ai-chat`)
      */
     async analyzeTextAPI(text, customPrompt = INVOICE_EXTRACTION_PROMPT) {
         try {
-            let apiUrl = ''
-            let apiKey = ''
-            let payload = {}
-
-            if (this.activeProvider === 'nvidia') {
-                apiUrl = `${this.nvidiaApiUrl}/chat/completions`
-                apiKey = this.nvidiaApiKey
-                payload = {
-                    model: 'meta/llama-3.1-8b-instruct', // Modelo ultrarrápido garantizado para texto
-                    messages: [
-                        {
-                            role: 'user',
-                            content: `Analiza el siguiente texto extraído y obtén los datos en JSON:\n\n${customPrompt}\n\nTEXTO EXTRAÍDO:\n${text}`
-                        }
-                    ],
-                    temperature: 0.1,
-                    top_p: 0.95,
-                    max_tokens: 800,
-                    stream: false
-                }
-            } else {
-                apiUrl = this.deepseekApiUrl
-                apiKey = this.deepseekApiKey
-                payload = {
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: `Analiza el siguiente texto extraído y obtén los datos en JSON:\n\n${customPrompt}\n\nTEXTO EXTRAÍDO:\n${text}`
-                        }
-                    ],
-                    temperature: 0.1
-                }
-            }
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify(payload)
-            })
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}))
-                throw new Error(`API Error: ${error.detail || error.error?.message || response.statusText}`)
-            }
-
-            const data = await response.json()
-            return data.choices[0].message.content
+            const prompt = `Analiza el siguiente texto extraído y obtén los datos en JSON:\n\n${customPrompt}\n\nTEXTO EXTRAÍDO:\n${text}`
+            return await callAiGenerate({ prompt, responseFormat: 'json' })
 
         } catch (error) {
             console.error('Error en análisis de texto:', error)
@@ -325,84 +274,15 @@ class OCRService {
     }
 
     /**
-     * Llama a Vision API (Gemma 3 o DeepSeek)
+     * Llama a la Edge Function `ai-chat` con visión (proveedor IA activo en servidor)
      */
     async callVisionAPI(imageBase64, customPrompt = INVOICE_EXTRACTION_PROMPT) {
         try {
-            let apiUrl = ''
-            let apiKey = ''
-            let payload = {}
-
-            if (this.activeProvider === 'nvidia') {
-                apiUrl = `${this.nvidiaApiUrl}/chat/completions`
-                apiKey = this.nvidiaApiKey
-                payload = {
-                    model: this.nvidiaModel,
-                    messages: [
-                        {
-                            role: 'user',
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: customPrompt
-                                },
-                                {
-                                    type: 'image_url',
-                                    image_url: {
-                                        url: `data:image/jpeg;base64,${imageBase64}`
-                                    }
-                                }
-                            ]
-                        }
-                    ],
-                    temperature: 0.1,
-                    top_p: 0.95,
-                    max_tokens: 800,
-                    stream: false
-                }
-            } else {
-                apiUrl = this.deepseekApiUrl
-                apiKey = this.deepseekApiKey
-                payload = {
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: [
-                                {
-                                    type: 'image_url',
-                                    image_url: {
-                                        url: `data:image/jpeg;base64,${imageBase64}`
-                                    }
-                                },
-                                {
-                                    type: 'text',
-                                    text: customPrompt
-                                }
-                            ]
-                        }
-                    ],
-                    temperature: 0.1,
-                    max_tokens: 2000
-                }
-            }
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify(payload)
+            return await callAiGenerate({
+                prompt: customPrompt,
+                images: [{ mimeType: 'image/jpeg', base64: imageBase64 }],
+                responseFormat: 'json'
             })
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({}))
-                throw new Error(`API Error: ${error.detail || error.error?.message || response.statusText}`)
-            }
-
-            const data = await response.json()
-            return data.choices[0].message.content
 
         } catch (error) {
             console.error('Error llamando a Vision API:', error)

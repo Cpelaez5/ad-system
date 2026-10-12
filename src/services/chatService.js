@@ -2,7 +2,8 @@
  * Chat Service — Motor de soporte IA para clientes
  * 
  * Responsabilidades:
- * - Comunicación con DeepSeek API (chat completions)
+ * - Comunicación con la IA vía la Edge Function `ai-chat` (la clave del proveedor
+ *   vive en el servidor, nunca en el bundle del navegador)
  * - Construcción de system prompt contextualizado por vista
  * - Persistencia de conversaciones y mensajes en Supabase
  * - Infraestructura lógica de límites por plan de suscripción
@@ -11,44 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient'
-import OpenAI from 'openai'
-
-// ═══════════════════════════════════════════════════
-// CONFIGURACIÓN DE IA MULTIPROVEEDOR
-// ═══════════════════════════════════════════════════
-
-const ACTIVE_PROVIDER = import.meta.env.VITE_ACTIVE_AI_PROVIDER || 'deepseek'
-
-// -- Config DeepSeek Original --
-const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY
-const DEEPSEEK_API_URL = import.meta.env.VITE_DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions'
-const DEEPSEEK_MODEL = 'deepseek-chat'
-
-// -- Config Nvidia (Gemma 3) --
-const NVIDIA_API_KEY = import.meta.env.VITE_NVIDIA_API_KEY
-const NVIDIA_MODEL = import.meta.env.VITE_NVIDIA_MODEL || 'google/gemma-3n-e4b-it'
-let NVIDIA_API_URL = import.meta.env.VITE_NVIDIA_API_URL || '/api/ai'
-
-if (NVIDIA_API_URL && NVIDIA_API_URL.startsWith('/')) {
-  NVIDIA_API_URL = window.location.origin + NVIDIA_API_URL
-}
-
-// Solo crear el cliente de OpenAI si la API key de Nvidia está disponible.
-// Sin esta protección, el SDK lanza una excepción fatal al cargarse el módulo
-// cuando no hay clave configurada (ej. en producción sin variables de Nvidia),
-// lo que provoca una página en blanco.
-let nvidiaClient = null
-try {
-  if (NVIDIA_API_KEY) {
-    nvidiaClient = new OpenAI({
-      apiKey: NVIDIA_API_KEY,
-      baseURL: NVIDIA_API_URL,
-      dangerouslyAllowBrowser: true
-    })
-  }
-} catch (err) {
-  console.warn('⚠️ No se pudo crear el cliente de Nvidia OpenAI:', err.message)
-}
+import { callAiGenerate } from '@/services/ai/aiGenerateClient'
 
 // ═══════════════════════════════════════════════════
 // LÍMITES POR PLAN (Infraestructura lógica)
@@ -320,14 +284,14 @@ class ChatService {
     return `${saludo} Soy parte del equipo de soporte. Actualmente te encuentras en **${modulo}**. ${viewContext.description.replace('El usuario está en ', 'Aquí puedes ').replace('El usuario está viendo ', 'Aquí puedes ver ')} ¿En qué te puedo ayudar hoy?`
   }
 
-  // ─── Comunicación con DeepSeek ───
+  // ─── Comunicación con la IA (Edge Function `ai-chat`) ───
 
   /**
-   * Envía un mensaje al usuario y recibe respuesta de DeepSeek.
+   * Envía un mensaje al usuario y recibe respuesta de la IA (vía Edge Function `ai-chat`).
    * @param {string} userMessage - Mensaje del usuario
    * @param {Array} conversationHistory - Historial de mensajes [{role, content}]
    * @param {Object} viewContext - Contexto de la vista {routeName, routeTitle, queryParams}
-   * @returns {Promise<string>} Respuesta de DeepSeek
+   * @returns {Promise<string>} Respuesta de la IA
    */
   async sendMessage(userMessage, conversationHistory = [], viewContext = {}) {
     const systemPrompt = this.buildSystemPrompt(
@@ -357,87 +321,38 @@ class ChatService {
       }
     }
 
-    // Construir array final de mensajes para la API
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...safeHistory
-    ]
-    
     // Siempre terminar con el mensaje actual del usuario
-    if (lastRole !== 'user') {
-      messages.push({ role: 'user', content: userMessage })
-    } else {
+    if (lastRole === 'user') {
       // Si el historial sin el mensaje actual terminaba en user, hubo un error de flujo.
-      // Reemplazamos el último mensaje por el actual para forzar la alternancia.
-      messages[messages.length - 1] = { role: 'user', content: userMessage }
+      // Quitamos ese último turno para forzar la alternancia antes de añadir el actual.
+      safeHistory.pop()
     }
 
+    // El contrato de la Edge Function `ai-chat` es { prompt, system }, sin roles
+    // intercalados, así que el historial se serializa como transcripción de texto
+    // y el system prompt se envía aparte.
+    const transcript = safeHistory
+      .map(msg => `${msg.role === 'user' ? 'Usuario' : 'Asistente'}: ${msg.content}`)
+      .join('\n\n')
+
+    const prompt = transcript
+      ? `${transcript}\n\nUsuario: ${userMessage}`
+      : userMessage
+
     try {
-      if (ACTIVE_PROVIDER === 'nvidia') {
-        // ---- FLUJO NVIDIA (Fetch Directo) ----
-        // Evitamos el SDK de OpenAI porque añade metadatos que el modelo Gemma 3 rechaza (HTTP 400)
-        const response = await fetch(`${NVIDIA_API_URL}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${NVIDIA_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: NVIDIA_MODEL,
-            messages,
-            temperature: 0.7,
-            top_p: 0.95,
-            max_tokens: 1000,
-            stream: false
-          })
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          console.error("Nvidia API Error:", errorData)
-          throw new Error(errorData.detail || errorData.error?.message || `Error HTTP ${response.status}`)
-        }
-
-        const data = await response.json()
-        return data.choices[0].message.content
-        
-      } else {
-        // ---- FLUJO DEEPSEEK (Fetch Directo Original) ----
-        const response = await fetch(DEEPSEEK_API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: DEEPSEEK_MODEL,
-            messages,
-            temperature: 0.7,
-            max_tokens: 500,
-            top_p: 0.9
-          })
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error?.message || `Error HTTP ${response.status}`)
-        }
-
-        const data = await response.json()
-        return data.choices[0].message.content
-      }
+      return await callAiGenerate({ prompt, system: systemPrompt })
 
     } catch (error) {
-      console.error(`❌ Error comunicándose con la IA (${ACTIVE_PROVIDER}):`, error)
+      console.error('❌ Error comunicándose con la IA:', error)
 
-      // Mensaje de fallback amigable
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+      // Mensaje de fallback amigable según el código de error de la Edge Function
+      if (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_KEY') {
         throw new Error('El servicio de IA no está disponible temporalmente. Por favor, intenta más tarde.')
       }
-      if (error.message.includes('429')) {
+      if (error.code === 'QUOTA_EXCEEDED' || error.code === 'PREVIEW_RATE_LIMIT') {
         throw new Error('Hemos recibido muchas consultas. Por favor espera un momento y vuelve a intentar. ⏳')
       }
-      if (!navigator.onLine) {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
         throw new Error('Parece que no tienes conexión a internet. Verifica tu conexión y vuelve a intentar. 📡')
       }
 

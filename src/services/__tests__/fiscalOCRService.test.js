@@ -1,20 +1,29 @@
 /**
  * Tests unitarios para el servicio OCR Fiscal (fiscalOCRService.js)
- * 
+ *
  * Cubre:
  * - Extracción de texto y fallback a OCR local.
- * - Simulación de llamadas a la API de DeepSeek (fetch mock).
+ * - Integración con la Edge Function `ai-chat` (mockeando supabase.functions.invoke).
  * - Formateo y clasificación de la respuesta.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+const invokeMock = vi.fn()
+vi.mock('@/lib/supabaseClient', () => ({
+  supabase: {
+    functions: {
+      invoke: (...args) => invokeMock(...args)
+    }
+  }
+}))
+
 import service from '@/services/fiscalOCRService'
-import BaseOCRService from '@/services/baseOcrService'
 
 describe('FiscalOCRService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    
+
     // Espiar métodos heredados para evitar procesamiento real de PDFs/Imágenes
     vi.spyOn(service, 'validateFile').mockImplementation(() => true)
     // String largo para pasar la validación directText.length > 100
@@ -22,9 +31,6 @@ describe('FiscalOCRService', () => {
     vi.spyOn(service, 'convertPdfToImage').mockResolvedValue(new File([''], 'test.jpg'))
     vi.spyOn(service, 'compressImage').mockResolvedValue(new File([''], 'compressed.jpg'))
     vi.spyOn(service, 'performLocalOCR').mockResolvedValue('Texto extraído mediante OCR Tesseract')
-    
-    // Mock global fetch para simular DeepSeek API
-    global.fetch = vi.fn()
   })
 
   afterEach(() => {
@@ -42,14 +48,14 @@ describe('FiscalOCRService', () => {
 
       const mockPdf = new File([''], 'documento.pdf', { type: 'application/pdf' })
       const result = await service.analyzeDocument(mockPdf)
-      
+
       // Debe haber llamado a extractTextFromPdf
       expect(service.extractTextFromPdf).toHaveBeenCalledWith(mockPdf)
-      
+
       // Como simulamos que extrajo suficiente texto ('Texto extraído...'), no debió usar convertPdfToImage
       expect(service.convertPdfToImage).not.toHaveBeenCalled()
       expect(result).toEqual({ docName: 'RIF' })
-      
+
       analyzeSpy.mockRestore()
       parseSpy.mockRestore()
     })
@@ -57,60 +63,54 @@ describe('FiscalOCRService', () => {
     it('utiliza OCR local (fallback) si el PDF no contiene texto suficiente (escaneado)', async () => {
       // Simulamos que el PDF digital no tiene texto (devuelve null o poco texto)
       service.extractTextFromPdf.mockResolvedValue('Corto') // < 100 caracteres
-      
+
       const analyzeSpy = vi.spyOn(service, 'analyzeTextWithDeepSeek').mockResolvedValue('{"docName":"Patente"}')
       const parseSpy = vi.spyOn(service, 'parseResponse').mockReturnValue({ docName: 'Patente' })
 
       const mockPdf = new File([''], 'escaneado.pdf', { type: 'application/pdf' })
       await service.analyzeDocument(mockPdf)
-      
+
       // Debe haber recurrido a imagen y OCR
       expect(service.convertPdfToImage).toHaveBeenCalledWith(mockPdf)
       expect(service.compressImage).toHaveBeenCalled()
       expect(service.performLocalOCR).toHaveBeenCalled()
-      
+
       analyzeSpy.mockRestore()
       parseSpy.mockRestore()
     })
   })
 
   // ═════════════════════════════════════════════════════════════
-  // Suite 2: IA API DeepSeek Integration
+  // Suite 2: Integración con la Edge Function `ai-chat`
   // ═════════════════════════════════════════════════════════════
   describe('analyzeTextWithDeepSeek', () => {
-    it('realiza la petición fetch con los parámetros correctos y retorna el contenido', async () => {
-      // Simulamos respuesta 200 OK de Fetch
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          choices: [
-            { message: { content: '{"category":"MUNICIPAL"}' } }
-          ]
-        })
+    it('invoca ai-chat con el texto en el prompt y retorna el texto generado', async () => {
+      invokeMock.mockResolvedValue({
+        data: { ok: true, data: { text: '{"category":"MUNICIPAL"}' } },
+        error: null
       })
 
       const content = await service.analyzeTextWithDeepSeek('Texto de prueba municipal')
-      
-      expect(global.fetch).toHaveBeenCalled()
+
+      expect(invokeMock).toHaveBeenCalledTimes(1)
       expect(content).toBe('{"category":"MUNICIPAL"}')
-      
-      const fetchCallArgs = global.fetch.mock.calls[0]
-      expect(fetchCallArgs[0]).toBe('https://api.deepseek.com/v1/chat/completions')
-      
-      // Verificamos payload
-      const payload = JSON.parse(fetchCallArgs[1].body)
-      expect(payload.model).toBe('deepseek-chat')
-      expect(payload.messages[0].content).toContain('Texto de prueba municipal')
+
+      const [fnName, options] = invokeMock.mock.calls[0]
+      expect(fnName).toBe('ai-chat')
+      expect(options.body.responseFormat).toBe('json')
+      expect(options.body.prompt).toContain('Texto de prueba municipal')
     })
 
-    it('lanza un error si la API de DeepSeek falla (ej. 401 Unauthorized)', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        statusText: 'Unauthorized',
-        json: async () => ({ error: { message: 'Invalid API Key' } })
+    it('lanza un error { code, message } si la Edge Function falla (ej. clave inválida)', async () => {
+      invokeMock.mockResolvedValue({
+        data: { ok: false, error: { code: 'INVALID_KEY', message: 'Invalid API Key' } },
+        error: null
       })
 
-      await expect(service.analyzeTextWithDeepSeek('texto')).rejects.toThrow('API Error: Invalid API Key')
+      await expect(service.analyzeTextWithDeepSeek('texto')).rejects.toMatchObject({
+        code: 'INVALID_KEY',
+        message: 'Invalid API Key'
+      })
     })
   })
 })

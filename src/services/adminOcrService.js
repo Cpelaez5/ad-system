@@ -7,10 +7,12 @@
  * - Items detallados
  * - Información financiera completa
  * 
- * Usa temperatura 0.0 para máxima precisión en extracción de datos
+ * El análisis se delega a la Edge Function `ai-chat`; la temperatura y el
+ * proveedor activo se configuran en el servidor (`ai_provider_profiles`).
  */
 
 import BaseOCRService from './baseOcrService'
+import { callAiGenerate } from './ai/aiGenerateClient'
 
 // Prompt optimizado para extracción completa
 const FULL_EXTRACTION_PROMPT = `Analiza esta factura y extrae TODOS los datos disponibles.
@@ -67,8 +69,6 @@ Reglas:
 class AdminOCRService extends BaseOCRService {
     constructor() {
         super()
-        this.apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY
-        this.apiUrl = 'https://api.deepseek.com/chat/completions'
     }
 
     /**
@@ -83,7 +83,7 @@ class AdminOCRService extends BaseOCRService {
             // Procesar archivo y obtener texto
             const text = await this.processFile(file)
 
-            console.log('📝 Analizando texto con DeepSeek (temperatura 0.0 para máxima precisión)...')
+            console.log('📝 Analizando texto con la IA (ai-chat, máxima precisión)...')
             const response = await this.analyzeTextWithDeepSeek(text)
 
             const data = this.parseJSONResponse(response)
@@ -113,37 +113,14 @@ class AdminOCRService extends BaseOCRService {
     }
 
     /**
-     * Analiza texto extraído usando DeepSeek
-     * Usa temperatura 0.0 para máxima precisión (recomendado para Data Analysis)
+     * Analiza texto extraído usando la IA (Edge Function `ai-chat`).
+     * Nota: se conserva el nombre `analyzeTextWithDeepSeek` por compatibilidad
+     * con tests y llamadores; el proveedor real lo decide el servidor.
      */
     async analyzeTextWithDeepSeek(text) {
         try {
-            const response = await fetch(this.apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'deepseek-chat',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: `${FULL_EXTRACTION_PROMPT}\n\nTEXTO DE LA FACTURA:\n${text}`
-                        }
-                    ],
-                    temperature: 0.0, // Máxima precisión para extracción de datos
-                    max_tokens: 3000
-                })
-            })
-
-            if (!response.ok) {
-                const error = await response.json()
-                throw new Error(`API Error: ${error.error?.message || response.statusText}`)
-            }
-
-            const data = await response.json()
-            return data.choices[0].message.content
+            const prompt = `${FULL_EXTRACTION_PROMPT}\n\nTEXTO DE LA FACTURA:\n${text}`
+            return await callAiGenerate({ prompt, responseFormat: 'json' })
 
         } catch (error) {
             console.error('Error en análisis de texto:', error)

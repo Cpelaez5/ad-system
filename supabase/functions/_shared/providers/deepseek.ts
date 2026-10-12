@@ -1,4 +1,4 @@
-import { IOcrProvider } from './types.ts';
+import { IOcrProvider, GenerateTextOptions } from './types.ts';
 
 export class DeepseekProvider implements IOcrProvider {
   async process(
@@ -40,18 +40,34 @@ export class DeepseekProvider implements IOcrProvider {
   async generateText(
     prompt: string,
     apiKey: string,
-    model: string
+    model: string,
+    options: GenerateTextOptions = {}
   ): Promise<{ text: string; usage: { promptTokenCount: number; candidatesTokenCount: number } }> {
+    // LIMITACIÓN DOCUMENTADA (misma decisión que en process()): DeepSeek no
+    // soporta contenido multimodal (image_url) de forma confiable en este flujo,
+    // ni PDFs ni fileUri. Si se pide visión, se lanza un error claro para que el
+    // frontend pueda decidir un fallback (ej. OCR local + análisis de texto).
+    if (options.images?.length) {
+      throw {
+        code: 'UNSUPPORTED_INPUT',
+        message: 'El proveedor DeepSeek no soporta imágenes/visión. Use un proveedor con soporte multimodal (ej. Gemini) o envíe texto ya extraído.'
+      };
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 55_000); // 55s timeout
 
-    const payload = {
+    const payload: any = {
       model: model,
       messages: [
-        { role: 'system', content: 'Eres un asistente inteligente.' },
+        { role: 'system', content: options.system || 'Eres un asistente inteligente.' },
         { role: 'user', content: prompt }
       ]
     };
+
+    if (options.responseFormat === 'json') {
+      payload.response_format = { type: 'json_object' };
+    }
 
     try {
       const response = await fetch('https://api.deepseek.com/chat/completions', {
