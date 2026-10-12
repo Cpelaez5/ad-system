@@ -70,6 +70,8 @@ Es el corazón del MVP y el diferenciador.
 - Bandeja de "pagos reportados" con aprobar o rechazar en 1 clic (activa la suscripción y notifica).
 - Gestión de usuarios con invitación (ya construida) y estados claros.
 - Ocultar `/ocr-demo` y `/test-form` en producción.
+- **Adelantado de la Fase 5 (decisión 2026-10-12): avisos de vencimiento por correo.** Job diario (`pg_cron` + Edge Function) que avisa al cliente 30, 7 y 1 días antes de que venza un papel de "Mis papeles" (`fiscal_docs.expiration_date`) o su plan. Plantilla corta en lenguaje llano con botón "Ver mis papeles".
+- **Adelantado de la Fase 5: registrar un gasto mandando la foto por WhatsApp** (gancho de lanzamiento). WhatsApp Business Cloud API (Meta) → webhook en Edge Function → identifica al cliente por su número verificado → reutiliza `gemini-ocr` → guarda como **borrador** y responde "Listo, registré tu gasto de $X en *Proveedor*. Revísalo aquí: <enlace>". Requisitos del usuario: cuenta de Meta Business verificada, número de teléfono dedicado y plantillas aprobadas (lo gestiona el usuario; el código no depende de eso para probarse en modo sandbox).
 
 ### Fase 4 — Lanzamiento comercial (1-2 semanas, en paralelo con la Fase 3) → `06-agente-producto-marketing.md`
 - Decisión de precios (ver §5), landing reescrita con el posicionamiento, comparativa con Fina y testimonios.
@@ -77,8 +79,8 @@ Es el corazón del MVP y el diferenciador.
 - Botón de soporte por WhatsApp, analítica básica (activación, registro del primer gasto), monitoreo de errores y backups verificados.
 
 ### Fase 5 — Diferenciadores post-MVP (backlog priorizado)
-1. Registrar gastos enviando la foto **por WhatsApp** (reutiliza el OCR).
-2. Alertas de vencimientos y pagos por WhatsApp y correo (motor proactivo del Roadmap v2.0).
+1. ~~Foto por WhatsApp~~ → adelantado a la Fase 3.
+2. Alertas por **WhatsApp** (las de correo se adelantan a la Fase 3) y motor proactivo del Roadmap v2.0 (alerta de gasto +15 %, reporte semanal "Salud de tu negocio").
 3. Modo contador multi-cliente y exportación para Profit, Gálac o Saint.
 4. Registro por voz ("Gasté 20 dólares en gasolina").
 5. Conciliación bancaria con CSV + IA.
