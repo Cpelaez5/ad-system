@@ -91,8 +91,8 @@ export default {
           first_name: this.form.first_name,
           last_name: this.form.last_name,
           username: this.form.email.split('@')[0],
-          role: 'contador',
-          organization_id: this.invitation.organization_id
+          // El rol y la organización los toma la BD de la invitación (handle_new_user), no de aquí
+          invitation_token: this.invitation.token
         }
 
         const { error } = await supabase.auth.signUp({
@@ -106,12 +106,6 @@ export default {
         // 🎯 Trackear evento de Registro en GA y Meta
         analyticsService.trackEvent('CompleteRegistration', { role: 'contador' })
         analyticsService.trackEvent('generate_lead', { role: 'contador' })
-
-        // Marcar invitación como aceptada
-        await supabase
-          .from('invitations')
-          .update({ status: 'accepted' })
-          .eq('id', this.invitation.id);
 
         alert('Cuenta creada exitosamente.')
         this.$router.push('/login')

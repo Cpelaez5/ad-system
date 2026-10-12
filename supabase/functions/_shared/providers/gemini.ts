@@ -1,4 +1,4 @@
-import { IOcrProvider } from './types.ts';
+import { IOcrProvider, GenerateTextOptions } from './types.ts';
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 export class GeminiProvider implements IOcrProvider {
@@ -133,16 +133,25 @@ export class GeminiProvider implements IOcrProvider {
   async generateText(
     prompt: string,
     apiKey: string,
-    model: string
+    model: string,
+    options: GenerateTextOptions = {}
   ): Promise<{ text: string; usage: { promptTokenCount: number; candidatesTokenCount: number } }> {
-    const payload = {
-      contents: [{
-        parts: [{ text: prompt }],
-      }],
+    const parts: any[] = [{ text: prompt }];
+
+    for (const image of options.images ?? []) {
+      parts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } });
+    }
+
+    const payload: any = {
+      contents: [{ parts }],
       generationConfig: {
-        responseMimeType: 'text/plain',
+        responseMimeType: options.responseFormat === 'json' ? 'application/json' : 'text/plain',
       },
     };
+
+    if (options.system) {
+      payload.systemInstruction = { parts: [{ text: options.system }] };
+    }
 
     if (model.includes('pro')) {
       payload.generationConfig.thinkingConfig = { thinkingBudget: 1024 };

@@ -17,11 +17,15 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// Debug: Mostrar todas las variables de entorno disponibles
-console.log('🔍 Variables de entorno disponibles:', {
+// Debug: Mostrar el estado de las variables de entorno esperadas.
+// IMPORTANTE: nunca loguear `import.meta.env` completo. Vite reemplaza esa
+// referencia por un objeto literal con TODAS las variables VITE_* definidas
+// en .env (incluyendo cualquier secreto que alguien agregue por error), y
+// ese objeto queda horneado en el bundle público y se imprime en la consola
+// del navegador en cada carga.
+console.log('🔍 Variables de entorno de Supabase:', {
   VITE_SUPABASE_URL: supabaseUrl,
-  VITE_SUPABASE_ANON_KEY: supabaseAnonKey ? 'Cargada' : 'No cargada',
-  allEnv: import.meta.env
+  VITE_SUPABASE_ANON_KEY: supabaseAnonKey ? 'Cargada' : 'No cargada'
 })
 
 // Validar que las variables de entorno estén configuradas

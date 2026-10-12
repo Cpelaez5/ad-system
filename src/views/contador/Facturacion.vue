@@ -595,6 +595,7 @@ import StatsCard from '@/components/common/StatsCard.vue'
 import CurrencyStatsCard from '@/components/common/CurrencyStatsCard.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import invoiceService from '@/services/invoiceService.js';
+import { obtenerUrlFirmada } from '@/services/storageUrlService.js';
 import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
 import InvoiceForm from '@/components/forms/InvoiceForm.vue';
@@ -870,8 +871,16 @@ export default {
       this.invoiceDialog = true;
     },
     
-    viewInvoice(invoice) {
-      this.viewingInvoice = JSON.parse(JSON.stringify(invoice));
+    async viewInvoice(invoice) {
+      const cloned = JSON.parse(JSON.stringify(invoice));
+      // Resolver la URL del adjunto (ruta o URL pública/firmada antigua) a una
+      // URL firmada lista para previsualizar/descargar antes de mostrar el diálogo.
+      if (cloned.attachments && cloned.attachments.length > 0 && cloned.attachments[0]) {
+        const att = cloned.attachments[0];
+        const signedUrl = await obtenerUrlFirmada('invoices', att.path || att.url);
+        if (signedUrl) att.url = signedUrl;
+      }
+      this.viewingInvoice = cloned;
       this.viewDialog = true;
     },
     
@@ -1030,10 +1039,11 @@ export default {
         if (!url) return false;
         return url.toLowerCase().includes('.pdf');
     },
-    downloadAttachment(invoice) {
+    async downloadAttachment(invoice) {
         const attach = this.getFirstAttachment(invoice);
         if (attach && attach.url) {
-            window.open(attach.url, '_blank');
+            const signedUrl = await obtenerUrlFirmada('invoices', attach.path || attach.url);
+            window.open(signedUrl || attach.url, '_blank');
         }
     },
     

@@ -1,0 +1,531 @@
+# 🗄️ Schema de Base de Datos
+
+> Supabase PostgreSQL con Row Level Security (RLS)
+
+---
+
+## Tablas Principales
+
+### organizations
+Empresas administradoras/contadoras que prestan servicios.
+
+```sql
+CREATE TABLE organizations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  rif TEXT UNIQUE NOT NULL,
+  address TEXT,
+  phone TEXT,
+  email TEXT,
+  logo_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+### users
+Usuarios del sistema vinculados a auth.users.
+
+```sql
+CREATE TABLE users (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  organization_id UUID REFERENCES organizations(id),
+  client_id UUID REFERENCES clients(id),
+  email TEXT NOT NULL,
+  first_name TEXT,
+  last_name TEXT,
+  role TEXT CHECK (role IN ('super_admin', 'admin', 'contador', 'cliente')),
+  avatar_url TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  invited_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Constraints importantes:
+-- cliente DEBE tener client_id
+-- super_admin NO debe tener organization_id
+```
+
+**Relaciones por rol**:
+| Rol | organization_id | client_id |
+|-----|-----------------|-----------|
+| super_admin | NULL | NULL |
+| admin | ✅ Requerido | NULL |
+| contador | ✅ Requerido | NULL |
+| cliente | ✅ Requerido | ✅ Requerido |
+
+---
+
+### clients
+Empresas cliente que reciben servicios contables.
+
+```sql
+CREATE TABLE clients (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  company_name TEXT NOT NULL,
+  rif TEXT NOT NULL,
+  address TEXT,
+  phone TEXT,
+  email TEXT,
+  contact_name TEXT,
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(organization_id, rif)
+);
+```
+
+---
+
+### invoices
+Facturas de compra/venta.
+
+```sql
+CREATE TABLE invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  client_id UUID REFERENCES clients(id), -- NULL = factura de la org
+  
+  -- Datos básicos
+  invoice_number TEXT NOT NULL,
+  invoice_type TEXT CHECK (invoice_type IN ('FACTURA', 'NOTA_CREDITO', 'NOTA_DEBITO')),
+  flow TEXT CHECK (flow IN ('VENTA', 'COMPRA')),
+  status TEXT DEFAULT 'BORRADOR' CHECK (status IN ('BORRADOR', 'EMITIDA', 'ENVIADA', 'PAGADA', 'VENCIDA', 'ANULADA', 'CRÉDITO')),
+  
+  -- Fechas
+  issue_date DATE NOT NULL,
+  due_date DATE,
+  
+  -- Montos
+  currency TEXT DEFAULT 'VES',
+  subtotal DECIMAL(15,2),
+  tax_rate DECIMAL(5,2),
+  tax_amount DECIMAL(15,2),
+  total DECIMAL(15,2),
+  
+  -- Retenciones
+  iva_retention DECIMAL(15,2),
+  islr_retention DECIMAL(15,2),
+  municipal_retention DECIMAL(15,2),
+  igtf DECIMAL(15,2),
+  
+  -- Emisor/Cliente info
+  issuer_name TEXT,
+  issuer_rif TEXT,
+  issuer_address TEXT,
+  recipient_name TEXT,
+  recipient_rif TEXT,
+  recipient_address TEXT,
+  
+  -- Extras
+  notes TEXT,
+  attachment_url TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Estados de factura**:
+- `BORRADOR` - En edición
+- `EMITIDA` - Oficial
+- `ENVIADA` - Al cliente
+- `PAGADA` - Cobrada/Pagada
+- `VENCIDA` - Sin pagar a tiempo
+- `ANULADA` - Cancelada (soft delete)
+
+---
+
+### documents
+Archivos en Supabase Storage.
+
+```sql
+CREATE TABLE documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  uploaded_by UUID REFERENCES auth.users(id),
+  
+  name TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_type TEXT,
+  file_size INTEGER,
+  category TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+### system_invoices
+Facturas del sistema hacia los clientes por su suscripción.
+
+```sql
+CREATE TABLE system_invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  subscription_id UUID REFERENCES client_subscriptions(id),
+  invoice_number TEXT NOT NULL UNIQUE,
+  amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'paid', 'overdue', 'canceled')),
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+  due_date DATE NOT NULL,
+  paid_at TIMESTAMPTZ,
+  payment_reference TEXT,
+  payment_method TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Estados**: `pending`, `paid`, `overdue`, `canceled`
+
+---
+
+### payment_methods
+Métodos de pago guardados por el cliente (placeholder).
+
+```sql
+CREATE TABLE payment_methods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  type TEXT NOT NULL DEFAULT 'bank_transfer'
+    CHECK (type IN ('bank_transfer', 'mobile_payment', 'zelle', 'cash')),
+  label TEXT NOT NULL,
+  details JSONB DEFAULT '{}',
+  is_default BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+### fiscal_docs
+Expediente Fiscal 360: Metadatos de permisos y documentos legales.
+
+```sql
+CREATE TABLE fiscal_docs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  client_id UUID REFERENCES clients(id),
+  
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('VIGENTE', 'TRAMITE', 'VENCIDO')),
+  expiration_date DATE,
+  
+  document_id UUID REFERENCES documents(id),
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+### invitations
+Sistema de invitaciones por email.
+
+```sql
+CREATE TABLE invitations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  token UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
+  role TEXT CHECK (role IN ('admin', 'contador', 'cliente')),
+  organization_id UUID REFERENCES organizations(id),
+  client_id UUID REFERENCES clients(id),
+  status TEXT DEFAULT 'pending',
+  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '7 days'),
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+## Políticas RLS
+
+### Principio General
+Cada tabla filtra por `organization_id` para aislamiento multi-tenant.
+
+```sql
+-- Ejemplo: invoices
+CREATE POLICY "invoices_select" ON invoices
+FOR SELECT USING (
+  organization_id = get_current_organization_id()
+);
+```
+
+### Funciones Helper
+```sql
+-- Obtener organization_id del usuario actual
+CREATE FUNCTION get_current_organization_id()
+RETURNS UUID AS $$
+  SELECT organization_id FROM users 
+  WHERE id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER;
+```
+
+---
+
+## Storage Buckets
+
+### documents
+- Límite: 50MB por archivo
+- Tipos: PDF, Excel, Word, Imágenes
+- Acceso: Por organization_id
+
+### payment-proofs
+- Límite: 10MB por archivo
+- Tipos: Imágenes, PDF
+- Acceso: Clientes suben, super_admin y cliente leen
+
+---
+
+## Tablas de Facturación del Sistema
+
+### payment_methods
+Métodos de pago configurados por super_admin (global del sistema).
+
+```sql
+CREATE TABLE payment_methods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('mobile_payment', 'bank_transfer', 'zelle', 'binance')),
+  description TEXT,
+  is_enabled BOOLEAN DEFAULT true,
+  charge_igtf BOOLEAN DEFAULT false,
+  details JSONB NOT NULL DEFAULT '{}',
+  support_phone_prefix TEXT,
+  support_phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### payment_reports
+Reportes de pago enviados por clientes para validación.
+
+```sql
+CREATE TABLE payment_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id UUID NOT NULL REFERENCES system_invoices(id),
+  client_id UUID NOT NULL REFERENCES clients(id),
+  payment_method_id UUID NOT NULL REFERENCES payment_methods(id),
+  reference TEXT NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  proof_url TEXT,
+  sender_details JSONB DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'pending_review'
+    CHECK (status IN ('pending_review', 'approved', 'rejected')),
+  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_at TIMESTAMPTZ,
+  rejection_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+### user_preferences
+Preferencias personalizadas por usuario (layout del dashboard, tema, filtros, etc.).
+
+```sql
+CREATE TABLE user_preferences (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  preference_key TEXT NOT NULL,
+  preference_value JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, organization_id, preference_key)
+);
+```
+
+**Claves de preferencia actuales**:
+| Clave | Descripción |
+|-------|-------------|
+| `dashboard_layout` | Layout Swapy del dashboard (posición de cards) |
+
+**RLS**: Cada usuario solo puede leer/escribir sus propias preferencias (`user_id = auth.uid()`).
+
+---
+
+### support_conversations
+Sesiones de chat de soporte IA para clientes.
+
+```sql
+CREATE TABLE support_conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'closed', 'waiting_agent')),
+  mode TEXT NOT NULL DEFAULT 'ai'
+    CHECK (mode IN ('ai', 'human')),
+  current_route TEXT,
+  current_route_title TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Campos clave**:
+| Campo | Descripción |
+|-------|-------------|
+| `mode` | `ai` = DeepSeek, `human` = Super Admin (Fase 2) |
+| `status` | `active`, `closed`, `waiting_agent` |
+| `current_route` | Última ruta del usuario en la conversación |
+
+**RLS**: Usuario ve solo sus conversaciones. Super Admin ve todas.
+
+---
+
+### support_messages
+Mensajes individuales dentro de cada conversación.
+
+```sql
+CREATE TABLE support_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'agent', 'system')),
+  content TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Roles de mensaje**: `user` (cliente), `assistant` (IA), `agent` (Super Admin futuro), `system` (sistema).
+
+**RLS**: Usuario ve mensajes de sus conversaciones. Super Admin ve todos.
+
+---
+
+---
+
+## Tablas de Retenciones Fiscales
+
+### conceptos_islr
+Catálogo de conceptos de retención de Impuesto Sobre La Renta (Decreto 1.808 SENIAT).
+
+```sql
+CREATE TABLE conceptos_islr (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  codigo TEXT, -- Ej: '055', '054', '053', '060'
+  nombre TEXT NOT NULL,
+  porcentaje_base DECIMAL(5,2) NOT NULL DEFAULT 100,
+  porcentaje_retencion DECIMAL(5,2) NOT NULL,
+  sustraendo_ut DECIMAL(10,2) NOT NULL DEFAULT 0,
+  monto_minimo_ut DECIMAL(10,2) NOT NULL DEFAULT 0,
+  aplica_persona TEXT DEFAULT 'AMBAS' CHECK (aplica_persona IN ('NATURAL', 'JURIDICA', 'AMBAS')),
+  descripcion TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### proveedores
+Directorio de proveedores con configuración de retenciones fiscales y contacto.
+
+```sql
+CREATE TABLE proveedores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  client_id UUID REFERENCES clients(id) ON DELETE CASCADE, -- Aislamiento por cliente
+  nombre TEXT NOT NULL,
+  rif TEXT NOT NULL,
+  tipo_persona TEXT NOT NULL CHECK (tipo_persona IN ('NATURAL', 'JURIDICA')),
+  telefono TEXT,
+  email TEXT,
+  direccion TEXT,
+  contacto_nombre TEXT,
+  iva_retention_rate DECIMAL(5,2) DEFAULT 0,
+  islr_concept_id UUID REFERENCES conceptos_islr(id),
+  municipal_rate DECIMAL(5,2) DEFAULT 0,
+  licencia_actividad_economica TEXT,
+  municipio_id UUID REFERENCES municipios(id),
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+```
+
+### retenciones
+Registro histórico y oficial de comprobantes de retención emitidos.
+
+```sql
+CREATE TABLE retenciones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  client_id UUID NOT NULL REFERENCES clients(id),
+  invoice_id UUID NOT NULL REFERENCES invoices(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('IVA', 'ISLR', 'MUNICIPAL')),
+  numero_comprobante TEXT NOT NULL,
+  proveedor_id UUID REFERENCES proveedores(id),
+  proveedor_nombre TEXT NOT NULL,
+  proveedor_rif TEXT NOT NULL,
+  proveedor_tipo_persona TEXT NOT NULL,
+  factura_numero TEXT,
+  factura_control TEXT,
+  factura_fecha DATE,
+  base_imponible DECIMAL(15,2) NOT NULL,
+  monto_iva DECIMAL(15,2),
+  porcentaje_retencion DECIMAL(5,2) NOT NULL,
+  monto_retenido DECIMAL(15,2) NOT NULL,
+  concepto_islr_id UUID REFERENCES conceptos_islr(id),
+  concepto_islr_nombre TEXT,
+  sustraendo_ut DECIMAL(10,2),
+  valor_ut DECIMAL(15,2),
+  municipio_id UUID REFERENCES municipios(id),
+  licencia_actividad TEXT,
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+```
+
+---
+
+## Migraciones
+
+Ubicación: `/migrations/`
+
+```
+migrations/
+├── 001_initial_schema.sql
+├── 002_add_users_table.sql
+├── 003_add_invoices_table.sql
+├── 006_retenciones_backend_schema.sql
+├── 007_retenciones_registrar_compra.sql
+├── 008_islr_catalogo_completo.sql
+├── 009_proveedores_schema_rls_views.sql
+└── ...
+```
+
+**Convención de nombres**:
+```
+NNN_descripcion_breve.sql
+```
+
+**Estructura de migración**:
+```sql
+-- migrations/NNN_descripcion.sql
+-- Descripción: [qué hace]
+-- Autor: [nombre]
+-- Fecha: YYYY-MM-DD
+
+[SQL statements]
+```
+

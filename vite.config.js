@@ -1,12 +1,9 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  const env = loadEnv(mode, process.cwd(), '')
-
+export default defineConfig(({ command }) => {
   return {
     plugins: [vue()],
     resolve: {
@@ -16,14 +13,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
-      open: true,
-      proxy: {
-        '/api/ai': {
-          target: env.VITE_NVIDIA_PROXY_TARGET || 'https://integrate.api.nvidia.com/v1',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/ai/, '')
-        }
-      }
+      open: true
     },
     css: {
       preprocessorOptions: {
@@ -38,6 +28,10 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'happy-dom',
       globals: true
-    }
+    },
+    esbuild: command === 'build' ? {
+      pure: ['console.log', 'console.debug', 'console.info'],
+      drop: ['debugger']
+    } : {}
   }
 })

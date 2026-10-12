@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient'
 import { getCurrentOrganizationId, queryWithTenant, insertWithTenant, updateWithTenant, deleteWithTenant } from '@/utils/tenantHelpers'
+import { extraerRutaStorage, obtenerUrlFirmada } from '@/services/storageUrlService.js'
 
 const documentService = {
   // Obtener todos los documentos de la organización actual
@@ -94,14 +95,16 @@ const documentService = {
 
       if (error) throw error
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath)
+      // Guardamos la RUTA (no una URL pública) en fileUrl para que siga funcionando
+      // cuando el bucket 'documents' pase a privado. Para mostrarla de inmediato
+      // generamos además una URL firmada de corta duración.
+      const signedUrl = await obtenerUrlFirmada('documents', filePath)
 
       return {
         success: true,
         data: {
-          fileUrl: publicUrl,
+          fileUrl: filePath,
+          signedUrl: signedUrl || null,
           filePath: filePath,
           fileType: file.type,
           fileSize: file.size
@@ -162,13 +165,12 @@ const documentService = {
 
       if (fetchError) throw fetchError
 
-      // Intentar borrar del storage extrayendo el path de la URL
+      // Intentar borrar del storage extrayendo la ruta real (acepta ruta relativa
+      // o URL pública/firmada antigua)
       if (doc.file_url) {
         try {
-          // URL format: .../documents/ORG_ID/CATEGORY/FILENAME
-          const urlParts = doc.file_url.split('/documents/')
-          if (urlParts.length > 1) {
-            const storagePath = urlParts[1]
+          const storagePath = extraerRutaStorage('documents', doc.file_url)
+          if (storagePath) {
             await supabase.storage.from('documents').remove([storagePath])
           }
         } catch (e) {

@@ -355,6 +355,7 @@
 <script>
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import { supabase } from '@/lib/supabaseClient'
+import { obtenerUrlFirmada } from '@/services/storageUrlService.js'
 
 export default {
   name: 'ClienteArchivo',
@@ -610,10 +611,8 @@ export default {
                 console.log(`🧹 Limpiando archivo huérfano del Storage: ${archivo.name}`)
                 try {
                   const { supabase } = await import('@/lib/supabaseClient')
-                  const urlParts = uploadResult.data.fileUrl.split('/')
-                  const documentsIndex = urlParts.indexOf('documents')
-                  if (documentsIndex !== -1) {
-                    const filePath = urlParts.slice(documentsIndex + 1).join('/')
+                  const filePath = uploadResult.data.filePath || uploadResult.data.fileUrl
+                  if (filePath) {
                     await supabase.storage
                       .from('documents')
                       .remove([filePath])
@@ -643,18 +642,20 @@ export default {
         }
       }
     },
-    verDocumento(documento) {
+    async verDocumento(documento) {
       console.log('Ver documento:', documento)
       if (documento.url) {
-        window.open(documento.url, '_blank')
+        const signedUrl = await obtenerUrlFirmada('documents', documento.url)
+        window.open(signedUrl || documento.url, '_blank')
       }
     },
     async descargarDocumento(documento) {
       try {
         console.log('📥 Descargando documento:', documento.nombre)
         if (documento.url) {
+          const signedUrl = await obtenerUrlFirmada('documents', documento.url)
           const link = document.createElement('a')
-          link.href = documento.url
+          link.href = signedUrl || documento.url
           link.download = documento.nombre
           link.target = '_blank'
           document.body.appendChild(link)

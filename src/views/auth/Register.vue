@@ -113,28 +113,17 @@ export default {
       try {
         const { supabase } = await import('@/lib/supabaseClient');
         
-        const { data, error } = await supabase
-          .from('invitations')
-          .select('*') 
-          .eq('token', token)
-          .maybeSingle();
+        // La tabla invitations no es legible sin sesión: se consulta por token exacto vía RPC
+        const { data: rows, error } = await supabase
+          .rpc('get_invitation_by_token', { p_token: token });
 
         if (error) throw error;
+        const data = rows?.[0];
         if (!data) throw new Error('La invitación no existe o ha expirado.');
         if (data.status !== 'pending') throw new Error('Esta invitación ya ha sido utilizada.');
         if (new Date(data.expires_at) < new Date()) throw new Error('La invitación ha caducado.');
 
-        let orgName = 'la organización';
-        try {
-            const { data: orgData } = await supabase
-                .from('organizations')
-                .select('name')
-                .eq('id', data.organization_id)
-                .maybeSingle();
-            if (orgData) orgName = orgData.name;
-        } catch (e) { console.warn(e); }
-
-        this.invitationData = { ...data, organization_name: orgName };
+        this.invitationData = { ...data, organization_name: data.organization_name || 'la organización' };
 
         if (data.role === 'cliente') this.currentComponent = 'RegisterClient';
         else if (data.role === 'contador') this.currentComponent = 'RegisterAccountant';

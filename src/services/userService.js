@@ -524,7 +524,8 @@ const userService = {
         organization_id: userData.organization_id,
         client_id: userData.client_id,
         plan_id: userData.plan_id,
-        trial_end: userData.trial_end
+        trial_end: userData.trial_end,
+        invitedAt: userData.invited_at
       };
     },
 
@@ -740,6 +741,51 @@ const userService = {
           error: e.message || 'Error inesperado al procesar la eliminación'
         };
       }
+    },
+
+    /**
+     * Invita a un usuario o reenvía la invitación invocando la Edge Function admin-invite-user.
+     * @param {Object} payload - { email, role, firstName, lastName }
+     * @returns {Promise<{ success: boolean, data?: object, message?: string }>}
+     */
+    async inviteUser({ email, role, firstName, lastName }) {
+      try {
+        const redirectUrl = window.location.origin + '/auth/set-password';
+        const { data, error } = await supabase.functions.invoke('admin-invite-user', {
+          body: {
+            email,
+            role,
+            first_name: firstName,
+            last_name: lastName,
+            redirect_url: redirectUrl
+          }
+        });
+
+        // Error de red o invocación
+        if (error) {
+          console.error('❌ Error de invocación Edge Function:', error);
+          return { success: false, message: error.message || 'Error al conectar con el servidor' };
+        }
+
+        // La Edge Function devuelve error dentro de data cuando status != 200
+        if (data?.error || data?.code) {
+          console.error('❌ Error de lógica de negocio:', data);
+          return { success: false, message: data.message || data.error || 'Error al procesar la invitación' };
+        }
+
+        return { success: true, data };
+      } catch (error) {
+        console.error('❌ Error inesperado al invitar usuario:', error);
+        return { success: false, message: error.message || 'Error inesperado al invitar usuario' };
+      }
+    },
+
+    /**
+     * Reenvía la invitación a un usuario pendiente. Idempotente.
+     * @param {Object} payload - { email, role, firstName, lastName }
+     */
+    async resendInvitation(payload) {
+      return this.inviteUser(payload);
     }
   };
 

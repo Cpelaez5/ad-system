@@ -9,6 +9,7 @@ import {
   handleTenantError
 } from '@/utils/tenantHelpers'
 import inventoryService from './inventoryService'
+import { extraerRutaStorage, obtenerUrlFirmada } from '@/services/storageUrlService.js'
 
 class InvoiceService {
   constructor() {
@@ -1255,16 +1256,19 @@ class InvoiceService {
         throw error
       }
 
-      // Obtener URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('invoices')
-        .getPublicUrl(filePath)
+      // Guardamos la RUTA (no una URL pública) en `url`/`path` para que siga
+      // funcionando cuando el bucket 'invoices' pase a privado: este objeto se
+      // persiste tal cual en invoices.attachments. Quien necesite mostrar o
+      // descargar el archivo debe re-firmarlo con obtenerUrlFirmada('invoices', path).
+      // `signedUrl` se entrega además para una previsualización inmediata opcional.
+      const signedUrl = await obtenerUrlFirmada('invoices', filePath)
 
-      console.log('✅ Archivo subido exitosamente:', publicUrl)
+      console.log('✅ Archivo subido exitosamente:', filePath)
 
       return {
         success: true,
-        url: publicUrl,
+        url: filePath,
+        signedUrl: signedUrl || null,
         path: filePath,
         fileName: file.name,
         fileSize: fileToUpload.size,
@@ -1280,11 +1284,13 @@ class InvoiceService {
   // Eliminar archivo adjunto de Supabase Storage
   async deleteAttachment(filePath) {
     try {
-      console.log('🗑️ Eliminando archivo de Supabase Storage:', filePath)
+      // Acepta tanto una ruta relativa como una URL pública/firmada antigua
+      const storagePath = extraerRutaStorage('invoices', filePath) || filePath
+      console.log('🗑️ Eliminando archivo de Supabase Storage:', storagePath)
 
       const { data, error } = await supabase.storage
         .from('invoices')
-        .remove([filePath])
+        .remove([storagePath])
 
       if (error) {
         console.error('❌ Error Delete Supabase:', error)

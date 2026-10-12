@@ -1,5 +1,7 @@
 # Contexto del Proyecto — Sistema Contable
 
+> **PLAN VIGENTE (oct-2026): `docs/mvp/PLAN-MVP.md`.** Antes de cualquier tarea lee `docs/mvp/manuales/00-REGLAS-COMUNES.md`, el manual de tu área y `docs/mvp/BITACORA.md`. Gran parte de `.agent/` y `CONTEXTO_PROYECTO.txt` está desactualizada.
+
 ## Stack técnico
 - Frontend: Vue 3 + Vite
 - Backend: Supabase (PostgreSQL + Edge Functions en Deno/TypeScript)
@@ -7,6 +9,13 @@
 - IDE: Google Antigravity con Gemini 3.1 Pro (thinking_level: high)
 
 ## Módulo activo: OCR de Comprobantes con IA Multi-Proveedor
+
+## Módulo: Invitación y Activación de Usuarios
+- `authToken` NUNCA se guarda manualmente en `localStorage` (mitigación estricta de XSS); Supabase gestiona la sesión internamente.
+- `redirectUrl` en Edge Function `admin-invite-user` SIEMPRE es validado contra la lista blanca `ALLOWED_ORIGINS`.
+- `SetPassword.vue` NO llama `getUser()` de forma manual síncrona en `mounted()`, sino que depende estrictamente de `onAuthStateChange`.
+- Las re-invitaciones a usuarios pendientes siempre se generan mediante `type: 'invite'`.
+
 
 ### Archivos clave de este módulo
 - `migrations/20260824_add_ai_settings_and_vault.sql` y `20260824_ai_provider_profiles.sql` — Schema de BD

@@ -1,3 +1,16 @@
+/** Una imagen en memoria lista para enviar a un proveedor multimodal. */
+export interface GenerateImageInput {
+  mimeType: string;
+  base64:   string;
+}
+
+/** Opciones extendidas para generateText: visión, system prompt y formato de salida. */
+export interface GenerateTextOptions {
+  images?:         GenerateImageInput[];
+  system?:         string;
+  responseFormat?: 'json';
+}
+
 export interface IOcrProvider {
   /**
    * Procesa un comprobante (imagen o PDF) y extrae los datos contables en JSON.
@@ -22,16 +35,21 @@ export interface IOcrProvider {
   ): Promise<any>;
 
   /**
-   * Genera texto libre para funcionalidad de Chat (sin forzar JSON estricto).
-   * 
-   * @param prompt El mensaje o arreglo de mensajes
+   * Genera texto libre para funcionalidad de Chat, y opcionalmente OCR/visión
+   * cuando el proveedor lo soporta (ver `options.images`).
+   *
+   * @param prompt El mensaje o instrucción principal
    * @param apiKey Llave API del proveedor
    * @param model Modelo a utilizar
+   * @param options Imágenes opcionales (visión), system prompt y formato de respuesta.
+   *   Si se pasan `images` y el proveedor no soporta visión, debe lanzar
+   *   `{ code: 'UNSUPPORTED_INPUT', message }`.
    * @returns Texto generado y metadata de tokens
    */
   generateText(
     prompt: string,
     apiKey: string,
-    model: string
+    model: string,
+    options?: GenerateTextOptions
   ): Promise<{ text: string; usage: { promptTokenCount: number; candidatesTokenCount: number } }>;
 }

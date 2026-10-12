@@ -783,6 +783,7 @@ import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
 import FiscalPeriodTracker from '@/components/fiscal/FiscalPeriodTracker.vue'
 import fiscalService from '@/services/fiscalService'
 import userService from '@/services/userService'
+import { obtenerUrlFirmada } from '@/services/storageUrlService.js'
 import systemLogo from '/ADSystem/logo.png'
 import { FISCAL_TYPES, MONTHS, isRecurringFrequency, getExpirationInfo } from '@/constants/fiscalDocuments'
 
@@ -1066,8 +1067,21 @@ const loadData = async () => {
     loading.value = true
     try {
         // Cargar según tab
-        docs.value = await fiscalService.getFiscalDocs({ trashed: currentTab.value === 'trash' })
-        
+        const rawDocs = await fiscalService.getFiscalDocs({ trashed: currentTab.value === 'trash' })
+
+        // Resolver file_url (ruta o URL pública/firmada antigua) a una URL firmada
+        // lista para mostrar/descargar/previsualizar, ya que el bucket 'documents'
+        // pasará a ser privado.
+        docs.value = await Promise.all(rawDocs.map(async (doc) => {
+            if (doc?.documents?.file_url) {
+                const signedUrl = await obtenerUrlFirmada('documents', doc.documents.file_url)
+                if (signedUrl) {
+                    doc.documents = { ...doc.documents, file_url: signedUrl }
+                }
+            }
+            return doc
+        }))
+
         // Stats siempre globales
         const newStats = await fiscalService.getStats()
         Object.assign(stats, newStats)

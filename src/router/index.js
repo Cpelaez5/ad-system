@@ -5,7 +5,7 @@ import Dashboard from '@/views/shared/Dashboard.vue'
 import Login from '@/views/shared/Login.vue'
 import Pricing from '../views/Pricing.vue'
 const Register = () => import('@/views/auth/Register.vue')
-const OCRDemo = () => import('@/views/shared/OCRDemo.vue')
+const SetPassword = () => import('@/views/auth/SetPassword.vue')
 
 // Vistas para cliente
 const ClienteMiArea = () => import('../views/cliente/ClienteMiArea.vue')
@@ -13,7 +13,6 @@ const ClienteDashboard = () => import('../views/cliente/Dashboard.vue')
 const ClienteCompras = () => import('../views/cliente/Compras.vue')
 const ClienteGastos = () => import('../views/cliente/Gastos.vue')
 const ClienteVentas = () => import('../views/cliente/Ventas.vue')
-const ClienteArchivo = () => import('../views/cliente/Archivo.vue')
 const ClienteFacturacion = () => import('../views/cliente/Facturacion.vue')
 const Settings = () => import('../views/shared/Settings.vue')
 const MunicipalSettings = () => import('../views/shared/MunicipalSettings.vue')
@@ -35,7 +34,6 @@ const FacturacionSistema = () => import('../views/admin/FacturacionSistema.vue')
 const AiSettings = () => import('../views/admin/AiSettings.vue')
 
 // Componentes de prueba
-import TestForm from '@/components/common/TestForm.vue'
 
 // Definir las rutas del sistema
 import LandingPage from '@/views/LandingPage.vue'
@@ -125,16 +123,16 @@ const routes = [
     }
   },
   {
+    path: '/auth/set-password',
+    name: 'SetPassword',
+    component: SetPassword,
+    meta: { requiresAuth: false, title: 'Definir Contraseña | AD SYSTEM' }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: Dashboard,
     meta: { requiresAuth: true, title: 'Dashboard', roles: ['super_admin', 'admin', 'contador'] } // Dashboard compartido para admin/contador
-  },
-  {
-    path: '/ocr-demo',
-    name: 'OCRDemo',
-    component: OCRDemo,
-    meta: { requiresAuth: true, title: 'Demo OCR', roles: ['super_admin', 'admin', 'contador'] }
   },
   {
     path: '/cliente/dashboard',
@@ -163,12 +161,6 @@ const routes = [
     name: 'ClienteVentas',
     redirect: to => { return { path: '/cliente/facturacion', query: { tab: 'ventas' } } }
   },
-  /* {
-    path: '/cliente/archivo',
-    name: 'ClienteArchivo',
-    component: ClienteArchivo,
-    meta: { requiresAuth: true, title: 'Mis Documentos', roles: ['cliente'] }
-  }, */
   {
     path: '/cliente/planes',
     name: 'ClientePlanes',
@@ -236,12 +228,6 @@ const routes = [
     meta: { requiresAuth: true, title: 'Archivo Digital', roles: ['admin', 'contador'] }
   },
   {
-    path: '/test-form',
-    name: 'TestForm',
-    component: TestForm,
-    meta: { requiresAuth: false, title: 'Formulario de Prueba' }
-  },
-  {
     path: '/usuarios',
     name: 'Usuarios',
     component: Usuarios,
@@ -292,7 +278,21 @@ const routes = [
     name: 'TrialExpired',
     component: () => import('../views/shared/TrialExpired.vue'),
     meta: { requiresAuth: true, title: 'Prueba Expirada' }
-  }
+  },
+  ...(import.meta.env.DEV ? [
+    {
+      path: '/ocr-demo',
+      name: 'OCRDemo',
+      component: () => import('@/views/shared/OCRDemo.vue'),
+      meta: { requiresAuth: true, title: 'Demo OCR', roles: ['super_admin', 'admin', 'contador'] }
+    },
+    {
+      path: '/test-form',
+      name: 'TestForm',
+      component: () => import('@/components/common/TestForm.vue'),
+      meta: { requiresAuth: false, title: 'Formulario de Prueba' }
+    }
+  ] : [])
 ]
 
 // Crear el router
