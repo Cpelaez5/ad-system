@@ -231,8 +231,8 @@ export default {
             estado: this.form.estado,
             municipio: this.form.municipio,
             address: this.form.address,
-
-            organization_id: this.invitation.organization_id
+            // La organización la decide el servidor a partir de la invitación (o el registro público)
+            invitation_token: this.invitation.token || null
           }
         });
 
