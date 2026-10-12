@@ -297,7 +297,7 @@
             <!-- Chips de Configuración Fiscal -->
             <div class="d-flex flex-wrap my-2" style="gap: 6px;">
               <v-chip size="x-small" color="secondary" variant="flat">
-                IVA: {{ prov.iva_retention_rate || 0 }}%
+                Ret. IVA: {{ prov.iva_retention_rate || 0 }}%
               </v-chip>
 
               <v-chip
@@ -434,7 +434,7 @@
             <td>
               <div class="d-flex flex-wrap" style="gap: 4px;">
                 <v-chip size="x-small" color="secondary" variant="flat">
-                  IVA: {{ prov.iva_retention_rate || 0 }}%
+                  Ret. IVA: {{ prov.iva_retention_rate || 0 }}%
                 </v-chip>
                 <v-chip
                   v-if="prov.islr_codigo || prov.islr_porcentaje"
