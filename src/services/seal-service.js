@@ -11,6 +11,7 @@
 import { supabase } from '@/lib/supabaseClient'
 import preferencesService from '@/services/preferencesService.js'
 import { getCurrentOrganizationId, getCurrentClientId } from '@/utils/tenantHelpers'
+import { obtenerUrlFirmada } from '@/services/storageUrlService.js'
 
 class SealService {
   /**
@@ -66,15 +67,45 @@ class SealService {
   }
 
   /**
-   * Obtiene la configuración de sellos y firmas del cliente específico.
-   * @param {string} [explicitClientId] - UUID opcional del cliente
-   * @returns {Promise<{ sealUrl: string|null, signatureUrl: string|null, combinedUrl: string|null, activeMode: string }>}
+   * Resuelve un valor almacenado (ruta de Storage, URL pública/firmada antigua o
+   * DataURL) a una URL lista para usar en <img>/fetch/html2canvas.
+   * - DataURL: se devuelve tal cual (no es un recurso de Storage).
+   * - Ruta o URL de Storage: se firma con obtenerUrlFirmada (bucket 'documents').
+   * - Si no se puede firmar (p.ej. valor no reconocido), se devuelve el valor original
+   *   como último recurso para no romper la UI mientras el bucket siga siendo público.
+   * @private
    */
-  async getSealConfig(explicitClientId = null) {
-    const { organizationId, clientId, userId } = await this._resolveContext(explicitClientId)
-    const storageKey = this._getStorageKey(clientId, userId)
-    const preferenceKey = this._getPreferenceKey(clientId, userId)
+  async _resolveAssetUrl(value) {
+    if (!value || typeof value !== 'string') return value || null
+    if (value.startsWith('data:')) return value
 
+    const signed = await obtenerUrlFirmada('documents', value)
+    return signed || value
+  }
+
+  /**
+   * Convierte una configuración "cruda" (con rutas/valores almacenados) en una
+   * configuración lista para mostrar, con sealUrl/signatureUrl/combinedUrl resueltos.
+   * @private
+   */
+  async _toDisplayConfig(rawConfig) {
+    if (!rawConfig) return rawConfig
+
+    const [sealUrl, signatureUrl, combinedUrl] = await Promise.all([
+      this._resolveAssetUrl(rawConfig.sealUrl),
+      this._resolveAssetUrl(rawConfig.signatureUrl),
+      this._resolveAssetUrl(rawConfig.combinedUrl)
+    ])
+
+    return { ...rawConfig, sealUrl, signatureUrl, combinedUrl }
+  }
+
+  /**
+   * Obtiene la configuración "cruda" (rutas de Storage o DataURL, sin resolver)
+   * desde la caché local privada y/o las preferencias remotas.
+   * @private
+   */
+  async _getRawConfig(storageKey, preferenceKey) {
     // Limpieza de clave global heredada vulnerable si existiese
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('ad_system_company_seal_config')
@@ -118,6 +149,21 @@ class SealService {
   }
 
   /**
+   * Obtiene la configuración de sellos y firmas del cliente específico, con las
+   * URLs ya resueltas (firmadas) y listas para usar en <img>/descargas/PDFs.
+   * @param {string} [explicitClientId] - UUID opcional del cliente
+   * @returns {Promise<{ sealUrl: string|null, signatureUrl: string|null, combinedUrl: string|null, activeMode: string }>}
+   */
+  async getSealConfig(explicitClientId = null) {
+    const { clientId, userId } = await this._resolveContext(explicitClientId)
+    const storageKey = this._getStorageKey(clientId, userId)
+    const preferenceKey = this._getPreferenceKey(clientId, userId)
+
+    const rawConfig = await this._getRawConfig(storageKey, preferenceKey)
+    return await this._toDisplayConfig(rawConfig)
+  }
+
+  /**
    * Convierte un archivo a DataURL (base64).
    * @param {File} file 
    * @returns {Promise<string>}
@@ -155,8 +201,12 @@ class SealService {
       // Convertir a DataURL como respaldo inmediato
       const dataUrl = await this.fileToDataUrl(file)
 
-      // Subir a Supabase Storage en ruta privada del cliente
-      let publicUrl = dataUrl
+      // Subir a Supabase Storage en ruta privada del cliente.
+      // Guardamos la RUTA (no una URL pública) para que siga funcionando cuando
+      // el bucket 'documents' pase a privado; si la subida falla, se conserva el
+      // DataURL como respaldo (se usa directamente, sin pasar por Storage).
+      let storedValue = dataUrl
+      let uploadedPath = null
       try {
         const ext = file.name.split('.').pop() || 'png'
         const clientFolder = clientId ? `clients/${clientId}` : `users/${userId || 'default'}`
@@ -167,24 +217,20 @@ class SealService {
           .upload(filePath, file, { upsert: true })
 
         if (!uploadError && uploadData) {
-          const { data: urlData } = supabase.storage
-            .from('documents')
-            .getPublicUrl(filePath)
-          if (urlData?.publicUrl) {
-            publicUrl = urlData.publicUrl
-          }
+          storedValue = filePath
+          uploadedPath = filePath
         }
       } catch (storageErr) {
         console.info('ℹ️ [SealService] Almacenando como DataURL aislado:', storageErr.message)
       }
 
-      // Actualizar la configuración privada del cliente
-      const currentConfig = await this.getSealConfig(clientId)
-      const updatedConfig = { ...currentConfig }
+      // Actualizar la configuración privada del cliente (valores crudos: rutas o DataURL)
+      const rawConfig = await this._getRawConfig(storageKey, preferenceKey)
+      const updatedConfig = { ...rawConfig }
 
-      if (type === 'seal') updatedConfig.sealUrl = publicUrl
-      else if (type === 'signature') updatedConfig.signatureUrl = publicUrl
-      else if (type === 'combined') updatedConfig.combinedUrl = publicUrl
+      if (type === 'seal') updatedConfig.sealUrl = storedValue
+      else if (type === 'signature') updatedConfig.signatureUrl = storedValue
+      else if (type === 'combined') updatedConfig.combinedUrl = storedValue
 
       // Guardar en localStorage privado del cliente
       localStorage.setItem(storageKey, JSON.stringify(updatedConfig))
@@ -192,15 +238,23 @@ class SealService {
       // Guardar en Supabase user_preferences con clave única del cliente
       await preferencesService.setPreference(preferenceKey, updatedConfig)
 
+      // URL lista para mostrar de inmediato (firmada si se subió a Storage, o el DataURL)
+      const displayUrl = uploadedPath
+        ? (await obtenerUrlFirmada('documents', uploadedPath)) || storedValue
+        : storedValue
+
+      // Configuración resuelta para componentes reactivos (sellos/firmas listos para <img>)
+      const displayConfig = await this._toDisplayConfig(updatedConfig)
+
       // Disparar evento para componentes reactivos
       window.dispatchEvent(new CustomEvent('ad-seal-config-changed', {
-        detail: { clientId, config: updatedConfig }
+        detail: { clientId, config: displayConfig }
       }))
 
       return {
         success: true,
-        url: publicUrl,
-        config: updatedConfig,
+        url: displayUrl,
+        config: displayConfig,
         message: 'Activo digital guardado exitosamente de forma privada'
       }
     } catch (error) {
@@ -224,8 +278,8 @@ class SealService {
       const storageKey = this._getStorageKey(clientId, userId)
       const preferenceKey = this._getPreferenceKey(clientId, userId)
 
-      const currentConfig = await this.getSealConfig(clientId)
-      const updatedConfig = { ...currentConfig }
+      const rawConfig = await this._getRawConfig(storageKey, preferenceKey)
+      const updatedConfig = { ...rawConfig }
 
       if (type === 'seal') updatedConfig.sealUrl = null
       else if (type === 'signature') updatedConfig.signatureUrl = null
@@ -234,11 +288,13 @@ class SealService {
       localStorage.setItem(storageKey, JSON.stringify(updatedConfig))
       await preferencesService.setPreference(preferenceKey, updatedConfig)
 
+      const displayConfig = await this._toDisplayConfig(updatedConfig)
+
       window.dispatchEvent(new CustomEvent('ad-seal-config-changed', {
-        detail: { clientId, config: updatedConfig }
+        detail: { clientId, config: displayConfig }
       }))
 
-      return { success: true, config: updatedConfig }
+      return { success: true, config: displayConfig }
     } catch (error) {
       console.error('❌ [SealService] Error en removeSealAsset:', error)
       return { success: false, message: error.message }

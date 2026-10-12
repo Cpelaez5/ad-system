@@ -9,6 +9,7 @@
  */
 import { supabase } from '@/lib/supabaseClient'
 import userSettingsService from '@/services/user-settings-service.js'
+import { obtenerUrlFirmada } from '@/services/storageUrlService.js'
 
 class EmailNotificationService {
   constructor() {
@@ -25,6 +26,20 @@ class EmailNotificationService {
     if (flow === 'COMPRA') return emailEntry.notifyOnCompra === true
     if (flow === 'GASTO')  return emailEntry.notifyOnGasto  === true
     return false
+  }
+
+  /**
+   * Resuelve los adjuntos (ruta o URL pública/firmada antigua del bucket 'invoices')
+   * a URLs firmadas que la Edge Function pueda descargar directamente, ya que el
+   * bucket pasará a ser privado.
+   * @private
+   */
+  async _resolveAttachmentUrls(attachments) {
+    if (!Array.isArray(attachments) || attachments.length === 0) return attachments || []
+    return Promise.all(attachments.map(async (att) => {
+      const signedUrl = await obtenerUrlFirmada('invoices', att.path || att.url)
+      return signedUrl ? { ...att, url: signedUrl } : att
+    }))
   }
 
   /**
@@ -136,10 +151,14 @@ class EmailNotificationService {
 
       console.log(`📧 [Email] Enviando a ${allRecipients.length} destinatario(s):`, allRecipients)
 
+      // Resolver adjuntos a URLs firmadas antes de construir los payloads
+      const resolvedAttachments = await this._resolveAttachmentUrls(invoiceData.attachments)
+      const invoiceDataForEmail = { ...invoiceData, attachments: resolvedAttachments }
+
       // Enviar a todos los destinatarios simultáneamente
       const results = await Promise.allSettled(
         allRecipients.map(email =>
-          this.sendEmail(this.buildPayload(email, clientName, invoiceData))
+          this.sendEmail(this.buildPayload(email, clientName, invoiceDataForEmail))
         )
       )
 

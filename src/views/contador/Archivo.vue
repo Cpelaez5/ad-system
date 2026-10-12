@@ -599,10 +599,8 @@ export default {
                 console.log(`🧹 Limpiando archivo huérfano del Storage: ${archivo.name}`)
                 try {
                   const { supabase } = await import('@/lib/supabaseClient')
-                  const urlParts = uploadResult.data.fileUrl.split('/')
-                  const documentsIndex = urlParts.indexOf('documents')
-                  if (documentsIndex !== -1) {
-                    const filePath = urlParts.slice(documentsIndex + 1).join('/')
+                  const filePath = uploadResult.data.filePath || uploadResult.data.fileUrl
+                  if (filePath) {
                     await supabase.storage
                       .from('documents')
                       .remove([filePath])

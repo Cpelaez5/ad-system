@@ -949,6 +949,7 @@ import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue';
 import ExpenseCategorySelector from '@/components/common/ExpenseCategorySelector.vue';
 
 import { supabase } from '@/lib/supabaseClient';
+import { obtenerUrlFirmada } from '@/services/storageUrlService.js';
 
 export default {
   name: 'ClientInvoiceForm',
@@ -1209,14 +1210,24 @@ export default {
     },
 
     invoice: {
-      handler(newInvoice) {
+      async handler(newInvoice) {
         if (newInvoice) {
-          this.formData = { 
+          this.formData = {
             ...newInvoice,
             // Asegurar que expense_type se cargue (si es compra antigua sin campo, default a COMPRA)
             expense_type: newInvoice.expense_type || (newInvoice.flow === 'COMPRA' ? 'COMPRA' : null),
             expense_category_id: newInvoice.expense_category_id || null
           };
+
+          // Resolver URLs de adjuntos ya guardados (ruta o URL pública/firmada antigua)
+          // a URLs firmadas listas para ver/descargar, ya que el bucket 'invoices'
+          // pasará a ser privado.
+          if (Array.isArray(this.formData.attachments) && this.formData.attachments.length > 0) {
+            this.formData.attachments = await Promise.all(this.formData.attachments.map(async (att) => {
+              const signedUrl = await obtenerUrlFirmada('invoices', att.path || att.url);
+              return signedUrl ? { ...att, url: signedUrl } : att;
+            }));
+          }
         }
       },
       immediate: true
