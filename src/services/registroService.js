@@ -15,6 +15,8 @@
 import invoiceService from '@/services/invoiceService.js'
 import retentionRpcService from '@/services/retentionRpcService.js'
 import emailNotificationService from '@/services/email-notification-service.js'
+import { supabase } from '@/lib/supabaseClient'
+import { logger } from '@/utils/logger'
 
 /**
  * Determina si el formulario corresponde a un egreso (compra o gasto) que debe
@@ -88,6 +90,15 @@ export async function guardarRegistro(formData) {
     } else if (esCompraConRpc(formData)) {
       const rpcPayload = construirPayloadRpc(formData)
       const rpcData = await retentionRpcService.registrarCompra(rpcPayload)
+      // El RPC no recibe la fecha fiscal: si el usuario la fijó, se guarda aparte
+      // (si no, el trigger de la BD la calcula con la regla de retención de IVA)
+      if (rpcData?.invoice_id && formData.fecha_fiscal) {
+        const { error: errFecha } = await supabase
+          .from('invoices')
+          .update({ fecha_fiscal: formData.fecha_fiscal })
+          .eq('id', rpcData.invoice_id)
+        if (errFecha) logger.warn('[registroService]', 'No se pudo fijar la fecha fiscal manual', errFecha.message)
+      }
       // Simular la respuesta de invoiceService para mantener compatibilidad
       savedResult = { success: true, data: { id: rpcData.invoice_id, ...formData } }
     } else {

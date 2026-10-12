@@ -65,6 +65,25 @@ describe('exportService.buildLibroCompras()', () => {
     expect(ws.getCell(`N${totalRow}`).value).toBe(15);    // 10 + 5 (Retención Municipal)
   });
 
+  // C1 (2026-10-13): docs/mvp/backlog-contadora-2026-10-12.md punto 1 — si la
+  // factura tiene fecha_fiscal (ej. porque el comprobante de retención de IVA
+  // se emitió en un mes posterior), el Libro de Compras debe mostrar esa fecha,
+  // no la de emisión, para coincidir con el período de declaración.
+  it('usa fecha_fiscal en la columna Fecha cuando existe, con fallback a issueDate si no', () => {
+    const ws = makeWorksheet();
+    const invoices = [
+      { id: 'c1', documentType: 'FACTURA', invoiceNumber: '00000030', issueDate: '2026-08-31', fecha_fiscal: '2026-09-02', issuer: { companyName: 'Proveedor Fin de Mes' }, financial: { totalSales: 100 } },
+      { id: 'c2', documentType: 'FACTURA', invoiceNumber: '00000031', issueDate: '2026-09-05', issuer: { companyName: 'Proveedor Sin Retencion' }, financial: { totalSales: 50 } }
+    ];
+
+    exportService.buildLibroCompras(ws, invoices, companyInfo);
+
+    // Fila 7 = primera factura (con fecha_fiscal) → debe mostrar 02/09/2026, no 31/08/2026
+    expect(ws.getCell('B7').value).toBe('02/09/2026');
+    // Fila 8 = segunda factura (sin fecha_fiscal) → cae a issueDate
+    expect(ws.getCell('B8').value).toBe('05/09/2026');
+  });
+
   it('no genera fila de totales si no hay facturas fiscales (todas filtradas)', () => {
     const ws = makeWorksheet();
     const invoices = [
@@ -107,6 +126,41 @@ describe('exportService.buildLibroVentas()', () => {
     expect(ws.getCell(`H${totalRow}`).value).toBe(348); // 232 + 116
     expect(ws.getCell(`J${totalRow}`).value).toBe(300);  // 200 + 100 (Venta Gravada)
     expect(ws.getCell(`K${totalRow}`).value).toBe(48);   // 32 + 16 (Débito Fiscal)
+  });
+
+  // C3 (2026-10-13): docs/mvp/backlog-contadora-2026-10-12.md punto 5 — el IVA
+  // retenido por el cliente (ingresado manualmente en SimpleInvoiceForm.vue,
+  // sección "Retenciones aplicadas por tu cliente") y su número de comprobante
+  // deben reflejarse en el Libro de Ventas exportado, y el monto debe sumarse en
+  // la fila de TOTALES.
+  it('incluye el IVA retenido por el cliente, su número de comprobante, y lo suma en TOTALES', () => {
+    const ws = makeWorksheet();
+    const invoices = [
+      {
+        id: 'v1', documentType: 'FACTURA', invoiceNumber: '00000020', issueDate: '2026-09-10',
+        client: { companyName: 'Cliente Contribuyente Especial' },
+        financial: {
+          totalSales: 232, taxableSales: 200, taxDebit: 32,
+          ivaRetention: 24, ivaRetentionNumber: '20260900000123',
+          islrRetention: 0, municipalRetention: 0, igtf: 0
+        }
+      },
+      {
+        id: 'v2', documentType: 'FACTURA', invoiceNumber: '00000021', issueDate: '2026-09-12',
+        client: { companyName: 'Cliente Sin Retención' },
+        financial: { totalSales: 116, taxableSales: 100, taxDebit: 16, ivaRetention: 0, islrRetention: 0, municipalRetention: 0, igtf: 0 }
+      }
+    ];
+
+    exportService.buildLibroVentas(ws, invoices, companyInfo);
+
+    // headerRow = 7 → primera fila de datos = 8
+    expect(ws.getCell('L8').value).toBe(24); // Retención IVA de Clientes
+    expect(ws.getCell('M8').value).toBe('20260900000123'); // N° Comprobante Ret. IVA
+    expect(ws.getCell('M9').value).toBe(''); // Sin retención, sin comprobante
+
+    // Fila de TOTALES (headerRow 7 + 2 filas de datos = fila 10)
+    expect(ws.getCell('L10').value).toBe(24); // 24 + 0
   });
 });
 

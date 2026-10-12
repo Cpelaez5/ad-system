@@ -35,6 +35,12 @@ vi.mock('@/services/email-notification-service.js', () => ({
   }
 }))
 
+const supabaseUpdate = { eq: vi.fn().mockResolvedValue({ error: null }) }
+vi.mock('@/lib/supabaseClient', () => ({
+  supabase: { from: vi.fn(() => ({ update: vi.fn(() => supabaseUpdate) })) }
+}))
+
+import { supabase } from '@/lib/supabaseClient'
 import invoiceService from '@/services/invoiceService.js'
 import retentionRpcService from '@/services/retentionRpcService.js'
 import emailNotificationService from '@/services/email-notification-service.js'
@@ -149,5 +155,20 @@ describe('registroService.guardarRegistro', () => {
 
     expect(result.success).toBe(true)
     expect(result.data.id).toBe('inv-email-fail')
+  })
+
+  it('compra por RPC con fecha fiscal manual: la fija aparte en la factura creada', async () => {
+    const formData = {
+      flow: 'COMPRA', expense_type: 'COMPRA', fecha_fiscal: '2026-09-05',
+      client_id: 'cli-1', proveedor_id: 'prov-1',
+      financial: { ivaRetention: 12, islrRetention: 0, municipalRetention: 0 }
+    }
+    retentionRpcService.registrarCompra.mockResolvedValue({ invoice_id: 'inv-9' })
+
+    const result = await guardarRegistro(formData)
+
+    expect(result.success).toBe(true)
+    expect(supabase.from).toHaveBeenCalledWith('invoices')
+    expect(supabaseUpdate.eq).toHaveBeenCalledWith('id', 'inv-9')
   })
 })

@@ -493,7 +493,14 @@ export default {
     },
     async loadISLRConcepts() {
       try {
-        const raw = await proveedorService.getISLRConcepts(this.formData.tipo_persona)
+        // W18 (2026-10-13): usar la MISMA lista completa (sin filtrar por tipo_persona)
+        // que el ajuste de retenciones de la factura (RetentionAdjustSheet.vue, que no
+        // pasa tipoPersona y por eso muestra el catálogo completo). Antes, al filtrar
+        // aquí por this.formData.tipo_persona, los parámetros fiscales del proveedor
+        // mostraban menos conceptos ISLR que el ajuste de la factura (ej: solo
+        // "Honorarios Profesionales 5% (Jurídica)" y no el 3% de Natural). Ver
+        // docs/mvp/backlog-contadora-2026-10-12.md W18.
+        const raw = await proveedorService.getISLRConcepts()
         this.conceptosIslr = (raw || []).map(c => ({
           ...c,
           displayLabel: c.codigo ? `[${c.codigo}] ${c.nombre} (${c.porcentaje_retencion}%)` : `${c.nombre} (${c.porcentaje_retencion}%)`

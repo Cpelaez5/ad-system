@@ -830,15 +830,35 @@
       ══════════════════════════════════════════════════════════ -->
       <!-- Resumen de Retenciones (solo COMPRA) -->
       <div v-if="formData.flow === 'COMPRA'" class="mt-4 mx-3">
-        <!-- Fecha de Emisión del Comprobante de Retención -->
-        <v-row dense class="mb-1" v-if="retencionesResult && (retencionesResult.iva > 0 || retencionesResult.islr > 0 || retencionesResult.municipal > 0)">
+        <!-- Fecha de Emisión del Comprobante de Retención.
+             W20: antes solo se mostraba con retencionesResult (cálculo en vivo), que
+             queda null al editar una factura ya guardada (el proveedor no se
+             recarga). Ahora también se muestra si la factura YA TIENE montos de
+             retención guardados, para poder corregir la fecha del comprobante. -->
+        <v-row dense class="mb-1" v-if="hasRetencionesRegistradas">
           <v-col cols="12" sm="6" md="4">
             <CustomDatePicker
               v-model="formData.financial.retentionDate"
               label="Fecha de Emisión de Retención"
               :min="formData.issueDate"
               :max="todayDate"
-              hint="Fecha de emisión del comprobante (no puede ser futura ni anterior a la factura)"
+              hint="Fecha de emisión del comprobante (no puede ser futura ni anterior a la factura). Editable también al corregir una compra ya guardada."
+              persistent-hint
+            />
+          </v-col>
+        </v-row>
+
+        <!-- C1: Fecha fiscal (mes en que se declara esta compra en el Libro de
+             Compras). Solo COMPRA. Se prellena con la fecha del comprobante de
+             retención de IVA si existe, o con la fecha de emisión si no; el
+             usuario puede corregirla manualmente. -->
+        <v-row dense class="mb-1">
+          <v-col cols="12" sm="6" md="4">
+            <CustomDatePicker
+              :model-value="formData.fecha_fiscal"
+              @update:model-value="val => { formData.fecha_fiscal = val; fechaFiscalManuallyEdited = true; }"
+              label="Fecha fiscal (mes en que declaras esta compra)"
+              hint="Determina en qué Libro de Compras (mes) aparece esta operación. Por defecto usa la fecha del comprobante de retención de IVA; si no hay retención, usa la fecha de emisión."
               persistent-hint
             />
           </v-col>
@@ -854,15 +874,43 @@
           @adjust="showAdjustSheet = true"
         />
 
+        <!-- C7: advertencia de municipio distinto (no bloquea, se puede confirmar) -->
+        <v-alert
+          v-if="municipalMismatch.detected"
+          type="warning"
+          variant="tonal"
+          density="comfortable"
+          class="mt-2 mb-2"
+        >
+          <div class="text-body-2">
+            Tu proveedor está en <strong>{{ municipalMismatch.issuerNombre }}</strong> y tu empresa en
+            <strong>{{ municipalMismatch.tenantNombre }}</strong>. Normalmente no corresponde retener
+            impuesto municipal en este caso.
+          </div>
+          <v-btn
+            v-if="!municipalMismatchConfirmed"
+            size="small"
+            color="warning"
+            variant="flat"
+            class="mt-2"
+            @click="confirmMunicipalMismatch"
+          >
+            Continuar igual
+          </v-btn>
+          <div v-else class="text-caption mt-1">
+            Confirmaste continuar con la retención municipal pese a la diferencia de municipio.
+          </div>
+        </v-alert>
+
         <!-- Números de Comprobante de Retención (COMPRA) -->
-        <v-card v-if="retencionesResult && (retencionesResult.iva > 0 || retencionesResult.islr > 0 || retencionesResult.municipal > 0)" class="mt-4 pa-4 rounded-lg" variant="outlined" color="grey-lighten-2">
+        <v-card v-if="hasRetencionesRegistradas" class="mt-4 pa-4 rounded-lg" variant="outlined" color="grey-lighten-2">
           <p class="sif-section-label text-black">Comprobantes de Retención</p>
           <div class="text-caption text-grey-darken-1 mb-3">
             Números auto-generados. Activa la edición manual si necesitas modificarlos.
           </div>
           <v-row dense class="mx-0 mt-1">
             <!-- IVA comprobante -->
-            <v-col cols="12" sm="4" v-if="retencionesResult.iva > 0">
+            <v-col cols="12" sm="4" v-if="showIvaComprobante">
               <v-text-field
                 v-model="formData.financial.ivaRetentionNumber"
                 label="Nro. Comprobante IVA"
@@ -892,7 +940,7 @@
               </v-text-field>
             </v-col>
             <!-- ISLR comprobante -->
-            <v-col cols="12" sm="4" v-if="retencionesResult.islr > 0">
+            <v-col cols="12" sm="4" v-if="showIslrComprobante">
               <v-text-field
                 v-model="formData.financial.islrRetentionNumber"
                 label="Nro. Comprobante ISLR"
@@ -922,7 +970,7 @@
               </v-text-field>
             </v-col>
             <!-- Municipal comprobante -->
-            <v-col cols="12" sm="4" v-if="retencionesResult.municipal > 0">
+            <v-col cols="12" sm="4" v-if="showMunicipalComprobante">
               <v-text-field
                 v-model="formData.financial.municipalRetentionNumber"
                 label="Nro. Comprobante Municipal"
@@ -1137,6 +1185,7 @@ import RetentionAdjustSheet from '@/components/forms/RetentionAdjustSheet.vue';
 import NumericInput from '@/components/common/NumericInput.vue';
 import { supabase } from '@/lib/supabaseClient';
 import { municipalConceptsService } from '@/services/municipalConceptsService.js';
+import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
 
 export function normalizeDateToYMD(dateInput) {
   if (!dateInput) return '';
@@ -1217,10 +1266,18 @@ export default {
       proveedor: null,
       retentionConfig: {
         aplicarIva: false, porcentajeIva: 75, baseIva: 0,
-        aplicarIslr: false, conceptoIslr: null, baseIslr: 0, conceptoIslrNombre: '',
+        aplicarIslr: false, conceptoIslr: null, baseIslr: 0, conceptoIslrNombre: '', tipoPersona: 'JURIDICA',
         aplicarMunicipal: false, porcentajeMunicipal: 0, baseMunicipal: 0, concepto_municipal_id: null, conceptoMunicipalNombre: ''
       },
       retencionesResult: null,
+      // C6: valor de la Unidad Tributaria vigente (configuracion_fiscal_global), para
+      // replicar en la vista previa el sustraendo que aplica el RPC registrar_compra_con_retenciones.
+      valorUT: null,
+      // C7: advertencia de municipio distinto entre proveedor y empresa (no bloquea, se puede confirmar)
+      municipalMismatch: { detected: false, tenantNombre: '', issuerNombre: '' },
+      municipalMismatchConfirmed: false,
+      // C1: si el usuario edita manualmente "Fecha fiscal", dejar de sobrescribirla automáticamente.
+      fechaFiscalManuallyEdited: false,
       showProveedorModal: false,
       proveedorInitialData: null,
       showAdjustSheet: false,
@@ -1286,6 +1343,10 @@ export default {
         expense_type:    null,
         expense_category_id: null,
         issueDate:       new Date().toISOString().split('T')[0],
+        // C1: mes en que se declara esta compra en el Libro de Compras (solo
+        // COMPRA; se prellena en prefillFechaFiscal() con la fecha del
+        // comprobante de retención de IVA, o con issueDate si no hay retención).
+        fecha_fiscal:    new Date().toISOString().split('T')[0],
         dueDate:         '',
         status:          'BORRADOR',
 
@@ -1440,6 +1501,29 @@ export default {
       const calculated = parseFloat((base + exento + iva + igtf).toFixed(2));
       const current = parseFloat(Number(this.formData.financial.totalSales || 0).toFixed(2));
       return Math.abs(calculated - current) >= 0.01;
+    },
+
+    // W20: antes esta sección dependía SOLO de retencionesResult (cálculo en
+    // vivo), que queda en null al editar una factura ya guardada porque el
+    // proveedor no se recarga automáticamente. Ahora también cuenta lo que ya
+    // está guardado en formData.financial, para poder corregir la fecha/número
+    // del comprobante de una compra ya registrada.
+    hasRetencionesRegistradas() {
+      const r = this.retencionesResult;
+      const f = this.formData.financial || {};
+      return !!(
+        (r && (r.iva > 0 || r.islr > 0 || r.municipal > 0)) ||
+        (Number(f.ivaRetention) > 0 || Number(f.islrRetention) > 0 || Number(f.municipalRetention) > 0)
+      );
+    },
+    showIvaComprobante() {
+      return !!((this.retencionesResult && this.retencionesResult.iva > 0) || Number(this.formData.financial.ivaRetention) > 0);
+    },
+    showIslrComprobante() {
+      return !!((this.retencionesResult && this.retencionesResult.islr > 0) || Number(this.formData.financial.islrRetention) > 0);
+    },
+    showMunicipalComprobante() {
+      return !!((this.retencionesResult && this.retencionesResult.municipal > 0) || Number(this.formData.financial.municipalRetention) > 0);
     }
   },
 
@@ -1447,18 +1531,22 @@ export default {
   watch: {
     proveedor: {
       async handler(nuevoProveedor) {
+        // C7: cambiar de proveedor invalida cualquier confirmación previa de municipio distinto
+        this.municipalMismatchConfirmed = false;
+        this.municipalMismatch = { detected: false, tenantNombre: '', issuerNombre: '' };
+
         if (!nuevoProveedor) {
-          this.retentionConfig = { aplicarIva: false, porcentajeIva: 75, aplicarIslr: false, conceptoIslr: null, aplicarMunicipal: false, porcentajeMunicipal: 0 };
+          this.retentionConfig = { aplicarIva: false, porcentajeIva: 75, aplicarIslr: false, conceptoIslr: null, tipoPersona: 'JURIDICA', aplicarMunicipal: false, porcentajeMunicipal: 0 };
           this.calcularRetenciones();
           return;
         }
-        
+
         this.loadingRetentionConfig = true;
         try {
           const id = nuevoProveedor.id;
           const { data, error } = await supabase.from('proveedores').select('*').eq('id', id).single();
           if (error) throw error;
-          
+
           const ivaRate = data.iva_retention_rate ? parseFloat(data.iva_retention_rate) : 0;
           const municipalRate = data.municipal_rate ? parseFloat(data.municipal_rate) : 0;
 
@@ -1468,12 +1556,15 @@ export default {
             aplicarIslr: !!data.islr_concept_id,
             conceptoIslr: data.islr_concept_id || null,
             conceptoIslrNombre: '',
+            // C6: tipo_persona del proveedor, necesario para aplicar el sustraendo ISLR
+            // (persona natural) igual que lo hace el RPC registrar_compra_con_retenciones.
+            tipoPersona: data.tipo_persona || 'JURIDICA',
             aplicarMunicipal: municipalRate > 0,
             porcentajeMunicipal: municipalRate,
             concepto_municipal_id: null,
             conceptoMunicipalNombre: ''
           };
-          
+
           this.formData.issuer.id = data.id || '';
           this.formData.issuer.companyName = data.nombre || '';
           this.formData.issuer.rif = data.rif || '';
@@ -1497,6 +1588,7 @@ export default {
     },
     'formData.issueDate'(date) {
       if (date) this.fetchExchangeRate(date);
+      this.prefillFechaFiscal();
     },
     'formData.financial.retentionDate'(newDate) {
       if (newDate && this.retencionesResult && !this.retentionCorrelativoManuallyEdited) {
@@ -1506,6 +1598,7 @@ export default {
           this.retencionesResult.municipal
         );
       }
+      this.prefillFechaFiscal();
     },
     'formData.documentType'(t) {
       this.formData.documentCategory = t === 'RECIBO' ? 'RECIBO' : 'FACTURA';
@@ -1570,10 +1663,14 @@ export default {
       handler(inv) {
         if (inv) {
           const today = new Date().toISOString().split('T')[0];
+          // C1: al editar, si la factura ya trae fecha_fiscal (guardada en BD) se
+          // respeta; si no (registros previos a la migración), se recalcula abajo.
+          this.fechaFiscalManuallyEdited = !!inv.fecha_fiscal;
           this.formData = {
             ...inv,
             expense_type: inv.expense_type || (inv.flow === 'COMPRA' ? 'COMPRA' : null),
             expense_category_id: inv.expense_category_id || null,
+            fecha_fiscal: inv.fecha_fiscal || inv.issueDate || today,
             financial: {
               ...(inv.financial || {}),
               retentionDate: inv.financial?.retentionDate || today
@@ -1588,6 +1685,9 @@ export default {
                 : (typeof it.product === 'string' ? it.product : null)
             }))
           };
+          if (!inv.fecha_fiscal) {
+            this.$nextTick(() => this.prefillFechaFiscal());
+          }
         }
       }
     }
@@ -1989,6 +2089,47 @@ export default {
       this.calculateTotals();
     },
     
+    // C6: obtiene (y cachea en memoria) el valor vigente de la Unidad Tributaria
+    // desde configuracion_fiscal_global, igual que lo consulta el RPC SQL
+    // registrar_compra_con_retenciones, para aplicar el mismo sustraendo en la vista previa.
+    async getValorUT() {
+      if (this.valorUT !== null && this.valorUT !== undefined) return this.valorUT;
+      try {
+        const { data } = await supabase
+          .from('configuracion_fiscal_global')
+          .select('valor_unidad_tributaria')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        this.valorUT = parseFloat(data?.valor_unidad_tributaria) || 0;
+      } catch (e) {
+        console.warn('No se pudo obtener el valor de la Unidad Tributaria:', e);
+        this.valorUT = 0;
+      }
+      return this.valorUT;
+    },
+
+    // C7: el usuario confirma que quiere aplicar la retención municipal aunque el
+    // proveedor esté en un municipio distinto. Se recalcula para que el monto
+    // vuelva a incluirse (ver aviso en el template, sección de retenciones COMPRA).
+    confirmMunicipalMismatch() {
+      this.municipalMismatchConfirmed = true;
+      this.calcularRetenciones();
+    },
+
+    // C1: prellena "Fecha fiscal" (solo COMPRA) con la fecha del comprobante de
+    // retención de IVA si existe, o con la fecha de emisión si no hay retención
+    // de IVA — misma regla que el backfill/trigger de la migración
+    // 20261013100000_fecha_fiscal.sql. No sobrescribe si el usuario ya la editó
+    // manualmente (fechaFiscalManuallyEdited).
+    prefillFechaFiscal() {
+      if (this.formData.flow !== 'COMPRA' || this.fechaFiscalManuallyEdited) return;
+      const tieneRetencionIva = (this.retencionesResult && this.retencionesResult.iva > 0) || Number(this.formData.financial.ivaRetention) > 0;
+      this.formData.fecha_fiscal = tieneRetencionIva
+        ? (this.formData.financial.retentionDate || this.formData.issueDate)
+        : this.formData.issueDate;
+    },
+
     // ── Retenciones ───────────────────────────────────────────────────────────
     async calcularRetenciones() {
       if (this.formData.flow !== 'COMPRA' || !this.proveedor) {
@@ -2022,10 +2163,20 @@ export default {
              const baseMonto = amount * (baseAplicable / 100);
              const rate = parseFloat(concepto.porcentaje_retencion) || 0;
              islr = parseFloat((baseMonto * (rate / 100)).toFixed(2));
+
+             // C6 (2026-10-13): igualar la vista previa a la regla del RPC SQL
+             // registrar_compra_con_retenciones: para proveedores PERSONA NATURAL se
+             // resta el sustraendo en UT (si el concepto ISLR define uno), con piso en 0.
+             const sustraendoUt = parseFloat(concepto.sustraendo_ut) || 0;
+             if (config.tipoPersona === 'NATURAL' && sustraendoUt > 0) {
+               const valorUT = await this.getValorUT();
+               const sustraendoBs = Math.round(sustraendoUt * valorUT * 100) / 100;
+               islr = Math.max(0, parseFloat((islr - sustraendoBs).toFixed(2)));
+             }
           }
         } catch(e) { console.error("Error calculando ISLR", e); }
       }
-      
+
       let municipal = 0;
       if (config.aplicarMunicipal && amount > 0) {
         try {
@@ -2040,16 +2191,37 @@ export default {
              this.retentionConfig.conceptoMunicipalNombre = '';
           }
         } catch(e) { console.error("Error calculando Municipal", e); }
-        
+
         if (this.retentionConfig.porcentajeMunicipal > 0) {
            municipal = parseFloat((amount * (this.retentionConfig.porcentajeMunicipal / 100)).toFixed(2));
         }
       }
-      
+
+      // C7 (2026-10-13): advertir (no bloquear) si proveedor y empresa están en
+      // municipios distintos. Mientras el usuario no confirme explícitamente
+      // ("Continuar igual"), el monto NO se aplica (queda en 0) para que el RPC no
+      // lo registre por accidente (financial.municipalRetention > 0 => p_aplicar_municipal=true).
+      this.municipalMismatch = { detected: false, tenantNombre: '', issuerNombre: '' };
+      if (municipal > 0) {
+        const tenantMun = this.formData.client?.municipio_id || this.formData.client?.municipio || '';
+        const issuerMun = this.formData.issuer?.municipio_id || this.formData.issuer?.municipio || '';
+        if (tenantMun && issuerMun && !venezuelaLocationsService.areSameMunicipality(tenantMun, issuerMun)) {
+          this.municipalMismatch = {
+            detected: true,
+            tenantNombre: venezuelaLocationsService.getCleanMunicipalityName(tenantMun),
+            issuerNombre: venezuelaLocationsService.getCleanMunicipalityName(issuerMun)
+          };
+          if (!this.municipalMismatchConfirmed) {
+            municipal = 0;
+          }
+        }
+      }
+
       this.retencionesResult = { iva, islr, municipal };
       this.formData.financial.ivaRetention = iva;
       this.formData.financial.islrRetention = islr;
       this.formData.financial.municipalRetention = municipal;
+      this.prefillFechaFiscal();
 
       // Sugerir números de comprobante (solo si no se editó manualmente)
       await this.sugerirCorrelativosRetencion(iva, islr, municipal);

@@ -2181,20 +2181,25 @@ export default {
      */
     applyDateFilterToInvoices(invoices) {
       if (!invoices || invoices.length === 0) return [];
-      
+
       this.exportDateError = '';
-      
+
       if (this.exportDateMode === 'month') {
         // Modo mes: usar exportMonthDate {month: 0-11, year: YYYY}
         if (!this.exportMonthDate) return invoices;
-        
+
         const targetYear = this.exportMonthDate.year;
         const targetMonth = this.exportMonthDate.month; // 0-indexed
-        
+
         return invoices.filter(inv => {
-          if (!inv.issueDate) return false;
-          const invoiceDate = new Date(inv.issueDate);
-          return invoiceDate.getFullYear() === targetYear && 
+          // C1 (2026-10-13): el Libro de Compras se filtra/agrupa por fecha_fiscal
+          // (mes en que corresponde declarar la operación) si existe, con fallback
+          // a la fecha de emisión. Solo aplica a COMPRA; VENTA sigue por issueDate.
+          // Ver docs/mvp/backlog-contadora-2026-10-12.md punto 1.
+          const referenceDate = (inv.flow === 'COMPRA' && inv.fecha_fiscal) ? inv.fecha_fiscal : inv.issueDate;
+          if (!referenceDate) return false;
+          const invoiceDate = new Date(referenceDate);
+          return invoiceDate.getFullYear() === targetYear &&
                  invoiceDate.getMonth() === targetMonth;
         });
       } else {
@@ -2222,8 +2227,10 @@ export default {
         endNormalized.setHours(23, 59, 59, 999);
         
         return invoices.filter(inv => {
-          if (!inv.issueDate) return false;
-          const invoiceDate = new Date(inv.issueDate);
+          // C1: mismo criterio que el filtro por mes (fecha_fiscal para COMPRA, con fallback).
+          const referenceDate = (inv.flow === 'COMPRA' && inv.fecha_fiscal) ? inv.fecha_fiscal : inv.issueDate;
+          if (!referenceDate) return false;
+          const invoiceDate = new Date(referenceDate);
           return invoiceDate >= startNormalized && invoiceDate <= endNormalized;
         });
       }
@@ -2395,7 +2402,7 @@ export default {
       if (!invoice) return false;
 
       // 1. Debe existir retención municipal en la factura
-      const hasRetention = (invoice.retenciones && Number(invoice.retenciones.municipal) > 0) || 
+      const hasRetention = (invoice.retenciones && Number(invoice.retenciones.municipal) > 0) ||
                            (invoice.financial && Number(invoice.financial.municipalRetention) > 0);
       if (!hasRetention) return false;
 
@@ -2407,14 +2414,16 @@ export default {
       // 3. Municipio del proveedor (con fallback al mapa reactivo en memoria por si fue actualizado)
       const provId = invoice.issuer?.id || invoice.issuer_id || invoice.provider_id;
       const provRif = invoice.issuer?.rif;
-      const issuerMunicipio = (provId && this.proveedoresMap?.[provId]) || 
-                              (provRif && this.proveedoresMap?.[provRif]) || 
-                              invoice.issuer?.municipio_id || 
+      const issuerMunicipio = (provId && this.proveedoresMap?.[provId]) ||
+                              (provRif && this.proveedoresMap?.[provRif]) ||
+                              invoice.issuer?.municipio_id ||
                               invoice.issuer?.municipio || '';
       if (!issuerMunicipio) return false;
 
-      // 4. Solo mostrar si ambos están en el mismo municipio
-      return venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio);
+      // C7 (2026-10-13): ya NO se oculta la opción solo porque los municipios
+      // difieran. Se muestra siempre que haya retención y datos de municipio en
+      // ambas partes; downloadMunicipal() advierte y pide confirmación si no coinciden.
+      return true;
     },
 
     async downloadMunicipal(invoice) {
@@ -2446,18 +2455,25 @@ export default {
           }
         }
 
-        // 3. Validar que proveedor y cliente estén en el mismo municipio
+        // C7 (2026-10-13): antes se bloqueaba. Ahora se advierte y se permite
+        // continuar si el usuario confirma (la contadora pidió "sin bloquear",
+        // ver W5 en docs/mvp/backlog-cliente-whatsapp.md).
+        let confirmMismatch = false;
         if (!venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio)) {
           const tenantNombre = venezuelaLocationsService.getCleanMunicipalityName(tenantMunicipio);
           const issuerNombre = venezuelaLocationsService.getCleanMunicipalityName(issuerMunicipio);
           this.showNotification(
-            `No se puede generar comprobante municipal: tu empresa está en ${tenantNombre} y el proveedor en ${issuerNombre}. La retención municipal solo aplica dentro del mismo municipio.`,
+            `Tu proveedor está en ${issuerNombre} y tu empresa en ${tenantNombre}. Normalmente no corresponde retener impuesto municipal en este caso.`,
             'warning'
           );
-          return;
+          const continuar = (typeof window !== 'undefined' && typeof window.confirm === 'function')
+            ? window.confirm('Tu proveedor está en otro municipio. Normalmente no corresponde retener. ¿Continuar igual?')
+            : false;
+          if (!continuar) return;
+          confirmMismatch = true;
         }
 
-        await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo);
+        await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo, { confirmMismatch });
         this.showNotification('Comprobante Municipal exportado exitosamente', 'success');
       } catch (error) {
         console.error('Error exportando comprobante Municipal:', error);

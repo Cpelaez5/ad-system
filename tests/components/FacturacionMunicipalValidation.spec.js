@@ -72,7 +72,12 @@ describe('Facturacion.vue - Descarga de Comprobante Municipal (downloadMunicipal
     };
   });
 
-  it('bloquea la descarga y muestra snackbar warning cuando el proveedor es de otro municipio', async () => {
+  // C7 (2026-10-13): antes "bloqueaba" sin excepción (MUNICIPAL_MISMATCH). Ahora
+  // advierte con snackbar y pregunta con un confirm; si el usuario cancela, no
+  // descarga; si confirma, continúa igual. Pedido de la contadora (W5).
+  it('advierte con snackbar y NO descarga si el usuario cancela el confirm, cuando el proveedor es de otro municipio', async () => {
+    const confirmSpy = vi.fn().mockReturnValue(false);
+    window.confirm = confirmSpy;
     const invoice = {
       id: 'inv-dif-mun',
       invoiceNumber: '00000042',
@@ -84,16 +89,46 @@ describe('Facturacion.vue - Descarga de Comprobante Municipal (downloadMunicipal
 
     await Facturacion.methods.downloadMunicipal.call(vm, invoice);
 
-    // 1. Debe mostrar advertencia en el snackbar
+    // 1. Debe mostrar advertencia en el snackbar (no bloqueo duro)
     expect(snackbarSpy).toHaveBeenCalledTimes(1);
     const [msg, type] = snackbarSpy.mock.calls[0];
     expect(type).toBe('warning');
-    expect(msg).toContain('No se puede generar comprobante municipal');
     expect(msg).toContain('Chacao');
     expect(msg).toContain('Baruta');
 
-    // 2. NO debe llamar a generarComprobanteMunicipal
+    // 2. Pregunta confirmación al usuario
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy.mock.calls[0][0]).toContain('¿Continuar igual?');
+
+    // 3. Como el usuario canceló, NO debe llamar a generarComprobanteMunicipal
     expect(retentionPdfService.generarComprobanteMunicipal).not.toHaveBeenCalled();
+    delete window.confirm;
+  });
+
+  it('advierte y permite continuar si el usuario CONFIRMA, aunque el proveedor sea de otro municipio', async () => {
+    const confirmSpy = vi.fn().mockReturnValue(true);
+    window.confirm = confirmSpy;
+    retentionPdfService.generarComprobanteMunicipal.mockResolvedValueOnce({ success: true });
+
+    const invoice = {
+      id: 'inv-dif-mun-confirmado',
+      invoiceNumber: '00000045',
+      issuer: {
+        nombre: 'Proveedor Baruta S.A.',
+        municipio_id: '15eecd2c-e9e1-4476-a5bc-b6a3889e6607' // Baruta (Miranda)
+      }
+    };
+
+    await Facturacion.methods.downloadMunicipal.call(vm, invoice);
+
+    // 1. Se llama a generarComprobanteMunicipal con confirmMismatch: true
+    expect(retentionPdfService.generarComprobanteMunicipal).toHaveBeenCalledTimes(1);
+    const callArgs = retentionPdfService.generarComprobanteMunicipal.mock.calls[0];
+    expect(callArgs[2]).toEqual({ confirmMismatch: true });
+
+    // 2. Termina en éxito
+    expect(snackbarSpy).toHaveBeenCalledWith('Comprobante Municipal exportado exitosamente', 'success');
+    delete window.confirm;
   });
 
   it('permite la descarga y muestra snackbar success cuando ambos municipios coinciden', async () => {
@@ -143,7 +178,9 @@ describe('Facturacion.vue - Descarga de Comprobante Municipal (downloadMunicipal
       expect(vm.canDownloadMunicipal(invoice)).toBe(false);
     });
 
-    it('retorna false si el proveedor y la empresa cliente están en DIFERENTES municipios (oculta del dropdown)', () => {
+    // C7 (2026-10-13): ya no se oculta del dropdown solo porque los municipios
+    // difieran; downloadMunicipal() advierte y pide confirmación al hacer clic.
+    it('retorna true aunque el proveedor y la empresa cliente estén en DIFERENTES municipios (ya no se oculta del dropdown)', () => {
       const invoice = {
         retenciones: { municipal: 15.50 },
         issuer: {
@@ -152,7 +189,7 @@ describe('Facturacion.vue - Descarga de Comprobante Municipal (downloadMunicipal
         }
       };
       // La empresa en vm está en Chacao
-      expect(vm.canDownloadMunicipal(invoice)).toBe(false);
+      expect(vm.canDownloadMunicipal(invoice)).toBe(true);
     });
 
     it('retorna true si el proveedor y la empresa cliente están en el MISMO municipio (muestra en dropdown)', () => {

@@ -1167,11 +1167,15 @@ class RetentionPdfService {
       y += 4
     }
     
+    // C2 (2026-10-13): renglón con el monto total de la factura CON IVA antes del
+    // sustraendo; "Cantidad Pagada" -> "Monto Total Factura"; se mantiene "Impuesto
+    // Retenido"; "Total Retención" -> "Neto a Pagar" (= total factura - retención ISLR).
+    // Pedido de la contadora: docs/mvp/backlog-contadora-2026-10-12.md puntos 2 y 3.
     const islrSummaryLines = [
-      { label: 'Cantidad Pagada:', val: formatNumber(total2 - retencionISLR) },
+      { label: 'Monto Total Factura:', val: formatNumber(total2) },
       { label: 'Impuesto Retenido (ISLR):', val: formatNumber(retencionISLR), isRed: true },
       { label: 'Sustraendo (Bs):', val: formatNumber(sustraendoBs) },
-      { label: 'Total Retención:', val: formatNumber(retencionISLR), isBold: true }
+      { label: 'Neto a Pagar:', val: formatNumber(total2 - retencionISLR), isBold: true }
     ]
 
     islrSummaryLines.forEach((sLine, sIdx) => {
@@ -1235,7 +1239,7 @@ class RetentionPdfService {
   // ==========================================
   // 3. COMPROBANTE DE RETENCION MUNICIPAL
   // ==========================================
-  async generarComprobanteMunicipal(invoice, companyInfo = {}) {
+  async generarComprobanteMunicipal(invoice, companyInfo = {}, options = {}) {
     // 1. Municipio del tenant
     const tenantMunicipio = companyInfo?.municipio || companyInfo?.municipio_id || invoice.client?.municipio_id || invoice.client?.municipio || ''
 
@@ -1261,13 +1265,17 @@ class RetentionPdfService {
       }
     }
 
-    // Validación defensiva: el comprobante municipal solo aplica si ambas partes están en el mismo municipio
-    if (!venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio)) {
+    // C7 (2026-10-13): antes se bloqueaba sin excepción. Ahora, si los municipios
+    // difieren, se advierte con MUNICIPAL_MISMATCH (el llamador debe mostrar la
+    // advertencia y pedir confirmación al usuario); solo si options.confirmMismatch
+    // viene en true (el usuario ya confirmó) se permite continuar generando el PDF.
+    // Pedido de la contadora, ver W5 en docs/mvp/backlog-cliente-whatsapp.md.
+    if (!venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio) && !options.confirmMismatch) {
       const tenantNombre = venezuelaLocationsService.getCleanMunicipalityName(tenantMunicipio)
       const issuerNombre = venezuelaLocationsService.getCleanMunicipalityName(issuerMunicipio)
       throw {
         code: 'MUNICIPAL_MISMATCH',
-        message: `No se puede generar comprobante municipal: la empresa está en ${tenantNombre} y el proveedor en ${issuerNombre}. La retención municipal solo aplica dentro del mismo municipio.`
+        message: `Tu proveedor está en ${issuerNombre} y tu empresa en ${tenantNombre}. Normalmente no corresponde retener impuesto municipal en este caso. ¿Continuar igual?`
       }
     }
 

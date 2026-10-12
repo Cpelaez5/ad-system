@@ -69,6 +69,8 @@ function buildVm(overrides = {}) {
     formData: {
       flow: 'COMPRA',
       issueDate: '2026-09-01',
+      issuer: {},
+      client: {},
       financial: {
         taxableSales: 0,
         nonTaxableSales: 0,
@@ -87,11 +89,23 @@ function buildVm(overrides = {}) {
     proveedor: { id: 'prov-ficticio-1' },
     retentionConfig: {
       aplicarIva: false, porcentajeIva: 75,
-      aplicarIslr: false, conceptoIslr: null, conceptoIslrNombre: '',
+      aplicarIslr: false, conceptoIslr: null, conceptoIslrNombre: '', tipoPersona: 'JURIDICA',
       aplicarMunicipal: false, porcentajeMunicipal: 0,
       concepto_municipal_id: null, conceptoMunicipalNombre: ''
     },
     retencionesResult: null,
+    // C6: valor UT ficticio para los tests (la implementación real consulta
+    // configuracion_fiscal_global); solo se usa si tipoPersona === 'NATURAL'.
+    valorUT: null,
+    getValorUT: vi.fn().mockResolvedValue(0),
+    // C7: estado de advertencia de municipio distinto (no bloquea, se puede confirmar)
+    municipalMismatch: { detected: false, tenantNombre: '', issuerNombre: '' },
+    municipalMismatchConfirmed: false,
+    // C1: calcularRetenciones() llama a prefillFechaFiscal() al final; se aísla
+    // aquí (igual que sugerirCorrelativosRetencion) para que estos tests se
+    // queden en el cálculo de montos. prefillFechaFiscal() se prueba aparte.
+    fechaFiscalManuallyEdited: false,
+    prefillFechaFiscal: vi.fn(),
     editarComprobanteIva: false,
     editarComprobanteIslr: false,
     editarComprobanteMunicipal: false,
@@ -206,17 +220,13 @@ describe('SimpleInvoiceForm.calcularRetenciones() — Retención de ISLR', () =>
   });
 
   it(
-    // REVISAR CON CONTADORA: según docs/mvp/manuales/04-agente-fiscal-venezuela.md
-    // ("PN: (base × %) − sustraendo (UT)") y el patrón ya aplicado en el RPC SQL
-    // `registrar_compra_con_retenciones` (docs/archivo/migrations-legacy/007_*.sql,
-    // líneas ~247-253: resta sustraendo_ut * valor_ut cuando tipo_persona = 'NATURAL'),
-    // el cálculo de ISLR para Persona Natural DEBERÍA restar el sustraendo en
-    // Unidades Tributarias. El método calcularRetenciones() de SimpleInvoiceForm.vue
-    // (preview en el formulario, antes de guardar) NO resta el sustraendo: solo hace
-    // base × %. Este test fija ese comportamiento ACTUAL de la vista previa, que es
-    // más alto que lo que finalmente se guarda vía el RPC. Posible inconsistencia
-    // entre lo que el usuario ve en pantalla y lo que se registra en BD.
-    'Persona Natural con sustraendo_ut: la vista previa actual NO resta el sustraendo en UT (posible inconsistencia con el RPC de guardado)',
+    // C6 (2026-10-13), antes REVISAR CON CONTADORA: la vista previa ahora replica
+    // la regla del RPC SQL `registrar_compra_con_retenciones`
+    // (docs/archivo/migrations-legacy/20260831_fix_retention_base_imponible_and_date.sql,
+    // líneas ~247-253): para proveedores con tipo_persona = 'NATURAL' resta
+    // sustraendo_ut * valor_ut (UT vigente), con piso en 0. Antes NO restaba nada
+    // en el preview, lo que causaba que el monto mostrado fuera mayor al guardado.
+    'Persona Natural con sustraendo_ut: la vista previa SÍ resta el sustraendo en UT, igual que el RPC de guardado',
     async () => {
       proveedorService.getISLRConcepts.mockResolvedValue([CONCEPTO_PN_SERVICIOS_3_SUSTRAENDO]);
 
@@ -224,14 +234,47 @@ describe('SimpleInvoiceForm.calcularRetenciones() — Retención de ISLR', () =>
       vm.formData.financial.taxableSales = 5000;
       vm.retentionConfig.aplicarIslr = true;
       vm.retentionConfig.conceptoIslr = CONCEPTO_PN_SERVICIOS_3_SUSTRAENDO.id;
+      vm.retentionConfig.tipoPersona = 'NATURAL';
+      vm.getValorUT = vi.fn().mockResolvedValue(1); // UT ficticia = Bs. 1 (solo para el test)
 
       await SimpleInvoiceForm.methods.calcularRetenciones.call(vm);
 
-      // 5000 * 100% * 3% = 150 (SIN restar sustraendo_ut * valor_ut)
-      // El RPC SQL, en cambio, restaría 83.33 UT * valor_ut vigente (ver nota arriba).
-      expect(vm.formData.financial.islrRetention).toBe(150);
+      // 5000 * 100% * 3% = 150, menos sustraendo 83.33 UT * Bs. 1 = 83.33 → 66.67
+      expect(vm.formData.financial.islrRetention).toBeCloseTo(66.67, 2);
+      expect(vm.getValorUT).toHaveBeenCalled();
     }
   );
+
+  it('Persona Natural: si el sustraendo supera la retención calculada, el monto nunca queda negativo (piso en 0)', async () => {
+    proveedorService.getISLRConcepts.mockResolvedValue([CONCEPTO_PN_SERVICIOS_3_SUSTRAENDO]);
+
+    const vm = buildVm();
+    vm.formData.financial.taxableSales = 100; // base chica: 100 * 3% = 3, sustraendo >> 3
+    vm.retentionConfig.aplicarIslr = true;
+    vm.retentionConfig.conceptoIslr = CONCEPTO_PN_SERVICIOS_3_SUSTRAENDO.id;
+    vm.retentionConfig.tipoPersona = 'NATURAL';
+    vm.getValorUT = vi.fn().mockResolvedValue(1);
+
+    await SimpleInvoiceForm.methods.calcularRetenciones.call(vm);
+
+    expect(vm.formData.financial.islrRetention).toBe(0);
+  });
+
+  it('Persona Jurídica: no se resta sustraendo aunque el concepto lo tenga (solo aplica a NATURAL)', async () => {
+    proveedorService.getISLRConcepts.mockResolvedValue([CONCEPTO_PN_SERVICIOS_3_SUSTRAENDO]);
+
+    const vm = buildVm();
+    vm.formData.financial.taxableSales = 5000;
+    vm.retentionConfig.aplicarIslr = true;
+    vm.retentionConfig.conceptoIslr = CONCEPTO_PN_SERVICIOS_3_SUSTRAENDO.id;
+    vm.retentionConfig.tipoPersona = 'JURIDICA';
+    vm.getValorUT = vi.fn().mockResolvedValue(1);
+
+    await SimpleInvoiceForm.methods.calcularRetenciones.call(vm);
+
+    expect(vm.formData.financial.islrRetention).toBe(150);
+    expect(vm.getValorUT).not.toHaveBeenCalled();
+  });
 
   it('no calcula ISLR si aplicarIslr es false aunque haya conceptoIslr asignado', async () => {
     proveedorService.getISLRConcepts.mockResolvedValue([CONCEPTO_PJ_SERVICIOS_2]);
@@ -272,18 +315,15 @@ describe('SimpleInvoiceForm.calcularRetenciones() — Retención Municipal', () 
   });
 
   it(
-    // REVISAR CON CONTADORA: la decisión 16 de GEMINI.md exige que la retención
-    // municipal solo aplique si comprador y proveedor están en el MISMO municipio
-    // (venezuelaLocationsService.areSameMunicipality), y así se bloquea la
-    // exportación del PDF (MUNICIPAL_MISMATCH, ver exportService.js y
-    // retention-pdf-service.js, ya cubierto por tests existentes). Sin embargo,
-    // calcularRetenciones() -- el cálculo que alimenta la VISTA PREVIA en el
-    // formulario -- NO llama a areSameMunicipality en ningún punto: calcula y
-    // muestra el monto municipal igual aunque los municipios difieran. Solo se
-    // bloquea después, al generar el comprobante PDF. Este test fija ese
-    // comportamiento actual (no es una validación, es una observación de que la
-    // vista previa es "optimista" respecto al PDF/guardado final).
-    'la vista previa calcula el monto municipal sin verificar si el proveedor está en el mismo municipio que la empresa',
+    // C7 (2026-10-13), antes REVISAR CON CONTADORA: la decisión 16 de GEMINI.md
+    // exige mismo municipio, pero la contadora pidió "advertir sin bloquear" (W5,
+    // docs/mvp/backlog-cliente-whatsapp.md). Ahora calcularRetenciones() SÍ verifica
+    // el municipio (venezuelaLocationsService.areSameMunicipality): si difieren, NO
+    // aplica el monto por defecto (queda en 0) y expone vm.municipalMismatch para
+    // que la UI muestre la advertencia; si el usuario confirma explícitamente
+    // ("Continuar igual" → municipalMismatchConfirmed = true), se recalcula y el
+    // monto se aplica igual.
+    'advierte (y NO aplica por defecto) si el proveedor está en un municipio distinto al de la empresa; permite continuar si el usuario confirma',
     async () => {
       municipalConceptsService.getConcepts.mockResolvedValue({
         success: true,
@@ -294,14 +334,43 @@ describe('SimpleInvoiceForm.calcularRetenciones() — Retención Municipal', () 
       vm.formData.financial.taxableSales = 1000;
       vm.retentionConfig.aplicarMunicipal = true;
       vm.retentionConfig.concepto_municipal_id = 'mun-2';
-      // Nota: calcularRetenciones() no recibe ni usa el municipio del proveedor
-      // ni el de la empresa en ningún punto de su lógica actual.
+      vm.formData.client.municipio_id = 'm-chacao';
+      vm.formData.issuer.municipio_id = 'm-baruta';
 
+      await SimpleInvoiceForm.methods.calcularRetenciones.call(vm);
+
+      // Por defecto NO se aplica el monto (se protege al usuario de un error fiscal)
+      expect(vm.formData.financial.municipalRetention).toBe(0);
+      expect(vm.municipalMismatch.detected).toBe(true);
+      expect(vm.municipalMismatch.tenantNombre).toContain('Chacao');
+      expect(vm.municipalMismatch.issuerNombre).toContain('Baruta');
+
+      // El usuario confirma explícitamente que quiere continuar igual
+      vm.municipalMismatchConfirmed = true;
       await SimpleInvoiceForm.methods.calcularRetenciones.call(vm);
 
       expect(vm.formData.financial.municipalRetention).toBe(20); // 1000 * 2%
     }
   );
+
+  it('no advierte si el proveedor y la empresa están en el mismo municipio', async () => {
+    municipalConceptsService.getConcepts.mockResolvedValue({
+      success: true,
+      data: [{ id: 'mun-2', porcentaje: 2, descripcion: 'Servicios ficticios' }]
+    });
+
+    const vm = buildVm();
+    vm.formData.financial.taxableSales = 1000;
+    vm.retentionConfig.aplicarMunicipal = true;
+    vm.retentionConfig.concepto_municipal_id = 'mun-2';
+    vm.formData.client.municipio_id = 'm-chacao';
+    vm.formData.issuer.municipio_id = 'm-chacao';
+
+    await SimpleInvoiceForm.methods.calcularRetenciones.call(vm);
+
+    expect(vm.formData.financial.municipalRetention).toBe(20);
+    expect(vm.municipalMismatch.detected).toBe(false);
+  });
 
   it('no calcula municipal si aplicarMunicipal es false', async () => {
     municipalConceptsService.getConcepts.mockResolvedValue({ success: true, data: [] });
@@ -360,5 +429,51 @@ describe('SimpleInvoiceForm.sugerirCorrelativosRetencion() — formato AAAAMM + 
     await SimpleInvoiceForm.methods.sugerirCorrelativosRetencion.call(vm, 120, 0, 0);
 
     expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('SimpleInvoiceForm.prefillFechaFiscal() — C1, Fecha fiscal (Libro de Compras)', () => {
+  it('usa la fecha del comprobante de retención (retentionDate) cuando hay retención de IVA', () => {
+    const vm = buildVm();
+    vm.formData.financial.ivaRetention = 120;
+    vm.formData.financial.retentionDate = '2026-09-02';
+    vm.formData.issueDate = '2026-08-31';
+
+    SimpleInvoiceForm.methods.prefillFechaFiscal.call(vm);
+
+    expect(vm.formData.fecha_fiscal).toBe('2026-09-02');
+  });
+
+  it('usa la fecha de emisión (issueDate) cuando NO hay retención de IVA', () => {
+    const vm = buildVm();
+    vm.formData.financial.ivaRetention = 0;
+    vm.formData.issueDate = '2026-09-05';
+
+    SimpleInvoiceForm.methods.prefillFechaFiscal.call(vm);
+
+    expect(vm.formData.fecha_fiscal).toBe('2026-09-05');
+  });
+
+  it('no sobrescribe el valor si el usuario ya lo editó manualmente', () => {
+    const vm = buildVm();
+    vm.formData.financial.ivaRetention = 120;
+    vm.formData.financial.retentionDate = '2026-09-02';
+    vm.formData.fecha_fiscal = '2026-10-15'; // el usuario puso otra fecha a mano
+    vm.fechaFiscalManuallyEdited = true;
+
+    SimpleInvoiceForm.methods.prefillFechaFiscal.call(vm);
+
+    expect(vm.formData.fecha_fiscal).toBe('2026-10-15');
+  });
+
+  it('no hace nada si el flujo no es COMPRA', () => {
+    const vm = buildVm();
+    vm.formData.flow = 'VENTA';
+    vm.formData.fecha_fiscal = '2026-01-01';
+    vm.formData.issueDate = '2026-09-05';
+
+    SimpleInvoiceForm.methods.prefillFechaFiscal.call(vm);
+
+    expect(vm.formData.fecha_fiscal).toBe('2026-01-01');
   });
 });
