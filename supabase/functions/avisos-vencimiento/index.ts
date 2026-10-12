@@ -55,7 +55,7 @@ function buildAvisoHtml(payload: {
   const SECONDARY = "#1F355C"; // azul de apoyo
   const ACCENT = "#E0B04F"; // dorado de apoyo
   const BG = "#EFEFEF";
-  const LOGO_URL = "https://adsystemapp.com/icon-adaptableV2.svg";
+  const LOGO_URL = "https://adsystemapp.com/ADSystem/png/logo.png"; // imagotipo oficial AD System (PNG: los correos no muestran SVG)
 
   const items = mensajes
     .map(
@@ -77,13 +77,11 @@ function buildAvisoHtml(payload: {
 <table width="100%" style="max-width:480px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
 
   <tr>
-    <td style="background:${SECONDARY};padding:22px 24px;text-align:center;">
-      <img src="${LOGO_URL}" alt="AD System" height="40" style="display:inline-block;vertical-align:middle;margin-right:10px;">
-      <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.5px;">AD System</span>
+    <td style="background:#ffffff;padding:22px 24px;text-align:center;border-bottom:4px solid ${PRIMARY};">
+      <img src="${LOGO_URL}" alt="AD System" height="36" style="display:inline-block;">
     </td>
   </tr>
 
-  <tr><td style="background:${ACCENT};height:4px;"></td></tr>
 
   <tr>
     <td style="padding:24px 24px 8px;">
@@ -132,7 +130,15 @@ Deno.serve(async (req: Request) => {
 
     const esServiceRole =
       authHeader === `Bearer ${SERVICE_ROLE_KEY}` && SERVICE_ROLE_KEY.length > 0;
-    const esCronValido = !!CRON_SECRET && cronSecretHeader === CRON_SECRET;
+    let esCronValido = !!CRON_SECRET && cronSecretHeader === CRON_SECRET;
+
+    // Sin secret en el entorno de la función: se valida contra Vault ('cron_secret')
+    // con una RPC que solo puede ejecutar service_role.
+    if (!esCronValido && !CRON_SECRET && cronSecretHeader) {
+      const clienteVerificacion = createClient(Deno.env.get("SUPABASE_URL") ?? "", SERVICE_ROLE_KEY);
+      const { data: coincide } = await clienteVerificacion.rpc("verificar_cron_secret", { p_secret: cronSecretHeader });
+      esCronValido = coincide === true;
+    }
 
     if (!esServiceRole && !esCronValido) {
       return jsonError(
@@ -287,7 +293,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: clientes, error: errClientes } = await supabaseAdmin
       .from("clients")
-      .select("id, company_name, contact_name, email")
+      .select("id, company_name, contact_person, email")
       .in("id", clientIds);
 
     if (errClientes) {
@@ -330,7 +336,7 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      const nombreCliente = cliente?.contact_name || cliente?.company_name || "cliente";
+      const nombreCliente = cliente?.contact_person || cliente?.company_name || "cliente";
 
       const mensajes = items.map((item) =>
         item.tipo === "fiscal"

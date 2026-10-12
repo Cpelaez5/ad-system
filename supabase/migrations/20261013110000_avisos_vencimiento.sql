@@ -69,3 +69,21 @@ SELECT cron.schedule(
   );
   $$
 );
+
+-- Validación del secreto del job contra Vault (sin depender de secrets de la
+-- Edge Function, que hoy no se pueden cargar por MCP). Solo service_role.
+CREATE OR REPLACE FUNCTION public.verificar_cron_secret(p_secret text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM vault.decrypted_secrets
+     WHERE name = 'cron_secret' AND decrypted_secret = p_secret
+  );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.verificar_cron_secret(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.verificar_cron_secret(text) TO service_role;
