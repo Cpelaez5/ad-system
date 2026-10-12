@@ -1,0 +1,380 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  hoyEnCaracas,
+  clasificarDocumentoFiscal,
+  clasificarFactura,
+  agruparPorCliente,
+  mensajeDocumentoFiscal,
+  mensajeFactura,
+  construirAsunto,
+} from "./logica.js";
+
+/**
+ * Edge Function: avisos-vencimiento
+ *
+ * Job diario (invocado por pg_cron vía pg_net, ver migración
+ * 20261013110000_avisos_vencimiento.sql) que avisa por correo:
+ *  a) documentos de `fiscal_docs` VIGENTES que vencen en 30, 7 o 1 días,
+ *     o que vencieron ayer (un solo aviso de "vencido").
+ *  b) facturas de suscripción (`system_invoices` pendientes) que vencen
+ *     en 3 o 0 días.
+ *
+ * Un correo por cliente por día con todos sus ítems. Idempotencia vía la
+ * tabla `avisos_enviados` (índice único client_id+tipo+referencia_id+dias_antes):
+ * se inserta el registro ANTES de enviar el correo con ON CONFLICT DO NOTHING
+ * y solo se envía si la fila se insertó de verdad (si ya existía, no se reenvía).
+ *
+ * Protegida: solo puede invocarla el cron (header `x-cron-secret` == secret
+ * de la función) o una llamada con el service_role key.
+ */
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-cron-secret",
+};
+
+function jsonError(code: string, message: string, status = 400) {
+  return new Response(JSON.stringify({ code, message }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// ─── Plantilla HTML corta, móvil primero, colores de marca AD System ─────────
+function buildAvisoHtml(payload: {
+  nombreCliente: string;
+  mensajes: string[];
+  appUrl: string;
+}) {
+  const { nombreCliente, mensajes, appUrl } = payload;
+
+  // Colores de marca AD System (docs/mvp/diseno/sistema-diseno.md §2.4)
+  const PRIMARY = "#8E1818"; // granate AD System
+  const SECONDARY = "#1F355C"; // azul de apoyo
+  const ACCENT = "#E0B04F"; // dorado de apoyo
+  const BG = "#EFEFEF";
+  const LOGO_URL = "https://adsystemapp.com/icon-adaptableV2.svg";
+
+  const items = mensajes
+    .map(
+      (m) => `
+    <tr>
+      <td style="padding:12px 16px;border-bottom:1px solid #eee;font-size:15px;color:#333;line-height:1.5;">
+        ${m}
+      </td>
+    </tr>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:${BG};font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:20px 0;">
+<tr><td align="center">
+<table width="100%" style="max-width:480px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+  <tr>
+    <td style="background:${SECONDARY};padding:22px 24px;text-align:center;">
+      <img src="${LOGO_URL}" alt="AD System" height="40" style="display:inline-block;vertical-align:middle;margin-right:10px;">
+      <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.5px;">AD System</span>
+    </td>
+  </tr>
+
+  <tr><td style="background:${ACCENT};height:4px;"></td></tr>
+
+  <tr>
+    <td style="padding:24px 24px 8px;">
+      <p style="margin:0;font-size:15px;color:#333;">Hola <strong>${nombreCliente}</strong>,</p>
+      <p style="margin:8px 0 0;font-size:14px;color:#555;">Tienes pendientes de atender:</p>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:8px 24px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f7;border-radius:8px;overflow:hidden;">
+        ${items}
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:0 24px 28px;text-align:center;">
+      <a href="${appUrl}" style="display:inline-block;background:${PRIMARY};color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600;">Ver mis papeles</a>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="background:${SECONDARY};padding:16px 24px;text-align:center;">
+      <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.6);">Aviso automático de <strong style="color:${ACCENT};">AD System</strong>.</p>
+    </td>
+  </tr>
+
+</table>
+</td></tr></table>
+</body>
+</html>`;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    // ─── 1. Autorización: solo el cron (secret) o service_role ────────────
+    const authHeader = req.headers.get("authorization") || "";
+    const cronSecretHeader = req.headers.get("x-cron-secret") || "";
+    const CRON_SECRET = Deno.env.get("CRON_SECRET");
+    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    const esServiceRole =
+      authHeader === `Bearer ${SERVICE_ROLE_KEY}` && SERVICE_ROLE_KEY.length > 0;
+    const esCronValido = !!CRON_SECRET && cronSecretHeader === CRON_SECRET;
+
+    if (!esServiceRole && !esCronValido) {
+      return jsonError(
+        "NO_AUTORIZADO",
+        "Esta función solo puede invocarla el job programado.",
+        401
+      );
+    }
+
+    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    if (!RESEND_API_KEY) {
+      return jsonError(
+        "CONFIG_FALTANTE",
+        "RESEND_API_KEY no está configurada en los secrets de la función.",
+        500
+      );
+    }
+    const FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "AD System <onboarding@resend.dev>";
+    const APP_URL = Deno.env.get("APP_URL") || "https://adsystemapp.com";
+
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      SERVICE_ROLE_KEY
+    );
+
+    const hoyISO = hoyEnCaracas();
+
+    // ─── 2. Candidatos: documentos fiscales VIGENTES y facturas pendientes ─
+    const { data: fiscalDocs, error: errFiscal } = await supabaseAdmin
+      .from("fiscal_docs")
+      .select("id, client_id, name, doc_type, status, expiration_date")
+      .eq("status", "VIGENTE")
+      .is("deleted_at", null)
+      .not("client_id", "is", null)
+      .not("expiration_date", "is", null);
+
+    if (errFiscal) {
+      console.error("Error consultando fiscal_docs:", errFiscal.message);
+      return jsonError("ERROR_CONSULTA", "No se pudieron leer los documentos fiscales.", 500);
+    }
+
+    const { data: invoices, error: errInvoices } = await supabaseAdmin
+      .from("system_invoices")
+      .select("id, client_id, invoice_number, status, due_date")
+      .eq("status", "pending")
+      .not("client_id", "is", null);
+
+    if (errInvoices) {
+      console.error("Error consultando system_invoices:", errInvoices.message);
+      return jsonError("ERROR_CONSULTA", "No se pudieron leer las facturas.", 500);
+    }
+
+    // ─── 3. Clasificar (¿toca avisar hoy?) ─────────────────────────────────
+    type ItemAviso = {
+      client_id: string;
+      tipo: "fiscal" | "factura";
+      referencia_id: string;
+      dias_antes: number;
+      nombre?: string;
+      doc_type?: string;
+      invoice_number?: string;
+    };
+
+    const itemsAviso: ItemAviso[] = [];
+
+    for (const doc of fiscalDocs ?? []) {
+      const diasAntes = clasificarDocumentoFiscal(doc, hoyISO);
+      if (diasAntes === null) continue;
+      itemsAviso.push({
+        client_id: doc.client_id,
+        tipo: "fiscal",
+        referencia_id: doc.id,
+        dias_antes: diasAntes,
+        nombre: doc.name,
+        doc_type: doc.doc_type,
+      });
+    }
+
+    for (const inv of invoices ?? []) {
+      const diasAntes = clasificarFactura(inv, hoyISO);
+      if (diasAntes === null) continue;
+      itemsAviso.push({
+        client_id: inv.client_id,
+        tipo: "factura",
+        referencia_id: inv.id,
+        dias_antes: diasAntes,
+        invoice_number: inv.invoice_number,
+      });
+    }
+
+    const conteos = {
+      candidatos_fiscal: itemsAviso.filter((i) => i.tipo === "fiscal").length,
+      candidatos_factura: itemsAviso.filter((i) => i.tipo === "factura").length,
+      clientes_procesados: 0,
+      correos_enviados: 0,
+      items_omitidos_duplicados: 0,
+      errores: 0,
+    };
+
+    if (itemsAviso.length === 0) {
+      return new Response(JSON.stringify({ success: true, ...conteos }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // ─── 4. Idempotencia por ítem: insertar en avisos_enviados ANTES de
+    //        enviar. Solo se incluye en el correo el ítem cuya fila se
+    //        insertó de verdad (si ya existía, se omite silenciosamente).
+    const itemsAEnviar: ItemAviso[] = [];
+    for (const item of itemsAviso) {
+      const { data: inserted, error: errInsert } = await supabaseAdmin
+        .from("avisos_enviados")
+        .insert({
+          client_id: item.client_id,
+          tipo: item.tipo,
+          referencia_id: item.referencia_id,
+          dias_antes: item.dias_antes,
+        })
+        .select("id")
+        .maybeSingle();
+
+      if (errInsert) {
+        // Conflicto de la restricción única = ya se avisó; cualquier otro
+        // error se cuenta pero no detiene el resto del job.
+        if (errInsert.code === "23505") {
+          conteos.items_omitidos_duplicados++;
+        } else {
+          console.error("Error insertando avisos_enviados:", errInsert.message);
+          conteos.errores++;
+        }
+        continue;
+      }
+
+      if (inserted) {
+        itemsAEnviar.push(item);
+      } else {
+        conteos.items_omitidos_duplicados++;
+      }
+    }
+
+    if (itemsAEnviar.length === 0) {
+      return new Response(JSON.stringify({ success: true, ...conteos }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // ─── 5. Agrupar por cliente y resolver destinatario + nombre ──────────
+    const grupos = agruparPorCliente(itemsAEnviar);
+    const clientIds = Array.from(grupos.keys());
+
+    const { data: clientes, error: errClientes } = await supabaseAdmin
+      .from("clients")
+      .select("id, company_name, contact_name, email")
+      .in("id", clientIds);
+
+    if (errClientes) {
+      console.error("Error consultando clients:", errClientes.message);
+      return jsonError("ERROR_CONSULTA", "No se pudieron leer los clientes.", 500);
+    }
+
+    const { data: usuariosCliente, error: errUsuarios } = await supabaseAdmin
+      .from("users")
+      .select("client_id, email")
+      .eq("role", "cliente")
+      .in("client_id", clientIds)
+      .eq("is_active", true);
+
+    if (errUsuarios) {
+      console.error("Error consultando users:", errUsuarios.message);
+      return jsonError("ERROR_CONSULTA", "No se pudieron leer los usuarios.", 500);
+    }
+
+    const clientePorId = new Map((clientes ?? []).map((c) => [c.id, c]));
+    const emailUsuarioPorCliente = new Map<string, string>();
+    for (const u of usuariosCliente ?? []) {
+      // Si hay más de un usuario cliente activo, se usa el primero encontrado.
+      if (u.client_id && u.email && !emailUsuarioPorCliente.has(u.client_id)) {
+        emailUsuarioPorCliente.set(u.client_id, u.email);
+      }
+    }
+
+    const appUrlFiscal = `${APP_URL.replace(/\/$/, "")}/cliente/fiscal-360`;
+
+    // ─── 6. Enviar un correo por cliente con todos sus ítems ───────────────
+    for (const [clientId, items] of grupos) {
+      conteos.clientes_procesados++;
+      const cliente = clientePorId.get(clientId);
+      const destinatario = emailUsuarioPorCliente.get(clientId) || cliente?.email;
+
+      if (!destinatario) {
+        console.warn("Cliente sin correo de destino disponible, se omite el aviso.");
+        conteos.errores++;
+        continue;
+      }
+
+      const nombreCliente = cliente?.contact_name || cliente?.company_name || "cliente";
+
+      const mensajes = items.map((item) =>
+        item.tipo === "fiscal"
+          ? mensajeDocumentoFiscal(nombreCliente, item)
+          : mensajeFactura(nombreCliente, item)
+      );
+
+      const html = buildAvisoHtml({
+        nombreCliente,
+        mensajes,
+        appUrl: appUrlFiscal,
+      });
+      const subject = construirAsunto(items);
+
+      try {
+        const resendResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ from: FROM_EMAIL, to: [destinatario], subject, html }),
+        });
+
+        if (!resendResponse.ok) {
+          const resultado = await resendResponse.json().catch(() => ({}));
+          console.error("Error de Resend al enviar aviso de vencimiento:", resultado?.message);
+          conteos.errores++;
+          continue;
+        }
+
+        conteos.correos_enviados++;
+      } catch (err) {
+        console.error("Error enviando aviso de vencimiento:", (err as Error).message);
+        conteos.errores++;
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true, ...conteos }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Error en Edge Function avisos-vencimiento:", (error as Error).message);
+    return jsonError("ERROR_INTERNO", "Ocurrió un error al procesar los avisos.", 500);
+  }
+});
