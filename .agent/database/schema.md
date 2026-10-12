@@ -38,6 +38,8 @@ CREATE TABLE users (
   last_name TEXT,
   role TEXT CHECK (role IN ('super_admin', 'admin', 'contador', 'cliente')),
   avatar_url TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  invited_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

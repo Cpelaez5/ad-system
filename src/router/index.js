@@ -5,6 +5,7 @@ import Dashboard from '@/views/shared/Dashboard.vue'
 import Login from '@/views/shared/Login.vue'
 import Pricing from '../views/Pricing.vue'
 const Register = () => import('@/views/auth/Register.vue')
+const SetPassword = () => import('@/views/auth/SetPassword.vue')
 const OCRDemo = () => import('@/views/shared/OCRDemo.vue')
 
 // Vistas para cliente
@@ -123,6 +124,12 @@ const routes = [
       title: 'Registrarse y Comenzar Prueba Gratuita | AD SYSTEM',
       description: 'Crea tu cuenta empresarial en AD SYSTEM hoy mismo. Pruébalo gratis sin compromiso y automatiza tus obligaciones fiscales.'
     }
+  },
+  {
+    path: '/auth/set-password',
+    name: 'SetPassword',
+    component: SetPassword,
+    meta: { requiresAuth: false, title: 'Definir Contraseña | AD SYSTEM' }
   },
   {
     path: '/dashboard',

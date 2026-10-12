@@ -202,5 +202,26 @@ WHERE organization_id = 'xxx'
 
 ---
 
-**Última actualización**: Noviembre 2024
+## 👥 Módulo de Invitación y Activación de Usuarios
+
+### **Descripción**
+Permite a usuarios administrativos (`super_admin` y `admin`) invitar nuevos colaboradores y clientes mediante el envío de correos corporativos automáticos con el branding oficial de **AD System** vía **Resend**, protegiendo la plataforma contra Open Redirect y ataques XSS.
+
+### **Flujo de Seguridad**
+1. **Emisión**: El administrador introduce Nombre, Apellido, Email y Rol desde `Usuarios.vue`.
+2. **Edge Function Segura (`admin-invite-user`)**:
+   - Valida autorización de quien invita (solo `super_admin` puede invitar otros `super_admin`).
+   - Valida que `redirect_url` provenga de la lista blanca `ALLOWED_ORIGINS` (`adsystemapp.com`, `localhost`).
+   - Llama a `supabaseAdmin.auth.admin.generateLink({ type: 'invite' })`.
+   - Registra al usuario en `public.users` con `is_active: false` y `invited_at`.
+   - Envía el correo con diseño HTML corporativo vía Resend.
+3. **Recepción y Activación (`SetPassword.vue`)**:
+   - El invitado hace clic en el enlace y accede a `/auth/set-password`.
+   - La vista escucha `supabase.auth.onAuthStateChange` sin manipular `localStorage` (mitigación XSS).
+   - El usuario define su contraseña de mínimo 8 caracteres con medidor visual de fortaleza.
+   - Tras configurar su contraseña, se actualiza `is_active: true` y se redirige autenticado a `/dashboard`.
+
+---
+
+**Última actualización**: Septiembre 2026
 

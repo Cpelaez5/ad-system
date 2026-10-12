@@ -1,5 +1,14 @@
 <template>
   <div class="usuarios-container">
+    <!-- Toast de Notificaciones -->
+    <div v-if="notification.show" class="notification-toast" :class="notification.type">
+      <i :class="notification.icon" class="notification-icon"></i>
+      <span class="notification-message">{{ notification.message }}</span>
+      <button class="notification-close" @click="notification.show = false">
+        <i class="mdi mdi-close"></i>
+      </button>
+    </div>
+
     <div class="page-header animate-slide-in-down">
       <div class="header-content">
         <div class="header-title">
@@ -13,8 +22,8 @@
         @click="openCreateModal"
         v-if="hasPermission('users.create')"
       >
-        <i class="mdi mdi-plus"></i>
-        Nuevo Usuario
+        <i class="mdi mdi-email-plus-outline mr-1"></i>
+        Invitar Usuario
       </button>
     </div>
 
@@ -95,14 +104,24 @@
                 <span 
                   class="status-badge"
                   :class="{ active: user.isActive, inactive: !user.isActive }"
+                  :title="user.isActive ? 'Usuario activo en el sistema' : 'El usuario aún no ha configurado su contraseña de acceso'"
                 >
-                  {{ user.isActive ? 'Activo' : 'Inactivo' }}
+                  <i :class="user.isActive ? 'mdi mdi-check-circle-outline' : 'mdi mdi-clock-outline'" style="font-size: 13px; margin-right: 4px;"></i>
+                  {{ user.isActive ? 'Activo' : 'Invitación Pendiente' }}
                 </span>
               </td>
               <td class="last-login">
                 {{ formatDate(user.lastLogin) }}
               </td>
               <td class="actions">
+                <button 
+                  class="btn-action btn-resend animate-micro-bounce"
+                  @click="resendInvite(user)"
+                  v-if="!user.isActive && hasPermission('users.update')"
+                  title="Reenviar correo de invitación"
+                >
+                  <i class="mdi mdi-email-sync"></i>
+                </button>
                 <button 
                   class="btn-action btn-view animate-micro-bounce"
                   @click="viewUser(user)"
@@ -145,33 +164,46 @@
     <div v-if="showModal" class="modal-overlay animate-fade-in" @click="closeModal">
       <div class="modal-content animate-scale-in" @click.stop>
         <div class="modal-header">
-          <h2>{{ isEditing ? 'Editar Usuario' : 'Nuevo Usuario' }}</h2>
+          <h2>{{ isEditing ? 'Editar Usuario' : 'Invitar Usuario al Sistema' }}</h2>
           <button class="btn-close animate-micro-rotate" @click="closeModal">
             <i class="mdi mdi-close"></i>
           </button>
         </div>
         
         <form @submit.prevent="saveUser" class="modal-form">
-          <div class="form-row">
+          <!-- Modo Edición: Campos de identificación -->
+          <div v-if="isEditing" class="form-row">
             <div class="form-group">
-              <label class="form-label">Nombre de usuario *</label>
+              <label class="form-label">Nombre de usuario</label>
               <input
                 v-model="formData.username"
                 type="text"
                 class="form-input"
-                required
-                :disabled="isEditing"
+                disabled
               />
             </div>
             <div class="form-group">
-              <label class="form-label">Email *</label>
+              <label class="form-label">Email</label>
               <input
                 v-model="formData.email"
                 type="email"
                 class="form-input"
-                required
+                disabled
               />
             </div>
+          </div>
+
+          <!-- Modo Invitación: Campo de Email destacado con ayuda -->
+          <div v-if="!isEditing" class="form-group">
+            <label class="form-label">Correo Electrónico *</label>
+            <input
+              v-model="formData.email"
+              type="email"
+              class="form-input"
+              placeholder="ejemplo@empresa.com"
+              required
+            />
+            <small class="field-hint">A esta dirección llegará el correo con el enlace seguro para activar la cuenta.</small>
           </div>
           
           <div class="form-row">
@@ -181,6 +213,7 @@
                 v-model="formData.firstName"
                 type="text"
                 class="form-input"
+                placeholder="Nombre"
                 required
               />
             </div>
@@ -190,32 +223,33 @@
                 v-model="formData.lastName"
                 type="text"
                 class="form-input"
+                placeholder="Apellido"
                 required
               />
             </div>
           </div>
           
           <div class="form-group">
-            <label class="form-label">Rol *</label>
+            <label class="form-label">Rol en el Sistema *</label>
             <select v-model="formData.role" class="form-select" required>
-              <option value="">Seleccionar rol</option>
-              <option v-for="(role, key) in roles" :key="key" :value="key">
-                {{ role.name }} - {{ role.description }}
+              <option value="">Selecciona un rol...</option>
+              <option v-for="(role, key) in availableRoles" :key="key" :value="key">
+                {{ role.name }} — {{ role.description }}
               </option>
             </select>
           </div>
           
-          <div v-if="!isEditing" class="form-group">
-            <label class="form-label">Contraseña *</label>
-            <input
-              v-model="formData.password"
-              type="password"
-              class="form-input"
-              required
-            />
+          <div v-if="!isEditing" class="invite-info-box">
+            <div class="invite-info-icon">
+              <i class="mdi mdi-email-check-outline"></i>
+            </div>
+            <div class="invite-info-text">
+              <strong>Envío automático de invitación</strong>
+              <p>El usuario recibirá un correo con el diseño institucional de <strong>AD System</strong> para activar su cuenta y crear su propia contraseña. No requieres asignarle una clave provisional.</p>
+            </div>
           </div>
           
-          <div class="form-group">
+          <div v-if="isEditing" class="form-group">
             <label class="checkbox-container">
               <input
                 v-model="formData.isActive"
@@ -231,8 +265,8 @@
               Cancelar
             </button>
             <button type="submit" class="btn-primary" :disabled="loading">
-              <span v-if="!loading">{{ isEditing ? 'Actualizar' : 'Crear' }}</span>
-              <span v-else class="loading-spinner">Guardando...</span>
+              <span v-if="!loading">{{ isEditing ? 'Actualizar Usuario' : 'Enviar Invitación' }}</span>
+              <span v-else class="loading-spinner">Procesando...</span>
             </button>
           </div>
         </form>
@@ -271,7 +305,7 @@
                   class="status-badge"
                   :class="{ active: selectedUser.isActive, inactive: !selectedUser.isActive }"
                 >
-                  {{ selectedUser.isActive ? 'Activo' : 'Inactivo' }}
+                  {{ selectedUser.isActive ? 'Activo' : 'Invitación Pendiente' }}
                 </span>
               </div>
             </div>
@@ -475,12 +509,27 @@ export default {
         role: '',
         password: '',
         isActive: true
-      }
+      },
+      notification: {
+        show: false,
+        message: '',
+        type: 'success',
+        icon: 'mdi mdi-check-circle'
+      },
+      notificationTimeout: null
     }
   },
   computed: {
     isSuperAdmin() {
       return this.currentUser?.role === 'super_admin'
+    },
+    availableRoles() {
+      if (this.isSuperAdmin) {
+        return this.roles
+      }
+      const filtered = { ...this.roles }
+      delete filtered.super_admin
+      return filtered
     }
   },
   async mounted() {
@@ -492,6 +541,11 @@ export default {
       }
     } catch (e) {}
     await this.loadData()
+  },
+  beforeUnmount() {
+    if (this.notificationTimeout) {
+      clearTimeout(this.notificationTimeout)
+    }
   },
   methods: {
     async loadData() {
@@ -559,6 +613,25 @@ export default {
       this.showModal = true
     },
     
+    showToast(message, type = 'success') {
+      const iconMap = {
+        success: 'mdi mdi-check-circle',
+        error: 'mdi mdi-alert-circle',
+        info: 'mdi mdi-information',
+        warning: 'mdi mdi-alert'
+      }
+      this.notification = {
+        show: true,
+        message,
+        type,
+        icon: iconMap[type] || 'mdi mdi-information'
+      }
+      if (this.notificationTimeout) clearTimeout(this.notificationTimeout)
+      this.notificationTimeout = setTimeout(() => {
+        this.notification.show = false
+      }, 5000)
+    },
+    
     viewUser(user) {
       this.selectedUser = user
       this.showDetailsModal = true
@@ -570,18 +643,49 @@ export default {
         
         if (this.isEditing) {
           await userService.updateUser(this.formData.id, this.formData)
+          await this.loadData()
+          this.closeModal()
+          this.showToast('Usuario actualizado correctamente', 'success')
         } else {
-          await userService.createUser(this.formData)
+          const res = await userService.inviteUser(this.formData)
+          if (res.success) {
+            await this.loadData()
+            this.closeModal()
+            this.showToast(`Invitación enviada exitosamente a ${this.formData.email}`, 'success')
+          } else {
+            // No cerrar modal si falló — el admin puede corregir y reintentar
+            this.showToast('Error al enviar invitación: ' + (res.message || 'Error desconocido'), 'error')
+          }
         }
-        
-        await this.loadData()
-        this.closeModal()
-        alert(this.isEditing ? 'Usuario actualizado correctamente' : 'Usuario creado correctamente')
       } catch (error) {
         console.error('Error guardando usuario:', error)
-        alert('Error al guardar el usuario')
+        this.showToast('Error al guardar el usuario: ' + (error.message || ''), 'error')
       } finally {
         this.loading = false
+      }
+    },
+    
+    async resendInvite(user) {
+      if (confirm(`¿Deseas reenviar el correo de invitación a ${user.email}?`)) {
+        try {
+          this.loading = true
+          const res = await userService.resendInvitation({
+            email: user.email,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName
+          })
+          if (res.success) {
+             this.showToast(`Invitación reenviada exitosamente a ${user.email}`, 'success')
+          } else {
+             this.showToast('Error: ' + res.message, 'error')
+          }
+        } catch (error) {
+          console.error('Error:', error)
+          this.showToast('Error al reenviar invitación.', 'error')
+        } finally {
+          this.loading = false
+        }
       }
     },
     
@@ -590,10 +694,10 @@ export default {
         try {
           await userService.deleteUser(user.id)
           await this.loadData()
-          alert('Usuario eliminado correctamente')
+          this.showToast('Usuario eliminado correctamente', 'success')
         } catch (error) {
           console.error('Error eliminando usuario:', error)
-          alert('Error al eliminar el usuario')
+          this.showToast('Error al eliminar el usuario', 'error')
         }
       }
     },
@@ -975,13 +1079,19 @@ export default {
 }
 
 .status-badge.active {
-  background: #4caf50;
-  color: white;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  display: inline-flex;
+  align-items: center;
 }
 
 .status-badge.inactive {
-  background: #f44336;
-  color: white;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  display: inline-flex;
+  align-items: center;
 }
 
 .last-login {
@@ -1006,6 +1116,19 @@ export default {
   transition: all 0.3s ease;
 }
 
+.btn-resend {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.btn-resend:hover {
+  background: #fde68a;
+  color: #78350f;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(180, 83, 9, 0.2);
+}
+
 .btn-view {
   background: #e3f2fd;
   color: #1976D2;
@@ -1028,6 +1151,106 @@ export default {
 
 .btn-action:hover {
   transform: scale(1.1);
+}
+
+/* Toast de Notificaciones */
+.notification-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  animation: slideInDown 0.3s ease-out;
+}
+
+.notification-toast.success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.notification-toast.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.notification-toast.info {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.notification-icon {
+  font-size: 20px;
+}
+
+.notification-message {
+  flex: 1;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+/* Cuadro Informativo de Invitación */
+.invite-info-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #f0f7ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #1F355C;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  color: #1F355C;
+}
+
+.invite-info-icon {
+  font-size: 22px;
+  color: #1F355C;
+  line-height: 1;
+}
+
+.invite-info-text strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 2px;
+  color: #1F355C;
+}
+
+.invite-info-text p {
+  margin: 0;
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.field-hint {
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
 }
 
 /* Modal styles */
