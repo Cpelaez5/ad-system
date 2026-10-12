@@ -23,6 +23,11 @@
 - No uses `console.log` en código nuevo: usa el logger (cuando exista, Fase 1).
 - Secretos: **nunca** con prefijo `VITE_` (todo `VITE_*` llega al navegador). Las llamadas a IA o a APIs con clave van por Edge Functions.
 
+## 3b. No reinventar la rueda
+- Stack: **Vue 3 + Vuetify 3**. Si Vuetify ya tiene el componente (diálogos, hojas inferiores, navegación inferior, listas, chips, skeletons, snackbars, steppers, data tables, menús…), **úsalo**. Los componentes propios en `src/components/ui/` son envoltorios delgados sobre Vuetify que fijan nuestro estándar visual, no reimplementaciones.
+- Para algo complejo que Vuetify no trae (gráficos, editores, exportaciones), usa una **librería probada** (ya instaladas: chart.js, exceljs, jspdf, pdf-lib, date-fns, @vuepic/vue-datepicker). Si falta una, instálala con `npm install` y justifícalo en el commit. Nada de reescribir a mano lo que ya resuelve una librería mantenida.
+- El aspecto "premium" sale de los tokens, los `defaults` de Vuetify y la composición, no de widgets hechos a mano. Referencia: `docs/mvp/diseno/sistema-diseno.md`.
+
 ## 4. Decisiones que NO se revierten
 Las 17 decisiones de `GEMINI.md` (patrón adaptador de IA, schema OCR en inglés, `taxableAmount`, correlativos fiscales inmutables, `retentionDate` separado de `issueDate`, alícuota 16% en el PDF de retención IVA, retención municipal solo con el mismo municipio, lookup en vivo de proveedores, Cashea por cuota con tasa del día del pago).
 
