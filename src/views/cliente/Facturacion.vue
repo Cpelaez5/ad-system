@@ -1163,11 +1163,10 @@ import CurrencyStatsCard from '@/components/common/CurrencyStatsCard.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue'
 import invoiceService from '@/services/invoiceService.js';
+import { guardarRegistro } from '@/services/registroService.js';
 import { obtenerUrlFirmada } from '@/services/storageUrlService.js';
 import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
-import retentionRpcService from '@/services/retentionRpcService.js';
-import emailNotificationService from '@/services/email-notification-service.js';
 import ClientInvoiceForm from '@/components/forms/client/ClientInvoiceForm.vue';
 import SimpleInvoiceForm  from '@/components/forms/client/SimpleInvoiceForm.vue';
 import CasheaInstallmentsModal from '@/components/forms/client/CasheaInstallmentsModal.vue';
@@ -1868,77 +1867,29 @@ export default {
       }
 
       // ── Formato nuevo (SimpleInvoiceForm emite el formData directamente) ─────
-      // El padre es responsable de la llamada al servicio (S de SOLID)
-      try {
-        const formData = result; // result ES el formData aquí
+      // La persistencia vive en registroService.guardarRegistro; esta vista solo
+      // decide qué hacer con la UI según el resultado.
+      const formData = result; // result ES el formData aquí
+      const saveResult = await guardarRegistro(formData);
 
-        let savedResult;
-        if (formData.id) {
-          savedResult = await invoiceService.updateInvoice(formData.id, formData);
-        } else {
-          // Fase 2: Si es un egreso (compra o gasto) y tiene retenciones, usar RPC seguro
-          const hasRetentions = (formData.financial?.ivaRetention > 0) || (formData.financial?.islrRetention > 0) || (formData.financial?.municipalRetention > 0);
-          if (formData.flow === 'COMPRA' && (formData.expense_type === 'COMPRA' || formData.expense_type === 'GASTO' || hasRetentions)) {
-            
-            // Construir el payload que espera el RPC
-            const rpcPayload = {
-              p_client_id: formData.client?.id || formData.client_id,
-              p_proveedor_id: formData.issuer?.id || formData.proveedor_id,
-              p_aplicar_iva: formData.financial?.ivaRetention > 0,
-              p_aplicar_islr: formData.financial?.islrRetention > 0,
-              p_aplicar_municipal: formData.financial?.municipalRetention > 0,
-              p_comprobante_iva: formData.financial?.ivaRetentionNumber || null,
-              p_comprobante_islr: formData.financial?.islrRetentionNumber || null,
-              p_comprobante_municipal: formData.financial?.municipalRetentionNumber || null,
-              p_factura: formData
-            };
-            
-            if (formData.islr_concept_id) {
-              rpcPayload.p_islr_concept_id = formData.islr_concept_id;
-            }
-            if (formData.concepto_municipal_id) {
-              rpcPayload.p_concepto_municipal_id = formData.concepto_municipal_id;
-            }
-
-            const rpcData = await retentionRpcService.registrarCompra(rpcPayload);
-            // Simular la respuesta de invoiceService para mantener compatibilidad con el resto de la vista
-            savedResult = { success: true, data: { id: rpcData.invoice_id, ...formData } };
-
-          } else {
-            savedResult = await invoiceService.createInvoice(formData);
-          }
-        }
-
-        if (!savedResult || !savedResult.success) {
-           throw new Error(savedResult?.message || 'Error desconocido al guardar factura en base de datos');
-        }
-
-        // Enviar notificación por email en background (solo al crear, no al editar)
-        if (savedResult?.data && !formData.id) {
-          emailNotificationService.notifyInvoiceCreated(savedResult.data)
-            .catch(err => console.warn('⚠️ Email no enviado:', err))
-        }
-
+      if (saveResult.success) {
         // Notificar al SimpleInvoiceForm que terminó con éxito
         if (this.$refs.simpleForm) {
           this.$refs.simpleForm.onSaveSuccess();
         }
 
         // Si fue una compra o gasto, notificar al módulo de proveedores para auto-sincronización
-        if (formData.flow === 'COMPRA' && typeof window !== 'undefined') {
+        if (saveResult.isCompra && typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('ad-proveedor-changed'));
         }
 
         this.closeInvoiceDialog();
         await this.loadInvoices();
-
-      } catch (err) {
-        console.error('❌ [Facturacion] Error al guardar factura:', err);
+      } else {
+        console.error('❌ [Facturacion] Error al guardar factura:', saveResult.message);
         // Notificar al SimpleInvoiceForm del error (no pierde los datos)
         if (this.$refs.simpleForm) {
-          this.$refs.simpleForm.onSaveFailed(
-            err?.message || 'Ocurrió un error al guardar. Por favor intenta de nuevo.'
-          );
+          this.$refs.simpleForm.onSaveFailed(saveResult.message);
         }
       }
     },
