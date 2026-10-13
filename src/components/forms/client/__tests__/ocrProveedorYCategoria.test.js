@@ -1,97 +1,66 @@
 /**
- * Tests unitarios de la lógica de OCR inteligente añadida en SimpleInvoiceForm.vue
+ * Tests unitarios de la lógica de OCR inteligente usada en SimpleInvoiceForm.vue
  * (Tarea C — ola Fase 2b): matching/creación de proveedor nuevo y sugerencia
  * de categoría de gasto.
  *
- * Siguiendo la convención de retentionCorrelatives.test.js: en vez de montar
- * el componente completo (pesado, con Vuetify + muchos hijos), se reproduce
- * aquí la MISMA lógica de decisión que usan `matchProveedorFromOcr` y
- * `sugerirYPrellenarCategoria` dentro de SimpleInvoiceForm.vue, operando
- * sobre un `ctx` simple. Las funciones puras de las que depende
- * (`normalizarRif`, `sugerirCategoria`) se importan de verdad.
+ * M10 (revisión ola F2b): antes este archivo REIMPLEMENTABA la misma lógica
+ * de decisión que usan `matchProveedorFromOcr` y `sugerirYPrellenarCategoria`
+ * dentro de SimpleInvoiceForm.vue, así que si el componente cambiaba, el test
+ * seguía en verde sin detectarlo. Ahora importa las funciones puras REALES
+ * (`decidirMatchProveedor`/`construirProveedorPendiente` de
+ * src/utils/matchProveedorOcr.js, `resolverCategoriaPorNombre` de
+ * src/utils/sugerirCategoria.js) que el propio componente llama — ver
+ * SimpleInvoiceForm.vue → matchProveedorFromOcr / _buscarCategoriaPorNombre.
+ *
+ * Los RIF son inventados pero con un dígito verificador calculado de verdad
+ * con el algoritmo del SENIAT (ver src/utils/rif.js), igual que en
+ * rif.test.js: ninguno corresponde a un contribuyente real.
  */
 import { describe, it, expect } from 'vitest'
+import { decidirMatchProveedor, construirProveedorPendiente } from '@/utils/matchProveedorOcr.js'
+import { sugerirCategoria, resolverCategoriaPorNombre } from '@/utils/sugerirCategoria.js'
 import { normalizarRif } from '@/utils/rif.js'
-import { sugerirCategoria } from '@/utils/sugerirCategoria.js'
 
-// ── Reproduce matchProveedorFromOcr (niveles de match + decisión de "pendiente") ──
-function decidirMatchProveedor(issuerData, proveedores) {
-  const normalizeName = (name) => String(name || '').toLowerCase().trim()
-  const ocrRif = normalizarRif(issuerData.rif)
-  const ocrName = normalizeName(issuerData.companyName)
-
-  if (proveedores.length === 0) {
-    return { matched: null, pendiente: construirPendiente(issuerData, ocrRif) }
-  }
-
-  let matched = null
-  if (ocrRif) {
-    matched = proveedores.find(p => normalizarRif(p.rif) === ocrRif) || null
-  }
-  if (!matched && ocrName && ocrName.length >= 3) {
-    matched = proveedores.find(p => normalizeName(p.nombre) === ocrName) || null
-  }
-  if (!matched && ocrName && ocrName.length >= 5) {
-    matched = proveedores.find(p => {
-      const pName = normalizeName(p.nombre)
-      return pName.includes(ocrName) || ocrName.includes(pName)
-    }) || null
-  }
-
-  if (matched) return { matched, pendiente: null }
-  return { matched: null, pendiente: construirPendiente(issuerData, ocrRif) }
-}
-
-// ── Reproduce _ofrecerCrearProveedor: solo deja "pendiente" (auto-crear al
-//    guardar) si el RIF se pudo reconocer; si no, no hay nada que auto-crear.
-function construirPendiente(issuerData, ocrRifNormalizado) {
-  if (!ocrRifNormalizado || !issuerData.companyName) return null
-  return {
-    nombre: issuerData.companyName,
-    rif: ocrRifNormalizado,
-    direccion: issuerData.address || '',
-    telefono: issuerData.phone || '',
-    email: issuerData.email || ''
-  }
-}
-
-describe('Tarea C — OCR: matching y creación pendiente de proveedor', () => {
+describe('decidirMatchProveedor (matching real de SimpleInvoiceForm)', () => {
   it('vincula por RIF exacto aunque el formato difiera (BD con guiones, OCR sin ellos)', () => {
-    const proveedores = [{ id: 'p1', nombre: 'Corpelec', rif: 'J-00000000-1' }]
-    const r = decidirMatchProveedor({ companyName: 'CORPELEC C.A.', rif: 'j000000001' }, proveedores)
+    const proveedores = [{ id: 'p1', nombre: 'Corpelec', rif: 'J-00000000-0' }]
+    const r = decidirMatchProveedor({ companyName: 'CORPELEC C.A.', rif: 'j000000000' }, proveedores)
     expect(r.matched?.id).toBe('p1')
+    expect(r.confidence).toBe('exact-rif')
     expect(r.pendiente).toBeNull()
   })
 
   it('vincula por nombre exacto cuando el RIF no coincide o falta', () => {
-    const proveedores = [{ id: 'p2', nombre: 'Distribuidora López', rif: 'J-11111111-1' }]
+    const proveedores = [{ id: 'p2', nombre: 'Distribuidora López', rif: 'J-11111111-0' }]
     const r = decidirMatchProveedor({ companyName: 'Distribuidora López', rif: null }, proveedores)
     expect(r.matched?.id).toBe('p2')
+    expect(r.confidence).toBe('exact-name')
   })
 
   it('vincula por coincidencia parcial de nombre', () => {
-    const proveedores = [{ id: 'p3', nombre: 'Panadería y Pastelería El Trigal C.A.', rif: 'J-22222222-2' }]
+    const proveedores = [{ id: 'p3', nombre: 'Panadería y Pastelería El Trigal C.A.', rif: 'J-22222222-1' }]
     const r = decidirMatchProveedor({ companyName: 'El Trigal', rif: null }, proveedores)
     expect(r.matched?.id).toBe('p3')
+    expect(r.confidence).toBe('partial-name')
   })
 
-  it('sin match y con RIF reconocible: deja proveedor "pendiente" (se crea al guardar)', () => {
-    const proveedores = [{ id: 'p1', nombre: 'Otro Proveedor', rif: 'J-33333333-3' }]
-    const r = decidirMatchProveedor({ companyName: 'Ferretería Nueva', rif: 'J-44444444-4' }, proveedores)
+  it('sin match y con RIF reconocible (válido): deja proveedor "pendiente" (se crea al guardar)', () => {
+    const proveedores = [{ id: 'p1', nombre: 'Otro Proveedor', rif: 'J-33333333-2' }]
+    const r = decidirMatchProveedor({ companyName: 'Ferretería Nueva', rif: 'J-44444444-3' }, proveedores)
     expect(r.matched).toBeNull()
     expect(r.pendiente).toEqual({
       nombre: 'Ferretería Nueva',
-      rif: 'J-44444444-4',
+      rif: 'J-44444444-3',
       direccion: '',
       telefono: '',
       email: ''
     })
   })
 
-  it('sin proveedores en el directorio: también deja proveedor pendiente si hay RIF', () => {
-    const r = decidirMatchProveedor({ companyName: 'Importadora XYZ', rif: 'j987654321' }, [])
+  it('sin proveedores en el directorio: también deja proveedor pendiente si el RIF es válido', () => {
+    const r = decidirMatchProveedor({ companyName: 'Importadora XYZ', rif: 'j987654324' }, [])
     expect(r.matched).toBeNull()
-    expect(r.pendiente?.rif).toBe('J-98765432-1')
+    expect(r.pendiente?.rif).toBe('J-98765432-4')
   })
 
   it('sin match y sin RIF reconocible: NO deja proveedor pendiente (no se puede crear sin RIF)', () => {
@@ -99,76 +68,91 @@ describe('Tarea C — OCR: matching y creación pendiente de proveedor', () => {
     expect(r.matched).toBeNull()
     expect(r.pendiente).toBeNull()
   })
+
+  it('I2: un RIF con dígito verificador inválido (OCR leyó mal un dígito) tampoco deja pendiente', () => {
+    // El DV real de J+44444444 es 3, no 9: `normalizarRif` lo rechaza.
+    const r = decidirMatchProveedor({ companyName: 'Ferretería Dudosa', rif: 'J-44444444-9' }, [])
+    expect(normalizarRif('J-44444444-9')).toBeNull()
+    expect(r.matched).toBeNull()
+    expect(r.pendiente).toBeNull()
+  })
 })
 
-// ── Reproduce sugerirYPrellenarCategoria: sugerirCategoria (real) + resolver
-//    por nombre contra las categorías reales del cliente (nunca crea una nueva) ──
-function normalizarTexto(s) {
-  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
-}
-function resolverCategoriaSugerida({ proveedor, items, textoOcr, historial, categoriaIA, categoriasCliente }) {
-  const sugerencia = sugerirCategoria({ proveedor, items, textoOcr, historial, categoriaIA })
-  if (!sugerencia.categoria) return { ...sugerencia, categoriaId: null }
+describe('construirProveedorPendiente', () => {
+  it('arma los datos del proveedor pendiente a partir del RIF ya normalizado', () => {
+    const p = construirProveedorPendiente(
+      { companyName: 'Ferretería Nueva', address: 'Av. Principal', phone: '0212-1234567', email: 'a@b.com' },
+      'J-44444444-3'
+    )
+    expect(p).toEqual({
+      nombre: 'Ferretería Nueva',
+      rif: 'J-44444444-3',
+      direccion: 'Av. Principal',
+      telefono: '0212-1234567',
+      email: 'a@b.com'
+    })
+  })
 
-  const objetivo = normalizarTexto(sugerencia.categoria)
-  const encontrada = categoriasCliente.find(c => normalizarTexto(c.name) === objetivo)
-    || categoriasCliente.find(c => normalizarTexto(c.name).includes(objetivo) || objetivo.includes(normalizarTexto(c.name)))
-    || null
+  it('devuelve null sin RIF normalizado, aunque haya nombre', () => {
+    expect(construirProveedorPendiente({ companyName: 'Ferretería Nueva' }, null)).toBeNull()
+  })
 
-  return { ...sugerencia, categoriaId: encontrada?.id || null }
-}
+  it('devuelve null sin nombre, aunque el RIF sea válido', () => {
+    expect(construirProveedorPendiente({ companyName: '' }, 'J-44444444-3')).toBeNull()
+  })
+})
 
+// ── sugerirYPrellenarCategoria: sugerirCategoria (real) + resolverCategoriaPorNombre (real) ──
 describe('Tarea C — OCR: prellenado de categoría sugerida', () => {
   it('prellena expense_category_id cuando la categoría sugerida existe en el cliente', () => {
-    const r = resolverCategoriaSugerida({
-      proveedor: { nombre: 'CORPELEC', rif: 'J-00000000-0' },
-      items: [],
-      textoOcr: '',
-      historial: [],
-      categoriaIA: null,
-      categoriasCliente: [{ id: 'cat-1', name: 'Electricidad' }, { id: 'cat-2', name: 'Internet y telefonía' }]
-    })
-    expect(r.categoria).toBe('Electricidad')
-    expect(r.categoriaId).toBe('cat-1')
+    const sugerencia = sugerirCategoria({ proveedor: { nombre: 'CORPELEC', rif: 'J-00000000-0' } })
+    expect(sugerencia.categoria).toBe('Electricidad')
+
+    const categoria = resolverCategoriaPorNombre(sugerencia.categoria, [
+      { id: 'cat-1', name: 'Electricidad' },
+      { id: 'cat-2', name: 'Internet y telefonía' }
+    ])
+    expect(categoria?.id).toBe('cat-1')
   })
 
   it('no prellena nada si la categoría sugerida no existe para ese cliente (no la inventa)', () => {
-    const r = resolverCategoriaSugerida({
-      proveedor: { nombre: 'Amazon.com' },
-      items: [],
-      textoOcr: '',
-      historial: [],
-      categoriaIA: null,
-      categoriasCliente: [{ id: 'cat-9', name: 'Nómina' }]
-    })
-    expect(r.categoria).toBe('Compras en línea')
-    expect(r.categoriaId).toBeNull()
+    const sugerencia = sugerirCategoria({ proveedor: { nombre: 'Amazon.com' } })
+    expect(sugerencia.categoria).toBe('Compras en línea')
+
+    const categoria = resolverCategoriaPorNombre(sugerencia.categoria, [{ id: 'cat-9', name: 'Nómina' }])
+    expect(categoria).toBeNull()
   })
 
   it('prioriza el historial del proveedor (id de su categoría habitual) sobre palabras clave', () => {
-    const r = resolverCategoriaSugerida({
+    const sugerencia = sugerirCategoria({
       proveedor: { nombre: 'CORPELEC', rif: 'J-00000000-0' },
-      items: [],
-      textoOcr: '',
-      historial: [{ proveedorRif: 'J-00000000-0', categoriaNombre: 'Servicios de luz', fecha: '2026-09-01' }],
-      categoriaIA: null,
-      categoriasCliente: [
-        { id: 'cat-luz', name: 'Servicios de luz' },
-        { id: 'cat-elec', name: 'Electricidad' }
-      ]
+      historial: [{ proveedorRif: 'J-00000000-0', categoriaNombre: 'Servicios de luz', fecha: '2026-09-01' }]
     })
-    expect(r.categoriaId).toBe('cat-luz')
+    expect(sugerencia.categoria).toBe('Servicios de luz')
+    expect(sugerencia.confianza).toBeGreaterThanOrEqual(0.9)
+
+    const categoria = resolverCategoriaPorNombre(sugerencia.categoria, [
+      { id: 'cat-luz', name: 'Servicios de luz' },
+      { id: 'cat-elec', name: 'Electricidad' }
+    ])
+    expect(categoria?.id).toBe('cat-luz')
   })
 
   it('usa la pista de la IA del OCR como último recurso', () => {
-    const r = resolverCategoriaSugerida({
+    const sugerencia = sugerirCategoria({
       proveedor: { nombre: 'Distribuidora XYZ' },
-      items: [],
-      textoOcr: '',
-      historial: [],
-      categoriaIA: 'Mantenimiento de equipos',
-      categoriasCliente: [{ id: 'cat-mant', name: 'Mantenimiento de equipos' }]
+      categoriaIA: 'Mantenimiento de equipos'
     })
-    expect(r.categoriaId).toBe('cat-mant')
+    expect(sugerencia.categoria).toBe('Mantenimiento de equipos')
+
+    const categoria = resolverCategoriaPorNombre(sugerencia.categoria, [{ id: 'cat-mant', name: 'Mantenimiento de equipos' }])
+    expect(categoria?.id).toBe('cat-mant')
+  })
+
+  it('I9: no elige una categoría por coincidencia parcial (solo nombre exacto normalizado)', () => {
+    // "Electricidad" sugerido no debe matchear "Electricidad del hogar" por
+    // subcadena — antes `_buscarCategoriaPorNombre` sí lo hacía.
+    const categoria = resolverCategoriaPorNombre('Electricidad', [{ id: 'cat-x', name: 'Electricidad del hogar' }])
+    expect(categoria).toBeNull()
   })
 })
