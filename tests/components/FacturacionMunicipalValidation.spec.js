@@ -76,8 +76,7 @@ describe('Facturacion.vue - Descarga de Comprobante Municipal (downloadMunicipal
   // advierte con snackbar y pregunta con un confirm; si el usuario cancela, no
   // descarga; si confirma, continúa igual. Pedido de la contadora (W5).
   it('advierte con snackbar y NO descarga si el usuario cancela el confirm, cuando el proveedor es de otro municipio', async () => {
-    const confirmSpy = vi.fn().mockReturnValue(false);
-    window.confirm = confirmSpy;
+    vm.confirmarMunicipioDistinto = vi.fn().mockResolvedValue(false);
     const invoice = {
       id: 'inv-dif-mun',
       invoiceNumber: '00000042',
@@ -97,17 +96,14 @@ describe('Facturacion.vue - Descarga de Comprobante Municipal (downloadMunicipal
     expect(msg).toContain('Baruta');
 
     // 2. Pregunta confirmación al usuario
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(confirmSpy.mock.calls[0][0]).toContain('¿Continuar igual?');
+    expect(vm.confirmarMunicipioDistinto).toHaveBeenCalledTimes(1);
 
     // 3. Como el usuario canceló, NO debe llamar a generarComprobanteMunicipal
     expect(retentionPdfService.generarComprobanteMunicipal).not.toHaveBeenCalled();
-    delete window.confirm;
   });
 
   it('advierte y permite continuar si el usuario CONFIRMA, aunque el proveedor sea de otro municipio', async () => {
-    const confirmSpy = vi.fn().mockReturnValue(true);
-    window.confirm = confirmSpy;
+    vm.confirmarMunicipioDistinto = vi.fn().mockResolvedValue(true);
     retentionPdfService.generarComprobanteMunicipal.mockResolvedValueOnce({ success: true });
 
     const invoice = {
@@ -128,7 +124,6 @@ describe('Facturacion.vue - Descarga de Comprobante Municipal (downloadMunicipal
 
     // 2. Termina en éxito
     expect(snackbarSpy).toHaveBeenCalledWith('Comprobante Municipal exportado exitosamente', 'success');
-    delete window.confirm;
   });
 
   it('permite la descarga y muestra snackbar success cuando ambos municipios coinciden', async () => {

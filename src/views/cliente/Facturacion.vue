@@ -1144,6 +1144,25 @@
       @saved="onCasheaSaved"
     />
 
+    <!-- ── Diálogo confirmación retención municipal ─────────── -->
+    <v-dialog v-model="municipalConfirmDialog" max-width="420" persistent>
+      <v-card>
+        <v-card-title class="text-h6 pb-2">Tu proveedor está en otro municipio</v-card-title>
+        <v-card-text>
+          Normalmente no corresponde retener el impuesto municipal cuando el proveedor está en otro municipio. ¿Quieres generar el comprobante igual?
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey-darken-1" variant="text" @click="resolverMunicipalConfirm(false)">
+            Cancelar
+          </v-btn>
+          <v-btn color="primary" variant="elevated" @click="resolverMunicipalConfirm(true)">
+            Generar igual
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- ── Sistema de Notificaciones Snackbar ─────────────────── -->
     <AppSnackbar
       v-model="snackbar.show"
@@ -1239,6 +1258,8 @@ export default {
       deleteDialog: false,
       viewDialog: false,
       showExportDialog: false,
+      municipalConfirmDialog: false,
+      municipalConfirmResolver: null,
       // Modal rápido de cuotas Cashea
       casheaDialog: false,
       casheaInvoice: null,
@@ -2466,9 +2487,7 @@ export default {
             `Tu proveedor está en ${issuerNombre} y tu empresa en ${tenantNombre}. Normalmente no corresponde retener impuesto municipal en este caso.`,
             'warning'
           );
-          const continuar = (typeof window !== 'undefined' && typeof window.confirm === 'function')
-            ? window.confirm('Tu proveedor está en otro municipio. Normalmente no corresponde retener. ¿Continuar igual?')
-            : false;
+          const continuar = await this.confirmarMunicipioDistinto();
           if (!continuar) return;
           confirmMismatch = true;
         }
@@ -2478,6 +2497,21 @@ export default {
       } catch (error) {
         console.error('Error exportando comprobante Municipal:', error);
         this.showNotification('Error al exportar comprobante Municipal', 'error');
+      }
+    },
+
+    confirmarMunicipioDistinto() {
+      this.municipalConfirmDialog = true;
+      return new Promise((resolve) => {
+        this.municipalConfirmResolver = resolve;
+      });
+    },
+
+    resolverMunicipalConfirm(value) {
+      this.municipalConfirmDialog = false;
+      if (this.municipalConfirmResolver) {
+        this.municipalConfirmResolver(value);
+        this.municipalConfirmResolver = null;
       }
     },
 
