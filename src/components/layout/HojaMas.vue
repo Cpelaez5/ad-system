@@ -2,35 +2,11 @@
   <div class="hoja-mas">
     <v-list>
       <v-list-item
-        prepend-icon="mdi-file-certificate-outline"
-        title="Mis papeles"
-        @click="$emit('navegar', '/cliente/fiscal-360')"
-      />
-      <v-list-item
-        v-if="!isServicesCompany"
-        prepend-icon="mdi-package-variant-closed"
-        title="Mi mercancía"
-        @click="$emit('navegar', '/cliente/inventario')"
-      />
-      <v-list-item
-        prepend-icon="mdi-truck-delivery-outline"
-        title="Mis proveedores"
-        @click="$emit('navegar', '/cliente/proveedores')"
-      />
-      <v-list-item
-        prepend-icon="mdi-domain"
-        title="Mi negocio"
-        @click="$emit('navegar', '/cliente/mi-area')"
-      />
-      <v-list-item
-        prepend-icon="mdi-crown-outline"
-        title="Mi plan"
-        @click="$emit('navegar', '/cliente/planes')"
-      />
-      <v-list-item
-        prepend-icon="mdi-chart-line"
-        title="¿Cómo voy?"
-        @click="$emit('navegar', '/cliente/dashboard')"
+        v-for="item in itemsMenu"
+        :key="item.key"
+        :prepend-icon="item.icono"
+        :title="item.titulo"
+        @click="$emit('navegar', item.to)"
       />
 
       <v-divider class="my-2" />
@@ -101,11 +77,19 @@
 
 <script>
 import { formatTasa } from '@/utils/formatMoney.js'
+import { getMenuClienteMas } from './menuPorRol.js'
 
 /**
  * HojaMas — contenido de la hoja "Más" de la barra inferior del cliente en
  * móvil (ver ClienteBottomNav.vue). Extraído a su propio componente para
  * que sea testeable sin montar toda la barra inferior.
+ *
+ * Corrección (revisión del shell, hallazgo #8 Importante): antes repetía a
+ * mano los 6 ítems del menú del cliente; si cambiaba una ruta, este menú y
+ * el del drawer (`MenuLateral.vue`) podían divergir sin que ningún test lo
+ * notara. Ahora usa `getMenuClienteMas` (la misma fuente de verdad de
+ * `menuPorRol.js`), igual que el docstring de ese archivo siempre dijo que
+ * pasaba.
  *
  * No navega ni cierra sesión por sí mismo: emite la intención
  * (`navegar`, `ayuda`, `logout`) y el padre decide (cerrar la hoja, usar el
@@ -125,6 +109,12 @@ export default {
   },
 
   emits: ['navegar', 'ayuda', 'logout'],
+
+  computed: {
+    itemsMenu() {
+      return getMenuClienteMas({ isServicesCompany: this.isServicesCompany })
+    },
+  },
 
   methods: {
     formatTasa,

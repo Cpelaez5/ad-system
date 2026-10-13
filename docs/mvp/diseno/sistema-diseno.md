@@ -162,7 +162,7 @@ Duraciones y curvas ya definidas en `src/styles/animations.css` (`--animation-du
 - Entradas/salidas de hojas, diálogos y snackbars: 300-500ms, `ease-out` al entrar.
 - Micro-interacciones (presionar un botón/tarjeta): 150-160ms, `scale(0.97-0.98)`.
 - `@media (prefers-reduced-motion: reduce)` ya está implementado globalmente (reduce toda animación/transición a 0,01ms) — **no quitar esa regla**.
-- Nunca animar accesos repetidos (barra inferior, tabs) — solo transiciones de entrada/salida de contenido nuevo.
+- Nunca animar accesos repetidos (barra inferior, tabs) — solo transiciones de entrada/salida de contenido nuevo. Esto prohíbe específicamente cualquier rebote/escala en el ícono de un tab al tocarlo (ej. `scale()` en el ícono activo de la barra inferior). **Excepción explícita:** el indicador posicional que marca cuál tab está activo (una barra/subrayado que se desliza de un ítem a otro) no es una animación de "contenido" sino de posición de la selección — se permite, en `--ad-move-rapido` (150ms), sin rebote ni escala.
 
 **Tokens de movimiento de los componentes de dashboard** (`TarjetaKPI`, `SeccionPanel`, `ListaRanking`, `SelectorPeriodo`, `GraficoBarras` — pantalla "¿Cómo voy?"). Aditivo, no un segundo sistema: mismos números en CSS (`src/styles/animations.css`, variables `--ad-move-*`) y en JS (`src/components/ui/movimiento.js`, para lo que no es CSS puro: duración de `AnimatedNumber` y de la animación de `chart.js`).
 
