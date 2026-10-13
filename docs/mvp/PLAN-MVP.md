@@ -75,6 +75,7 @@ Es el corazón del MVP y el diferenciador.
 
 ### Fase 4 — Lanzamiento comercial (1-2 semanas, en paralelo con la Fase 3) → `06-agente-producto-marketing.md`
 - Decisión de precios (ver §5), landing reescrita con el posicionamiento, comparativa con Fina y testimonios.
+- **Landing nueva enfocada en ventas (último paso del MVP, pedido del usuario 2026-10-13):** rehacer `LandingPage.vue` desde cero tomando como referencia lo que funciona en Fina Partner (`auditorias/competencia-fina-profundo.md`) y superándolo: capturas reales de la app dentro de marcos tipo Mac/iPhone, animaciones con **GSAP + ScrollTrigger** (secciones que se revelan, demo "foto → registrado" que se reproduce al hacer scroll, contadores, logo animado), elementos dinámicos, prueba social, comparativa, precios reales y CTA a la prueba gratis. Móvil primero, rendimiento (Lighthouse ≥90) y `prefers-reduced-motion`. Skills: `gsap-scrolltrigger`, `gsap-core`, `gsap-timeline`, `impeccable`, `copywriting`, `cro`.
 - Términos, privacidad y política de reembolso (diferenciarse de "cero reembolsos").
 - Botón de soporte por WhatsApp, analítica básica (activación, registro del primer gasto), monitoreo de errores y backups verificados.
 
