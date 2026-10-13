@@ -361,8 +361,14 @@
     />
 
     <template v-else>
+      <!-- M2: en móvil no había ningún indicador mientras loading estaba
+           activo (ni skeleton ni EstadoVacio) — se veía la pantalla en
+           blanco un instante. -->
+      <div v-if="loading && $vuetify.display.xs" class="d-flex flex-column ga-2">
+        <v-skeleton-loader v-for="n in 4" :key="n" type="list-item-two-line" />
+      </div>
       <EstadoVacio
-        v-if="!loading && filteredInvoices.length === 0"
+        v-else-if="!loading && filteredInvoices.length === 0"
         :icono="estadoVacioIcono"
         :titulo="estadoVacioTitulo"
         :mensaje="estadoVacioMensaje"
