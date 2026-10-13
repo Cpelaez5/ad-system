@@ -32,4 +32,30 @@ describe('ResumenMonto.vue', () => {
     })
     expect(conBs.text()).toContain('Bs')
   })
+
+  it('con animar usa AnimatedNumber (porque monto ya es un Number) en vez del texto fijo', () => {
+    const wrapper = mount(ResumenMonto, {
+      props: { etiqueta: 'Vendiste', monto: 100, animar: true },
+      global: {
+        stubs: {
+          ...globalConfig.stubs,
+          AnimatedNumber: {
+            props: ['value', 'formatter'],
+            template: '<span class="animated-stub">{{ formatter ? formatter(value) : value }}</span>',
+          },
+        },
+      },
+    })
+    expect(wrapper.find('.animated-stub').exists()).toBe(true)
+    expect(wrapper.text()).toContain('$ 100,00')
+  })
+
+  it('admite contenido extra por el slot por defecto (lo usa TarjetaKPI para la comparación)', () => {
+    const wrapper = mount(ResumenMonto, {
+      props: { etiqueta: 'Vendiste', monto: 100 },
+      slots: { default: '<p class="extra">12% más</p>' },
+      global: globalConfig,
+    })
+    expect(wrapper.find('.extra').exists()).toBe(true)
+  })
 })
