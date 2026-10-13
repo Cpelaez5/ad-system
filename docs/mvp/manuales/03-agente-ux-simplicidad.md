@@ -53,3 +53,8 @@ Rojo `#A81C22`, azul `#1F355C`, dorado `#E0B04F`, gris `#EFEFEF`. Títulos con M
 - Gasto con foto: ≤3 toques y ≤60 s.
 - Ningún término fiscal en la primera capa sin su (?).
 - `npm test` en verde y los cálculos sin cambios (tests del agente Fiscal).
+
+### U8. Diálogos usables en el teléfono (hallazgo E2E 2026-10-13)
+- [ ] Crear `src/components/ui/DialogoAdaptable.vue` (envoltorio de v-dialog: `scrollable`, `fullscreen` en xs, acciones fijas abajo, título con botón cerrar) y migrar TODOS los diálogos del cliente. Caso real: el diálogo de subir documento de Mis papeles era más alto que la pantalla y "Guardar/Cancelar" quedaban inalcanzables (corregido puntualmente en FiscalDocDialog).
+- Archivos con diálogos sin `scrollable`/`fullscreen`: ClienteMiArea, Compras, Facturacion (4), FacturacionSuscripcion (3), Fiscal360, Gastos, Inventario (4), Proveedores, Ventas, CasheaInstallmentsModal, ClientInvoiceForm, InventoryAdjustmentDialog, HojaInferior (revisar).
+- Cubrir con un test E2E móvil por diálogo principal (abrir → los botones de acción están visibles sin scroll → cancelar).

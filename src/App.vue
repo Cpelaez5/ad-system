@@ -5,9 +5,9 @@
     <!-- Sistema de notificaciones -->
     <NotificationSystem ref="notificationSystem" />
     
-    <!-- Barra de navegación principal -->
-    <AppNavigation 
-      v-if="showNavigation" 
+    <!-- Armazón de la app: app bar + menú lateral + barra inferior del cliente -->
+    <AppShell
+      v-if="showNavigation"
       @banner-visibility-change="handleBannerVisibility"
     />
     
@@ -39,7 +39,7 @@
 </template>
 
 <script>
-import AppNavigation from './components/layout/AppNavigation.vue'
+import AppShell from './components/layout/AppShell.vue'
 import AppFooter from './components/layout/AppFooter.vue'
 import NotificationSystem from './components/common/NotificationSystem.vue'
 import PageTransition from './components/common/PageTransition.vue'
@@ -53,7 +53,7 @@ import { useNotificacionStore } from '@/store/notificacionStore'
 export default {
   name: 'App',
   components: {
-    AppNavigation,
+    AppShell,
     AppFooter,
     NotificationSystem,
     PageTransition,

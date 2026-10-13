@@ -79,6 +79,13 @@ html, body {
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 
+  /* Tokens de movimiento compartidos (shell + componentes ui "con personalidad"):
+     curva fuerte de salida (easing.dev) + dos duraciones cortas. Se componen así:
+     transition: transform var(--ad-move-rapido) var(--ad-move-curva-entrada);
+     Respetan automáticamente prefers-reduced-motion por la regla global de
+     animations.css (* { transition-duration: 0.01ms !important } ya aplicada). */
+  /* Tokens de movimiento: ver --ad-move-* en animations.css (fuente única) */
+
   /* Tipografía */
   --font-primary: 'Montserrat', sans-serif;
   --font-secondary: 'Open Sans', sans-serif;

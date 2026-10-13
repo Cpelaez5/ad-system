@@ -16,6 +16,21 @@
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
   --ease-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* Tokens de movimiento de los componentes de dashboard (TarjetaKPI,
+     SeccionPanel, ListaRanking, SelectorPeriodo, GraficoBarras) — ver
+     src/components/ui/movimiento.js para la razón de cada valor y su
+     equivalente en JS (AnimatedNumber, chart.js). Aditivo: no reemplaza
+     nada de arriba. */
+  --ad-move-duracion-entrada: 280ms;
+  --ad-move-duracion-entrada-lista: 240ms;
+  --ad-move-escalon-lista: 50ms;
+  --ad-move-duracion-press: 150ms;
+  --ad-move-escala-press: 0.98;
+  --ad-move-curva-entrada: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Duraciones de la navegación (barra, menú lateral, chips) */
+  --ad-move-rapido: 150ms;
+  --ad-move-normal: 250ms;
 }
 
 /* ========================================
@@ -564,4 +579,37 @@
 
 .animate-micro-scale:hover {
   transform: scale(1.05);
+}
+
+/* ========================================
+   MOVIMIENTO DE COMPONENTES DE DASHBOARD
+   (TarjetaKPI, SeccionPanel, ListaRanking,
+   SelectorPeriodo, GraficoBarras)
+   ======================================== */
+
+@keyframes adMoveEntrada {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Entrada suave al aparecer (una vez, al montar) — aplicar junto con
+   animation-delay: calc(var(--ad-move-escalon-lista) * <índice>) para
+   escalonar tarjetas/ítems de una lista. */
+.ad-move-entrada {
+  animation: adMoveEntrada var(--ad-move-duracion-entrada) var(--ad-move-curva-entrada) both;
+}
+
+/* Feedback táctil sutil para filas/chips/tarjetas tocables. */
+.ad-move-press {
+  transition: transform var(--ad-move-duracion-press) var(--ad-move-curva-entrada);
+}
+
+.ad-move-press:active {
+  transform: scale(var(--ad-move-escala-press));
 }

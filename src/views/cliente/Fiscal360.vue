@@ -79,7 +79,7 @@
             :block="$vuetify.display.smAndDown"
             @click="openDialog()"
           >
-            <span class="d-none d-sm-inline mr-1">Nuevo</span> Documento
+            Nuevo documento
           </v-btn>
         </v-col>
       </v-row>

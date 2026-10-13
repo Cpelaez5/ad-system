@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
+import { configDefaults } from 'vitest/config'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
@@ -27,7 +28,17 @@ export default defineConfig(({ command }) => {
     },
     test: {
       environment: 'happy-dom',
-      globals: true
+      globals: true,
+      // e2e/ son specs de Playwright, no de vitest; .claude/worktrees/** son
+      // copias de otros agentes (ver 00-REGLAS-COMUNES.md §5.0).
+      exclude: [...configDefaults.exclude, '**/e2e/**', '**/.claude/worktrees/**'],
+      // Permite montar Vuetify REAL (createVuetify) en tests como MenuLateral.spec.js
+      // sin que vitest externalice 'vuetify' y falle con sus .css.
+      server: {
+        deps: {
+          inline: ['vuetify']
+        }
+      }
     },
     esbuild: command === 'build' ? {
       pure: ['console.log', 'console.debug', 'console.info'],
