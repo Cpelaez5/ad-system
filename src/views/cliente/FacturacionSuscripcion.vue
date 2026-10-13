@@ -1,17 +1,9 @@
 <template>
   <v-container fluid class="billing-page pa-4 pa-md-6">
-    <!-- Encabezado -->
-    <div class="d-flex flex-column flex-md-row align-center justify-space-between mb-6">
-      <div>
-        <h1 class="text-h4 font-weight-bold text-secondary">
-          <v-icon class="mr-2" color="secondary">mdi-receipt-text-outline</v-icon>
-          Facturación
-        </h1>
-        <p class="text-body-2 text-medium-emphasis mb-0">
-          Historial de pagos de tu suscripción al sistema.
-        </p>
-      </div>
-    </div>
+    <EncabezadoPagina
+      titulo="Facturación"
+      subtitulo="Historial de pagos de tu suscripción al sistema"
+    />
 
     <!-- Stats Cards -->
     <v-row class="mb-6">
@@ -75,13 +67,34 @@
       <v-tabs-window v-else v-model="activeTab">
         <!-- ==================== TAB: FACTURAS ==================== -->
         <v-tabs-window-item value="invoices">
-          <div v-if="invoices.length === 0" class="text-center py-12 px-4">
-            <v-icon size="64" color="grey-lighten-1" class="mb-4">mdi-receipt-text-check-outline</v-icon>
-            <h3 class="text-h6 text-grey-darken-1 mb-2">No hay facturas aún</h3>
-            <p class="text-body-2 text-medium-emphasis">
-              Las facturas de tu suscripción aparecerán aquí cuando se generen.
-            </p>
+          <EstadoVacio
+            v-if="invoices.length === 0"
+            icono="mdi-receipt-text-check-outline"
+            titulo="Todavía no tienes facturas"
+            mensaje="Las facturas de tu suscripción aparecerán aquí cuando se generen."
+          />
+
+          <!-- Lista en móvil: tarjetas legibles en vez de tabla -->
+          <div v-else-if="$vuetify.display.xs" class="px-2 pb-2">
+            <FilaLista
+              v-for="item in invoices"
+              :key="item.id"
+              :titulo="item.invoice_number"
+              :subtitulo="formatDate(item.period_start) + ' — ' + formatDate(item.period_end)"
+              :valor="'$' + formatMoney(item.amount)"
+              :estado="statusLabel(item.status)"
+              :color-estado="statusColor(item.status)"
+            >
+              <template #acciones>
+                <v-btn v-if="item.status === 'pending' || invoiceReportStatus(item.id) === 'rejected'"
+                  size="small" color="primary" variant="tonal" class="text-none"
+                  @click="openPaymentDialog(item)">
+                  {{ invoiceReportStatus(item.id) === 'rejected' ? 'Reintentar' : 'Reportar' }}
+                </v-btn>
+              </template>
+            </FilaLista>
           </div>
+
           <v-data-table v-else :headers="tableHeaders" :items="invoices" :items-per-page="10"
             class="billing-table" density="comfortable">
             <template v-slot:item.invoice_number="{ item }">
@@ -137,13 +150,12 @@
 
         <!-- ==================== TAB: MIS REPORTES ==================== -->
         <v-tabs-window-item value="reports">
-          <div v-if="clientReports.length === 0" class="text-center py-12 px-4">
-            <v-icon size="64" color="grey-lighten-1" class="mb-4">mdi-file-document-outline</v-icon>
-            <h3 class="text-h6 text-grey-darken-1 mb-2">No tienes reportes de pago</h3>
-            <p class="text-body-2 text-medium-emphasis">
-              Cuando reportes un pago desde la pestaña "Facturas", aparecerá aquí.
-            </p>
-          </div>
+          <EstadoVacio
+            v-if="clientReports.length === 0"
+            icono="mdi-file-document-outline"
+            titulo="Todavía no tienes reportes de pago"
+            mensaje='Cuando reportes un pago desde la pestaña "Facturas", aparecerá aquí.'
+          />
           <v-data-table v-else :headers="reportHeaders" :items="clientReports" :items-per-page="10"
             class="billing-table" density="comfortable">
             <template v-slot:item.invoice="{ item }">
@@ -205,17 +217,14 @@
     </v-card>
 
     <!-- ==================== DIALOG: REPORTAR / EDITAR PAGO ==================== -->
-    <v-dialog v-model="showPaymentDialog" max-width="650" persistent>
-      <v-card rounded="xl">
-        <v-card-title class="text-h6 font-weight-bold pa-4 d-flex align-center">
-          <v-icon color="primary" class="mr-2">{{ isEditingReport ? 'mdi-pencil' : 'mdi-cash-register' }}</v-icon>
-          {{ isEditingReport ? 'Editar Reporte de Pago' : 'Reportar Pago' }}
-          <v-spacer></v-spacer>
-          <v-btn icon="mdi-close" variant="text" size="small" @click="closePaymentDialog"></v-btn>
-        </v-card-title>
-        <v-divider></v-divider>
-
-        <v-card-text class="pa-5">
+    <DialogoAdaptable
+      v-model="showPaymentDialog"
+      :titulo="isEditingReport ? 'Editar reporte de pago' : 'Reportar pago'"
+      :icono="isEditingReport ? 'mdi-pencil' : 'mdi-cash-register'"
+      max-width="650"
+      persistent
+      :cargando="submittingPayment"
+    >
           <!-- Info de la factura -->
           <v-alert variant="tonal" color="info" border="start" class="mb-5 text-body-2" density="compact">
             <strong>Factura:</strong> {{ selectedInvoice?.invoice_number }}<br>
@@ -507,33 +516,28 @@
                ¿Necesitas ayuda con este pago?
              </v-btn>
            </div>
-        </v-card-text>
 
-        <v-card-actions class="px-5 pb-5">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" color="grey-darken-1" @click="closePaymentDialog" class="mr-2">Cancelar</v-btn>
-          <v-btn color="primary" variant="flat" :loading="submittingPayment" :disabled="!paymentFormValid"
-            @click="submitPayment" class="text-none font-weight-bold">
-            <v-icon start>mdi-check-circle</v-icon>
-            {{ isEditingReport ? 'Guardar Cambios' : 'Confirmar Pago' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #acciones>
+        <v-btn variant="text" color="grey-darken-1" :disabled="submittingPayment" @click="closePaymentDialog">Cancelar</v-btn>
+        <v-btn color="primary" variant="flat" :loading="submittingPayment" :disabled="!paymentFormValid"
+          @click="submitPayment" class="text-none font-weight-bold">
+          <v-icon start>mdi-check-circle</v-icon>
+          {{ isEditingReport ? 'Guardar Cambios' : 'Confirmar Pago' }}
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- ==================== DIALOG: DETALLE DE REPORTE ==================== -->
-    <v-dialog v-model="showDetailDialog" max-width="550">
-      <v-card rounded="xl">
-        <v-card-title class="text-h6 font-weight-bold pa-4 d-flex align-center">
-          <v-icon color="primary" class="mr-2">mdi-file-document-outline</v-icon>
-          Detalle del Reporte
-          <v-spacer></v-spacer>
-          <v-chip :color="reportStatusColor(detailReport?.status)" size="small" variant="tonal" class="font-weight-bold">
-            {{ reportStatusLabel(detailReport?.status) }}
-          </v-chip>
-        </v-card-title>
-        <v-divider></v-divider>
-        <v-card-text v-if="detailReport" class="pa-5">
+    <DialogoAdaptable
+      v-model="showDetailDialog"
+      titulo="Detalle del reporte"
+      icono="mdi-file-document-outline"
+      max-width="550"
+    >
+        <v-chip v-if="detailReport" :color="reportStatusColor(detailReport?.status)" size="small" variant="tonal" class="font-weight-bold mb-3">
+          {{ reportStatusLabel(detailReport?.status) }}
+        </v-chip>
+        <template v-if="detailReport">
           <v-list density="compact" class="bg-transparent">
             <v-list-item>
               <template v-slot:prepend><v-icon size="18" color="primary">mdi-receipt-text-outline</v-icon></template>
@@ -611,39 +615,36 @@
               </v-btn>
             </template>
           </template>
-        </v-card-text>
-        <v-card-actions class="px-5 pb-5">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showDetailDialog = false">Cerrar</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        </template>
+
+      <template #acciones>
+        <v-btn variant="text" @click="showDetailDialog = false">Cerrar</v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- ==================== DIALOG: CONFIRMAR ELIMINAR ==================== -->
-    <v-dialog v-model="showDeleteDialog" max-width="400">
-      <v-card rounded="xl">
-        <v-card-title class="text-h6 font-weight-bold pa-4">
-          <v-icon color="error" class="mr-2">mdi-alert-circle</v-icon>
-          Eliminar Reporte
-        </v-card-title>
-        <v-card-text class="pa-4">
+    <DialogoAdaptable
+      v-model="showDeleteDialog"
+      titulo="Eliminar reporte"
+      icono="mdi-alert-circle"
+      max-width="400"
+      :cargando="deletingReport"
+    >
           ¿Estás seguro de que deseas eliminar este reporte de pago?
           <br><br>
           <strong>Referencia:</strong> {{ deleteTarget?.reference }}<br>
           <strong>Monto:</strong> ${{ formatMoney(deleteTarget?.amount) }}
           <br><br>
           <span class="text-caption text-medium-emphasis">Esta acción no se puede deshacer. El comprobante adjuntado también será eliminado.</span>
-        </v-card-text>
-        <v-card-actions class="px-4 pb-4">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="showDeleteDialog = false" class="mr-2">Cancelar</v-btn>
-          <v-btn variant="flat" color="error" :loading="deletingReport" @click="deleteReport" class="text-none font-weight-bold">
-            <v-icon start>mdi-delete</v-icon>
-            Eliminar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+
+      <template #acciones>
+        <v-btn variant="text" :disabled="deletingReport" @click="showDeleteDialog = false">Cancelar</v-btn>
+        <v-btn variant="flat" color="error" :loading="deletingReport" @click="deleteReport" class="text-none font-weight-bold">
+          <v-icon start>mdi-delete</v-icon>
+          Eliminar
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" location="top right" timeout="3000">
@@ -658,9 +659,19 @@ import billingService from '@/services/billingService';
 import paymentOcrService from '@/services/paymentOcrService';
 import userService from '@/services/userService';
 import bcvService from '@/services/bcvService';
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue';
+import EstadoVacio from '@/components/ui/EstadoVacio.vue';
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
+import FilaLista from '@/components/ui/FilaLista.vue';
 
 export default {
   name: 'FacturacionSuscripcion',
+  components: {
+    EncabezadoPagina,
+    EstadoVacio,
+    DialogoAdaptable,
+    FilaLista
+  },
   data() {
     return {
       loading: true,

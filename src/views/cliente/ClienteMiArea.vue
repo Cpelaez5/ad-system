@@ -1,9 +1,9 @@
 <template>
   <v-container fluid class="pa-4 pa-md-6">
-    <div class="mb-6">
-      <h1 class="text-h4 font-weight-bold">Mi Perfil</h1>
-      <p class="text-body-1 text-medium-emphasis">Administra tu información personal y los datos de tu empresa</p>
-    </div>
+    <EncabezadoPagina
+      titulo="Mi perfil"
+      subtitulo="Administra tu información personal y los datos de tu empresa"
+    />
 
     <v-row>
       <!-- Columna Izquierda: Datos Empresa -->
@@ -380,83 +380,81 @@
     </v-row>
 
     <!-- Modal de Cambio de Contraseña -->
-    <v-dialog v-model="showPasswordModal" max-width="500px" persistent>
-      <v-card rounded="xl">
-        <v-card-title class="text-h6 font-weight-bold pa-4">
-          Cambiar Contraseña
-          <v-btn icon="mdi-close" variant="text" size="small" class="float-right" @click="showPasswordModal = false"></v-btn>
-        </v-card-title>
-        
-        <v-card-text class="pa-4">
-          <v-alert
-            color="info"
-            variant="tonal"
-            icon="mdi-shield-check"
-            class="mb-4 text-caption"
-            border="start"
-          >
-            Por tu seguridad, necesitamos verificar tu contraseña actual antes de realizar el cambio.
-          </v-alert>
+    <DialogoAdaptable
+      v-model="showPasswordModal"
+      titulo="Cambiar contraseña"
+      icono="mdi-lock-reset"
+      persistent
+      :cargando="loadingPassword"
+    >
+      <v-alert
+        color="info"
+        variant="tonal"
+        icon="mdi-shield-check"
+        class="mb-4 text-caption"
+        border="start"
+      >
+        Por tu seguridad, necesitamos verificar tu contraseña actual antes de realizar el cambio.
+      </v-alert>
 
-          <v-form @submit.prevent="updatePassword" ref="passwordForm">
-            <v-text-field
-              v-model="passwordForm.current"
-              label="Contraseña Actual"
-              type="password"
-              variant="outlined"
-              density="comfortable"
-              class="mb-3"
-              prepend-inner-icon="mdi-lock"
-              :rules="[v => !!v || 'Requerido']"
-            ></v-text-field>
+      <v-form @submit.prevent="updatePassword" ref="passwordForm">
+        <v-text-field
+          v-model="passwordForm.current"
+          label="Contraseña Actual"
+          type="password"
+          variant="outlined"
+          density="comfortable"
+          class="mb-3"
+          prepend-inner-icon="mdi-lock"
+          :rules="[v => !!v || 'Requerido']"
+        ></v-text-field>
 
-            <v-divider class="my-4"></v-divider>
+        <v-divider class="my-4"></v-divider>
 
-            <v-text-field
-              v-model="passwordForm.new"
-              label="Nueva Contraseña"
-              type="password"
-              variant="outlined"
-              density="comfortable"
-              class="mb-2"
-              prepend-inner-icon="mdi-lock-plus"
-              :rules="[v => !!v || 'Requerido', v => v.length >= 6 || 'Mínimo 6 caracteres']"
-            ></v-text-field>
+        <v-text-field
+          v-model="passwordForm.new"
+          label="Nueva Contraseña"
+          type="password"
+          variant="outlined"
+          density="comfortable"
+          class="mb-2"
+          prepend-inner-icon="mdi-lock-plus"
+          :rules="[v => !!v || 'Requerido', v => v.length >= 6 || 'Mínimo 6 caracteres']"
+        ></v-text-field>
 
-            <v-text-field
-              v-model="passwordForm.confirm"
-              label="Repetir Nueva Contraseña"
-              type="password"
-              variant="outlined"
-              density="comfortable"
-              class="mb-4"
-              prepend-inner-icon="mdi-lock-check"
-              :error-messages="passwordError"
-              :rules="[v => !!v || 'Requerido']"
-            ></v-text-field>
+        <v-text-field
+          v-model="passwordForm.confirm"
+          label="Repetir Nueva Contraseña"
+          type="password"
+          variant="outlined"
+          density="comfortable"
+          class="mb-4"
+          prepend-inner-icon="mdi-lock-check"
+          :error-messages="passwordError"
+          :rules="[v => !!v || 'Requerido']"
+        ></v-text-field>
+      </v-form>
 
-            <div class="d-flex justify-end gap-2">
-              <v-btn 
-                variant="text" 
-                color="grey-darken-1" 
-                @click="showPasswordModal = false"
-                class="mr-2"
-              >
-                Cancelar
-              </v-btn>
-              <v-btn 
-                color="primary" 
-                type="submit" 
-                :loading="loadingPassword"
-                :disabled="!formValid"
-              >
-                Actualizar Contraseña
-              </v-btn>
-            </div>
-          </v-form>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+      <template #acciones>
+        <v-btn
+          variant="text"
+          color="grey-darken-1"
+          :disabled="loadingPassword"
+          @click="showPasswordModal = false"
+        >
+          Cancelar
+        </v-btn>
+        <v-btn
+          color="primary"
+          variant="flat"
+          :loading="loadingPassword"
+          :disabled="!formValid"
+          @click="updatePassword"
+        >
+          Actualizar Contraseña
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <v-snackbar 
       v-model="snackbar.show" 
@@ -476,9 +474,15 @@
 import userService from '@/services/userService';
 import sealService from '@/services/seal-service';
 import venezuelaLocationsService from '@/services/venezuelaLocationsService';
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue';
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
 
 export default {
   name: 'PerfilCliente',
+  components: {
+    EncabezadoPagina,
+    DialogoAdaptable
+  },
   data() {
     return {
       currentUser: null,

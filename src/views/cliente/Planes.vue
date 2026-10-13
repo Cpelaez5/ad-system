@@ -1,38 +1,17 @@
 <template>
   <v-container fluid class="planes-page pa-4 pa-md-6">
     <!-- Banner de suscripción actual -->
-    <v-alert
+    <AvisoAmable
       v-if="currentSubscription && currentSubscription.plan"
-      color="secondary"
-      variant="tonal"
-      class="mb-6 rounded-xl"
-      border="start"
-      border-color="primary"
-    >
-      <div class="d-flex align-center justify-space-between flex-wrap">
-        <div>
-          <h3 class="text-h6 font-weight-bold mb-1">
-            Plan Actual: {{ currentSubscription.plan.name }}
-            <v-chip size="small" :color="isActive ? 'success' : 'error'" class="ml-2 font-weight-bold">
-              {{ isActive ? 'Activo' : 'Expirado' }}
-            </v-chip>
-          </h3>
-          <p class="mb-0 text-body-2 opacity-80">
-            <template v-if="formattedExpirationDate">
-              Tu suscripción es válida hasta el <strong>{{ formattedExpirationDate }}</strong>.
-            </template>
-            <template v-else>
-              Tu suscripción se encuentra activa.
-            </template>
-          </p>
-        </div>
-        <div class="mt-3 mt-md-0" v-if="!isActive">
-          <v-btn color="primary" variant="flat" rounded="pill" @click="scrollToPlans">
-            Renovar Ahora
-          </v-btn>
-        </div>
-      </div>
-    </v-alert>
+      :tipo="isActive ? 'info' : 'advertencia'"
+      :titulo="`Plan actual: ${currentSubscription.plan.name} (${isActive ? 'Activo' : 'Expirado'})`"
+      :mensaje="formattedExpirationDate
+        ? `Tu suscripción es válida hasta el ${formattedExpirationDate}.`
+        : 'Tu suscripción se encuentra activa.'"
+      :texto-accion="!isActive ? 'Renovar ahora' : ''"
+      class="mb-6"
+      @accion="scrollToPlans"
+    />
 
     <PricingSection
       title="Planes de Suscripción"
@@ -61,12 +40,13 @@
 
 <script>
 import PricingSection from '@/components/common/PricingSection.vue';
+import AvisoAmable from '@/components/ui/AvisoAmable.vue';
 import plansService from '@/services/plansService';
 import userService from '@/services/userService';
 
 export default {
   name: 'Planes',
-  components: { PricingSection },
+  components: { PricingSection, AvisoAmable },
   data() {
     return {
       processingPlan: null,
