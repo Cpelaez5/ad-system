@@ -27,7 +27,16 @@ export default defineConfig(({ command }) => {
     },
     test: {
       environment: 'happy-dom',
-      globals: true
+      globals: true,
+      // Permite montar Vuetify REAL (createVuetify) en tests que lo
+      // necesiten (ej. tests/components/MenuLateral.spec.js) sin que
+      // vitest externalice 'vuetify' y falle al no poder resolver los
+      // .css que importan sus componentes.
+      server: {
+        deps: {
+          inline: ['vuetify']
+        }
+      }
     },
     esbuild: command === 'build' ? {
       pure: ['console.log', 'console.debug', 'console.info'],
