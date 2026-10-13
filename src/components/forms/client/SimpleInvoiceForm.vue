@@ -1418,6 +1418,7 @@ import PasoGuiado from '@/components/ui/PasoGuiado.vue';
 import TarjetaAccion from '@/components/ui/TarjetaAccion.vue';
 import AyudaTermino from '@/components/ui/AyudaTermino.vue';
 import EnvolturaDetallesContables from './EnvolturaDetallesContables.vue';
+import { hoyISO } from '@/utils/fechas';
 import GLOSARIO from '@/constants/glosario.js';
 import retentionPdfService from '@/services/retention-pdf-service.js';
 
@@ -1603,11 +1604,11 @@ export default {
         flow:            'VENTA',
         expense_type:    null,
         expense_category_id: null,
-        issueDate:       new Date().toISOString().split('T')[0],
+        issueDate:       hoyISO(),
         // C1: mes en que se declara esta compra en el Libro de Compras (solo
         // COMPRA; se prellena en prefillFechaFiscal() con la fecha del
         // comprobante de retención de IVA, o con issueDate si no hay retención).
-        fecha_fiscal:    new Date().toISOString().split('T')[0],
+        fecha_fiscal:    hoyISO(),
         dueDate:         '',
         status:          'BORRADOR',
 
@@ -1619,7 +1620,7 @@ export default {
           taxDebit: 0, ivaRetention: 0, islrRetention: 0,
           municipalRetention: 0, igtf: 0,
           ivaRetentionNumber: '', islrRetentionNumber: '', municipalRetentionNumber: '',
-          retentionDate: new Date().toISOString().split('T')[0],
+          retentionDate: hoyISO(),
           currency: 'VES', exchangeRate: 1, exchangeRateEur: null,
           paymentMethod: null, paymentReference: '',
           credit: null
@@ -1715,7 +1716,7 @@ export default {
     },
 
     todayDate() {
-      return new Date().toISOString().split('T')[0];
+      return hoyISO();
     },
 
     currentExchangeRateValue() {
@@ -1959,7 +1960,7 @@ export default {
       immediate: true,
       handler(inv) {
         if (inv) {
-          const today = new Date().toISOString().split('T')[0];
+          const today = hoyISO();
           // C1: al editar, si la factura ya trae fecha_fiscal (guardada en BD) se
           // respeta; si no (registros previos a la migración), se recalcula abajo.
           this.fechaFiscalManuallyEdited = !!inv.fecha_fiscal;
@@ -2094,7 +2095,7 @@ export default {
       if (remaining < 0) return;
       
       const amountPerInst = parseFloat((remaining / count).toFixed(2));
-      const issueDate = new Date(this.formData.issueDate || new Date().toISOString().split('T')[0]);
+      const issueDate = new Date(this.formData.issueDate || hoyISO());
       
       const oldInstallments = this.formData.financial.credit.installments || [];
       const newInstallments = [];
@@ -2406,7 +2407,7 @@ export default {
       const date = this.normalizeDateToYMD ? this.normalizeDateToYMD(rawDate) : normalizeDateToYMD(rawDate);
       if (!date) return;
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = hoyISO();
         let r;
         
         // Si se fuerza hoy o la fecha de la factura es de hoy, usamos la tasa EN VIVO
@@ -2472,7 +2473,7 @@ export default {
     },
 
     async applyTodayRate() {
-      const today = new Date().toISOString().split('T')[0];
+      const today = hoyISO();
       await this.fetchExchangeRate(today, true, true);
       this.isEditingExchangeRate = false;
     },
@@ -2731,7 +2732,7 @@ export default {
     async sugerirCorrelativosRetencion(iva, islr, municipal) {
       try {
         const clientId = this.currentUser?.client?.id || this.currentUser?.client_id;
-        const fecha = this.formData.financial.retentionDate || this.formData.issueDate || new Date().toISOString().split('T')[0];
+        const fecha = this.formData.financial.retentionDate || this.formData.issueDate || hoyISO();
         if (!clientId) return;
 
         // Solo sugerir si el campo no fue editado manualmente
@@ -3270,6 +3271,20 @@ export default {
       const esAnulada = this.formData.status === 'ANULADA';
       if (!esAnulada && this.formData.financial.totalSales <= 0) {
         this.showSnackbar('El total de la factura debe ser mayor a 0. Agrega al menos un producto o ajusta los montos.', 'error');
+        return false;
+      }
+      // 4b. Moneda extranjera: la tasa del día de la factura es obligatoria. Con tasa 1
+      //     los montos en bolívares (libros, retenciones) saldrían mal sin que nadie lo note.
+      const moneda = this.formData.financial.currency;
+      const tasa = Number(this.formData.financial.exchangeRate);
+      if (moneda && moneda !== 'VES' && !esAnulada && (!tasa || tasa <= 1)) {
+        this.isEditingExchangeRate = true;
+        if (this.simple) this.simpleDetailsOpen = true;
+        this.showSnackbar(
+          'Falta la tasa del dólar del día de la factura. Escríbela en "Tasa de cambio" (la encuentras en bcv.org.ve) o toca "Usar tasa de hoy".',
+          'error',
+          8000
+        );
         return false;
       }
       // 5. Stock suficiente (solo en VENTA)

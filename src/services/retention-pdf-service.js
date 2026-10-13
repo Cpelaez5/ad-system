@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabaseClient'
 import venezuelaLocationsService from '@/services/venezuelaLocationsService.js'
 import systemLogo from '/ADSystem/logo.png'
 import watermarkLogo from '/ADSystem/png/svg_logo_ADADAD_3000x3000.png'
+import { formatFechaCorta } from '@/utils/fechas'
 
 // ══════════════════════════════════════════════════════
 // Constantes de diseño corporativo AD SYSTEM
@@ -83,16 +84,8 @@ function formatNumber(value, decimals = 2) {
 /** Formateador de fechas DD/MM/YYYY */
 function formatDate(dateStr) {
   if (!dateStr) return ''
-  try {
-    const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return String(dateStr)
-    const day = String(d.getDate()).padStart(2, '0')
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const year = d.getFullYear()
-    return `${day}/${month}/${year}`
-  } catch (e) {
-    return String(dateStr)
-  }
+  // Fecha local: new Date('YYYY-MM-DD') imprimía el día anterior en Venezuela (UTC-4)
+  return formatFechaCorta(dateStr) || String(dateStr)
 }
 
 /** Extrae año y mes de una fecha */
