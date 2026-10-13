@@ -35,7 +35,15 @@
       <!-- ─── Saludo + frase del mes ─── -->
       <div class="mb-6">
         <h1 class="inicio-saludo mb-2">¡Hola, {{ nombreUsuario }}!</h1>
-        <p class="inicio-frase-mes">{{ fraseDelMes }}</p>
+        <p class="inicio-frase-mes" :aria-label="fraseDelMes">
+          <template v-if="totalVendidoUSD === 0 && totalGastadoUSD === 0">Este mes todavía no registras nada. Empieza tocando "Gasté o compré algo".</template>
+          <template v-else>En {{ nombreMesActual }} vendiste
+            <AnimatedNumber :value="totalVendidoUSD" :formatter="formatearUSD" :duration="400" />
+            y gastaste
+            <AnimatedNumber :value="totalGastadoUSD" :formatter="formatearUSD" :duration="400" />
+            . Te quedan
+            <AnimatedNumber :value="diferenciaUSD" :formatter="formatearUSD" :duration="400" />.</template>
+        </p>
         <p v-if="mostrarEquivalenteBs" class="inicio-frase-bs text-medium-emphasis">
           ≈ {{ bsVendido }} vendidos · {{ bsGastado }} gastados · {{ bsDiferencia }} de diferencia
         </p>
@@ -45,16 +53,17 @@
       <AvisoAmable
         v-if="avisoExito"
         tipo="info"
+        icono="mdi-check-circle"
         :mensaje="avisoExito.mensaje"
         texto-accion="Registrar otro"
         cerrable
-        class="mb-4"
+        class="mb-4 aviso-exito-animado"
         @accion="registrarOtro"
         @cerrar="avisoExito = null"
       />
 
       <!-- ─── Tres acciones grandes ─── -->
-      <div class="mb-6">
+      <div class="mb-6 inicio-acciones">
         <TarjetaAccion
           icono="mdi-cart-outline"
           titulo="Vendí algo"
@@ -159,6 +168,7 @@ import { useNotificacionStore } from '@/store/notificacionStore'
 import TarjetaAccion from '@/components/ui/TarjetaAccion.vue'
 import EstadoVacio from '@/components/ui/EstadoVacio.vue'
 import AvisoAmable from '@/components/ui/AvisoAmable.vue'
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import SimpleInvoiceForm from '@/components/forms/client/SimpleInvoiceForm.vue'
 
 export default {
@@ -168,6 +178,7 @@ export default {
     TarjetaAccion,
     EstadoVacio,
     AvisoAmable,
+    AnimatedNumber,
     SimpleInvoiceForm,
   },
 
@@ -261,6 +272,11 @@ export default {
   },
 
   methods: {
+    /** Formateador para <AnimatedNumber> en la frase del mes (misma forma que formatMoney). */
+    formatearUSD(numero) {
+      return formatMoney(numero, 'USD')
+    },
+
     // ═══════════════════════════════════════════
     // CARGA DE DATOS
     // ═══════════════════════════════════════════
@@ -501,6 +517,43 @@ export default {
 .inicio-frase-bs {
   font-size: 0.8125rem;
   margin-top: 4px;
+}
+
+/* Entrada escalonada de las 3 tarjetas de acción: corta y calmada (no es
+   el sistema de animación global de animations.css — es específica de
+   esta lista de 3 tarjetas). */
+.inicio-acciones > * {
+  opacity: 0;
+  animation: inicio-tarjeta-entrada 320ms cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+.inicio-acciones > *:nth-child(1) { animation-delay: 0ms; }
+.inicio-acciones > *:nth-child(2) { animation-delay: 90ms; }
+.inicio-acciones > *:nth-child(3) { animation-delay: 180ms; }
+
+@keyframes inicio-tarjeta-entrada {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Check animado al guardar: el ícono de éxito aparece con un pequeño "pop". */
+.aviso-exito-animado :deep(.v-alert__prepend .v-icon) {
+  animation: inicio-check-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes inicio-check-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inicio-acciones > * {
+    animation: none;
+    opacity: 1;
+  }
+  .aviso-exito-animado :deep(.v-alert__prepend .v-icon) {
+    animation: none;
+  }
 }
 
 .inicio-subtitulo {

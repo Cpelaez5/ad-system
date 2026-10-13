@@ -102,6 +102,12 @@ describe('Inicio.vue — pantalla de inicio del cliente', () => {
     const { wrapper } = montarInicio()
     await flushPromises()
 
+    // Los montos de la frase del mes usan <AnimatedNumber> (conteo animado,
+    // ver docs/mvp/diseno/sistema-diseno.md §3.5): se espera a que termine
+    // su animación (400ms) antes de leer el texto final.
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    await flushPromises()
+
     const texto = wrapper.text()
     expect(texto).toContain('¡Hola, María!')
     expect(texto).toContain(formatMoney(1250, 'USD'))

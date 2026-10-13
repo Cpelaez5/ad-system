@@ -111,6 +111,7 @@ export default {
 <style scoped>
 .boton-accion {
   font-size: 16px;
+  transition: transform 150ms ease-out;
 }
 
 .boton-accion--principal {
@@ -118,9 +119,24 @@ export default {
   font-size: 1.0625rem;
 }
 
+/* Feedback táctil: el botón se "hunde" un poco al presionar (igual que
+   TarjetaAccion), para que quede claro que el toque se registró. */
+.boton-accion:active {
+  transform: scale(0.98);
+}
+
 /* Foco visible en navegación por teclado (no en click/touch). */
 .boton-accion:focus-visible {
   outline: 3px solid #1F355C;
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boton-accion {
+    transition: none;
+  }
+  .boton-accion:active {
+    transform: none;
+  }
 }
 </style>
