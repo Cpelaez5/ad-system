@@ -366,8 +366,8 @@
         :icono="estadoVacioIcono"
         :titulo="estadoVacioTitulo"
         :mensaje="estadoVacioMensaje"
-        :texto-accion="(currentTab === 'trash' || currentTab === 'retenciones') ? '' : 'Nuevo Registro'"
-        @accion="openNewInvoiceDialog"
+        :texto-accion="estadoVacioPorFiltro ? 'Limpiar filtros' : ((currentTab === 'trash' || currentTab === 'retenciones') ? '' : 'Nuevo Registro')"
+        @accion="estadoVacioPorFiltro ? clearFilters() : openNewInvoiceDialog()"
       />
 
       <template v-else>
@@ -377,7 +377,7 @@
             v-for="(item, i) in filteredInvoices"
             :key="item.id"
             class="ad-move-entrada"
-            :style="{ animationDelay: `${Math.min(i, 12) * 50}ms` }"
+            :style="{ animationDelay: `calc(var(--ad-move-escalon-lista) * ${Math.min(i, 12)})` }"
             :quien="item.flow === 'VENTA' ? item.client?.companyName : item.issuer?.companyName"
             :subtitulo="item.invoiceNumber"
             :fecha="item.issueDate"
@@ -1518,8 +1518,16 @@ export default {
       return 'VENTA';
     },
 
+    // M1 (ola F2b): si hay búsqueda/filtros activos (no el simple recorte por
+    // pestaña), la lista vacía no significa "aún no registras nada" — significa
+    // que ESOS filtros no encontraron nada. Mensaje distinto + "Limpiar filtros"
+    // en vez de "Nuevo Registro" (que sería confuso: sí hay registros).
+    estadoVacioPorFiltro() {
+      return this.activeFiltersCount > 0;
+    },
     // Copy del estado vacío según la pestaña activa (en lenguaje llano, enseña qué tocar)
     estadoVacioIcono() {
+      if (this.estadoVacioPorFiltro) return 'mdi-filter-remove-outline';
       const iconos = {
         ventas: 'mdi-cash-plus',
         compras: 'mdi-cart',
@@ -1530,6 +1538,7 @@ export default {
       return iconos[this.currentTab] || 'mdi-receipt-text-outline';
     },
     estadoVacioTitulo() {
+      if (this.estadoVacioPorFiltro) return 'No hay resultados con estos filtros';
       const titulos = {
         ventas: 'Aún no registras ventas',
         compras: 'Aún no registras compras',
@@ -1540,6 +1549,7 @@ export default {
       return titulos[this.currentTab] || 'Aún no registras movimientos';
     },
     estadoVacioMensaje() {
+      if (this.estadoVacioPorFiltro) return 'Prueba con otra búsqueda o quita algún filtro.';
       const mensajes = {
         ventas: 'Toca «Nuevo Registro» y tómale foto a tu factura de venta.',
         compras: 'Toca «Nuevo Registro» y tómale foto a tu factura de compra.',

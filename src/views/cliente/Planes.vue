@@ -43,6 +43,7 @@ import PricingSection from '@/components/common/PricingSection.vue';
 import AvisoAmable from '@/components/ui/AvisoAmable.vue';
 import plansService from '@/services/plansService';
 import userService from '@/services/userService';
+import { parseFechaLocal, formatFechaLocal } from '@/utils/fechas.js';
 
 export default {
   name: 'Planes',
@@ -65,14 +66,17 @@ export default {
       if (!this.currentSubscription) return false;
       if (this.currentSubscription.status === 'active' || this.currentSubscription.status === 'trial') return true;
       if (this.currentSubscription.next_billing_date) {
-        return new Date(this.currentSubscription.next_billing_date) > new Date();
+        // Menor (ola F2b): new Date('YYYY-MM-DD') interpreta medianoche UTC,
+        // que en Caracas ya es el día anterior — parseFechaLocal la trata
+        // como medianoche LOCAL.
+        const fecha = parseFechaLocal(this.currentSubscription.next_billing_date);
+        return fecha ? fecha > new Date() : false;
       }
       return false;
     },
     formattedExpirationDate() {
       if (this.currentSubscription?.next_billing_date) {
-        const date = new Date(this.currentSubscription.next_billing_date);
-        return date.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+        return formatFechaLocal(this.currentSubscription.next_billing_date, { year: 'numeric', month: 'long', day: 'numeric' }, 'es-ES');
       }
       return null;
     }

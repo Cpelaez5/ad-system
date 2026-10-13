@@ -297,11 +297,11 @@
 
           <EstadoVacio
             v-if="!loadingProducts && filteredProducts.length === 0"
-            icono="mdi-package-variant-closed"
-            titulo="Todavía no tienes productos"
-            mensaje="Registra tu primer producto para llevar el control de stock, costos y precios de venta."
-            texto-accion="Nuevo producto"
-            @accion="openProductDialog()"
+            :icono="inventarioEstadoVacioPorFiltro ? 'mdi-filter-remove-outline' : 'mdi-package-variant-closed'"
+            :titulo="inventarioEstadoVacioPorFiltro ? 'No hay resultados con estos filtros' : 'Todavía no tienes productos'"
+            :mensaje="inventarioEstadoVacioPorFiltro ? 'Prueba con otra búsqueda o quita algún filtro.' : 'Registra tu primer producto para llevar el control de stock, costos y precios de venta.'"
+            :texto-accion="inventarioEstadoVacioPorFiltro ? 'Limpiar filtros' : 'Nuevo producto'"
+            @accion="inventarioEstadoVacioPorFiltro ? limpiarFiltrosInventario() : openProductDialog()"
           />
 
           <!-- Lista en móvil: tarjetas legibles en vez de tabla -->
@@ -831,6 +831,17 @@ export default {
   computed: {
     filteredProducts() {
       let result = this.products;
+      // M1 (ola F2b): antes esto solo filtraba por fecha; la búsqueda
+      // (productSearch) solo afectaba el buscador interno de la v-data-table
+      // de escritorio (prop `search`), así que en el teléfono (donde se usa
+      // esta lista) escribir en el buscador no filtraba nada.
+      if (this.productSearch) {
+        const q = this.productSearch.toLowerCase().trim();
+        result = result.filter(p =>
+          (p.name && p.name.toLowerCase().includes(q)) ||
+          (p.code && p.code.toLowerCase().includes(q))
+        );
+      }
       if (this.dateFromFilter) {
         result = result.filter(p => new Date(p.created_at) >= new Date(this.dateFromFilter));
       }
@@ -840,6 +851,13 @@ export default {
         result = result.filter(p => new Date(p.created_at) <= toDate);
       }
       return result;
+    },
+    // M1: distingue "no tienes productos" (products.length === 0) de "esta
+    // búsqueda/filtro no encontró nada" (hay productos, pero el filtro los
+    // dejó todos afuera) — antes mostraba siempre el mismo mensaje con el
+    // CTA "Nuevo producto", confuso cuando sí hay productos.
+    inventarioEstadoVacioPorFiltro() {
+      return this.products.length > 0 && this.filteredProducts.length === 0;
     },
     filteredMovements() {
       let result = this.movements;
@@ -994,6 +1012,13 @@ export default {
       } finally {
         this.loadingDashboard = false
       }
+    },
+    // M1: limpia búsqueda y fechas (no "ver eliminados", que es una vista
+    // explícita, no un filtro accidental) y recarga.
+    limpiarFiltrosInventario() {
+      this.productSearch = ''
+      this.dateFromFilter = null
+      this.dateToFilter = null
     },
     async loadProducts() {
       this.loadingProducts = true
