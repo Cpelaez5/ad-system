@@ -15,8 +15,59 @@
 import invoiceService from '@/services/invoiceService.js'
 import retentionRpcService from '@/services/retentionRpcService.js'
 import emailNotificationService from '@/services/email-notification-service.js'
+import proveedorService from '@/services/proveedorService.js'
 import { supabase } from '@/lib/supabaseClient'
 import { logger } from '@/utils/logger'
+import { normalizarRif } from '@/utils/rif.js'
+
+/**
+ * Si el OCR no encontró el proveedor (emisor) en el directorio del cliente,
+ * `SimpleInvoiceForm` deja los datos leídos en `formData.issuer._proveedorPendiente`
+ * en vez de un `issuer.id` real (ver Tarea C — OCR). Esta función resuelve esa
+ * marca justo antes de guardar: busca de nuevo por si acaso (RIF normalizado)
+ * y, si sigue sin existir, lo crea con el servicio de proveedores existente.
+ *
+ * Nunca se ejecuta si el usuario cancela el registro: solo corre dentro de
+ * `guardarRegistro`, que solo se llama al guardar de verdad.
+ *
+ * @param {{ nombre?: string, rif?: string, direccion?: string, telefono?: string, email?: string }} pendiente
+ * @returns {Promise<{ success: boolean, id?: string, rif?: string, message?: string }>}
+ */
+async function resolverProveedorPendiente(pendiente) {
+  try {
+    const rifNormalizado = normalizarRif(pendiente?.rif)
+    if (!rifNormalizado) {
+      return { success: false, message: 'El proveedor leído del documento no tiene un RIF reconocible; selecciónalo o créalo manualmente.' }
+    }
+
+    // Puede que ya exista (otra pestaña, el botón "Nuevo", u otro registro
+    // guardado mientras tanto): nunca duplicar por RIF.
+    const existentes = await proveedorService.getProveedores({ onlyActive: true })
+    const match = (existentes || []).find(p => normalizarRif(p.rif) === rifNormalizado)
+    if (match) {
+      return { success: true, id: match.id, rif: match.rif }
+    }
+
+    const esNatural = /^[VE]-/.test(rifNormalizado)
+    const creado = await proveedorService.createProveedor({
+      nombre: pendiente.nombre || '',
+      rif: rifNormalizado,
+      direccion: pendiente.direccion || null,
+      telefono: pendiente.telefono || null,
+      email: pendiente.email || null,
+      tipo_persona: esNatural ? 'NATURAL' : 'JURIDICA'
+    })
+
+    if (!creado.success) {
+      return { success: false, message: creado.error || 'No se pudo registrar el proveedor nuevo.' }
+    }
+
+    return { success: true, id: creado.data.id, rif: creado.data.rif }
+  } catch (err) {
+    logger.warn('[registroService]', 'No se pudo crear el proveedor pendiente del OCR', err.message)
+    return { success: false, message: 'No se pudo registrar el proveedor nuevo. Intenta seleccionarlo manualmente.' }
+  }
+}
 
 /**
  * Determina si el formulario corresponde a un egreso (compra o gasto) que debe
@@ -84,6 +135,18 @@ export async function guardarRegistro(formData) {
   try {
     const isUpdate = Boolean(formData?.id)
     let savedResult
+
+    // Proveedor nuevo sugerido por el OCR, nunca creado hasta este punto
+    // (ver Tarea C — OCR, punto 1: "nada se crea si el usuario cancela").
+    if (!isUpdate && formData?.flow === 'COMPRA' && formData.issuer?._proveedorPendiente && !formData.issuer?.id) {
+      const resuelto = await resolverProveedorPendiente(formData.issuer._proveedorPendiente)
+      if (!resuelto.success) {
+        return { success: false, message: resuelto.message }
+      }
+      formData.issuer.id = resuelto.id
+      if (resuelto.rif) formData.issuer.rif = resuelto.rif
+      delete formData.issuer._proveedorPendiente
+    }
 
     if (isUpdate) {
       savedResult = await invoiceService.updateInvoice(formData.id, formData)
