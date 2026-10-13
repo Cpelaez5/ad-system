@@ -8,7 +8,10 @@ const corsHeaders = {
 
 // Organización a la que entran los clientes que se registran sin invitación (registro público).
 // El navegador NUNCA decide la organización: o viene de una invitación válida o es esta.
-const PUBLIC_CLIENT_ORG_ID = Deno.env.get('PUBLIC_CLIENT_ORG_ID') ?? '11111111-1111-1111-1111-111111111111'
+// Es la organización de sistema "AD System Directo" (tipo 'directo', sin staff de despachos);
+// ver docs/mvp/estrategia/flujo-multiinquilino-contadores.md y la migración 20261013150000.
+// Fija en el código a propósito: una variable de entorno vieja no debe poder mandar empresas a un despacho.
+const PUBLIC_CLIENT_ORG_ID = '00000000-0000-4000-8000-0000000000d1'
 
 class ErrorRegistro extends Error {}
 
