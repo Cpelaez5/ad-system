@@ -20,7 +20,7 @@ test.describe('Cliente — Mis papeles del negocio', () => {
     await expect(tarjetas).toBeVisible()
 
     // Diálogo de "Nuevo Documento": abrir y cancelar sin subir nada.
-    await page.getByRole('button', { name: /Nuevo.*Documento/ }).click()
+    await page.getByRole('button', { name: /Nuevo documento/i }).click()
     const dialogCancelar = page.getByRole('button', { name: 'Cancelar' })
     await expect(dialogCancelar).toBeVisible()
     await dialogCancelar.click()

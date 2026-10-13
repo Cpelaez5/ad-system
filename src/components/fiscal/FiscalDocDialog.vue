@@ -4,6 +4,8 @@
     @update:model-value="$emit('update:modelValue', $event)"
     max-width="700px"
     persistent
+    scrollable
+    :fullscreen="$vuetify.display.xs"
   >
     <v-card class="fiscal-doc-dialog">
       <v-card-title class="bg-primary text-white d-flex align-center py-3">

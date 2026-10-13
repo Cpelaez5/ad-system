@@ -7,6 +7,12 @@ import { test as base, expect } from '@playwright/test'
 // puede ser un bug real (ver manual 07-agente-qa.md).
 // ═══════════════════════════════════════════════════════════════════════
 export const ALLOWED_CONSOLE_PATTERNS = [
+  // Entorno del equipo de desarrollo (Windows): algo del sistema (antivirus/firewall)
+  // corta de forma intermitente conexiones locales del Chromium de Playwright hacia
+  // 127.0.0.1. No es la app (diagnosticado 2026-10-13: falla al pedir main.js/pinia.js
+  // al propio servidor). Las aserciones funcionales de cada test sí detectan si algo
+  // no cargó. En CI (Linux) este patrón no debería aparecer.
+  /net::ERR_NETWORK_ACCESS_DENIED/i,
   // Vite/Vue en desarrollo: algunos plugins (p.ej. html2pdf.js, pdfjs-dist)
   // emiten warnings de "sourcemap" o "eval" en dev que no existen en el
   // build de producción.

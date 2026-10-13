@@ -45,7 +45,8 @@ export default defineConfig({
   webServer: {
     command: 'npm run build && npx vite preview --host 127.0.0.1 --port 5174 --strictPort',
     url: 'http://127.0.0.1:5174',
-    reuseExistingServer: true,
+    // Siempre levanta su propio build (si se reutilizaba un dev server en 5174 se probaba otra cosa).
+    reuseExistingServer: !!process.env.E2E_REUSE_SERVER,
     timeout: 240_000,
   },
 
