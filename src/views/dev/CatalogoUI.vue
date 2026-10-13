@@ -51,6 +51,33 @@
     </section>
 
     <section class="mb-10">
+      <h2 class="mb-4">FilaMovimiento</h2>
+      <div class="d-flex flex-column ga-2">
+        <FilaMovimiento
+          quien="Ferretería López C.A."
+          subtitulo="RIF J-12345678-9"
+          fecha="2026-10-05"
+          :monto="1250.5"
+          moneda="USD"
+          estado="Pagada"
+          color-estado="success"
+          icono="mdi-arrow-down"
+          color-icono="error"
+        />
+        <FilaMovimiento
+          quien="Comercial Reyes"
+          fecha="2026-10-01"
+          :monto="430"
+          moneda="USD"
+          estado="Crédito"
+          color-estado="warning"
+          icono="mdi-arrow-up"
+          color-icono="success"
+        />
+      </div>
+    </section>
+
+    <section class="mb-10">
       <h2 class="mb-4">AvisoAmable</h2>
       <div class="d-flex flex-column ga-3">
         <AvisoAmable tipo="info" mensaje="Dólar BCV hoy: Bs 36,50" />
@@ -194,6 +221,7 @@ import ListaRanking from '@/components/ui/ListaRanking.vue'
 import GraficoBarras from '@/components/ui/GraficoBarras.vue'
 import ChipTasa from '@/components/ui/ChipTasa.vue'
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import FilaMovimiento from '@/components/ui/FilaMovimiento.vue'
 
 /**
  * CatalogoUI — vitrina de los componentes de src/components/ui/ para
@@ -219,6 +247,7 @@ export default {
     GraficoBarras,
     ChipTasa,
     EncabezadoPagina,
+    FilaMovimiento,
   },
 
   data() {

@@ -39,11 +39,12 @@
     <!-- ═══════════════════════════════════════════════ -->
     <template v-else>
       <!-- Header Section -->
-      <v-row class="mb-6 animate-section" style="animation-delay: 0.1s">
-        <v-col cols="12" md="8">
-          
-        </v-col>
-        <v-col cols="12" md="4" class="d-flex flex-wrap align-center justify-md-end justify-start ga-2 mt-4 mt-md-0">
+      <EncabezadoPagina
+        titulo="Mis movimientos"
+        subtitulo="Tus facturas de venta, compra y gastos en un solo lugar."
+        class="mb-6 animate-section"
+        style="animation-delay: 0.1s"
+      >
           <v-btn
             color="primary"
             size="large"
@@ -116,8 +117,7 @@
               </v-list-item>
             </v-list>
           </v-menu>
-        </v-col>
-      </v-row>
+      </EncabezadoPagina>
 
       <!-- Estadísticas rápidas -->
       <v-row class="mb-6 animate-section" style="animation-delay: 0.2s">
@@ -349,13 +349,55 @@
       </v-expansion-panel>
     </v-expansion-panels>
 
-    <!-- Tabla de facturas -->
-    <v-card class="animate-section" style="animation-delay: 0.5s">
+    <!-- Error al cargar: mensaje llano + Reintentar, en vez de una lista vacía silenciosa -->
+    <AvisoAmable
+      v-if="loadError"
+      tipo="error"
+      titulo="No pudimos cargar tus movimientos"
+      :mensaje="loadError"
+      texto-accion="Reintentar"
+      @accion="loadInvoices"
+      class="mb-4"
+    />
+
+    <template v-else>
+      <EstadoVacio
+        v-if="!loading && filteredInvoices.length === 0"
+        :icono="estadoVacioIcono"
+        :titulo="estadoVacioTitulo"
+        :mensaje="estadoVacioMensaje"
+        :texto-accion="(currentTab === 'trash' || currentTab === 'retenciones') ? '' : 'Nuevo Registro'"
+        @accion="openNewInvoiceDialog"
+      />
+
+      <template v-else>
+        <!-- Lista en móvil: la tabla de varias columnas es ilegible en xs -->
+        <div v-if="$vuetify.display.xs" class="d-flex flex-column ga-2">
+          <FilaMovimiento
+            v-for="(item, i) in filteredInvoices"
+            :key="item.id"
+            class="ad-move-entrada"
+            :style="{ animationDelay: `${Math.min(i, 12) * 50}ms` }"
+            :quien="item.flow === 'VENTA' ? item.client?.companyName : item.issuer?.companyName"
+            :subtitulo="item.invoiceNumber"
+            :fecha="item.issueDate"
+            :monto="getDisplayAmount(item)"
+            :moneda="currencyDisplay"
+            :estado="item.status"
+            :color-estado="getStatusColor(item.status)"
+            :icono="item.flow === 'VENTA' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
+            :color-icono="item.flow === 'VENTA' ? 'success' : 'error'"
+            @abrir="currentTab !== 'trash' && viewInvoice(item)"
+          />
+        </div>
+
+        <!-- Tabla de facturas (escritorio) -->
+        <v-card v-else class="animate-section" style="animation-delay: 0.5s">
       <v-card-title>
         <v-icon left>mdi-receipt-long</v-icon>
         {{ currentTab === 'retenciones' ? 'Registro de Retenciones Fiscales' : 'Lista de Facturas' }} ({{ filteredInvoices.length }})
       </v-card-title>
-      
+
       <v-data-table
         :headers="dynamicHeaders"
         :items="filteredInvoices"
@@ -583,11 +625,18 @@
           </div>
         </template>
       </v-data-table>
-    </v-card>
+        </v-card>
+      </template>
+    </template>
 
-    <!-- Diálogo para nueva/editar factura -->
+    <!-- Diálogo para nueva/editar factura: envuelve SimpleInvoiceForm/ClientInvoiceForm,
+         que ya traen su propio encabezado/pie de card (sif-header/sif-footer) y su
+         pantalla completa en móvil (scrollable + fullscreen por debajo de "sm").
+         No se reemplaza por DialogoAdaptable para no duplicar ese encabezado/pie —
+         no se tocó el interior de ninguno de los dos formularios (otro agente
+         trabaja en SimpleInvoiceForm; ver informe de la tarea). -->
     <!-- Para volver al formulario original: cambiar USE_SIMPLE_FORM a false en data() -->
-    <v-dialog v-model="invoiceDialog" max-width="1100px" scrollable :fullscreen="$vuetify.display.smAndDown">
+    <v-dialog v-model="invoiceDialog" max-width="1100px" scrollable :fullscreen="$vuetify.display.smAndDown" :transition="$vuetify.display.xs ? 'dialog-bottom-transition' : 'dialog-transition'">
       <SimpleInvoiceForm
         v-if="USE_SIMPLE_FORM"
         ref="simpleForm"
@@ -606,32 +655,38 @@
     </v-dialog>
 
     <!-- Diálogo de confirmación de eliminación -->
-    <v-dialog v-model="deleteDialog" max-width="400px">
-      <v-card>
-        <v-card-title>Confirmar Eliminación</v-card-title>
-        <v-card-text>
-          <div v-if="currentTab === 'trash'" class="text-error font-weight-bold mb-2">
-            ⚠️ Atención: Borrado Definitivo
-          </div>
-          ¿Está seguro de que desea {{ currentTab === 'trash' ? 'eliminar DEFINITIVAMENTE' : 'enviar a la papelera' }} la factura <strong>{{ invoiceToDelete?.invoiceNumber }}</strong>?
-          {{ currentTab === 'trash' ? 'Esta acción NO se puede deshacer.' : 'Podrá restaurarla luego desde la papelera.' }}
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="deleteDialog = false">
-            Cancelar
-          </v-btn>
-          <v-btn color="error" @click="confirmDelete">
-            Eliminar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DialogoAdaptable
+      v-model="deleteDialog"
+      titulo="Confirmar eliminación"
+      icono="mdi-delete-alert-outline"
+      max-width="420"
+      :cargando="deleting"
+    >
+      <div v-if="currentTab === 'trash'" class="text-error font-weight-bold mb-2">
+        ⚠️ Atención: Borrado Definitivo
+      </div>
+      ¿Está seguro de que desea {{ currentTab === 'trash' ? 'eliminar DEFINITIVAMENTE' : 'enviar a la papelera' }} la factura <strong>{{ invoiceToDelete?.invoiceNumber }}</strong>?
+      {{ currentTab === 'trash' ? 'Esta acción NO se puede deshacer.' : 'Podrá restaurarla luego desde la papelera.' }}
+      <template #acciones>
+        <v-spacer></v-spacer>
+        <v-btn color="grey-darken-1" variant="text" :disabled="deleting" @click="deleteDialog = false">
+          Cancelar
+        </v-btn>
+        <v-btn color="error" variant="elevated" :loading="deleting" @click="confirmDelete">
+          Eliminar
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- Diálogo de vista de factura -->
-    <v-dialog v-model="viewDialog" max-width="1200px" scrollable :fullscreen="$vuetify.display.smAndDown">
-      <v-card v-if="viewingInvoice" class="rounded-xl elevation-0" style="border-radius: 20px !important;">
-        <!-- Header con gradiente sutil -->
+    <DialogoAdaptable
+      v-model="viewDialog"
+      :titulo="viewingInvoice ? `Factura ${viewingInvoice.invoiceNumber}` : 'Detalle de factura'"
+      icono="mdi-receipt-long"
+      max-width="1200"
+    >
+      <template v-if="viewingInvoice">
+        <!-- Header con gradiente sutil (contexto visual: número, flujo y estado) -->
         <div class="pa-4 pa-md-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
             <div class="d-flex align-center">
                 <v-avatar color="white" size="48" class="mr-4">
@@ -825,54 +880,53 @@
             
           </v-row>
         </v-card-text>
-        <v-divider></v-divider>
-        <v-card-actions class="pa-4 bg-grey-lighten-5">
-          <!-- Menú de Descargas Unificado (Modal) -->
-          <v-menu>
-            <template v-slot:activator="{ props }">
-              <v-btn
-                color="success"
-                variant="tonal"
-                prepend-icon="mdi-download"
-                v-bind="props"
-              >
-                Descargas
-              </v-btn>
-            </template>
-            <v-list density="compact">
-              <v-list-item @click="downloadReceiptPdf(viewingInvoice)" prepend-icon="mdi-file-pdf-box">
-                <v-list-item-title>Ver / Descargar Resumen en PDF</v-list-item-title>
-              </v-list-item>
-              <v-list-item v-if="hasAttachment(viewingInvoice)" @click="downloadAttachment(viewingInvoice)" prepend-icon="mdi-paperclip">
-                <v-list-item-title>Ver / Descargar Foto Adjunta</v-list-item-title>
-              </v-list-item>
-              <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.islr > 0) || (viewingInvoice.financial && viewingInvoice.financial.islrRetention > 0)" @click="downloadISLR(viewingInvoice)" prepend-icon="mdi-file-percent">
-                <v-list-item-title>Descargar Comprobante ISLR (PDF)</v-list-item-title>
-              </v-list-item>
-              <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.iva > 0) || (viewingInvoice.financial && viewingInvoice.financial.ivaRetention > 0)" @click="downloadIVA(viewingInvoice)" prepend-icon="mdi-file-certificate">
-                <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
-              </v-list-item>
-              <v-list-item v-if="canDownloadMunicipal(viewingInvoice)" @click="downloadMunicipal(viewingInvoice)" prepend-icon="mdi-file-document-outline">
-                <v-list-item-title>Descargar Comprobante Municipal (PDF)</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-          <v-spacer></v-spacer>
-          <v-btn color="primary" variant="elevated" @click="viewDialog = false" class="px-6">
-            Cerrar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      </template>
+
+      <template #acciones>
+        <!-- Menú de Descargas Unificado (Modal) -->
+        <v-menu v-if="viewingInvoice">
+          <template v-slot:activator="{ props }">
+            <v-btn
+              color="success"
+              variant="tonal"
+              prepend-icon="mdi-download"
+              v-bind="props"
+            >
+              Descargas
+            </v-btn>
+          </template>
+          <v-list density="compact">
+            <v-list-item @click="downloadReceiptPdf(viewingInvoice)" prepend-icon="mdi-file-pdf-box">
+              <v-list-item-title>Ver / Descargar Resumen en PDF</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="hasAttachment(viewingInvoice)" @click="downloadAttachment(viewingInvoice)" prepend-icon="mdi-paperclip">
+              <v-list-item-title>Ver / Descargar Foto Adjunta</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.islr > 0) || (viewingInvoice.financial && viewingInvoice.financial.islrRetention > 0)" @click="downloadISLR(viewingInvoice)" prepend-icon="mdi-file-percent">
+              <v-list-item-title>Descargar Comprobante ISLR (PDF)</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.iva > 0) || (viewingInvoice.financial && viewingInvoice.financial.ivaRetention > 0)" @click="downloadIVA(viewingInvoice)" prepend-icon="mdi-file-certificate">
+              <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="canDownloadMunicipal(viewingInvoice)" @click="downloadMunicipal(viewingInvoice)" prepend-icon="mdi-file-document-outline">
+              <v-list-item-title>Descargar Comprobante Municipal (PDF)</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+        <v-spacer></v-spacer>
+        <v-btn color="primary" variant="elevated" @click="viewDialog = false" class="px-6">
+          Cerrar
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- Diálogo de opciones avanzadas de exportación -->
-    <v-dialog v-model="showExportDialog" max-width="600px">
-      <v-card>
-        <v-card-title>
-          <v-icon left>mdi-download</v-icon>
-          Opciones de Exportación
-        </v-card-title>
-        <v-card-text>
+    <DialogoAdaptable
+      v-model="showExportDialog"
+      titulo="Opciones de exportación"
+      icono="mdi-download"
+      max-width="600"
+    >
           <v-form>
             <v-row>
               <v-col cols="12">
@@ -932,36 +986,33 @@
             • Moneda: {{ exportOptions.currency }}<br>
             • Formato: {{ exportOptions.format }}
           </v-alert>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="showExportDialog = false">
-            Cancelar
-          </v-btn>
-          <v-btn color="success" @click="exportWithOptions">
-            <v-icon left>mdi-download</v-icon>
-            Exportar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+
+      <template #acciones>
+        <v-spacer></v-spacer>
+        <v-btn color="grey-darken-1" variant="text" @click="showExportDialog = false">
+          Cancelar
+        </v-btn>
+        <v-btn color="success" variant="elevated" @click="exportWithOptions">
+          <v-icon left>mdi-download</v-icon>
+          Exportar
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- Diálogo de filtros de fecha para exportación (UX Mejorado) -->
-    <v-dialog v-model="exportDateDialog" max-width="520px" persistent>
-      <v-card class="export-date-dialog">
-        <!-- Header con contexto claro -->
-        <v-card-title class="d-flex align-center pa-4 bg-primary">
-          <v-icon color="white" class="mr-3">mdi-file-export-outline</v-icon>
-          <div>
-            <div class="text-h6 text-white">Exportar Registros</div>
-            <div class="text-caption text-white-50">
-              {{ pendingExportType === 'fiscal' ? 'Libro Fiscal SENIAT' : 'Reporte General' }}
-              - {{ pendingExportFlow === 'COMPRA' ? 'Compras/Gastos' : 'Ventas' }}
-            </div>
-          </div>
-        </v-card-title>
+    <DialogoAdaptable
+      v-model="exportDateDialog"
+      titulo="Exportar registros"
+      icono="mdi-file-export-outline"
+      max-width="520"
+      persistent
+    >
+          <!-- Contexto: tipo de libro y flujo -->
+          <p class="text-body-2 text-medium-emphasis mb-4">
+            {{ pendingExportType === 'fiscal' ? 'Libro Fiscal SENIAT' : 'Reporte General' }}
+            - {{ pendingExportFlow === 'COMPRA' ? 'Compras/Gastos' : 'Ventas' }}
+          </p>
 
-        <v-card-text class="pa-5">
           <!-- Error Alert -->
           <v-alert
             v-if="exportDateError"
@@ -1109,33 +1160,29 @@
               Prueba seleccionar otro período con datos disponibles
             </div>
           </v-card>
-        </v-card-text>
 
-        <!-- Acciones con botones claros -->
-        <v-divider></v-divider>
-        <v-card-actions class="pa-4">
-          <v-btn 
-            variant="text" 
-            color="grey-darken-1"
-            @click="cancelExportDateDialog"
-            prepend-icon="mdi-close"
-          >
-            Cancelar
-          </v-btn>
-          <v-spacer></v-spacer>
-          <v-btn
-            color="success"
-            variant="elevated"
-            size="large"
-            :disabled="filteredExportPreviewCount === 0 || !!exportDateError"
-            @click="confirmExportWithDateFilter"
-            prepend-icon="mdi-download"
-          >
-            Exportar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #acciones>
+        <v-btn
+          variant="text"
+          color="grey-darken-1"
+          @click="cancelExportDateDialog"
+          prepend-icon="mdi-close"
+        >
+          Cancelar
+        </v-btn>
+        <v-spacer></v-spacer>
+        <v-btn
+          color="success"
+          variant="elevated"
+          size="large"
+          :disabled="filteredExportPreviewCount === 0 || !!exportDateError"
+          @click="confirmExportWithDateFilter"
+          prepend-icon="mdi-download"
+        >
+          Exportar
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- ── Modal rápido de cuotas Cashea ──────────────────────── -->
     <CasheaInstallmentsModal
@@ -1145,23 +1192,24 @@
     />
 
     <!-- ── Diálogo confirmación retención municipal ─────────── -->
-    <v-dialog v-model="municipalConfirmDialog" max-width="420" persistent>
-      <v-card>
-        <v-card-title class="text-h6 pb-2">Tu proveedor está en otro municipio</v-card-title>
-        <v-card-text>
-          Normalmente no corresponde retener el impuesto municipal cuando el proveedor está en otro municipio. ¿Quieres generar el comprobante igual?
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey-darken-1" variant="text" @click="resolverMunicipalConfirm(false)">
-            Cancelar
-          </v-btn>
-          <v-btn color="primary" variant="elevated" @click="resolverMunicipalConfirm(true)">
-            Generar igual
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DialogoAdaptable
+      v-model="municipalConfirmDialog"
+      titulo="Tu proveedor está en otro municipio"
+      icono="mdi-map-marker-alert-outline"
+      max-width="420"
+      persistent
+    >
+      Normalmente no corresponde retener el impuesto municipal cuando el proveedor está en otro municipio. ¿Quieres generar el comprobante igual?
+      <template #acciones>
+        <v-spacer></v-spacer>
+        <v-btn color="grey-darken-1" variant="text" @click="resolverMunicipalConfirm(false)">
+          Cancelar
+        </v-btn>
+        <v-btn color="primary" variant="elevated" @click="resolverMunicipalConfirm(true)">
+          Generar igual
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- ── Sistema de Notificaciones Snackbar ─────────────────── -->
     <AppSnackbar
@@ -1197,6 +1245,11 @@ import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import { supabase } from '@/lib/supabaseClient';
 import proveedorService from '@/services/proveedorService.js';
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import EstadoVacio from '@/components/ui/EstadoVacio.vue'
+import AvisoAmable from '@/components/ui/AvisoAmable.vue'
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
+import FilaMovimiento from '@/components/ui/FilaMovimiento.vue'
 
 export default {
   name: 'FacturacionCliente',
@@ -1208,7 +1261,12 @@ export default {
     AnimatedNumber,
     StatsCard,
     CurrencyStatsCard,
-    CustomDatePicker
+    CustomDatePicker,
+    EncabezadoPagina,
+    EstadoVacio,
+    AvisoAmable,
+    DialogoAdaptable,
+    FilaMovimiento
   },
   data() {
     return {
@@ -1221,6 +1279,8 @@ export default {
       proveedoresMap: {},
       initialLoading: true,
       loading: true,
+      loadError: '',
+      deleting: false,
       invoices: [],
       trashInvoices: [], 
       filteredInvoices: [],
@@ -1398,7 +1458,40 @@ export default {
       }
       return 'VENTA';
     },
-    
+
+    // Copy del estado vacío según la pestaña activa (en lenguaje llano, enseña qué tocar)
+    estadoVacioIcono() {
+      const iconos = {
+        ventas: 'mdi-cash-plus',
+        compras: 'mdi-cart',
+        gastos: 'mdi-cash-minus',
+        retenciones: 'mdi-file-document-outline',
+        trash: 'mdi-delete',
+      };
+      return iconos[this.currentTab] || 'mdi-receipt-text-outline';
+    },
+    estadoVacioTitulo() {
+      const titulos = {
+        ventas: 'Aún no registras ventas',
+        compras: 'Aún no registras compras',
+        gastos: 'Aún no registras gastos',
+        retenciones: 'Todavía no tienes retenciones',
+        trash: 'La papelera está vacía',
+      };
+      return titulos[this.currentTab] || 'Aún no registras movimientos';
+    },
+    estadoVacioMensaje() {
+      const mensajes = {
+        ventas: 'Toca «Nuevo Registro» y tómale foto a tu factura de venta.',
+        compras: 'Toca «Nuevo Registro» y tómale foto a tu factura de compra.',
+        gastos: 'Toca «Nuevo Registro» y registra lo que gastaste, con o sin factura.',
+        retenciones: 'Aquí verás las facturas de compra con retención de IVA, ISLR o municipal.',
+        trash: 'Las facturas que elimines aparecerán aquí antes de borrarse para siempre.',
+      };
+      return mensajes[this.currentTab] || 'Toca «Nuevo Registro» para empezar.';
+    },
+
+
     // Titulo dinámico para el botón de borrar
     deleteButtonText() {
        return this.currentTab === 'trash' ? 'Eliminar Definitivamente' : 'Mover a Papelera';
@@ -1551,6 +1644,7 @@ export default {
       
       try {
         this.loading = true;
+        this.loadError = '';
         console.log('🔄 Cargando facturas del cliente...', { clientId: myClientId });
         
         // 1. Cargar Ventas y Compras por client_id — ambas usan el mismo filtro seguro
@@ -1602,11 +1696,12 @@ export default {
         }
       } catch (error) {
         console.error('❌ Error al cargar facturas:', error);
+        this.loadError = 'No pudimos cargar tus movimientos. Revisa tu conexión e intenta de nuevo.';
       } finally {
         this.loading = false;
       }
     },
-    
+
     async calculateStats() {
       const sourceData = this.filteredInvoices;
       
@@ -1849,19 +1944,27 @@ export default {
     
     async confirmDelete() {
       if (!this.invoiceToDelete) return;
-      
+
+      this.deleting = true;
       try {
         if (this.currentTab === 'trash') {
             await invoiceService.hardDeleteInvoice(this.invoiceToDelete.id);
         } else {
             await invoiceService.deleteInvoice(this.invoiceToDelete.id);
         }
-        
+
         await this.loadInvoices(); // Recarga todo (invoices y trashInvoices)
         this.deleteDialog = false;
         this.invoiceToDelete = null;
+        this.showNotification(
+          this.currentTab === 'trash' ? '¡Listo! Eliminamos la factura definitivamente.' : '¡Listo! Enviamos la factura a la papelera.',
+          'success'
+        );
       } catch (error) {
         console.error('❌ Error al eliminar factura:', error);
+        this.showNotification('No pudimos eliminar la factura. Intenta de nuevo.', 'error');
+      } finally {
+        this.deleting = false;
       }
     },
 
@@ -1869,8 +1972,10 @@ export default {
         try {
             await invoiceService.restoreInvoice(invoice.id);
             await this.loadInvoices(); // Mueve de trash a active
+            this.showNotification('¡Listo! Restauramos la factura.', 'success');
         } catch (error) {
             console.error('❌ Error al restaurar factura:', error);
+            this.showNotification('No pudimos restaurar la factura. Intenta de nuevo.', 'error');
         }
     },
     
