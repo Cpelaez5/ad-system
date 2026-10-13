@@ -62,7 +62,7 @@ describe('TarjetaDocumentoFiscal.vue', () => {
     expect(wrapper.text()).toContain('En trámite')
   })
 
-  it('renderiza un botón "Subir ahora" y el nombre del tipo cuando es un documento pendiente', () => {
+  it('renderiza un botón "Subir" y el nombre del tipo cuando es un documento pendiente', () => {
     const wrapper = mount(TarjetaDocumentoFiscal, {
       props: {
         pendiente: { id: 'RIF', label: 'RIF', category: 'LEGAL', required: true }
@@ -71,7 +71,7 @@ describe('TarjetaDocumentoFiscal.vue', () => {
     })
 
     expect(wrapper.text()).toContain('RIF')
-    expect(wrapper.text()).toContain('Subir ahora')
+    expect(wrapper.text()).toContain('Subir')
   })
 
   it('muestra la categoría cuando se pasa categoriaTitulo', () => {
@@ -93,12 +93,12 @@ describe('TarjetaDocumentoFiscal.vue', () => {
       global: globalConfig
     })
 
-    await wrapper.find('div.tarjeta-doc-fiscal').trigger('click')
+    await wrapper.find('div.fila-papel').trigger('click')
     expect(wrapper.emitted('ver')).toBeTruthy()
     expect(wrapper.emitted('ver')[0][0]).toEqual(doc)
   })
 
-  it('emite "subir" con el tipo pendiente al pulsar "Subir ahora"', async () => {
+  it('emite "subir" con el tipo pendiente al pulsar "Subir"', async () => {
     const pendiente = { id: 'RIF', label: 'RIF', category: 'LEGAL', required: true }
     const wrapper = mount(TarjetaDocumentoFiscal, {
       props: { pendiente },
@@ -106,10 +106,36 @@ describe('TarjetaDocumentoFiscal.vue', () => {
     })
 
     const buttons = wrapper.findAll('button')
-    const subirBtn = buttons.find(b => b.text().includes('Subir ahora'))
+    const subirBtn = buttons.find(b => b.text().includes('Subir'))
     expect(subirBtn).toBeTruthy()
     await subirBtn.trigger('click')
     expect(wrapper.emitted('subir')).toBeTruthy()
     expect(wrapper.emitted('subir')[0][0]).toEqual(pendiente)
+  })
+
+  it('un documento vencido muestra la acción "Renovar" y emite "editar"', async () => {
+    const doc = { id: 9, name: 'Licencia', status: 'VIGENTE', emission_date: '2025-01-10', expiration_date: '2026-05-01' }
+    const wrapper = mount(TarjetaDocumentoFiscal, { props: { doc }, global: globalConfig })
+    const renovar = wrapper.findAll('button').find(b => b.text().includes('Renovar'))
+    expect(renovar).toBeTruthy()
+    await renovar.trigger('click')
+    expect(wrapper.emitted('editar')[0][0]).toEqual(doc)
+    expect(wrapper.emitted('ver')).toBeFalsy()
+  })
+
+  it('el menú ⋮ ofrece Ver, Editar y Mover a la papelera', () => {
+    const doc = { id: 3, name: 'RIF', status: 'VIGENTE', emission_date: '2026-01-10', expiration_date: '2027-01-10' }
+    const wrapper = mount(TarjetaDocumentoFiscal, { props: { doc }, global: globalConfig })
+    const html = wrapper.html()
+    expect(html).toContain('Ver')
+    expect(html).toContain('Editar')
+    expect(html).toContain('Mover a la papelera')
+  })
+
+  it('un documento "una sola vez" ya subido muestra "Listo" y no ofrece Renovar', () => {
+    const doc = { id: 4, name: 'Publicación Mercantil', status: 'VIGENTE', emission_date: '2020-01-10' }
+    const wrapper = mount(TarjetaDocumentoFiscal, { props: { doc, frecuencia: 'PERMANENT' }, global: globalConfig })
+    expect(wrapper.text()).toContain('se sube una sola vez')
+    expect(wrapper.text()).not.toContain('Renovar')
   })
 })

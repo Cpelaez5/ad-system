@@ -194,7 +194,7 @@ const routes = [
     path: '/cliente/fiscal-360',
     name: 'ClienteFiscal360',
     component: () => import('@/views/cliente/Fiscal360.vue'),
-    meta: { requiresAuth: true, title: 'Expediente Fiscal 360', roles: ['cliente'] }
+    meta: { requiresAuth: true, title: 'Mis papeles', roles: ['cliente'] }
   },
   {
     path: '/cliente/inventario',
