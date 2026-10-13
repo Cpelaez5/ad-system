@@ -50,8 +50,12 @@
     <!-- CONTENIDO PRINCIPAL                             -->
     <!-- ═══════════════════════════════════════════════ -->
     <template v-else>
-      <div class="d-flex align-center justify-end mb-6 animate-section" style="animation-delay: 0.1s">
-        <div class="d-flex" style="gap: 12px;">
+      <EncabezadoPagina
+        titulo="Inventario"
+        subtitulo="Productos, stock y movimientos (Kardex)"
+        class="animate-section"
+        style="animation-delay: 0.1s"
+      >
            <v-btn
             color="secondary"
             variant="elevated"
@@ -75,29 +79,28 @@
             prepend-icon="mdi-export"
           >
             Exportar
-            
+
             <v-menu activator="parent">
               <v-list>
-                <v-list-item 
-                  prepend-icon="mdi-cash-multiple" 
-                  title="Inventario Valorizado" 
-                  @click="downloadValuation" 
+                <v-list-item
+                  prepend-icon="mdi-cash-multiple"
+                  title="Inventario Valorizado"
+                  @click="downloadValuation"
                 />
-                <v-list-item 
-                  prepend-icon="mdi-history" 
-                  title="Kardex Global" 
-                  @click="downloadKardex" 
+                <v-list-item
+                  prepend-icon="mdi-history"
+                  title="Kardex Global"
+                  @click="downloadKardex"
                 />
-                <v-list-item 
-                  prepend-icon="mdi-table-arrow-right" 
-                  title="Resumen Horizontal" 
+                <v-list-item
+                  prepend-icon="mdi-table-arrow-right"
+                  title="Resumen Horizontal"
                   @click="openExportDialog"
                 />
               </v-list>
             </v-menu>
           </v-btn>
-        </div>
-      </div>
+      </EncabezadoPagina>
 
       <!-- Estadísticas rápidas -->
       <v-row class="mb-6 animate-section" style="animation-delay: 0.2s">
@@ -292,7 +295,42 @@
             <v-btn icon="mdi-refresh" variant="text" @click="loadProducts"></v-btn>
           </v-card-title>
 
+          <EstadoVacio
+            v-if="!loadingProducts && filteredProducts.length === 0"
+            icono="mdi-package-variant-closed"
+            titulo="Todavía no tienes productos"
+            mensaje="Registra tu primer producto para llevar el control de stock, costos y precios de venta."
+            texto-accion="Nuevo producto"
+            @accion="openProductDialog()"
+          />
+
+          <!-- Lista en móvil: tarjetas legibles en vez de tabla -->
+          <div v-else-if="$vuetify.display.xs" class="px-2 pb-2">
+            <FilaLista
+              v-for="item in filteredProducts"
+              :key="item.id"
+              :titulo="item.name"
+              :subtitulo="(item.code ? item.code + ' · ' : '') + (item.deleted_at ? 'Eliminado' : item.stock + ' ' + item.unit)"
+              :valor="formatCurrency(item.sale_price, item.currency)"
+              :estado="item.deleted_at ? '' : (item.stock <= 0 ? 'Agotado' : (item.stock <= item.min_stock ? 'Stock bajo' : ''))"
+              :color-estado="item.stock <= 0 ? 'error' : 'warning'"
+            >
+              <template #acciones>
+                <template v-if="!item.deleted_at">
+                  <v-btn icon="mdi-pencil" size="small" variant="text" color="primary" @click="openProductDialog(item)"></v-btn>
+                  <v-btn icon="mdi-history" size="small" variant="text" color="info" @click="viewMovements(item)" title="Ver Kardex"></v-btn>
+                  <v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="openDeleteDialog(item)"></v-btn>
+                </template>
+                <template v-else>
+                  <v-btn icon="mdi-restore" size="small" variant="text" color="success" @click="openRestoreDialog(item)" title="Restaurar producto"></v-btn>
+                  <v-btn icon="mdi-history" size="small" variant="text" color="info" @click="viewMovements(item)" title="Ver Kardex"></v-btn>
+                </template>
+              </template>
+            </FilaLista>
+          </div>
+
           <v-data-table
+            v-else
             :headers="productHeaders"
             :items="filteredProducts"
             :loading="loadingProducts"
@@ -414,10 +452,13 @@
     </v-window>
 
     <!-- Dialogo Producto -->
-    <v-dialog v-model="productDialog" max-width="600px" :fullscreen="$vuetify.display.smAndDown">
-      <v-card>
-        <v-card-title>{{ editingProduct ? 'Editar Producto' : 'Nuevo Producto' }}</v-card-title>
-        <v-card-text>
+    <DialogoAdaptable
+      v-model="productDialog"
+      :titulo="editingProduct ? 'Editar producto' : 'Nuevo producto'"
+      icono="mdi-package-variant"
+      max-width="600"
+      :cargando="savingProduct"
+    >
           <v-form ref="productForm" v-model="productValid" @submit.prevent="saveProduct">
             <v-row dense>
               <v-col cols="12" sm="6">
@@ -528,23 +569,21 @@
 
             </v-row>
           </v-form>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="productDialog = false">Cancelar</v-btn>
-          <v-btn color="primary" @click="saveProduct">Guardar</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+
+      <template #acciones>
+        <v-btn variant="text" :disabled="savingProduct" @click="productDialog = false">Cancelar</v-btn>
+        <v-btn color="primary" variant="flat" :loading="savingProduct" @click="saveProduct">Guardar</v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- Dialogo Kardex (Movimientos Producto) -->
-    <v-dialog v-model="movementsDialog" max-width="900px">
-      <v-card>
-        <v-card-title>
-           Movimientos: {{ selectedProductForMovements?.name }}
-           <v-chip class="ml-2" size="small">{{ selectedProductForMovements?.stock }} {{ selectedProductForMovements?.unit }}</v-chip>
-        </v-card-title>
-        <v-card-text>
+    <DialogoAdaptable
+      v-model="movementsDialog"
+      :titulo="`Movimientos: ${selectedProductForMovements?.name || ''}`"
+      icono="mdi-history"
+      max-width="900"
+    >
+           <v-chip v-if="selectedProductForMovements" size="small" class="mb-3">{{ selectedProductForMovements?.stock }} {{ selectedProductForMovements?.unit }}</v-chip>
            <v-data-table
              :headers="movementHeaders"
              :items="productMovements"
@@ -578,13 +617,11 @@
                 <span v-else class="text-caption text-disabled">N/A</span>
               </template>
            </v-data-table>
-        </v-card-text>
-        <v-card-actions>
-           <v-spacer></v-spacer>
-           <v-btn color="primary" @click="movementsDialog = false">Cerrar</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+
+      <template #acciones>
+        <v-btn color="primary" variant="flat" @click="movementsDialog = false">Cerrar</v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <InventoryAdjustmentDialog
         v-model="adjustmentDialog"
@@ -592,13 +629,13 @@
     />
 
     <!-- Diálogo Confirmar Eliminación (Soft Delete) -->
-    <v-dialog v-model="deleteConfirmDialog" max-width="500px">
-      <v-card>
-        <v-card-title class="text-h6 bg-error text-white">
-          <v-icon start color="white">mdi-delete-alert</v-icon>
-          Eliminar Producto
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <DialogoAdaptable
+      v-model="deleteConfirmDialog"
+      titulo="Eliminar producto"
+      icono="mdi-delete-alert"
+      max-width="500"
+      :cargando="deletingProduct"
+    >
           <p class="mb-3">
             ¿Está seguro que desea eliminar el producto <strong>{{ productToDelete?.name }}</strong>?
           </p>
@@ -610,49 +647,48 @@
             <li>No aparecerá en el buscador de ventas ni en listas de productos activos.</li>
             <li>Podrá restaurarlo posteriormente si es necesario.</li>
           </ul>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="deleteConfirmDialog = false">Cancelar</v-btn>
-          <v-btn color="error" variant="elevated" @click="confirmDeleteProduct">
-            <v-icon start>mdi-delete</v-icon>
-            Eliminar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+
+      <template #acciones>
+        <v-btn variant="text" :disabled="deletingProduct" @click="deleteConfirmDialog = false">Cancelar</v-btn>
+        <v-btn color="error" variant="flat" :loading="deletingProduct" @click="confirmDeleteProduct">
+          <v-icon start>mdi-delete</v-icon>
+          Eliminar
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- Diálogo Confirmar Restauración -->
-    <v-dialog v-model="restoreConfirmDialog" max-width="450px">
-      <v-card>
-        <v-card-title class="text-h6 bg-success text-white">
-          <v-icon start color="white">mdi-restore</v-icon>
-          Restaurar Producto
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <DialogoAdaptable
+      v-model="restoreConfirmDialog"
+      titulo="Restaurar producto"
+      icono="mdi-restore"
+      max-width="450"
+      :cargando="restoringProduct"
+    >
           <p>
             ¿Desea restaurar el producto <strong>{{ productToRestore?.name }}</strong>?
           </p>
           <p class="text-caption text-grey mt-2">
             El producto volverá a estar activo y aparecerá en el buscador de ventas.
           </p>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="restoreConfirmDialog = false">Cancelar</v-btn>
-          <v-btn color="success" variant="elevated" @click="confirmRestoreProduct">
-            <v-icon start>mdi-restore</v-icon>
-            Restaurar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+
+      <template #acciones>
+        <v-btn variant="text" :disabled="restoringProduct" @click="restoreConfirmDialog = false">Cancelar</v-btn>
+        <v-btn color="success" variant="flat" :loading="restoringProduct" @click="confirmRestoreProduct">
+          <v-icon start>mdi-restore</v-icon>
+          Restaurar
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- Dialogo Exportar Resumen -->
-    <v-dialog v-model="exportDialog" max-width="400px">
-      <v-card>
-        <v-card-title>Exportar Resumen</v-card-title>
-        <v-card-text>
+    <DialogoAdaptable
+      v-model="exportDialog"
+      titulo="Exportar resumen"
+      icono="mdi-table-arrow-right"
+      max-width="400"
+      :cargando="exportingSummary"
+    >
           <v-row>
             <v-col cols="12">
               <v-text-field v-model="exportDates.start" label="Desde" type="date" variant="outlined"></v-text-field>
@@ -661,14 +697,12 @@
               <v-text-field v-model="exportDates.end" label="Hasta" type="date" variant="outlined"></v-text-field>
             </v-col>
           </v-row>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="exportDialog = false">Cancelar</v-btn>
-          <v-btn color="primary" @click="confirmExportSummary">Exportar</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+
+      <template #acciones>
+        <v-btn variant="text" :disabled="exportingSummary" @click="exportDialog = false">Cancelar</v-btn>
+        <v-btn color="primary" variant="flat" :loading="exportingSummary" @click="confirmExportSummary">Exportar</v-btn>
+      </template>
+    </DialogoAdaptable>
 
     </template>
   </v-container>
@@ -681,11 +715,24 @@ import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import InventoryAdjustmentDialog from '@/components/inventory/InventoryAdjustmentDialog.vue'
 import StatsCard from '@/components/common/StatsCard.vue'
 import CurrencyStatsCard from '@/components/common/CurrencyStatsCard.vue'
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import EstadoVacio from '@/components/ui/EstadoVacio.vue'
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
+import FilaLista from '@/components/ui/FilaLista.vue'
 import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, format, subMonths } from 'date-fns'
 
 export default {
   name: 'ClienteInventario',
-  components: { AnimatedNumber, InventoryAdjustmentDialog, StatsCard, CurrencyStatsCard },
+  components: {
+    AnimatedNumber,
+    InventoryAdjustmentDialog,
+    StatsCard,
+    CurrencyStatsCard,
+    EncabezadoPagina,
+    EstadoVacio,
+    DialogoAdaptable,
+    FilaLista
+  },
   data() {
     return {
       activeTab: 'dashboard',
@@ -745,13 +792,18 @@ export default {
         initial_stock: 0
       },
 
+      savingProduct: false,
+
       // Soft delete UI
       showDeletedProducts: false,
       deleteConfirmDialog: false,
       productToDelete: null,
+      deletingProduct: false,
       deletedProducts: [],
       restoreConfirmDialog: false,
       productToRestore: null,
+      restoringProduct: false,
+      exportingSummary: false,
 
       movementsDialog: false,
       selectedProductForMovements: null,
@@ -977,7 +1029,8 @@ export default {
     
     async saveProduct() {
       if (!this.$refs.productForm.validate()) return
-      
+
+      this.savingProduct = true
       try {
         const payload = { ...this.productForm }
         const initialStock = payload.initial_stock // Extract simple property
@@ -1021,10 +1074,14 @@ export default {
         }
         
         this.productDialog = false
+        this.$root?.showSnackbar?.(this.editingProduct ? '¡Listo! Producto actualizado.' : '¡Listo! Producto creado.', 'success')
         // Recargar en paralelo para no bloquear la UI
         await Promise.all([this.loadProducts(), this.loadDashboard()])
       } catch (e) {
         console.error('Error saving product', e)
+        this.$root?.showSnackbar?.('No pudimos guardar el producto. Intenta de nuevo.', 'error')
+      } finally {
+        this.savingProduct = false
       }
     },
 
@@ -1036,14 +1093,19 @@ export default {
 
     // Confirmar soft delete
     async confirmDeleteProduct() {
+      this.deletingProduct = true
       try {
         await inventoryService.deleteProduct(this.productToDelete.id)
         this.deleteConfirmDialog = false
         this.productToDelete = null
+        this.$root?.showSnackbar?.('¡Listo! Producto eliminado.', 'success')
         this.loadProducts()
         this.loadDashboard()
       } catch (e) {
         console.error('Error deleting product', e)
+        this.$root?.showSnackbar?.('No pudimos eliminar el producto. Intenta de nuevo.', 'error')
+      } finally {
+        this.deletingProduct = false
       }
     },
 
@@ -1055,14 +1117,19 @@ export default {
 
     // Confirmar restauración de producto
     async confirmRestoreProduct() {
+      this.restoringProduct = true
       try {
         await inventoryService.restoreProduct(this.productToRestore.id)
         this.restoreConfirmDialog = false
         this.productToRestore = null
+        this.$root?.showSnackbar?.('¡Listo! Producto restaurado.', 'success')
         this.loadProducts()
         this.loadDashboard()
       } catch (e) {
         console.error('Error restoring product', e)
+        this.$root?.showSnackbar?.('No pudimos restaurar el producto. Intenta de nuevo.', 'error')
+      } finally {
+        this.restoringProduct = false
       }
     },
 
@@ -1139,7 +1206,7 @@ export default {
             await inventoryExportService.exportValuation(allProducts)
         } catch (e) {
             console.error(e)
-            alert('Error exportando inventario')
+            this.$root?.showSnackbar?.('No pudimos exportar el inventario. Intenta de nuevo.', 'error')
         }
     },
     async downloadKardex() {
@@ -1156,7 +1223,7 @@ export default {
             await inventoryExportService.exportMovements(allMovements)
         } catch (e) {
              console.error(e)
-             alert('Error exportando kardex')
+             this.$root?.showSnackbar?.('No pudimos exportar el kardex. Intenta de nuevo.', 'error')
         }
     },
     
@@ -1174,16 +1241,19 @@ export default {
     },
     
     async confirmExportSummary() {
-        this.exportDialog = false;
-        // Loading...
+        this.exportingSummary = true;
         try {
              const allProducts = await inventoryService.getProducts({ limit: 5000 });
              const allMovements = await inventoryService.getAllMovements({ limit: 10000 });
-             
+
              await inventoryExportService.exportHorizontalSummary(allProducts, allMovements, this.exportDates);
+             this.exportDialog = false;
+             this.$root?.showSnackbar?.('¡Listo! Resumen exportado.', 'success')
         } catch (e) {
             console.error(e);
-            alert('Error generando reporte: ' + e.message);
+            this.$root?.showSnackbar?.('No pudimos generar el reporte. Intenta de nuevo.', 'error')
+        } finally {
+            this.exportingSummary = false;
         }
     }
   }

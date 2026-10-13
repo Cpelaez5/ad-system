@@ -3,45 +3,41 @@
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- 1. CABECERA & ACCIONES PRINCIPALES                     -->
     <!-- ══════════════════════════════════════════════════════ -->
-    <div class="d-flex flex-column flex-sm-row align-start align-sm-center justify-space-between mb-6" style="gap: 16px;">
-      <div>
-        
-      </div>
+    <EncabezadoPagina
+      titulo="Proveedores"
+      subtitulo="Directorio con los parámetros fiscales para compras y retenciones"
+    >
+      <v-btn
+        icon="mdi-refresh"
+        variant="tonal"
+        color="secondary"
+        density="comfortable"
+        :loading="loading"
+        @click="loadData"
+        title="Actualizar datos"
+      ></v-btn>
 
-      <!-- Botones de Acción Superiores -->
-      <div class="d-flex align-center flex-wrap" style="gap: 10px;">
-        <v-btn
-          icon="mdi-refresh"
-          variant="tonal"
-          color="secondary"
-          density="comfortable"
-          :loading="loading"
-          @click="loadData"
-          title="Actualizar datos"
-        ></v-btn>
+      <v-btn
+        color="white"
+        variant="elevated"
+        prepend-icon="mdi-file-excel-outline"
+        class="text-secondary font-weight-bold elevation-1"
+        @click="exportToExcel"
+        :loading="exporting"
+      >
+        Exportar Excel
+      </v-btn>
 
-        <v-btn
-          color="white"
-          variant="elevated"
-          prepend-icon="mdi-file-excel-outline"
-          class="text-secondary font-weight-bold elevation-1"
-          @click="exportToExcel"
-          :loading="exporting"
-        >
-          Exportar Excel
-        </v-btn>
-
-        <v-btn
-          color="primary"
-          variant="elevated"
-          prepend-icon="mdi-plus"
-          class="elevation-2 font-weight-bold"
-          @click="openCreateModal"
-        >
-          Nuevo Proveedor
-        </v-btn>
-      </div>
-    </div>
+      <v-btn
+        color="primary"
+        variant="elevated"
+        prepend-icon="mdi-plus"
+        class="elevation-2 font-weight-bold"
+        @click="openCreateModal"
+      >
+        Nuevo Proveedor
+      </v-btn>
+    </EncabezadoPagina>
 
     <!-- ══════════════════════════════════════════════════════ -->
     <!-- 2. TARJETAS DE KPIS Y MÉTRICAS FINANCIERAS (RESPONSIVE)-->
@@ -195,37 +191,16 @@
     </div>
 
     <!-- Estado Vacío (Empty State) -->
-    <div v-else-if="filteredProveedores.length === 0" class="text-center py-12">
-      <v-avatar size="76" color="grey-lighten-3" class="mb-4">
-        <v-icon size="38" color="grey-darken-1">mdi-domain-off</v-icon>
-      </v-avatar>
-      <h3 class="text-h6 font-weight-bold text-secondary mb-1">
-        {{ searchQuery ? 'No hay resultados para tu búsqueda' : 'No se encontraron proveedores' }}
-      </h3>
-      <p class="text-body-2 text-grey-darken-1 mb-4" style="max-width: 460px; margin: 0 auto;">
-        {{ searchQuery
-          ? 'Intenta con otro término de búsqueda o limpia los filtros activos.'
-          : 'Registra tus proveedores con sus parámetros fiscales para automatizar compras y comprobantes de retención.' }}
-      </p>
-      <v-btn
-        v-if="searchQuery"
-        variant="outlined"
-        color="secondary"
-        prepend-icon="mdi-filter-remove-outline"
-        @click="searchQuery = ''; activeFilter = 'ALL'"
-      >
-        Limpiar Filtros
-      </v-btn>
-      <v-btn
-        v-else
-        color="primary"
-        variant="flat"
-        prepend-icon="mdi-plus"
-        @click="openCreateModal"
-      >
-        Registrar Primer Proveedor
-      </v-btn>
-    </div>
+    <EstadoVacio
+      v-else-if="filteredProveedores.length === 0"
+      icono="mdi-domain-off"
+      :titulo="searchQuery ? 'No hay resultados para tu búsqueda' : 'Todavía no tienes proveedores'"
+      :mensaje="searchQuery
+        ? 'Intenta con otro término de búsqueda o limpia los filtros activos.'
+        : 'Registra tus proveedores con sus parámetros fiscales para automatizar compras y comprobantes de retención.'"
+      :texto-accion="searchQuery ? 'Limpiar filtros' : 'Registrar primer proveedor'"
+      @accion="searchQuery ? limpiarFiltros() : openCreateModal()"
+    />
 
     <!-- A. VISTA MÓVIL: FEED DE TARJETAS TÁCTILES FIRST MOBILE -->
     <div v-else-if="isMobile">
@@ -558,34 +533,35 @@
     />
 
     <!-- Diálogo de Confirmación de Borrado / Desactivación -->
-    <v-dialog v-model="deleteDialogOpen" max-width="460" persistent>
-      <v-card class="rounded-xl pa-2">
-        <v-card-title class="d-flex align-center text-h6 font-weight-bold text-primary">
-          <v-icon color="primary" class="mr-2">mdi-alert-circle-outline</v-icon>
-          ¿Eliminar Proveedor?
-        </v-card-title>
-        <v-card-text class="text-body-2 text-grey-darken-2">
-          ¿Estás seguro de que deseas eliminar a <strong>{{ providerToDelete?.nombre }}</strong> (RIF: {{ providerToDelete?.rif }})?
-          <p class="mt-2 text-caption text-grey">
-            Si este proveedor tiene compras o retenciones registradas, se archivará de forma segura para preservar la integridad de tus libros fiscales.
-          </p>
-        </v-card-text>
-        <v-card-actions class="pa-3">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" color="grey-darken-1" @click="deleteDialogOpen = false">
-            Cancelar
-          </v-btn>
-          <v-btn
-            color="primary"
-            variant="flat"
-            :loading="deleting"
-            @click="executeDelete"
-          >
-            Confirmar
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DialogoAdaptable
+      v-model="deleteDialogOpen"
+      titulo="¿Eliminar proveedor?"
+      icono="mdi-alert-circle-outline"
+      max-width="460"
+      persistent
+      :cargando="deleting"
+    >
+      <div class="text-body-2 text-grey-darken-2">
+        ¿Estás seguro de que deseas eliminar a <strong>{{ providerToDelete?.nombre }}</strong> (RIF: {{ providerToDelete?.rif }})?
+        <p class="mt-2 text-caption text-grey">
+          Si este proveedor tiene compras o retenciones registradas, se archivará de forma segura para preservar la integridad de tus libros fiscales.
+        </p>
+      </div>
+
+      <template #acciones>
+        <v-btn variant="text" color="grey-darken-1" :disabled="deleting" @click="deleteDialogOpen = false">
+          Cancelar
+        </v-btn>
+        <v-btn
+          color="primary"
+          variant="flat"
+          :loading="deleting"
+          @click="executeDelete"
+        >
+          Confirmar
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
   </v-container>
 </template>
 
@@ -593,6 +569,9 @@
 import ProveedorModalForm from '@/components/forms/ProveedorModalForm.vue'
 import ProveedorDetailModal from '@/components/forms/ProveedorDetailModal.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import EstadoVacio from '@/components/ui/EstadoVacio.vue'
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import proveedorService from '@/services/proveedorService.js'
 
 export default {
@@ -600,7 +579,10 @@ export default {
   components: {
     ProveedorModalForm,
     ProveedorDetailModal,
-    AnimatedNumber
+    AnimatedNumber,
+    EncabezadoPagina,
+    EstadoVacio,
+    DialogoAdaptable
   },
   data() {
     return {
@@ -722,6 +704,10 @@ export default {
       if (filterValue === 'CON_ISLR') return this.proveedores.filter(p => Boolean(p.islr_concept_id)).length
       if (filterValue === 'CON_MUN') return this.proveedores.filter(p => Boolean(p.municipio_id || p.municipal_rate)).length
       return 0
+    },
+    limpiarFiltros() {
+      this.searchQuery = ''
+      this.activeFilter = 'ALL'
     },
     openCreateModal() {
       this.selectedProveedor = null
