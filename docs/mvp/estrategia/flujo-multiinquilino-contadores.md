@@ -1,5 +1,7 @@
 # Flujo multiinquilino con contadores — especificación
 
+> **ESTADO (2026-10-13, decisión del usuario): por ahora hay UNA SOLA firma de contadores** (la organización `1111…`). Toda empresa que se registra es cliente de esa firma y su staff (admin y contador) la gestiona. Este documento es el **diseño para cuando haya varias firmas**; no se implementa ahora. Lo único aplicado es aditivo e inocuo: columna `tipo`, org "AD System Directo" **reservada y sin uso**, y el trigger que impide staff en Directo. `register-client` v15 volvió a enviar las empresas a la firma.
+
 Fecha: 2026-10-13. Decisión del usuario: el sistema es multiinquilino; los contadores pueden registrar a sus clientes; debe ser fácil de usar y de escalar; programa de socios contadores **sí**. El flujo lo decide el orquestador siguiendo los estándares del sector (QuickBooks Online Accountant, Xero HQ/Partner, Alegra Contador, Siigo Contador).
 
 ## 1. Cómo lo hace la industria (resumen)
@@ -99,7 +101,7 @@ Filtros: "requieren atención", por contador. Acciones por empresa: **entrar a l
 
 > **Prioridad del usuario (2026-10-13):** por ahora el foco es el **flujo del cliente**, completo y pulido. Junto con él va lo mínimo de los otros roles para que ese flujo funcione de punta a punta: el **super admin** gestiona planes y pagos (aprobar o rechazar, facturas del sistema) y el **admin/contador** gestiona lo fiscal y contable de sus clientes (revisar registros, retenciones, libros, papeles). Los flujos de despacho de este documento (F1 a F8) se implementan **después** del flujo del cliente, salvo el paso 1 (aislamiento), que ya está hecho.
 
-**Hecho (2026-10-13):** migración `20261013150000_org_tipo_y_directo` (tipo de organización, org "AD System Directo", trigger que impide staff en Directo) y `register-client` v14 apuntando a Directo (fija en el código). Pendiente: mover las empresas autorregistradas que hoy están en el despacho `1111…`, con una lista validada.
+**Hecho (2026-10-13):** migración `20261013150000_org_tipo_y_directo` (aditiva). `register-client` v14 apuntó a Directo y, por la decisión de una sola firma, **v15 volvió a la firma `1111…`**. Ninguna empresa quedó en Directo.
 **Antes del lanzamiento:**
 1. Org Directo + `register-client` apuntando a ella + `tipo` (cierra el problema de aislamiento). *El movimiento de las empresas existentes espera la lista validada.*
 2. F1 registro de despacho con su organización.

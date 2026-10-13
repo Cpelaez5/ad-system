@@ -24,7 +24,8 @@ En contraste (uso interno y para páginas comparativas): *Norkut opera tu tienda
 ### D2. "Tu contador adentro"
 - **Qué es:** el despacho contable tiene su panel con toda su cartera y ve cada registro, papel y vencimiento de sus clientes en tiempo real. Pide documentos y revisa; el cliente manda todo desde el teléfono. Se acaba el "mándame las facturas por WhatsApp".
 - **Por qué nadie más:** ni Norkut ni Fina tienen un rol de contador ni una cartera de clientes.
-- **Doble efecto:** es un **canal de distribución**. Cada despacho trae de 20 a 50 empresas. Programa de socios contadores con comisión recurrente (ver `flujo-multiinquilino-contadores.md`).
+- **Al lanzar hay una sola firma** (decisión del usuario 2026-10-13): "tu contador adentro" = el equipo de la firma trabajando dentro del sistema con cada cliente. El programa de socios contadores y el registro de otras firmas quedan para después.
+- **Doble efecto (futuro):** es un **canal de distribución**. Cada despacho trae de 20 a 50 empresas. Programa de socios contadores con comisión recurrente (ver `flujo-multiinquilino-contadores.md`).
 - **Momento demo:** el contador abre "Mi cartera" → semáforo de 30 clientes → toca uno en rojo → "le falta subir la licencia; vence en 5 días" → botón *Pedir documento*.
 - **Para que sea verdad al lanzar:** registro de despacho, agregar o invitar clientes, "Conectar con mi contador", panel **Mi cartera** con semáforo, **pedir documento** y estado "revisado por tu contador" en cada registro.
 
@@ -58,7 +59,7 @@ POS fiscal, inventario multitienda, campañas y CRM de marketing. Se cubren con 
 - **D3:** tiempo para registrar con foto; abandono del formulario; uso de la ayuda.
 
 ## Consecuencias en el plan (prioridades antes del lanzamiento)
-1. Flujo multiinquilino con contadores + Mi cartera + pedir documento (D2). **Nuevo, alto.**
+1. **Foco actual: flujo del cliente completo**, más super admin (planes y pagos) y admin/contador (fiscal y contable de sus clientes): Mi cartera de la firma, pedir documento y "revisado por tu contador" (D2). Varias firmas y socios contadores, después.
 2. Calendario fiscal personal + resumen "lo que vas a declarar" (D1). **Nuevo, alto, barato.**
 3. Activar avisos + campana de notificaciones + ayuda contextual (D1, D3).
 4. Validación de libros con la contadora (D1).
