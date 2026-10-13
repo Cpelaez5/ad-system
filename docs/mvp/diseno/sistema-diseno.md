@@ -106,10 +106,9 @@ Los tonos de marca se tomaron leyendo los píxeles reales de los archivos oficia
 
 **Berlin Sans FB** (fuente del manual de marca, usada ahí solo para el wordmark "System" dibujado) no es una fuente web ni está instalada, y añadirla implicaría una licencia nueva. Se mantiene la decisión ya vigente del proyecto:
 
-- **Montserrat** (ya instalada vía `@fontsource`) para títulos, botones, tabs, nombres de tarjeta — es geométrica y de peso similar a Berlin Sans FB, la aproximación razonable sin fuente nueva.
-- **Open Sans** (ya instalada vía `@fontsource`) para texto de cuerpo/lectura — mejor legibilidad en párrafos largos y en pantallas pequeñas que una fuente geométrica.
-
-Esto ya estaba parcialmente en el CSS pero una regla `!important` más amplia (que forzaba Montserrat en *todo*) lo pisaba. Se corrigió en `src/styles/vuetify-overrides.css` (ver §4) sin tocar ninguna vista.
+- **Montserrat** (instalada vía `@fontsource`) en **toda** la interfaz: títulos, botones, cuerpo, montos y tablas. Es geométrica y de peso similar a Berlin Sans FB.
+- **Decisión del usuario (2026-10-13):** se quitó Open Sans para el cuerpo. Mezclaba dos fuentes dentro de una misma tarjeta y se percibía como "fuentes que no se aplican". Legibilidad: cuerpo ≥ 16px y peso 400-500.
+- Prohibido declarar otras familias (Poppins, Inter, Open Sans…): no se cargan y caen en la fuente del sistema. Los gráficos (Chart.js) usan `'Montserrat, sans-serif'`.
 
 #### Escala tipográfica (px)
 
@@ -121,8 +120,8 @@ Esto ya estaba parcialmente en el CSS pero una regla `!important` más amplia (q
 | H4 | 20px | 24px | Montserrat 600 |
 | H5 | 18px | 20px | Montserrat 500 |
 | H6 | 16px | 18px | Montserrat 500 |
-| Cuerpo | **16px** (mínimo, nunca menos) | 16px | Open Sans 400 |
-| Texto secundario / ayuda | 14px | 14px | Open Sans 400 |
+| Cuerpo | **16px** (mínimo, nunca menos) | 16px | Montserrat 400 |
+| Texto secundario / ayuda | 14px | 14px | Montserrat 400 |
 | Monto destacado (`ResumenMonto`) | 32px | 32px | Montserrat 700 |
 
 > Antes, una regla en `global.css` bajaba el cuerpo a 14px por debajo de 768px — se eliminó (ver §4): el cuerpo nunca baja de 16px, como pide `PLAN-MVP.md §2` regla 6.
@@ -193,7 +192,7 @@ Todos son **aditivos o de corrección de color/tipografía** — ninguno reestru
 
 - **`src/main.js`** (tema de Vuetify): `primary` → `#8E1818` (granate AD System, antes `#A81C22` de la firma contable); `error` → `#D32F2F` (antes igual al `primary`, ahora distinto a propósito); `success` → `#2E7D32` (antes `#4CAF50`, fallaba AA con texto blanco); se agregaron los tokens nuevos `metal` (`#9CA3AF`) y `granateOscuro` (`#320B0B`); tema oscuro con `primary` → `#C18080` (granate aclarado).
 - **`src/styles/global.css`**: mismas variables CSS (`--color-primary`, `--color-error`, `--color-success`, + `--color-metal`, `--color-granate-oscuro`) sincronizadas con el tema; se quitó la regla que bajaba el cuerpo a 14px en móvil; se agregó el bloque de alturas táctiles mínimas (aditivo, nunca encoge) y un foco visible (`:focus-visible`) consistente.
-- **`src/styles/vuetify-overrides.css`**: se agregó un bloque que devuelve Open Sans a los contenedores de texto de cuerpo (`p`, `.v-card-text`, `.v-alert`, `.v-field__input`, `.v-messages`, `.v-tooltip`, `.text-body-*`) sin tocar títulos/botones/menús (siguen en Montserrat); y la corrección de contraste del dorado como texto (`.text-warning` → `#1F355C`, íconos se quedan dorados).
+- **`src/styles/vuetify-overrides.css`**: ~~bloque Open Sans para el cuerpo~~ (quitado el 2026-10-13, todo es Montserrat); y la corrección de contraste del dorado como texto (`.text-warning` → `#1F355C`, íconos se quedan dorados).
 
 No se modificó `esbuild`/`drop console`, el `errorHandler` ni la lógica de notificaciones de `main.js`/`App.vue`.
 

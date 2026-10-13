@@ -183,7 +183,7 @@
         <!-- Navegación de carpetas -->
         <v-card>
           <v-card-title>
-            <v-icon left>mdi-folder-tree</v-icon>
+            <v-icon left>mdi-file-tree-outline</v-icon>
             Carpetas
           </v-card-title>
           <v-card-text>
@@ -729,7 +729,7 @@ export default {
         'PDF': 'mdi-file-pdf-box',
         'Excel': 'mdi-file-excel-box',
         'Word': 'mdi-file-word-box',
-        'Imagen': 'mdi-file-image-box',
+        'Imagen': 'mdi-file-image-outline',
         'Otro': 'mdi-file-document'
       }
       return iconos[tipo] || 'mdi-file-document'

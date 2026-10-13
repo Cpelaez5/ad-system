@@ -252,7 +252,7 @@
     <!-- Tabla de facturas -->
     <v-card>
       <v-card-title>
-        <v-icon left>mdi-receipt-long</v-icon>
+        <v-icon left>mdi-receipt-text-outline</v-icon>
         Lista de Facturas ({{ filteredInvoices.length }})
       </v-card-title>
       
@@ -378,7 +378,7 @@
         <div class="pa-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
             <div class="d-flex align-center">
                 <v-avatar color="white" size="48" class="mr-4">
-                    <v-icon icon="mdi-receipt-long" color="secondary" size="24"></v-icon>
+                    <v-icon icon="mdi-receipt-text-outline" color="secondary" size="24"></v-icon>
                 </v-avatar>
                 <div class="flex-grow-1">
                     <div class="text-h5 font-weight-bold text-white">{{ viewingInvoice.invoiceNumber }}</div>

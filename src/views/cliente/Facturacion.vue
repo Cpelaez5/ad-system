@@ -394,7 +394,7 @@
         <!-- Tabla de facturas (escritorio) -->
         <v-card v-else class="animate-section" style="animation-delay: 0.5s">
       <v-card-title>
-        <v-icon left>mdi-receipt-long</v-icon>
+        <v-icon left>mdi-receipt-text-outline</v-icon>
         {{ currentTab === 'retenciones' ? 'Registro de Retenciones Fiscales' : 'Lista de Facturas' }} ({{ filteredInvoices.length }})
       </v-card-title>
 
@@ -681,32 +681,33 @@
     <!-- Diálogo de vista de factura -->
     <DialogoAdaptable
       v-model="viewDialog"
-      :titulo="viewingInvoice ? `Factura ${viewingInvoice.invoiceNumber}` : 'Detalle de factura'"
-      icono="mdi-receipt-long"
+      titulo="Detalle de factura"
+      icono="mdi-receipt-text-outline"
       max-width="1200"
     >
       <template v-if="viewingInvoice">
-        <!-- Header con gradiente sutil (contexto visual: número, flujo y estado) -->
-        <div class="pa-4 pa-md-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
-            <div class="d-flex align-center">
-                <v-avatar color="white" size="48" class="mr-4">
-                    <v-icon icon="mdi-receipt-long" color="secondary" size="24"></v-icon>
+        <!-- Encabezado: número (puede ser largo, salta de línea), tipo y estado -->
+        <div class="detalle-factura__encabezado pa-4 pa-md-6 rounded-lg mb-4">
+            <div class="d-flex align-start flex-wrap ga-3">
+                <v-avatar color="white" size="44" class="flex-shrink-0">
+                    <v-icon icon="mdi-receipt-text-outline" color="secondary" size="24"></v-icon>
                 </v-avatar>
-                <div class="flex-grow-1">
-                    <div class="text-h5 font-weight-bold text-white">{{ viewingInvoice.invoiceNumber }}</div>
+                <div class="flex-grow-1" style="min-width: 0;">
+                    <div class="text-caption text-white" style="opacity: 0.8">Factura N.º</div>
+                    <div class="text-h6 text-md-h5 font-weight-bold text-white detalle-factura__numero">{{ viewingInvoice.invoiceNumber }}</div>
                     <div class="text-caption text-white" style="opacity: 0.8">{{ viewingInvoice.flow }}</div>
                 </div>
-                <v-chip 
-                    :color="getStatusColor(viewingInvoice.status)" 
-                    size="small" 
-                    class="font-weight-bold px-3"
+                <v-chip
+                    :color="getStatusColor(viewingInvoice.status)"
+                    size="small"
+                    class="font-weight-bold px-3 flex-shrink-0"
                     variant="elevated"
                 >
                     {{ viewingInvoice.status }}
                 </v-chip>
             </div>
         </div>
-        
+
         <v-card-text class="pa-0">
           <v-row no-gutters>
             <!-- Document Info -->
@@ -2700,5 +2701,14 @@ export default {
   height: 100%;
   position: absolute;
   cursor: pointer;
+}
+
+.detalle-factura__encabezado {
+  background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);
+}
+
+.detalle-factura__numero {
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 </style>

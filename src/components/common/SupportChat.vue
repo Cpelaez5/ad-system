@@ -615,7 +615,7 @@ export default {
   flex-direction: column;
   overflow: hidden;
   z-index: 1500;
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'Montserrat', sans-serif;
 }
 
 /* Versión móvil: fullscreen */
@@ -889,7 +889,7 @@ export default {
   border-radius: 20px;
   padding: 7px 14px;
   font-size: 12px;
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   color: #1F355C;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -940,7 +940,7 @@ export default {
   background: transparent;
   outline: none;
   font-size: 13px;
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   color: #333;
   padding: 8px 0;
 }

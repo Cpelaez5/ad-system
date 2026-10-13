@@ -26,20 +26,21 @@ function setWidth(width) {
   Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: width })
 }
 
-function mountMenu({ width, modelValue = false, collapsed = false, role = 'admin', isServicesCompany = false } = {}) {
+function mountMenu({ width, modelValue = false, modo = 'fijo', role = 'admin', isServicesCompany = false } = {}) {
   setWidth(width)
   const vuetify = createVuetify({ components, directives })
 
   const Wrapper = defineComponent({
     name: 'MenuLateralTestWrapper',
-    props: { modelValue: Boolean, collapsed: Boolean, role: String, isServicesCompany: Boolean },
-    emits: ['update:modelValue', 'logout'],
+    props: { modelValue: Boolean, modo: String, role: String, isServicesCompany: Boolean },
+    emits: ['update:modelValue', 'logout', 'cambiar-modo'],
     setup(props, { emit }) {
       return () =>
         h(VLayout, null, () =>
           h(MenuLateral, {
             modelValue: props.modelValue,
-            collapsed: props.collapsed,
+            modo: props.modo,
+            onCambiarModo: (m) => emit('cambiar-modo', m),
             role: props.role,
             isServicesCompany: props.isServicesCompany,
             'onUpdate:modelValue': (v) => emit('update:modelValue', v),
@@ -50,8 +51,8 @@ function mountMenu({ width, modelValue = false, collapsed = false, role = 'admin
   })
 
   return mount(Wrapper, {
-    props: { modelValue, collapsed, role, isServicesCompany },
-    global: { plugins: [vuetify] },
+    props: { modelValue, modo, role, isServicesCompany },
+    global: { plugins: [vuetify], stubs: { RouterLink: { template: '<a><slot /></a>' } } },
     attachTo: document.body,
   })
 }
@@ -77,7 +78,7 @@ describe('MenuLateral (Vuetify real, sin stubs)', () => {
       // translateX(0px) = visible/empujando; translateX(-256px) = oculto (el bug reportado).
       expect(nav.attributes('style')).toContain('translateX(0px)')
       expect(nav.attributes('style')).not.toMatch(/translateX\(-/)
-      expect(nav.attributes('style')).toContain('width: 256px')
+      expect(nav.attributes('style')).toContain('width: 264px')
     })
 
     it('≥1280px: también queda activo si el padre todavía no cargó nada (modelValue null/undefined)', async () => {
@@ -109,24 +110,53 @@ describe('MenuLateral (Vuetify real, sin stubs)', () => {
     })
   })
 
-  describe('modo rail (plegado) en escritorio — rail + persistencia (hallazgo #8)', () => {
-    it('ancho nativo: 256px expandido, 56px (railWidth) cuando collapsed=true', async () => {
-      const expandido = mountMenu({ width: 1400, collapsed: false, role: 'admin' })
-      await flush(expandido)
-      expect(expandido.get('.v-navigation-drawer').attributes('style')).toContain('width: 256px')
-
-      const rail = mountMenu({ width: 1400, collapsed: true, role: 'admin' })
-      await flush(rail)
-      const nav = rail.get('.v-navigation-drawer')
-      expect(nav.classes()).toContain('v-navigation-drawer--rail')
-      expect(nav.attributes('style')).toContain('width: 56px')
+  describe('modos en escritorio: fijo (abierto) y auto (recogido + expandir al pasar el mouse)', () => {
+    it("modo 'fijo': 264px, sin rail", async () => {
+      const wrapper = mountMenu({ width: 1400, modo: 'fijo', role: 'admin' })
+      await flush(wrapper)
+      const nav = wrapper.get('.v-navigation-drawer')
+      expect(nav.attributes('style')).toContain('width: 264px')
+      expect(nav.classes()).not.toContain('v-navigation-drawer--rail')
     })
 
-    it('la preferencia de rail (prop `collapsed`) es la que decide, no el ancho por sí solo', async () => {
-      // A <1280px nunca hay rail, sin importar `collapsed` (lo decide `esPermanente`, ver MenuLateral.vue).
-      const wrapper = mountMenu({ width: 960, collapsed: true, role: 'admin' })
+    it("modo 'auto': rail de 72px con expand-on-hover", async () => {
+      const wrapper = mountMenu({ width: 1400, modo: 'auto', role: 'admin' })
+      await flush(wrapper)
+      const nav = wrapper.get('.v-navigation-drawer')
+      expect(nav.classes()).toContain('v-navigation-drawer--rail')
+      expect(nav.classes()).toContain('menu-lateral--recogido')
+      expect(nav.attributes('style')).toContain('width: 72px')
+    })
+
+    it('a <1280px nunca hay rail, sin importar el modo', async () => {
+      const wrapper = mountMenu({ width: 960, modo: 'auto', role: 'admin' })
       await flush(wrapper)
       expect(wrapper.get('.v-navigation-drawer').classes()).not.toContain('v-navigation-drawer--rail')
+    })
+
+    it('el pin de la cabecera alterna el modo y explica qué hace', async () => {
+      const fijo = mountMenu({ width: 1400, modo: 'fijo', role: 'admin' })
+      await flush(fijo)
+      const boton = fijo.find('[aria-label="Recoger el menú y expandir al pasar el mouse"]')
+      expect(boton.exists()).toBe(true)
+      await boton.trigger('click')
+      expect(fijo.emitted('cambiar-modo')).toEqual([['auto']])
+      fijo.unmount()
+
+      const auto = mountMenu({ width: 1400, modo: 'auto', role: 'admin' })
+      await flush(auto)
+      const botonAuto = auto.find('[aria-label="Dejar el menú siempre abierto"]')
+      expect(botonAuto.exists()).toBe(true)
+      await botonAuto.trigger('click')
+      expect(auto.emitted('cambiar-modo')).toEqual([['fijo']])
+      auto.unmount()
+    })
+
+    it('el pin no aparece en el drawer temporal (<1280px)', async () => {
+      const wrapper = mountMenu({ width: 960, modelValue: true, role: 'admin' })
+      await flush(wrapper)
+      expect(wrapper.find('.menu-lateral__boton-modo').exists()).toBe(false)
+      wrapper.unmount()
     })
   })
 
@@ -140,17 +170,15 @@ describe('MenuLateral (Vuetify real, sin stubs)', () => {
       expect(descriptor.styles[0].scoped).toBeFalsy()
     })
 
-    it('las reglas del rail están acotadas a la clase real del <nav> (.menu-lateral), no a :deep() roto', () => {
+    it('las reglas del modo recogido están acotadas a la clase real del <nav> (.menu-lateral)', () => {
       expect(css).not.toContain(':deep(')
-      expect(css).toContain('.menu-lateral.v-navigation-drawer--rail .v-list-item-title')
-      expect(css).toContain('.menu-lateral.v-navigation-drawer--rail .v-list-item {')
-      expect(css).toContain('.menu-lateral.v-navigation-drawer--rail .menu-lateral__header')
-      expect(css).toContain('.menu-lateral.v-navigation-drawer--rail .v-list-group__header .v-list-item__append')
+      expect(css).toContain('.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .v-list-item-title')
+      expect(css).toContain('.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .v-list-item__spacer')
+      expect(css).toContain('.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .menu-lateral__header')
     })
 
-    it('el ancho/borde del propio drawer está acotado a `.menu-lateral` (la clase que SÍ llega al <nav>)', () => {
-      expect(css).toContain('.menu-lateral {')
-      expect(css).toContain('border-right')
+    it('respeta prefers-reduced-motion', () => {
+      expect(css).toContain('prefers-reduced-motion: reduce')
     })
   })
 
@@ -176,7 +204,7 @@ describe('MenuLateral (Vuetify real, sin stubs)', () => {
     it('emite "logout" al hacer clic en "Cerrar Sesión"', async () => {
       const wrapper = mountMenu({ width: 1400, role: 'admin' })
       await flush(wrapper)
-      const itemLogout = wrapper.findAll('.v-list-item').find((item) => item.text().includes('Cerrar Sesión'))
+      const itemLogout = wrapper.findAll('.v-list-item').find((item) => item.text().includes('Cerrar sesión'))
       expect(itemLogout).toBeTruthy()
       await itemLogout.trigger('click')
       expect(wrapper.emitted('logout')).toBeTruthy()

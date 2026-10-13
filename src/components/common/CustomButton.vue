@@ -114,7 +114,7 @@ export default {
 
 <style scoped>
 .custom-button {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0.5px;

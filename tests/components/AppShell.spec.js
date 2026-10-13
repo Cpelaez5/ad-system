@@ -41,6 +41,7 @@ import MenuLateral from '@/components/layout/MenuLateral.vue'
 import ClienteBottomNav from '@/components/layout/ClienteBottomNav.vue'
 
 const RAIL_KEY = 'ad_system_sidebar_rail_collapsed'
+const MODO_KEY = 'ad_system_menu_modo'
 
 function flushPromises() {
   return new Promise((resolve) => setTimeout(resolve, 0))
@@ -83,7 +84,6 @@ describe('AppShell', () => {
     expect(wrapper.findComponent(ClienteBottomNav).exists()).toBe(true)
     expect(wrapper.findComponent(MenuLateral).props('role')).toBe('cliente')
     expect(wrapper.findComponent(BarraSuperior).props('mostrarMenu')).toBe(false)
-    expect(wrapper.findComponent(BarraSuperior).props('mostrarBotonRail')).toBe(false)
   })
 
   it('tablet/móvil no-cliente (<1280px): pide el botón de menú del drawer temporal', async () => {
@@ -91,33 +91,35 @@ describe('AppShell', () => {
     await flushPromises()
 
     expect(wrapper.findComponent(BarraSuperior).props('mostrarMenu')).toBe(true)
-    expect(wrapper.findComponent(BarraSuperior).props('mostrarBotonRail')).toBe(false)
   })
 
-  it('escritorio (>=1280px): pide el botón de plegar/desplegar (rail) y persiste la preferencia', async () => {
+  it("escritorio (>=1280px): menú en modo 'fijo' por defecto; el pin lo cambia y se guarda", async () => {
     const wrapper = mountShell({ role: 'admin', xs: false, lgAndUp: true })
     await flushPromises()
 
-    const barra = wrapper.findComponent(BarraSuperior)
-    expect(barra.props('mostrarMenu')).toBe(false)
-    expect(barra.props('mostrarBotonRail')).toBe(true)
-    expect(barra.props('railCollapsed')).toBe(false)
-    expect(wrapper.findComponent(MenuLateral).props('collapsed')).toBe(false)
+    expect(wrapper.findComponent(BarraSuperior).props('mostrarMenu')).toBe(false)
+    const menu = wrapper.findComponent(MenuLateral)
+    expect(menu.props('modo')).toBe('fijo')
 
-    await barra.vm.$emit('toggle-rail')
+    await menu.vm.$emit('cambiar-modo', 'auto')
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findComponent(MenuLateral).props('collapsed')).toBe(true)
-    expect(localStorage.getItem(RAIL_KEY)).toBe('1')
+    expect(wrapper.findComponent(MenuLateral).props('modo')).toBe('auto')
+    expect(localStorage.getItem(MODO_KEY)).toBe('auto')
   })
 
-  it('recuerda la preferencia de rail guardada de una sesión anterior', async () => {
+  it('recuerda el modo guardado de una sesión anterior', async () => {
+    localStorage.setItem(MODO_KEY, 'auto')
+    const wrapper = mountShell({ role: 'contador', xs: false, lgAndUp: true })
+    await flushPromises()
+    expect(wrapper.findComponent(MenuLateral).props('modo')).toBe('auto')
+  })
+
+  it("migra la preferencia anterior (rail plegado = '1') al modo 'auto'", async () => {
     localStorage.setItem(RAIL_KEY, '1')
     const wrapper = mountShell({ role: 'contador', xs: false, lgAndUp: true })
     await flushPromises()
-
-    expect(wrapper.findComponent(MenuLateral).props('collapsed')).toBe(true)
-    expect(wrapper.findComponent(BarraSuperior).props('railCollapsed')).toBe(true)
+    expect(wrapper.findComponent(MenuLateral).props('modo')).toBe('auto')
   })
 
   it('pasa la tasa BCV cargada a ClienteBottomNav y a BarraSuperior', async () => {

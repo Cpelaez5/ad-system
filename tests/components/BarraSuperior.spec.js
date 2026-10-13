@@ -53,16 +53,10 @@ describe('BarraSuperior', () => {
     expect(wrapper.emitted('toggle-drawer')).toBeTruthy()
   })
 
-  it('muestra el botón de plegar/desplegar (rail) solo si mostrarBotonRail=true, y emite toggle-rail', async () => {
-    const conRail = mount(BarraSuperior, { props: { mostrarBotonRail: true, railCollapsed: false }, global: globalConfig })
-    const boton = conRail.find('[aria-label="Contraer menú"]')
-    expect(boton.exists()).toBe(true)
-    await boton.trigger('click')
-    expect(conRail.emitted('toggle-rail')).toBeTruthy()
-
-    const sinRail = mount(BarraSuperior, { props: { mostrarBotonRail: false }, global: globalConfig })
-    expect(sinRail.find('[aria-label="Contraer menú"]').exists()).toBe(false)
-    expect(sinRail.find('[aria-label="Expandir menú"]').exists()).toBe(false)
+  it('ya no tiene botón de plegar el menú (ahora es el pin del propio menú lateral)', () => {
+    const wrapper = mount(BarraSuperior, { props: {}, global: globalConfig })
+    expect(wrapper.find('[aria-label="Contraer menú"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Expandir menú"]').exists()).toBe(false)
   })
 
   it('solo muestra las tasas habilitadas por las preferencias (showUsdRate/showEurRate)', () => {

@@ -54,7 +54,7 @@ export default {
 }
 
 .encabezado-pagina__subtitulo {
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   font-size: 1rem;
   color: var(--text-secondary, #1F355C);
   margin: 4px 0 0;

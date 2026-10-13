@@ -39,6 +39,18 @@ async function login(page, usuario, password, attempt = 1) {
   }
 }
 
+// Una sesión guardada hace menos de 45 min sigue sirviendo (el token de Supabase dura 1 h y el
+// cliente lo refresca solo). Reutilizarla evita depender de un login nuevo en cada corrida: en este
+// equipo Windows las conexiones locales del navegador fallan a ratos (ver helpers/base.js).
+const MAX_EDAD_SESION_MS = 45 * 60 * 1000
+function sesionVigente(archivo) {
+  try {
+    return Date.now() - fs.statSync(archivo).mtimeMs < MAX_EDAD_SESION_MS
+  } catch {
+    return false
+  }
+}
+
 export default async function globalSetup() {
   const clienteEmail = process.env.E2E_CLIENTE_EMAIL
   const clientePassword = process.env.E2E_CLIENTE_PASSWORD
@@ -52,6 +64,8 @@ export default async function globalSetup() {
   }
 
   fs.mkdirSync(path.resolve(__dirname, '.auth'), { recursive: true })
+
+  if (sesionVigente(CLIENTE_STORAGE) && sesionVigente(SUPERADMIN_STORAGE)) return
 
   const browser = await chromium.launch()
 

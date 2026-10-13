@@ -215,7 +215,7 @@
           <v-col cols="12" md="6">
             <v-card class="pa-4">
               <v-card-title>
-                <v-icon left>mdi-cash-flow</v-icon>
+                <v-icon left>mdi-cash-sync</v-icon>
                 Flujo de Caja
               </v-card-title>
               <v-card-text>

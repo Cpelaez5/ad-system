@@ -232,7 +232,7 @@ export default {
   font-weight: 500;
   color: #010101;
   margin-bottom: 8px;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Montserrat', sans-serif;
 }
 
 .date-picker-label.error {
@@ -253,7 +253,7 @@ export default {
   border-radius: 8px;
   padding: 12px 16px 12px 40px; /* Extra left padding for icon */
   font-size: 0.875rem;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background-color: #FFFFFF;
 }
@@ -283,14 +283,14 @@ export default {
   color: #961112;
   font-size: 0.75rem;
   margin-top: 4px;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Montserrat', sans-serif;
 }
 
 .date-picker-hint {
   color: #666;
   font-size: 0.75rem;
   margin-top: 4px;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Montserrat', sans-serif;
 }
 
 /* =========================================
@@ -302,7 +302,7 @@ export default {
   border-radius: 16px;
   box-shadow: 0 12px 32px rgba(2, 37, 77, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03);
   border: 1px solid #E5E7EB;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   overflow: hidden;
   padding: 8px;
 }
