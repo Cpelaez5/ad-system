@@ -10,6 +10,12 @@
  * Datos inventados. Montos y fechas ficticios.
  */
 import { describe, it, expect, vi } from 'vitest';
+// SimpleInvoiceForm.vue ahora importa retention-pdf-service.js (modo simple, botón
+// "Descargar comprobante"), que a su vez importa el logo con una ruta absoluta
+// ('/ADSystem/logo.png'); sin este mock, Vitest intenta resolverla como archivo real
+// y falla en Windows. Mismo mock que ya usan otros specs que tocan ese servicio.
+vi.mock('/ADSystem/logo.png', () => ({ default: 'mock-logo.png' }));
+vi.mock('/ADSystem/png/svg_logo_ADADAD_3000x3000.png', () => ({ default: 'mock-watermark.png' }));
 import SimpleInvoiceForm from '@/components/forms/client/SimpleInvoiceForm.vue';
 
 function buildVm(overrides = {}) {

@@ -2,8 +2,120 @@
   <v-card class="sif-card" @submit.prevent="handleSubmit">
   <v-form ref="form">
 
+    <!-- ══════════════════════════════════════════════════════════════════
+         MODO SIMPLE — pantalla de éxito (tras guardar, ver handleSubmit /
+         onSaveSuccess). "Registrar otro" vuelve al paso 1 con form limpio;
+         "Volver al inicio" solo emite 'cancel' (lo maneja Inicio.vue).
+    ══════════════════════════════════════════════════════════════════ -->
+    <div v-if="simple && simpleSuccess" class="sif-simple-success pa-6 text-center" data-testid="simple-success">
+      <v-icon color="success" size="72" class="mb-4">mdi-check-circle</v-icon>
+      <h2 class="text-h5 font-weight-bold mb-2">
+        ¡Listo! Guardamos tu {{ formData.flow === 'VENTA' ? 'venta' : 'gasto' }}.
+      </h2>
+      <p class="text-body-1 text-medium-emphasis mb-6">
+        Ya puedes verlo en Mis movimientos.
+      </p>
+
+      <div v-if="simpleMostrarAvisoRetencion" class="mb-3">
+        <BotonAccion
+          texto="Descargar comprobante"
+          icono="mdi-file-download-outline"
+          variante="secundaria"
+          tamano="principal"
+          :cargando="simpleDescargandoComprobante"
+          @click="simpleDescargarComprobante"
+        />
+      </div>
+
+      <BotonAccion
+        texto="Registrar otro"
+        icono="mdi-plus"
+        variante="primaria"
+        tamano="principal"
+        class="mb-3"
+        @click="simpleResetForm"
+      />
+      <BotonAccion
+        texto="Volver al inicio"
+        variante="terciaria"
+        tamano="normal"
+        @click="$emit('cancel')"
+      />
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         MODO SIMPLE — Paso 1: ¿Tienes la factura? (fase2-spec.md §3.1-2)
+         Reutiliza el FileUploadZone/handleExtractedData de siempre (ver
+         simpleHandleFileSelect): no se duplica el flujo OCR.
+    ══════════════════════════════════════════════════════════════════ -->
+    <template v-else-if="simple && simpleStep === 1">
+      <v-card-title class="sif-header pa-5 pb-4">
+        <div class="d-flex align-center ga-3">
+          <PasoGuiado
+            :paso-actual="1"
+            :total-pasos="2"
+            titulo="¿Tienes la factura o el recibo?"
+            subtitulo="Elige una opción para empezar"
+            class="flex-grow-1"
+          />
+          <v-btn icon="mdi-close" variant="text" color="grey" @click="$emit('cancel')" />
+        </div>
+      </v-card-title>
+      <v-divider />
+      <v-card-text class="pa-5">
+        <template v-if="extracting">
+          <div class="text-center py-6" data-testid="simple-leyendo">
+            <v-progress-circular indeterminate color="primary" size="56" width="5" class="mb-4" />
+            <p class="text-body-1 font-weight-medium mb-5">{{ simpleReadingMessage }}</p>
+            <v-skeleton-loader type="article" class="mx-auto" max-width="340" />
+          </div>
+        </template>
+        <template v-else>
+          <TarjetaAccion
+            icono="mdi-camera"
+            titulo="Tomarle foto"
+            subtitulo="Usa la cámara de tu teléfono"
+            color="primary"
+            class="mb-3"
+            @click="simpleTomarFoto"
+          />
+          <TarjetaAccion
+            icono="mdi-paperclip"
+            titulo="Subir archivo"
+            subtitulo="Un PDF o una imagen guardada"
+            color="secondary"
+            class="mb-3"
+            @click="simpleSubirArchivo"
+          />
+          <TarjetaAccion
+            icono="mdi-pencil-outline"
+            titulo="No tengo factura"
+            subtitulo="Registro los datos a mano"
+            color="grey-darken-1"
+            @click="simpleSinFactura"
+          />
+        </template>
+
+        <!-- Inputs ocultos: mismo FileUploadZone/flujo OCR, solo cambia quién lo dispara -->
+        <div style="display:none">
+          <FileUploadZone
+            ref="fileUploadZone"
+            accept="application/pdf,image/jpeg,image/png,image/jpg"
+            :max-size-m-b="10"
+            @file-selected="simpleHandleFileSelect"
+          />
+        </div>
+      </v-card-text>
+    </template>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Paso 2 del modo simple, o formulario completo (simple=false, igual
+         que siempre: lo usa Facturacion.vue sin ningún cambio de aspecto).
+    ══════════════════════════════════════════════════════════════════ -->
+    <template v-else>
+
     <!-- ═══════════════════════════════════════════════════════╗
-         HEADER                                               
+         HEADER
     ═══════════════════════════════════════════════════════════ -->
     <!-- HEADER fijo -->
     <v-card-title class="sif-header pa-5 pb-4">
@@ -30,6 +142,105 @@
     <!-- CUERPO scrollable (v-card-text maneja el scroll automáticamente con scrollable en el dialog) -->
     <v-card-text class="sif-body pa-0">
 
+      <!-- ══════════════════════════════════════════════════════════════════
+           MODO SIMPLE — Paso 2: Confirma estos datos (fase2-spec.md §3.3)
+           4 campos grandes; el resto del formulario (idéntico al de hoy)
+           queda debajo, en "Ver detalles contables" (eager: siempre montado
+           para que los cálculos/validaciones de siempre sigan funcionando).
+      ══════════════════════════════════════════════════════════════════ -->
+      <div v-if="simple" class="sif-section sif-simple-fields" data-testid="simple-paso2">
+        <PasoGuiado
+          :paso-actual="2"
+          :total-pasos="2"
+          titulo="Confirma estos datos"
+          :subtitulo="simplePaso2Subtitulo"
+          class="mb-4"
+        />
+
+        <v-row dense>
+          <!-- COMPRA/GASTO: proveedor. VENTA: cliente -->
+          <v-col cols="12">
+            <p class="sif-section-label">
+              {{ formData.flow === 'VENTA' ? '¿A quién le vendiste?' : '¿A quién le pagaste?' }}
+            </p>
+            <ProveedorAutocomplete
+              v-if="formData.flow === 'COMPRA'"
+              v-model="proveedor"
+              @add-new="showProveedorModal = true"
+            />
+            <v-text-field
+              v-else
+              v-model="counterpartName"
+              placeholder="Ej: Distribuidora López"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+              :rules="[v => !!v || 'Este campo es obligatorio']"
+            />
+          </v-col>
+
+          <!-- ¿Cuánto? (total con impuesto incluido; reutiliza el motor fiscal
+               de siempre en reversa, ver onSimpleTotalInput) -->
+          <v-col cols="12" sm="6">
+            <p class="sif-section-label">
+              ¿Cuánto?
+              <AyudaTermino clave="iva" />
+            </p>
+            <NumericInput
+              :model-value="formData.financial.totalSales"
+              @update:model-value="onSimpleTotalInput"
+              :prefix="currencySymbol"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+
+          <!-- ¿Cuándo? -->
+          <v-col cols="12" sm="6">
+            <p class="sif-section-label">¿Cuándo?</p>
+            <CustomDatePicker
+              v-model="formData.issueDate"
+              :rules="[v => !!v || 'La fecha es requerida']"
+            />
+          </v-col>
+
+          <!-- COMPRA/GASTO: ¿En qué? · VENTA: ¿Cómo te pagaron? -->
+          <v-col cols="12" v-if="formData.flow === 'COMPRA'">
+            <p class="sif-section-label">¿En qué?</p>
+            <ExpenseCategorySelector
+              v-model="formData.expense_category_id"
+              :client-id="currentUser?.client?.id"
+              :rules="[v => !!v || 'La categoría es requerida']"
+            />
+          </v-col>
+          <v-col cols="12" v-else>
+            <p class="sif-section-label">¿Cómo te pagaron?</p>
+            <v-select
+              v-model="formData.financial.paymentMethod"
+              :items="paymentMethods"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              clearable
+            />
+          </v-col>
+        </v-row>
+
+        <!-- Retenciones: solo si el cliente es agente de retención (ver
+             clienteEsAgenteRetencion) y hay algo que retener en esta compra. -->
+        <div v-if="simpleMostrarAvisoRetencion" class="d-flex align-center ga-1 mt-3 text-body-2 text-medium-emphasis" data-testid="simple-aviso-retencion">
+          <v-icon size="18" color="primary">mdi-file-certificate-outline</v-icon>
+          <span>También preparamos tu comprobante de retención.</span>
+          <AyudaTermino clave="comprobante_de_retencion" />
+        </div>
+      </div>
+
+      <EnvolturaDetallesContables
+        :simple="simple"
+        :abierto="simpleDetailsOpen"
+        @update:abierto="v => { simpleDetailsOpen = v }"
+      >
       <!-- ══════════════════════════════════════════════════════
            SECCIÓN 0: ESCANEAR CON IA (siempre visible arriba)
       ══════════════════════════════════════════════════════════ -->
@@ -150,7 +361,7 @@
         <p class="sif-section-label">Datos del documento</p>
         <v-row dense>
           <!-- Número de factura -->
-          <v-col cols="12" sm="5">
+          <v-col cols="12" sm="5" ref="simpleDetalleInvoiceNumber">
             <v-text-field
               v-model="formData.invoiceNumber"
               label="Número de factura o recibo"
@@ -503,7 +714,7 @@
       <!-- ══════════════════════════════════════════════════════
            SECCIÓN 4: PRODUCTOS / ÍTEMS
       ══════════════════════════════════════════════════════════ -->
-      <div class="sif-section">
+      <div class="sif-section" ref="simpleDetalleItems">
         <div class="d-flex align-center justify-space-between mb-3">
           <p class="sif-section-label ma-0">Productos o servicios</p>
           <v-btn
@@ -903,7 +1114,7 @@
         </v-alert>
 
         <!-- Números de Comprobante de Retención (COMPRA) -->
-        <v-card v-if="hasRetencionesRegistradas" class="mt-4 pa-4 rounded-lg" variant="outlined" color="grey-lighten-2">
+        <v-card v-if="hasRetencionesRegistradas" ref="simpleDetalleRetenciones" class="mt-4 pa-4 rounded-lg" variant="outlined" color="grey-lighten-2">
           <p class="sif-section-label text-black">Comprobantes de Retención</p>
           <div class="text-caption text-grey-darken-1 mb-3">
             Números auto-generados. Activa la edición manual si necesitas modificarlos.
@@ -1100,7 +1311,7 @@
           />
         </v-expand-transition>
       </div>
-
+      </EnvolturaDetallesContables>
     </v-card-text><!-- /sif-body -->
 
     <v-divider />
@@ -1119,7 +1330,20 @@
         </div>
       </v-expand-transition>
 
-      <div class="d-flex align-center ga-3 w-100">
+      <!-- Modo simple: un solo botón "Guardar" fijo de 56px (BotonAccion) -->
+      <div v-if="simple" class="w-100" data-testid="simple-guardar">
+        <BotonAccion
+          texto="Guardar"
+          icono="mdi-content-save"
+          variante="primaria"
+          tamano="principal"
+          :cargando="saving"
+          :deshabilitado="saving"
+          @click="simpleHandleSubmit"
+        />
+      </div>
+
+      <div v-else class="d-flex align-center ga-3 w-100">
         <v-btn variant="text" color="grey-darken-1" @click="$emit('cancel')" :disabled="saving">
           Cancelar
         </v-btn>
@@ -1139,7 +1363,10 @@
       </div>
     </v-card-actions>
 
-    <!-- Snackbar -->
+    </template>
+    <!-- /v-else: Paso 2 del modo simple, o formulario completo -->
+
+    <!-- Snackbar: siempre presente, sin importar el paso del modo simple -->
     <AppSnackbar
       v-model="snackbar.show"
       :type="snackbar.type"
@@ -1186,6 +1413,13 @@ import NumericInput from '@/components/common/NumericInput.vue';
 import { supabase } from '@/lib/supabaseClient';
 import { municipalConceptsService } from '@/services/municipalConceptsService.js';
 import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
+import BotonAccion from '@/components/ui/BotonAccion.vue';
+import PasoGuiado from '@/components/ui/PasoGuiado.vue';
+import TarjetaAccion from '@/components/ui/TarjetaAccion.vue';
+import AyudaTermino from '@/components/ui/AyudaTermino.vue';
+import EnvolturaDetallesContables from './EnvolturaDetallesContables.vue';
+import GLOSARIO from '@/constants/glosario.js';
+import retentionPdfService from '@/services/retention-pdf-service.js';
 
 export function normalizeDateToYMD(dateInput) {
   if (!dateInput) return '';
@@ -1213,15 +1447,22 @@ let _itemKey = 0;
 
 export default {
   name: 'SimpleInvoiceForm',
-  components: { 
-    AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete, 
+  components: { EnvolturaDetallesContables,
+    AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete,
     ExpenseCategorySelector, ProveedorAutocomplete, ProveedorModalForm,
-    RetentionSummaryCard, RetentionAdjustSheet, NumericInput
+    RetentionSummaryCard, RetentionAdjustSheet, NumericInput,
+    BotonAccion, PasoGuiado, TarjetaAccion, AyudaTermino
   },
 
   props: {
     invoice: { type: Object, default: null },
-    flow:    { type: String, default: 'VENTA' }
+    flow:    { type: String, default: 'VENTA' },
+    // Fase 2 — modo simple (ver docs/mvp/diseno/fase2-spec.md §3).
+    // false (por defecto): el formulario se ve y funciona EXACTAMENTE igual que
+    // hoy (lo usa Facturacion.vue). true: presenta un asistente de 2 pasos
+    // (¿Tienes la factura? → Confirma 4 datos) con el resto del formulario
+    // disponible, sin cambios de lógica, dentro de "Ver detalles contables".
+    simple:  { type: Boolean, default: false }
   },
 
   emits: ['submit', 'cancel', 'saved'],
@@ -1293,6 +1534,26 @@ export default {
 
       // Snackbar
       snackbar: { show: false, message: '', type: 'info', timeout: 4000 },
+
+      // ──── Modo simple (Fase 2) ────────────────────────────────────────────────
+      // Paso del asistente (1 = ¿Tienes la factura?, 2 = Confirma estos datos).
+      simpleStep: 1,
+      // true tras un guardado exitoso en modo simple: muestra la pantalla de éxito.
+      simpleSuccess: false,
+      // true/false: si el acordeón "Ver detalles contables" está abierto.
+      simpleDetailsOpen: false,
+      // Mensajes humanos rotativos mientras se lee el documento (sin jerga de OCR).
+      simpleReadingMessages: [
+        'Leyendo tu documento...',
+        'Buscando el total...',
+        'Revisando los datos...',
+        'Ya casi está...'
+      ],
+      simpleReadingMsgIndex: 0,
+      simpleReadingTimer: null,
+      // true si en algún momento se registró una retención (para ofrecer "Descargar comprobante").
+      simpleHuboRetencion: false,
+      simpleDescargandoComprobante: false,
 
       // ──── Opciones de flujo (lenguaje humano) ────────────────────────────────
       flowOptions: [
@@ -1524,6 +1785,35 @@ export default {
     },
     showMunicipalComprobante() {
       return !!((this.retencionesResult && this.retencionesResult.municipal > 0) || Number(this.formData.financial.municipalRetention) > 0);
+    },
+
+    // ──── Modo simple (Fase 2) ──────────────────────────────────────────────
+    // Mensaje humano que se muestra mientras se lee el documento (rota cada
+    // ~1.8s, ver iniciarMensajesLectura()). Nunca jerga de OCR.
+    simpleReadingMessage() {
+      const msgs = this.simpleReadingMessages;
+      return msgs[this.simpleReadingMsgIndex % msgs.length];
+    },
+
+    // Perfil fiscal del cliente (el perfil del NEGOCIO que usa el sistema, no
+    // el del proveedor): si ninguno de estos tres está activo, el cliente
+    // nunca está obligado a retener impuestos, así que en modo simple no vale
+    // la pena mostrarle nada sobre retenciones (ver fase2-spec.md §3.4).
+    clienteEsAgenteRetencion() {
+      const c = this.currentUser?.client || {};
+      return !!(c.es_contribuyente_especial || c.es_agente_retencion_municipal || c.retains_islr);
+    },
+
+    // En modo simple: si corresponde mostrar la línea "También preparamos tu
+    // comprobante de retención" en el paso 2 (COMPRA, cliente agente de
+    // retención y hay algo que retener).
+    simpleMostrarAvisoRetencion() {
+      return this.simple && this.formData.flow === 'COMPRA' && this.clienteEsAgenteRetencion && this.hasRetencionesRegistradas;
+    },
+
+    // Subtítulo humano del paso 2 (igual para compra/gasto y venta).
+    simplePaso2Subtitulo() {
+      return 'Solo necesitamos estos 4 datos. El resto lo calculamos nosotros.';
     }
   },
 
@@ -1649,6 +1939,13 @@ export default {
         this.fetchExchangeRate(this.formData.issueDate);
       }
     },
+    // Modo simple: arranca/detiene los mensajes humanos rotativos ("Leyendo tu
+    // documento...") exactamente mientras el OCR está trabajando (`extracting`),
+    // sin tocar la lógica del OCR en sí.
+    extracting(val) {
+      if (val) this.iniciarMensajesLectura();
+      else this.detenerMensajesLectura();
+    },
     manualMode(val) {
       this.manualTotalOverride = false;
       if (!val) {
@@ -1699,8 +1996,26 @@ export default {
       this.formData.flow = this.flow;
       this.formData.items = [ this.newItem() ];
     }
+    // Modo simple: la pantalla "¿En qué?" (ExpenseCategorySelector) solo se ve
+    // hoy cuando expense_type === 'GASTO'. En modo simple no le pedimos al
+    // usuario distinguir "mercancía" de "otro gasto" en la primera capa, así
+    // que toda COMPRA se trata como un gasto por categoría salvo que la IA
+    // detecte lo contrario al leer el documento (ver handleExtractedData).
+    if (this.simple && !this.isEditing && this.formData.flow === 'COMPRA' && !this.formData.expense_type) {
+      this.formData.expense_type = 'GASTO';
+    }
     await this.loadCurrentUser();
     this.fetchExchangeRate(this.formData.issueDate);
+    // Modo simple: guarda una foto del formulario ya pre-llenado (mis datos,
+    // flow, expense_type) para que "Registrar otro" (simpleResetForm) vuelva
+    // a este mismo punto de partida en vez de a un formulario vacío de cero.
+    if (this.simple && !this.isEditing) {
+      this._simpleInitialFormData = JSON.parse(JSON.stringify(this.formData));
+    }
+  },
+
+  beforeUnmount() {
+    this.detenerMensajesLectura();
   },
 
   // ─── METHODS ─────────────────────────────────────────────────────────────────
@@ -1829,6 +2144,191 @@ export default {
 
     isStockError(item) {
       return this.formData.flow === 'VENTA' && item.product && item.quantity > item.product.stock;
+    },
+
+    // ── Modo simple (Fase 2) ───────────────────────────────────────────────────
+    // Paso 1, botón "Tomarle foto": reutiliza el input de cámara que ya vive
+    // dentro de FileUploadZone (misma ref que el panel OCR de siempre), solo
+    // cambiamos quién lo dispara.
+    simpleTomarFoto() {
+      this.$refs.fileUploadZone?.triggerCameraInput?.();
+    },
+    // Paso 1, botón "Subir archivo" (PDF o imagen).
+    simpleSubirArchivo() {
+      this.$refs.fileUploadZone?.triggerFileInput?.();
+    },
+    // Paso 1, al elegir foto/archivo: dispara el mismo flujo OCR de siempre
+    // (handleExtractedData, sin duplicarlo) pero sin esperar un segundo toque
+    // en "Extraer automáticamente" — en modo simple la lectura arranca sola.
+    // Al terminar (con o sin éxito) avanza al paso 2 para que la usuaria
+    // confirme/corrija los 4 datos; si el OCR falló, los deja vacíos para
+    // llenarlos a mano, pero nunca la deja atascada en el paso 1.
+    async simpleHandleFileSelect(file) {
+      this.uploadedFile = file;
+      this.ocrResult = null;
+      await this.handleExtractedData(file);
+      this.simpleIrAPaso2();
+    },
+    // Paso 1, botón "No tengo factura": documento tipo RECIBO, sin pasar por el OCR.
+    simpleSinFactura() {
+      this.formData.documentType = 'RECIBO';
+      this.simpleIrAPaso2();
+    },
+    // Avanza al paso 2 asegurando que el formulario tenga un número de
+    // factura/recibo válido (en modo simple el usuario nunca lo escribe a
+    // mano salvo que abra "Ver detalles contables").
+    simpleIrAPaso2() {
+      this.ensureInvoiceNumberForSimple();
+      this.simpleStep = 2;
+    },
+    // Genera un número de recibo interno cuando el usuario no tiene uno (o el
+    // OCR no lo detectó), para que la validación de siempre (que exige
+    // invoiceNumber) nunca le pida ese dato en la primera capa.
+    ensureInvoiceNumberForSimple() {
+      if (!this.simple || this.formData.invoiceNumber) return;
+      const sello = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+      const azar = Math.floor(100 + Math.random() * 900);
+      this.formData.invoiceNumber = `REC-${sello}${azar}`;
+    },
+    // Mensajes humanos rotativos mientras se lee el documento (watcher de
+    // `extracting` más abajo los arranca/detiene; nunca jerga de OCR).
+    iniciarMensajesLectura() {
+      this.simpleReadingMsgIndex = 0;
+      this.detenerMensajesLectura();
+      this.simpleReadingTimer = setInterval(() => {
+        this.simpleReadingMsgIndex++;
+      }, 1800);
+    },
+    detenerMensajesLectura() {
+      if (this.simpleReadingTimer) {
+        clearInterval(this.simpleReadingTimer);
+        this.simpleReadingTimer = null;
+      }
+    },
+    // Paso 2, campo "¿Cuánto?": el usuario solo ve el total (con impuesto
+    // incluido). Reutilizamos el mismo cálculo de siempre (16% de IVA sobre la
+    // base) en reversa para no duplicar la lógica fiscal: fijamos la base
+    // imponible y dejamos que los watchers existentes (calculateFromBase →
+    // calculateTotals → calcularRetenciones) hagan el resto.
+    onSimpleTotalInput(val) {
+      const total = parseFloat(val);
+      const totalValido = isNaN(total) ? 0 : total;
+      this.manualTotalOverride = false;
+      this.formData.financial.taxableSales = parseFloat((totalValido / 1.16).toFixed(2));
+    },
+    // Determina si un error de validación corresponde a un campo que vive
+    // dentro de "Ver detalles contables" (no a los 4 campos del paso 2). Si es
+    // así, hay que abrir el acordeón y llevar la vista hasta ese campo.
+    simpleCampoDeDetalleConError() {
+      if (this.isDuplicate) return 'invoiceNumber';
+      if (this.formData.flow === 'VENTA') {
+        const overflow = this.formData.items.find(i => i.product && i.quantity > i.product.stock);
+        if (overflow) return 'items';
+      }
+      if (this.formData.flow === 'COMPRA') {
+        if (this.comprobanteDuplicado.iva || this.comprobanteDuplicado.islr || this.comprobanteDuplicado.municipal) {
+          return 'retenciones';
+        }
+      }
+      return null;
+    },
+    // Abre el acordeón de detalles y hace scroll al campo problemático.
+    simpleAbrirDetallesYScroll(campo) {
+      this.simpleDetailsOpen = true;
+      this.$nextTick(() => {
+        const refs = {
+          invoiceNumber: 'simpleDetalleInvoiceNumber',
+          items: 'simpleDetalleItems',
+          retenciones: 'simpleDetalleRetenciones'
+        };
+        const el = this.$refs[refs[campo]];
+        const nodo = el?.$el || el;
+        if (nodo && typeof nodo.scrollIntoView === 'function') {
+          nodo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    },
+    // Botón "Guardar" del modo simple: valida igual que siempre, pero si la
+    // causa del error vive dentro de "Ver detalles contables", abre el
+    // acordeón y hace scroll en vez de dejar al usuario buscando a ciegas.
+    async simpleHandleSubmit() {
+      this.ensureInvoiceNumberForSimple();
+      if (!this.validate()) {
+        const campo = this.simpleCampoDeDetalleConError();
+        if (campo) this.simpleAbrirDetallesYScroll(campo);
+        return;
+      }
+      await this.handleSubmit();
+    },
+    // "Registrar otro": vuelve al paso 1 con un formulario en blanco, sin
+    // perder la pestaña/flow (VENTA o COMPRA) con la que se abrió el diálogo.
+    simpleResetForm() {
+      if (this._simpleInitialFormData) {
+        this.formData = JSON.parse(JSON.stringify(this._simpleInitialFormData));
+      }
+      this.formData.items = [ this.newItem() ];
+      this.formData.flow = this.flow;
+      if (this.formData.flow === 'COMPRA' && !this.formData.expense_type) {
+        this.formData.expense_type = 'GASTO';
+      }
+      this.proveedor = null;
+      this.uploadedFile = null;
+      this.ocrResult = null;
+      this.aiFieldsStatus = {};
+      this.isDuplicate = false;
+      this.manualTotalOverride = false;
+      this.fechaFiscalManuallyEdited = false;
+      this.retentionCorrelativoManuallyEdited = false;
+      this.editarComprobanteIva = false;
+      this.editarComprobanteIslr = false;
+      this.editarComprobanteMunicipal = false;
+      this.simpleDetailsOpen = false;
+      this.simpleHuboRetencion = false;
+      this.simpleSuccess = false;
+      this.simpleStep = 1;
+      this.fetchExchangeRate(this.formData.issueDate);
+    },
+    // Datos de la empresa del cliente para los PDF de comprobante — mismo
+    // criterio que Facturacion.vue → _buildCompanyInfo(), para no inventar un
+    // formato nuevo de comprobante.
+    simpleBuildCompanyInfo() {
+      const clientProfile = this.currentUser?.client || {};
+      const orgProfile = Array.isArray(this.currentUser?.organization)
+        ? this.currentUser.organization[0]
+        : (this.currentUser?.organization || {});
+      return {
+        name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
+        rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
+        address: clientProfile.address || orgProfile.address || 'DIRECCIÓN NO REGISTRADA',
+        phone: clientProfile.phone || orgProfile.phone || '',
+        licencia_actividad_economica: clientProfile.licencia_actividad_economica || '',
+        municipio: clientProfile.municipio_id || clientProfile.municipio || '',
+        estado: clientProfile.estado || '',
+        activity_type: clientProfile.activity_type || ''
+      };
+    },
+    // Pantalla de éxito, botón "Descargar comprobante": reutiliza el mismo
+    // servicio de PDF que ya usa Facturacion.vue (retention-pdf-service), no
+    // genera un documento nuevo.
+    async simpleDescargarComprobante() {
+      this.simpleDescargandoComprobante = true;
+      try {
+        const companyInfo = this.simpleBuildCompanyInfo();
+        if (this.showIvaComprobante) await retentionPdfService.generarComprobanteIVA(this.formData, companyInfo);
+        if (this.showIslrComprobante) await retentionPdfService.generarComprobanteISLR(this.formData, companyInfo);
+        if (this.showMunicipalComprobante) await retentionPdfService.generarComprobanteMunicipal(this.formData, companyInfo);
+        this.showSnackbar('¡Listo! Descargamos tu comprobante de retención.', 'success');
+      } catch (err) {
+        console.error('❌ [SimpleInvoiceForm] Error al descargar comprobante:', err);
+        this.showSnackbar('No pudimos generar el comprobante. Puedes descargarlo luego desde "Mis movimientos".', 'error');
+      } finally {
+        this.simpleDescargandoComprobante = false;
+      }
+    },
+    // Término del glosario (src/constants/glosario.js) para los (?) de ayuda
+    // de la primera capa del modo simple. Nunca crea un término nuevo.
+    simpleGlosario(clave) {
+      return GLOSARIO[clave] || null;
     },
 
     // ── Selección de flujo ────────────────────────────────────────────────────
@@ -2853,6 +3353,12 @@ export default {
     onSaveSuccess() {
       this.saving = false;
       this.savingStep = '';
+      // Modo simple: mostrar la pantalla de éxito propia del componente
+      // ("Registrar otro" / "Volver al inicio"), ver fase2-spec.md §3.5.
+      if (this.simple) {
+        this.simpleHuboRetencion = this.hasRetencionesRegistradas;
+        this.simpleSuccess = true;
+      }
     },
 
     // Llamado al crear un nuevo proveedor desde el ProveedorModalForm
