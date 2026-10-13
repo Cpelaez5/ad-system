@@ -87,6 +87,10 @@ Es el corazón del MVP y el diferenciador.
 5. Conciliación bancaria con CSV + IA.
 6. Integración con imprenta digital autorizada (Providencia SNAT/2024/000102).
 
+7. **Paridad con Fina** (de `auditorias/competencia-fina-profundo.md`): asistente de IA conversacional con lenguaje llano fiscal ("¿debo retener? ¿cuánto?") — ya existe base en `SupportChat` + `ai-chat`; comisiones por vendedor; CRM con mensajes masivos; conciliación bancaria real.
+8. **Facturación fiscal vía imprenta digital autorizada** (Providencia SNAT/2024/000102): Fina la promete y la tiene retrasada; ser primeros es una ventaja grande. Requiere alianza con una imprenta digital (decisión de negocio del usuario).
+9. **Contenido y confianza (Fase 4):** centro de tutoriales en video por tipo de negocio, blog SEO fiscal venezolano, Shorts de 15-20 s con usuarios 60+, y reseñas verificables (Google Business).
+
 ### Transversal — QA → `07-agente-qa.md`
 Cierra cada fase: vitest verde, recorrido en navegador de los flujos cliente y super admin (escritorio y móvil) y checklist "prueba de la abuela".
 
