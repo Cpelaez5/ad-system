@@ -11,8 +11,12 @@ test.use({ storageState: CLIENTE_STORAGE })
 // necesitar scroll (la regresión original que motivó DialogoAdaptable: un
 // diálogo más alto que la pantalla dejaba los botones inalcanzables en el
 // teléfono, ver src/components/ui/DialogoAdaptable.vue).
+// Acota el botón al pie de ACCIONES del diálogo realmente activo
+// (`.v-overlay--active .v-card-actions`), nunca a cualquier "Cancelar" que
+// pueda matchear dentro del contenido con scroll o en un diálogo anterior
+// que Vuetify no desmontó del DOM (hallazgo de la corrida real 2026-10-13).
 async function expectCancelarSinScroll(page) {
-  const cancelar = page.getByRole('button', { name: 'Cancelar' })
+  const cancelar = page.locator('.v-overlay--active .v-card-actions').getByRole('button', { name: 'Cancelar' })
   await expect(cancelar).toBeVisible()
   const caja = await cancelar.boundingBox()
   const viewport = page.viewportSize()

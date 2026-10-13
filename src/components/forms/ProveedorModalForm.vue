@@ -8,7 +8,11 @@
     scrollable
     transition="dialog-bottom-transition"
   >
-    <v-card class="proveedor-modal-card d-flex flex-column h-100" :class="{ 'rounded-0': isMobile, 'rounded-xl': !isMobile }">
+    <v-card
+      class="proveedor-modal-card d-flex flex-column h-100"
+      :class="{ 'rounded-0': isMobile, 'rounded-xl': !isMobile }"
+      :style="!isMobile ? 'max-height: 90vh;' : ''"
+    >
       <!-- ══════════════════════════════════════════════════════ -->
       <!-- 1. CABECERA Y PESTAÑAS (FIJAS SUPERIORES)             -->
       <!-- ══════════════════════════════════════════════════════ -->
