@@ -1,5 +1,5 @@
 <template>
-  <v-tooltip location="bottom" text="Tasa oficial BCV de hoy">
+  <v-tooltip location="bottom" :text="tituloTooltip">
     <template #activator="{ props: tooltipProps }">
       <v-chip
         v-bind="tooltipProps"
@@ -8,33 +8,50 @@
         variant="flat"
         :size="size"
         :disabled="loading"
+        :aria-label="ariaLabel"
         @click="$emit('click')"
       >
         <v-icon v-if="loading" size="14" class="mr-1 chip-tasa__spin">mdi-loading</v-icon>
-        <span class="chip-tasa__valor">{{ texto }}</span>
+        <span class="chip-tasa__valor" aria-hidden="true">{{ texto }}</span>
       </v-chip>
     </template>
   </v-tooltip>
 </template>
 
 <script>
-import { formatMoney } from '@/utils/formatMoney.js'
+import { formatTasa } from '@/utils/formatMoney.js'
+
+/** Nombre llano de cada moneda cotizada, para el tooltip y el aria-label. */
+const NOMBRE_MONEDA = {
+  USD: 'dólar',
+  EUR: 'euro',
+  CNY: 'yuan',
+  TRY: 'lira turca',
+  RUB: 'rublo',
+}
 
 /**
- * ChipTasa — chip compacto de tasa de cambio (BCV) SIN etiqueta larga, con
- * tooltip fijo "Tasa oficial BCV de hoy" (en Configuración ya se aclara el
- * origen). Reutilizado en el app bar (escritorio/tablet, ≥600px) y en la
- * sección "Tasas del día" de la hoja "Más" del cliente en móvil.
+ * ChipTasa — chip compacto de tasa de cambio (BCV) SIN etiqueta larga.
+ * Reutilizado en el app bar (escritorio/tablet, ≥600px) y en la sección
+ * "Tasas del día" de la hoja "Más" del cliente en móvil.
  *
  * Reemplaza, para este caso de uso compacto, a `ExchangeRateChip` (que sigue
  * existiendo para cualquier otro lugar que necesite la etiqueta larga
  * "Dólar BCV hoy: Bs 36,50" + flecha de tendencia).
+ *
+ * Corrección (revisión del shell, hallazgo #3 Importante): el valor SIEMPRE
+ * son bolívares por unidad de `currency` — nunca se formatea con el símbolo
+ * de esa moneda (`formatMoney(rate, 'USD')` mostraba "$ 36,50", como si 36,50
+ * fueran dólares). Se usa `formatTasa` (siempre "Bs ...", igual que
+ * `HojaMas.vue`) precedido del código de moneda ("USD Bs 36,50"), y un
+ * `aria-label` descriptivo porque el texto visible no alcanza por sí solo
+ * para un lector de pantalla.
  */
 export default {
   name: 'ChipTasa',
 
   props: {
-    /** Moneda cotizada: define el símbolo mostrado ("$", "€"...). */
+    /** Moneda cotizada: USD/EUR/CNY/TRY/RUB (el valor mostrado siempre es en bolívares). */
     currency: {
       type: String,
       required: true,
@@ -68,11 +85,26 @@ export default {
   },
 
   computed: {
+    nombreMoneda() {
+      return NOMBRE_MONEDA[this.currency] || this.currency
+    },
     texto() {
       if (this.error) return '—'
       if (this.rateValue === null || this.rateValue === undefined) return '···'
-      // "$ 36,50", "€ 39,10": símbolo de la moneda cotizada + el valor en Bs.
-      return formatMoney(this.rateValue, this.currency)
+      // "USD Bs 36,50", "EUR Bs 39,10": código de la moneda cotizada + el
+      // valor en bolívares (siempre con `formatTasa`, nunca el símbolo de
+      // la moneda cotizada — esto NO son dólares/euros, son bolívares).
+      return `${this.currency} ${formatTasa(this.rateValue)}`
+    },
+    tituloTooltip() {
+      return `Tasa oficial BCV del ${this.nombreMoneda}`
+    },
+    ariaLabel() {
+      if (this.error) return `Tasa oficial BCV del ${this.nombreMoneda}: no disponible. Pulsa para reintentar.`
+      if (this.rateValue === null || this.rateValue === undefined) {
+        return `Tasa oficial BCV del ${this.nombreMoneda}: cargando.`
+      }
+      return `Tasa oficial BCV del ${this.nombreMoneda}: ${formatTasa(this.rateValue)}. Pulsa para actualizar.`
     },
   },
 

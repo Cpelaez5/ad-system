@@ -1,7 +1,7 @@
 <template>
   <v-navigation-drawer
     v-if="renderDrawer"
-    :model-value="modelValue"
+    :model-value="esPermanente ? true : modelValue"
     :permanent="esPermanente"
     :temporary="esTemporal"
     :rail="railActivo"
@@ -77,6 +77,14 @@ import { getMenuPorRol } from './menuPorRol.js'
  *  - ≥1280px (lg+): drawer permanent, empuja el contenido; modo rail
  *    (solo íconos + tooltip) plegable con el botón de `BarraSuperior`
  *    (prop `collapsed`, preferencia persistida por el padre).
+ *
+ * Corrección (revisión del shell, hallazgo #1 Crítico): `VNavigationDrawer`
+ * solo se autoactiva cuando su `model-value` es `null` — con `false` (el
+ * valor inicial de `AppShell.drawerOpen`) queda oculto incluso siendo
+ * `permanent`, porque el watch de `permanent` solo corre cuando ese prop
+ * *cambia*, no al montar ya en escritorio. Por eso el `:model-value` fuerza
+ * `true` cuando el drawer es permanente, sin depender del valor que venga
+ * del padre (ver MenuLateral.spec.js, "no queda oculto en escritorio").
  */
 export default {
   name: 'MenuLateral',
@@ -136,29 +144,32 @@ export default {
 }
 </script>
 
-<style scoped>
+<style>
+/* Bloque NO scoped a propósito (revisión del shell, hallazgo #2 Importante):
+   `VNavigationDrawer` renderiza un Fragment como raíz, así que el atributo
+   `data-v-*` de scope de este componente nunca llega al <nav> real — los
+   selectores "deep" (".v-navigation-drawer...") de un `<style scoped>` exigen
+   ese atributo como ancestro y por eso nunca aplicaban (11 de 14 reglas
+   quedaban muertas, incluida toda la animación del plegado en rail). La
+   clase propia `.menu-lateral` SÍ llega al <nav> (Vuetify reenvía `class`
+   como prop explícita, no por scopeId), así que cada regla queda acotada a
+   ese selector + las clases de modificador nativas de Vuetify
+   (`.v-navigation-drawer--rail`), sin depender de scoping. Ver
+   MenuLateral.spec.js, "el modo rail aplica sus estilos". */
 .menu-lateral {
   border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Plegado/desplegado fluido: ancho (nativo de Vuetify) + fade de texto,
-   ambos con los tokens de movimiento compartidos del shell (ver
-   src/styles/animations.css --ad-move-*). Sigue el mismo patrón :deep() que ya
-   usaba Sidebar.vue para alcanzar las clases de modificador que Vuetify
-   agrega en tiempo de ejecución a la raíz del drawer. */
-:deep(.v-navigation-drawer) {
   transition: width var(--ad-move-normal) var(--ad-move-curva-entrada) !important;
 }
 
-:deep(.v-list-item-title) {
+.menu-lateral .v-list-item-title {
   transition: opacity var(--ad-move-rapido) var(--ad-move-curva-entrada);
 }
 
-:deep(.v-navigation-drawer--rail) .v-list-item-title {
+.menu-lateral.v-navigation-drawer--rail .v-list-item-title {
   opacity: 0;
 }
 
-.menu-lateral__header {
+.menu-lateral .menu-lateral__header {
   padding: 20px 0;
   display: flex;
   justify-content: center;
@@ -166,42 +177,42 @@ export default {
   transition: padding var(--ad-move-normal) var(--ad-move-curva-entrada);
 }
 
-:deep(.v-navigation-drawer--rail) .menu-lateral__header {
+.menu-lateral.v-navigation-drawer--rail .menu-lateral__header {
   padding: 10px 0;
 }
 
-.menu-lateral__logo {
+.menu-lateral .menu-lateral__logo {
   transition: height var(--ad-move-normal) var(--ad-move-curva-entrada);
 }
 
-:deep(.v-list-item--active) {
+.menu-lateral .v-list-item--active {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.1);
   color: white !important;
 }
 
-:deep(.v-list-item--active) .v-icon {
+.menu-lateral .v-list-item--active .v-icon {
   color: #e0b04f !important;
 }
 
-:deep(.v-navigation-drawer--rail) .v-list-item {
+.menu-lateral.v-navigation-drawer--rail .v-list-item {
   justify-content: center;
 }
 
-:deep(.v-navigation-drawer) ::-webkit-scrollbar {
+.menu-lateral::-webkit-scrollbar {
   width: 4px;
 }
 
-:deep(.v-navigation-drawer) ::-webkit-scrollbar-thumb {
+.menu-lateral::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 2px;
 }
 
-:deep(.v-navigation-drawer:not(.v-navigation-drawer--rail)) .v-list-group__items .v-list-item {
+.menu-lateral:not(.v-navigation-drawer--rail) .v-list-group__items .v-list-item {
   padding-left: 32px;
 }
 
-:deep(.v-navigation-drawer--rail) .v-list-group__header .v-list-item__append {
+.menu-lateral.v-navigation-drawer--rail .v-list-group__header .v-list-item__append {
   display: none;
 }
 </style>

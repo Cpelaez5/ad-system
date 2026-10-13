@@ -14,13 +14,13 @@ import ClienteBottomNav from '@/components/layout/ClienteBottomNav.vue'
  * (el v-if raíz del componente), no el estilo visual de Vuetify.
  */
 
-function mountBottomNav(isXs) {
-  return mount(ClienteBottomNav, {
+function mountBottomNav(isXs, push = vi.fn()) {
+  const wrapper = mount(ClienteBottomNav, {
     global: {
       mocks: {
         $vuetify: { display: { xs: isXs } },
         $route: { path: '/cliente/inicio', query: {} },
-        $router: { push: vi.fn() }
+        $router: { push }
       },
       stubs: {
         HojaInferior: true,
@@ -28,6 +28,7 @@ function mountBottomNav(isXs) {
       }
     }
   })
+  return { wrapper, push }
 }
 
 describe('ClienteBottomNav', () => {
@@ -42,7 +43,7 @@ describe('ClienteBottomNav', () => {
   it('se muestra en móvil (<600px) para el rol cliente', async () => {
     localStorage.setItem('currentUser', JSON.stringify({ role: 'cliente' }))
 
-    const wrapper = mountBottomNav(true)
+    const { wrapper } = mountBottomNav(true)
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).toContain('Inicio')
@@ -54,7 +55,7 @@ describe('ClienteBottomNav', () => {
   it('NO se muestra en móvil para el rol admin', async () => {
     localStorage.setItem('currentUser', JSON.stringify({ role: 'admin' }))
 
-    const wrapper = mountBottomNav(true)
+    const { wrapper } = mountBottomNav(true)
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).not.toContain('Registrar')
@@ -63,9 +64,38 @@ describe('ClienteBottomNav', () => {
   it('NO se muestra en escritorio (>=600px) para el rol cliente (ahí manda el drawer)', async () => {
     localStorage.setItem('currentUser', JSON.stringify({ role: 'cliente' }))
 
-    const wrapper = mountBottomNav(false)
+    const { wrapper } = mountBottomNav(false)
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).not.toContain('Registrar')
+  })
+
+  describe('navegarDesdeMas (hallazgo #8: HojaMas.vue ahora emite destinos de ruta, no strings a mano)', () => {
+    it('acepta un string de path (compatibilidad) y navega si no es la ruta actual', async () => {
+      localStorage.setItem('currentUser', JSON.stringify({ role: 'cliente' }))
+      const { wrapper, push } = mountBottomNav(true)
+      await wrapper.vm.$nextTick()
+
+      await wrapper.vm.navegarDesdeMas('/cliente/fiscal-360')
+      expect(push).toHaveBeenCalledWith('/cliente/fiscal-360')
+    })
+
+    it('acepta un objeto de ruta ({ name }) — lo que ahora emite HojaMas.vue', async () => {
+      localStorage.setItem('currentUser', JSON.stringify({ role: 'cliente' }))
+      const { wrapper, push } = mountBottomNav(true)
+      await wrapper.vm.$nextTick()
+
+      await wrapper.vm.navegarDesdeMas({ name: 'ClienteDashboard' })
+      expect(push).toHaveBeenCalledWith({ name: 'ClienteDashboard' })
+    })
+
+    it('no explota si router.push rechaza (navegación duplicada u otro error de router)', async () => {
+      localStorage.setItem('currentUser', JSON.stringify({ role: 'cliente' }))
+      const pushQueFalla = vi.fn(() => Promise.reject(new Error('duplicada')))
+      const { wrapper } = mountBottomNav(true, pushQueFalla)
+      await wrapper.vm.$nextTick()
+
+      await expect(wrapper.vm.navegarDesdeMas({ name: 'ClienteDashboard' })).resolves.toBeUndefined()
+    })
   })
 })

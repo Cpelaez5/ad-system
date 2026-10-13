@@ -174,18 +174,22 @@ export default {
         this.currentUserData = {};
       }
     },
-    irA(path) {
-      if (this.$route?.path !== path) {
-        this.$router.push(path);
+    /** Admite un path string ('/cliente/inicio') o un destino de router ({name}), ver HojaMas.vue. */
+    async irA(destino) {
+      if (typeof destino === 'string' && this.$route?.path === destino) return;
+      try {
+        await this.$router.push(destino);
+      } catch (error) {
+        // Navegación duplicada u otro error de router: no es crítico.
       }
     },
     registrar(tipo) {
       this.sheetRegistrar = false;
       this.$router.push({ path: '/cliente/inicio', query: { registrar: tipo } });
     },
-    navegarDesdeMas(path) {
+    navegarDesdeMas(destino) {
       this.sheetMas = false;
-      this.irA(path);
+      return this.irA(destino);
     },
     abrirAyuda() {
       this.sheetMas = false;
@@ -227,17 +231,13 @@ export default {
   gap: 2px;
 }
 
-/* Ícono activo: leve rebote (solo transform, barato y corto). */
-.cliente-bottom-nav :deep(.v-btn .v-icon) {
-  transition: transform var(--ad-move-rapido) var(--ad-move-curva-entrada);
-}
-
-.cliente-bottom-nav :deep(.v-btn--selected .v-icon) {
-  transform: scale(1.14);
-}
-
 /* Indicador activo: barra fina que se desliza entre los 4 ítems iguales
-   (grow). Puramente decorativo (aria-hidden), no afecta el layout. */
+   (grow). Puramente decorativo (aria-hidden), no afecta el layout.
+   Hallazgo #9 (revisión del shell): sin rebote en el ícono activo — el
+   sistema de diseño prohíbe animar accesos repetidos (barra inferior,
+   tabs); el indicador se mueve en --ad-move-rapido porque es la posición
+   de la selección, no una animación de contenido (ver sistema-diseno.md
+   §3.5). */
 .cliente-bottom-nav__indicador {
   position: absolute;
   top: 0;
@@ -246,7 +246,7 @@ export default {
   height: 3px;
   background: var(--color-primary, #8E1818);
   opacity: 0;
-  transition: transform var(--ad-move-normal) var(--ad-move-curva-entrada), opacity var(--ad-move-rapido) var(--ad-move-curva-entrada);
+  transition: transform var(--ad-move-rapido) var(--ad-move-curva-entrada), opacity var(--ad-move-rapido) var(--ad-move-curva-entrada);
   pointer-events: none;
 }
 

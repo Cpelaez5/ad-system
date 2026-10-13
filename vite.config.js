@@ -29,12 +29,16 @@ export default defineConfig(({ command }) => {
     test: {
       environment: 'happy-dom',
       globals: true,
-      // e2e/ son specs de Playwright (@playwright/test), no de vitest —
-      // ver playwright.config.js y docs/mvp/auditorias/e2e-2026-10-13.md.
-      // .claude/worktrees/**: otros agentes trabajan ahí en paralelo (ver
-      // manual 00-REGLAS-COMUNES.md §5.0); son worktrees de git anidados en
-      // esta carpeta y vitest los recorrería como si fueran código propio.
-      exclude: [...configDefaults.exclude, '**/e2e/**', '**/.claude/worktrees/**']
+      // e2e/ son specs de Playwright, no de vitest; .claude/worktrees/** son
+      // copias de otros agentes (ver 00-REGLAS-COMUNES.md §5.0).
+      exclude: [...configDefaults.exclude, '**/e2e/**', '**/.claude/worktrees/**'],
+      // Permite montar Vuetify REAL (createVuetify) en tests como MenuLateral.spec.js
+      // sin que vitest externalice 'vuetify' y falle con sus .css.
+      server: {
+        deps: {
+          inline: ['vuetify']
+        }
+      }
     },
     esbuild: command === 'build' ? {
       pure: ['console.log', 'console.debug', 'console.info'],

@@ -32,92 +32,105 @@
     <template v-else>
       <SelectorPeriodo v-model="periodo" class="mb-4" />
 
+      <!-- Hallazgo #5: nunca se suman bolívares como si fueran dólares; si a
+           alguna factura le falta toda tasa (guardada y BCV), se avisa en
+           vez de inflar/ocultar el total. -->
+      <AvisoAmable
+        v-if="facturasSinTasa > 0"
+        tipo="advertencia"
+        :mensaje="mensajeFacturasSinTasa"
+        class="mb-4"
+      />
+
+      <!-- Hallazgo #7: el estado vacío del período SOLO reemplaza las tres
+           tarjetas — el gráfico de 6 meses y los rankings siguen visibles
+           (usan su propio histórico/estado vacío interno). -->
       <transition name="cruce" mode="out-in">
         <EstadoVacio
           v-if="!tieneMovimientos"
-          key="vacio"
+          key="vacio-periodo"
           icono="mdi-chart-line"
           titulo="Aún no hay movimientos en este período"
           mensaje="Registra tu primera venta o gasto."
           texto-accion="Registrar ahora"
+          class="mb-4"
           @accion="registrar"
         />
 
-        <div v-else key="contenido">
-          <!-- Tres tarjetas resumen -->
-          <v-row class="mb-4">
-            <v-col cols="12" md="4">
-              <TarjetaKPI
-                etiqueta="Vendí"
-                :monto="totalVendi"
-                :monto-bs="bsVendi"
-                color="success"
-                :variacion="variacionVendi"
-                :subir-es-bueno="true"
-                :etiqueta-periodo-anterior="etiquetaAnterior"
-                :indice="0"
-              />
-            </v-col>
-            <v-col cols="12" md="4">
-              <TarjetaKPI
-                etiqueta="Gasté"
-                :monto="totalGaste"
-                :monto-bs="bsGaste"
-                color="error"
-                :variacion="variacionGaste"
-                :subir-es-bueno="false"
-                :etiqueta-periodo-anterior="etiquetaAnterior"
-                :indice="1"
-              />
-            </v-col>
-            <v-col cols="12" md="4">
-              <TarjetaKPI
-                etiqueta="Me queda"
-                :monto="meQueda"
-                :monto-bs="bsMeQueda"
-                :color="meQueda >= 0 ? 'success' : 'error'"
-                :variacion="variacionMeQueda"
-                :subir-es-bueno="true"
-                :etiqueta-periodo-anterior="etiquetaAnterior"
-                :indice="2"
-              />
-            </v-col>
-          </v-row>
-
-          <!-- Gráfico: últimos 6 meses -->
-          <SeccionPanel
-            titulo="Últimos 6 meses"
-            subtitulo="Vendí vs. Gasté, mes a mes"
-            icono="mdi-chart-bar"
-            class="mb-4"
-            :retraso-ms="150"
-          >
-            <GraficoBarras :labels="datosGrafico.labels" :series="seriesGrafico" :altura="280" />
-          </SeccionPanel>
-
-          <!-- Top categorías y top clientes -->
-          <v-row>
-            <v-col cols="12" md="6">
-              <SeccionPanel titulo="¿En qué gasto más?" icono="mdi-receipt-text-outline" :retraso-ms="200">
-                <ListaRanking
-                  :items="categorias"
-                  color="error"
-                  vacio-texto="Sin gastos registrados en este período."
-                />
-              </SeccionPanel>
-            </v-col>
-            <v-col cols="12" md="6">
-              <SeccionPanel titulo="¿A quién le vendo más?" icono="mdi-account-group-outline" :retraso-ms="200">
-                <ListaRanking
-                  :items="clientesTop"
-                  color="secondary"
-                  vacio-texto="Sin ventas registradas en este período."
-                />
-              </SeccionPanel>
-            </v-col>
-          </v-row>
-        </div>
+        <v-row v-else key="tarjetas" class="mb-4">
+          <v-col cols="12" md="4">
+            <TarjetaKPI
+              etiqueta="Vendí"
+              :monto="totalVendi"
+              :monto-bs="bsVendi"
+              color="success"
+              :variacion="variacionVendi"
+              :subir-es-bueno="true"
+              :etiqueta-periodo-anterior="etiquetaAnterior"
+              :indice="0"
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <TarjetaKPI
+              etiqueta="Gasté"
+              :monto="totalGaste"
+              :monto-bs="bsGaste"
+              color="error"
+              :variacion="variacionGaste"
+              :subir-es-bueno="false"
+              :etiqueta-periodo-anterior="etiquetaAnterior"
+              :indice="1"
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <TarjetaKPI
+              etiqueta="Me queda"
+              :monto="meQueda"
+              :monto-bs="bsMeQueda"
+              :color="meQueda >= 0 ? 'success' : 'error'"
+              :variacion="variacionMeQueda"
+              :subir-es-bueno="true"
+              :etiqueta-periodo-anterior="etiquetaAnterior"
+              :indice="2"
+            />
+          </v-col>
+        </v-row>
       </transition>
+
+      <!-- Gráfico: últimos 6 meses (histórico completo, siempre visible). -->
+      <SeccionPanel
+        titulo="Últimos 6 meses"
+        subtitulo="Vendí vs. Gasté, mes a mes"
+        icono="mdi-chart-bar"
+        class="mb-4"
+        :retraso-ms="150"
+      >
+        <GraficoBarras :labels="datosGrafico.labels" :series="seriesGrafico" :altura="280" />
+      </SeccionPanel>
+
+      <!-- Top categorías y top clientes (del período elegido; si el período
+           está vacío, cada lista muestra su propio texto de "sin datos",
+           siempre visibles). -->
+      <v-row>
+        <v-col cols="12" md="6">
+          <SeccionPanel titulo="¿En qué gasto más?" icono="mdi-receipt-text-outline" :retraso-ms="200">
+            <ListaRanking
+              :items="categorias"
+              color="error"
+              vacio-texto="Sin gastos registrados en este período."
+            />
+          </SeccionPanel>
+        </v-col>
+        <v-col cols="12" md="6">
+          <SeccionPanel titulo="¿A quién le vendo más?" icono="mdi-account-group-outline" :retraso-ms="200">
+            <ListaRanking
+              :items="clientesTop"
+              color="secondary"
+              vacio-texto="Sin ventas registradas en este período."
+            />
+          </SeccionPanel>
+        </v-col>
+      </v-row>
     </template>
   </v-container>
 </template>
@@ -205,21 +218,37 @@ export default {
       return filtrarPorRango(this.comprasRaw, this.rango.inicioAnterior, this.rango.finAnterior)
     },
 
-    totalVendi() {
+    /** `{ total, excluidas }` — ver `sumarMontosUsd` (hallazgo #5: tasa de la factura primero, nunca Bs como USD). */
+    resumenVentas() {
       return sumarMontosUsd(this.ventasPeriodo, this.tasaBCV)
     },
-    totalGaste() {
+    resumenCompras() {
       return sumarMontosUsd(this.comprasPeriodo, this.tasaBCV)
+    },
+    totalVendi() {
+      return this.resumenVentas.total
+    },
+    totalGaste() {
+      return this.resumenCompras.total
     },
     meQueda() {
       return this.totalVendi - this.totalGaste
     },
 
+    /** Facturas del período elegido que no se pudieron convertir a USD (ninguna tasa disponible). */
+    facturasSinTasa() {
+      return this.resumenVentas.excluidas + this.resumenCompras.excluidas
+    },
+    mensajeFacturasSinTasa() {
+      const n = this.facturasSinTasa
+      return `${n} factura${n === 1 ? '' : 's'} no se ${n === 1 ? 'incluyó' : 'incluyeron'} porque no tiene${n === 1 ? '' : 'n'} tasa de cambio.`
+    },
+
     totalVendiAnterior() {
-      return sumarMontosUsd(this.ventasAnterior, this.tasaBCV)
+      return sumarMontosUsd(this.ventasAnterior, this.tasaBCV).total
     },
     totalGasteAnterior() {
-      return sumarMontosUsd(this.comprasAnterior, this.tasaBCV)
+      return sumarMontosUsd(this.comprasAnterior, this.tasaBCV).total
     },
     meQuedaAnterior() {
       return this.totalVendiAnterior - this.totalGasteAnterior
@@ -254,9 +283,12 @@ export default {
       return agruparPorMes(this.ventasRaw, this.comprasRaw, this.tasaBCV, 6)
     },
     seriesGrafico() {
+      // Colores del tema actual (no un hex fijo, hallazgo #17): respeta el
+      // tema oscuro, donde success/error son tonos distintos para AA.
+      const colores = this.$vuetify.theme.current.colors
       return [
-        { nombre: 'Vendí', datos: this.datosGrafico.vendi, color: '#2E7D32' },
-        { nombre: 'Gasté', datos: this.datosGrafico.gaste, color: '#D32F2F' },
+        { nombre: 'Vendí', datos: this.datosGrafico.vendi, color: colores.success },
+        { nombre: 'Gasté', datos: this.datosGrafico.gaste, color: colores.error },
       ]
     },
 
@@ -297,16 +329,24 @@ export default {
         const ventasOk = ventasRes.status === 'fulfilled'
         const comprasOk = comprasRes.status === 'fulfilled'
 
-        if (!ventasOk && !comprasOk) {
+        // Hallazgo #6: si falla la carga de ventas O de compras, se muestra
+        // el error (con Reintentar) en vez de seguir con esa lista en []
+        // (que la pantalla mostraba como "$0", un dato falso).
+        if (!ventasOk || !comprasOk) {
           this.loadError = {
             code: 'ERROR_CARGA',
-            message: 'No pudimos cargar tu resumen. Intenta de nuevo.',
+            message:
+              !ventasOk && !comprasOk
+                ? 'No pudimos cargar tu resumen. Intenta de nuevo.'
+                : !ventasOk
+                  ? 'No pudimos cargar tus ventas. Intenta de nuevo.'
+                  : 'No pudimos cargar tus compras. Intenta de nuevo.',
           }
           return
         }
 
-        this.ventasRaw = ventasOk ? ventasRes.value || [] : []
-        this.comprasRaw = comprasOk ? comprasRes.value || [] : []
+        this.ventasRaw = ventasRes.value || []
+        this.comprasRaw = comprasRes.value || []
         this.tasaBCV = bcvRes.status === 'fulfilled' && bcvRes.value?.success ? bcvRes.value.data : null
       } catch (error) {
         this.loadError = {
