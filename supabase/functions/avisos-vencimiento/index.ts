@@ -1,3 +1,6 @@
+// NOTA: en Supabase está desplegada una versión de UN solo archivo (el deploy con import de
+// ./logica.js falla). Al cambiar logica.js o este archivo, re-desplegar copiando la lógica
+// dentro de index.ts (ver versión 4 en el panel de Supabase).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -42,6 +45,16 @@ function jsonError(code: string, message: string, status = 400) {
   });
 }
 
+// Los nombres vienen de la BD (empresa, documento): se escapan antes de ir al HTML.
+function escaparHtml(texto: string) {
+  return String(texto ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ─── Plantilla HTML corta, móvil primero, colores de marca AD System ─────────
 function buildAvisoHtml(payload: {
   nombreCliente: string;
@@ -62,7 +75,7 @@ function buildAvisoHtml(payload: {
       (m) => `
     <tr>
       <td style="padding:12px 16px;border-bottom:1px solid #eee;font-size:15px;color:#333;line-height:1.5;">
-        ${m}
+        ${escaparHtml(m)}
       </td>
     </tr>`
     )
@@ -85,7 +98,7 @@ function buildAvisoHtml(payload: {
 
   <tr>
     <td style="padding:24px 24px 8px;">
-      <p style="margin:0;font-size:15px;color:#333;">Hola <strong>${nombreCliente}</strong>,</p>
+      <p style="margin:0;font-size:15px;color:#333;">Hola <strong>${escaparHtml(nombreCliente)}</strong>,</p>
       <p style="margin:8px 0 0;font-size:14px;color:#555;">Tienes pendientes de atender:</p>
     </td>
   </tr>
