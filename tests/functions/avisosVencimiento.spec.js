@@ -135,7 +135,7 @@ describe('avisos-vencimiento: lógica pura', () => {
   describe('construcción de mensajes y asunto (tuteo, lenguaje llano)', () => {
     it('mensajeDocumentoFiscal usa tuteo y nombre del cliente', () => {
       const msg = mensajeDocumentoFiscal('María', { nombre: 'tu RIF', dias_antes: 7 })
-      expect(msg).toBe('Hola María, tu RIF vence en 7 días. Renovarlo a tiempo evita multas.')
+      expect(msg).toBe('Tu RIF vence en 7 días. Renovarlo a tiempo evita multas.')
     })
 
     it('mensajeDocumentoFiscal cambia el llamado a la acción cuando ya venció', () => {
@@ -146,7 +146,7 @@ describe('avisos-vencimiento: lógica pura', () => {
 
     it('mensajeFactura incluye el número de factura si está disponible', () => {
       const msg = mensajeFactura('Carlos', { invoice_number: 'INV-001', dias_antes: 0 })
-      expect(msg).toBe('Hola Carlos, tu factura de suscripción (INV-001) vence hoy.')
+      expect(msg).toBe('Tu factura de suscripción (INV-001) vence hoy.')
     })
 
     it('construirAsunto usa singular/plural según la cantidad de ítems', () => {

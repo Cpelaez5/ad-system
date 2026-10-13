@@ -100,13 +100,15 @@ export function mensajeDocumentoFiscal(nombreCliente, item) {
   const accion = item.dias_antes === DIAS_VENCIDO_FISCAL
     ? 'Renuévalo lo antes posible para evitar multas.'
     : 'Renovarlo a tiempo evita multas.'
-  return `Hola ${nombreCliente}, ${nombreDoc} ${textoVencimiento(item.dias_antes)}. ${accion}`
+  // El saludo va una sola vez en la cabecera del correo; cada línea va directo al punto
+  const doc = nombreDoc.charAt(0).toUpperCase() + nombreDoc.slice(1)
+  return `${doc} ${textoVencimiento(item.dias_antes)}. ${accion}`
 }
 
 /** Mensaje corto en tuteo para una factura de suscripción/plan. */
 export function mensajeFactura(nombreCliente, item) {
   const ref = item.invoice_number ? ` (${item.invoice_number})` : ''
-  return `Hola ${nombreCliente}, tu factura de suscripción${ref} ${textoVencimiento(item.dias_antes)}.`
+  return `Tu factura de suscripción${ref} ${textoVencimiento(item.dias_antes)}.`
 }
 
 /** Asunto del correo según la cantidad de ítems del cliente ese día. */
