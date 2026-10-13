@@ -1,6 +1,16 @@
 <template>
   <v-container fluid class="pa-4 pa-md-6">
-    <v-row class="mb-6">
+    <EncabezadoPagina titulo="Compras" subtitulo="Tus facturas de compra a proveedores." class="ad-move-entrada">
+      <BotonAccion
+        texto="Nueva Compra"
+        icono="mdi-plus"
+        tamano="principal"
+        :ancho="$vuetify.display.smAndDown ? 'completo' : 'auto'"
+        @click="openNewInvoiceDialog"
+      />
+    </EncabezadoPagina>
+
+    <v-row class="mb-6 ad-move-entrada" style="animation-delay: 60ms">
       <v-col cols="12" sm="6" md="3">
         <v-card class="pa-6 stats-card" height="120" style="background-color: #02254d;">
           <div class="d-flex flex-column justify-center h-100">
@@ -45,8 +55,9 @@
         </v-card>
       </v-col>
     </v-row>
-    <v-row class="mb-4">
-      <v-col cols="12" md="6">
+
+    <v-row class="mb-4 ad-move-entrada" style="animation-delay: 100ms">
+      <v-col cols="12">
         <v-text-field
           v-model="searchQuery"
           prepend-inner-icon="mdi-magnify"
@@ -57,56 +68,110 @@
           @input="applyFilters"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="6" class="text-left text-md-right mt-2 mt-md-0">
-        <v-btn color="primary" size="large" prepend-icon="mdi-plus" @click="openNewInvoiceDialog" :block="$vuetify.display.smAndDown">
-          Nueva Compra
-        </v-btn>
-      </v-col>
     </v-row>
 
-    <v-card>
-      <v-card-title>
-        <v-icon left>mdi-cart</v-icon>
-        Mis Compras ({{ filteredInvoices.length }})
-      </v-card-title>
-      <v-data-table :headers="headers" :items="filteredInvoices" :loading="loading" class="elevation-1" :items-per-page="10">
-        <template v-slot:item.invoiceNumber="{ item }">
-          <v-chip color="secondary" variant="tonal">{{ item.invoiceNumber }}</v-chip>
-        </template>
-        <template v-slot:item.client="{ item }">
-          <div>
-            <div class="font-weight-medium">{{ item.issuer?.companyName || item.client_info?.companyName || 'N/A' }}</div>
-            <div class="text-caption text-grey">{{ item.issuer?.rif || item.client_info?.rif || '' }}</div>
-          </div>
-        </template>
-        <template v-slot:item.issueDate="{ item }">{{ formatDate(item.issueDate) }}</template>
-        <template v-slot:item.total="{ item }">{{ formatCurrency(item.financial?.totalSales || 0) }}</template>
-        <template v-slot:item.status="{ item }">
-          <v-chip :color="getStatusColor(item.status)" variant="tonal" size="small">{{ item.status }}</v-chip>
-        </template>
-        <template v-slot:item.actions="{ item }">
-          <v-btn icon="mdi-eye" size="small" color="info" variant="text" @click="viewInvoice(item)"></v-btn>
-          <v-btn icon="mdi-pencil" size="small" color="warning" variant="text" @click="editInvoice(item)"></v-btn>
-          <v-btn icon="mdi-delete" size="small" color="error" variant="text" @click="deleteInvoice(item)"></v-btn>
-        </template>
-      </v-data-table>
-    </v-card>
+    <!-- Error al cargar: mensaje llano + Reintentar, en vez de una lista vacía silenciosa -->
+    <AvisoAmable
+      v-if="loadError"
+      tipo="error"
+      titulo="No pudimos cargar tus compras"
+      :mensaje="loadError"
+      texto-accion="Reintentar"
+      @accion="reloadData"
+      class="mb-4"
+    />
 
-    <v-dialog v-model="invoiceDialog" max-width="1200px" scrollable :fullscreen="$vuetify.display.smAndDown">
+    <template v-else>
+      <EstadoVacio
+        v-if="!loading && filteredInvoices.length === 0"
+        icono="mdi-cart"
+        titulo="Aún no registras compras"
+        mensaje="Toca «Nueva Compra» y registra tu primera factura de proveedor."
+        texto-accion="Nueva Compra"
+        @accion="openNewInvoiceDialog"
+      />
+
+      <template v-else>
+        <!-- Lista en móvil: la tabla de varias columnas es ilegible en xs -->
+        <div v-if="$vuetify.display.xs" class="d-flex flex-column ga-2">
+          <FilaMovimiento
+            v-for="(item, i) in filteredInvoices"
+            :key="item.id"
+            class="ad-move-entrada"
+            :style="{ animationDelay: `${Math.min(i, 12) * 50}ms` }"
+            :quien="proveedorNombre(item)"
+            :subtitulo="item.invoiceNumber"
+            :fecha="item.issueDate"
+            :monto="item.financial?.totalSales || 0"
+            moneda="USD"
+            :estado="item.status"
+            :color-estado="getStatusColor(item.status)"
+            icono="mdi-cart"
+            color-icono="warning"
+            @abrir="viewInvoice(item)"
+          />
+        </div>
+
+        <!-- Tabla en escritorio -->
+        <v-card v-else class="ad-move-entrada" style="animation-delay: 140ms">
+          <v-card-title>
+            <v-icon left>mdi-cart</v-icon>
+            Mis Compras ({{ filteredInvoices.length }})
+          </v-card-title>
+          <v-data-table :headers="headers" :items="filteredInvoices" :loading="loading" class="elevation-1" :items-per-page="10">
+            <template v-slot:item.invoiceNumber="{ item }">
+              <v-chip color="secondary" variant="tonal">{{ item.invoiceNumber }}</v-chip>
+            </template>
+            <template v-slot:item.client="{ item }">
+              <div>
+                <div class="font-weight-medium">{{ proveedorNombre(item) }}</div>
+                <div class="text-caption text-grey">{{ item.issuer?.rif || item.client_info?.rif || '' }}</div>
+              </div>
+            </template>
+            <template v-slot:item.issueDate="{ item }">{{ formatDate(item.issueDate) }}</template>
+            <template v-slot:item.total="{ item }">{{ formatCurrency(item.financial?.totalSales || 0) }}</template>
+            <template v-slot:item.status="{ item }">
+              <v-chip :color="getStatusColor(item.status)" variant="tonal" size="small">{{ item.status }}</v-chip>
+            </template>
+            <template v-slot:item.actions="{ item }">
+              <v-btn icon="mdi-eye" size="small" color="info" variant="text" @click="viewInvoice(item)"></v-btn>
+              <v-btn icon="mdi-pencil" size="small" color="warning" variant="text" @click="editInvoice(item)"></v-btn>
+              <v-btn icon="mdi-delete" size="small" color="error" variant="text" @click="deleteInvoice(item)"></v-btn>
+            </template>
+          </v-data-table>
+        </v-card>
+      </template>
+    </template>
+
+    <!-- Diálogo de nueva/editar compra: envuelve InvoiceForm, que ya trae su
+         propio encabezado/pie fijos y pantalla completa en móvil (scrollable
+         + fullscreen por debajo de "sm"). No se reemplaza por DialogoAdaptable
+         para no duplicar encabezado/acciones (ver informe de la tarea). -->
+    <v-dialog v-model="invoiceDialog" max-width="1200px" scrollable :fullscreen="$vuetify.display.smAndDown" :transition="$vuetify.display.xs ? 'dialog-bottom-transition' : 'dialog-transition'">
       <InvoiceForm :invoice="editingInvoice" :flow="'COMPRA'" :auto-party-mode="true" @submit="handleInvoiceSubmit" @cancel="closeInvoiceDialog" />
     </v-dialog>
 
-    <v-dialog v-model="deleteDialog" max-width="400px">
-      <v-card>
-        <v-card-title>Confirmar Eliminación</v-card-title>
-        <v-card-text>¿Eliminar la compra <strong>{{ invoiceToDelete?.invoiceNumber }}</strong>?</v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="grey" variant="text" @click="deleteDialog = false">Cancelar</v-btn>
-          <v-btn color="error" @click="confirmDelete">Eliminar</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DialogoAdaptable
+      v-model="deleteDialog"
+      titulo="Confirmar eliminación"
+      icono="mdi-delete-alert-outline"
+      max-width="420"
+      :cargando="deleting"
+    >
+      ¿Eliminar la compra <strong>{{ invoiceToDelete?.invoiceNumber }}</strong>?
+      <template #acciones>
+        <v-spacer></v-spacer>
+        <v-btn color="grey-darken-1" variant="text" :disabled="deleting" @click="deleteDialog = false">Cancelar</v-btn>
+        <v-btn color="error" variant="elevated" :loading="deleting" @click="confirmDelete">Eliminar</v-btn>
+      </template>
+    </DialogoAdaptable>
+
+    <AppSnackbar
+      v-model="snackbar.show"
+      :type="snackbar.type"
+      :message="snackbar.message"
+      :timeout="snackbar.timeout"
+    />
   </v-container>
 </template>
 
@@ -115,14 +180,33 @@ import InvoiceForm from '@/components/forms/InvoiceForm.vue';
 import invoiceService from '@/services/invoiceService.js';
 import userService from '@/services/userService.js';
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import AppSnackbar from '@/components/common/AppSnackbar.vue'
 import bcvService from '@/services/bcvService.js'
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import BotonAccion from '@/components/ui/BotonAccion.vue'
+import EstadoVacio from '@/components/ui/EstadoVacio.vue'
+import AvisoAmable from '@/components/ui/AvisoAmable.vue'
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
+import FilaMovimiento from '@/components/ui/FilaMovimiento.vue'
 
 export default {
   name: 'ClienteCompras',
-  components: { InvoiceForm, AnimatedNumber },
+  components: {
+    InvoiceForm,
+    AnimatedNumber,
+    AppSnackbar,
+    EncabezadoPagina,
+    BotonAccion,
+    EstadoVacio,
+    AvisoAmable,
+    DialogoAdaptable,
+    FilaMovimiento,
+  },
   data() {
     return {
       loading: false,
+      loadError: '',
+      deleting: false,
       invoices: [],
       filteredInvoices: [],
       searchQuery: '',
@@ -133,6 +217,12 @@ export default {
       deleteDialog: false,
       editingInvoice: null,
       invoiceToDelete: null,
+      snackbar: {
+        show: false,
+        message: '',
+        type: 'info',
+        timeout: 5000,
+      },
       headers: [
         { title: 'Número', key: 'invoiceNumber', sortable: true },
         { title: 'Proveedor', key: 'client', sortable: true },
@@ -169,6 +259,7 @@ export default {
     },
     async loadInvoices() {
       this.loading = true
+      this.loadError = ''
       try {
         // Filtrar por client_id del usuario actual
         const resp = await invoiceService.getInvoices({ flow: 'COMPRA', clientId: this.clientId })
@@ -178,6 +269,7 @@ export default {
         console.error('❌ Error al cargar compras:', e)
         this.invoices = []
         this.computeStats()
+        this.loadError = 'No pudimos cargar tus compras. Revisa tu conexión e intenta de nuevo.'
       } finally {
         this.loading = false
       }
@@ -193,13 +285,16 @@ export default {
       }
       this.stats = stats
     },
+    proveedorNombre(item) {
+      return item.issuer?.companyName || item.client_info?.companyName || 'N/A'
+    },
     applyFilters() {
       let filtered = [...this.invoices]
       if (this.searchQuery) {
         const s = this.searchQuery.toLowerCase()
         filtered = filtered.filter(i =>
           i.invoiceNumber?.toLowerCase().includes(s) ||
-          (i.issuer?.companyName || i.client_info?.companyName || '').toLowerCase().includes(s)
+          this.proveedorNombre(i).toLowerCase().includes(s)
         )
       }
       if (this.statusFilter) {
@@ -225,11 +320,22 @@ export default {
     },
     async confirmDelete() {
       if (!this.invoiceToDelete) return
-      const res = await invoiceService.deleteInvoice(this.invoiceToDelete.id)
-      if (res.success) {
-        await this.reloadData()
-        this.deleteDialog = false
-        this.invoiceToDelete = null
+      this.deleting = true
+      try {
+        const res = await invoiceService.deleteInvoice(this.invoiceToDelete.id)
+        if (res.success) {
+          await this.reloadData()
+          this.deleteDialog = false
+          this.invoiceToDelete = null
+          this.mostrarAviso('success', '¡Listo! Eliminamos la compra.')
+        } else {
+          this.mostrarAviso('error', 'No pudimos eliminar la compra. Intenta de nuevo.')
+        }
+      } catch (e) {
+        console.error('❌ Error al eliminar compra:', e)
+        this.mostrarAviso('error', 'No pudimos eliminar la compra. Intenta de nuevo.')
+      } finally {
+        this.deleting = false
       }
     },
     async handleInvoiceSubmit(result) {
@@ -237,11 +343,17 @@ export default {
         await this.reloadData()
         this.invoiceDialog = false
         this.editingInvoice = null
+        this.mostrarAviso('success', '¡Listo! Guardamos tu compra.')
+      } else {
+        this.mostrarAviso('error', 'No pudimos guardar tu compra. Intenta de nuevo.')
       }
     },
     closeInvoiceDialog() {
       this.invoiceDialog = false
       this.editingInvoice = null
+    },
+    mostrarAviso(type, message) {
+      this.snackbar = { show: true, type, message, timeout: 5000 }
     },
     formatDate(d) { return d ? new Date(d).toLocaleDateString('es-ES') : '' },
     formatCurrency(a, currency = 'VES') {
@@ -298,4 +410,3 @@ export default {
 .amount-changing { animation: amountChange 0.5s ease-in-out; }
 @keyframes amountChange { 0% { transform: scale(1) translateY(0); opacity: 1; } 50% { transform: scale(1.02) translateY(-2px); opacity: 0.9; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
 </style>
-
