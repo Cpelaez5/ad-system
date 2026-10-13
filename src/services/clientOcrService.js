@@ -110,7 +110,8 @@ ESTRUCTURA JSON REQUERIDA (Retorna SOLO esto)
   },
 
   "currency": "VES|USD|EUR",
-  "notes": "Observaciones o null"
+  "notes": "Observaciones o null",
+  "expenseCategoryHint": "Solo si detectedFlow es COMPRA o GASTO: una palabra o frase corta con el tipo de gasto (ej: Electricidad, Internet, Papelería, Comida, Combustible, Alquiler, Compras en línea, Mantenimiento) o null si no es claro"
 }
 
 ═══════════════════════════════════════════════════════════════
