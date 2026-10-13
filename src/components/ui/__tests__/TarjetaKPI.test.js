@@ -54,7 +54,7 @@ describe('TarjetaKPI.vue', () => {
     expect(wrapper.text()).toContain('12% más que el período anterior')
   })
 
-  it('variación despreciable (<0.5%) se ve neutra, con ícono de "igual"', () => {
+  it('variación despreciable (<0.5%) se ve neutra, con ícono de "igual" y texto con contraste AA', () => {
     const wrapper = mount(TarjetaKPI, {
       props: { etiqueta: 'Vendí', monto: 100, variacion: 0.1 },
       global: globalConfig,
@@ -62,6 +62,20 @@ describe('TarjetaKPI.vue', () => {
     const icono = wrapper.find('[data-icon]')
     expect(icono.attributes('data-icon')).toBe('mdi-minus')
     expect(icono.attributes('data-color')).toBe('grey')
+    // hallazgo #12: texto neutro NO usa text-grey (no pasa AA).
+    expect(wrapper.find('.tarjeta-kpi__comparacion span').classes()).toContain('text-medium-emphasis')
+    expect(wrapper.find('.tarjeta-kpi__comparacion span').classes()).not.toContain('text-grey')
+  })
+
+  it('variación "nuevo" (período anterior en 0) no inventa un porcentaje', () => {
+    const wrapper = mount(TarjetaKPI, {
+      props: { etiqueta: 'Vendí', monto: 100, variacion: 'nuevo', etiquetaPeriodoAnterior: 'el mes pasado' },
+      global: globalConfig,
+    })
+    expect(wrapper.text()).toContain('No hubo nada el mes pasado para comparar')
+    expect(wrapper.text()).not.toContain('100%')
+    const icono = wrapper.find('[data-icon]')
+    expect(icono.attributes('data-icon')).toBe('mdi-star-four-points-outline')
   })
 
   it('usa la etiqueta del período anterior que se le pase', () => {

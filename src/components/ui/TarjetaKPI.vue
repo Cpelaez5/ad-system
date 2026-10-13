@@ -10,14 +10,14 @@
   >
     <div v-if="texto" class="tarjeta-kpi__comparacion mt-2 d-flex align-center ga-1">
       <v-icon :icon="icono" :color="colorComparacion" size="16" />
-      <span class="text-caption" :class="`text-${colorComparacion}`">{{ texto }}</span>
+      <span class="text-caption" :class="claseTexto">{{ texto }}</span>
     </div>
   </ResumenMonto>
 </template>
 
 <script>
 import ResumenMonto from './ResumenMonto.vue'
-import { textoComparacion } from '@/utils/resumenFinanciero'
+import { textoComparacion, UMBRAL_SIN_CAMBIO } from '@/utils/resumenFinanciero'
 import { ESCALON_LISTA_MS } from './movimiento.js'
 
 /**
@@ -47,8 +47,12 @@ export default {
     montoBs: { type: Number, default: null },
     /** Color del monto grande (token del tema: "success", "error", "primary"...). */
     color: { type: String, default: 'primary' },
-    /** Porcentaje vs período anterior. null = sin período anterior para comparar. */
-    variacion: { type: Number, default: null },
+    /**
+     * Porcentaje vs período anterior (ver `calcularVariacion`). `null` = sin
+     * período anterior para comparar; `'nuevo'` = el período anterior fue 0
+     * (crecimiento indefinido, no "100% más").
+     */
+    variacion: { type: [Number, String], default: null },
     /** Si subir el monto es una buena noticia para esta tarjeta. */
     subirEsBueno: { type: Boolean, default: true },
     /** Cómo nombrar el período anterior en el texto ("el mes pasado", "el año pasado"...). */
@@ -61,20 +65,31 @@ export default {
     texto() {
       return textoComparacion(this.variacion, this.etiquetaPeriodoAnterior)
     },
+    esNuevo() {
+      return this.variacion === 'nuevo'
+    },
     sinCambioRelevante() {
-      return this.variacion === null || Math.abs(this.variacion) < 0.5
+      if (this.esNuevo) return false
+      return this.variacion === null || Math.abs(this.variacion) < UMBRAL_SIN_CAMBIO
     },
     subio() {
-      return (this.variacion || 0) > 0
+      return !this.esNuevo && (this.variacion || 0) > 0
     },
     icono() {
+      if (this.esNuevo) return 'mdi-star-four-points-outline'
       if (this.sinCambioRelevante) return 'mdi-minus'
       return this.subio ? 'mdi-arrow-up-bold' : 'mdi-arrow-down-bold'
     },
     colorComparacion() {
+      if (this.esNuevo) return 'secondary'
       if (this.sinCambioRelevante) return 'grey'
       const esBueno = this.subio === this.subirEsBueno
       return esBueno ? 'success' : 'error'
+    },
+    /** Texto de la comparación: evita `text-grey` (≈2.7:1, no pasa AA) cuando es neutro. */
+    claseTexto() {
+      if (this.sinCambioRelevante) return 'text-medium-emphasis'
+      return `text-${this.colorComparacion}`
     },
     retraso() {
       return `${this.indice * ESCALON_LISTA_MS}ms`
