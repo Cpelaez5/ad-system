@@ -1059,6 +1059,7 @@
     <!-- Diálogo de filtros de fecha para exportación (UX Mejorado) -->
     <DialogoAdaptable
       v-model="exportDateDialog"
+      @cerrar="cancelExportDateDialog"
       titulo="Exportar registros"
       icono="mdi-file-export-outline"
       max-width="520"
@@ -1251,6 +1252,7 @@
     <!-- ── Diálogo confirmación retención municipal ─────────── -->
     <DialogoAdaptable
       v-model="municipalConfirmDialog"
+      @cerrar="resolverMunicipalConfirm(false)"
       titulo="Tu proveedor está en otro municipio"
       icono="mdi-map-marker-alert-outline"
       max-width="420"

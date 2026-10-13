@@ -54,4 +54,26 @@ describe('DialogoAdaptable.vue', () => {
     const wrapper = montar({ cargando: true })
     expect(wrapper.find('button[aria-label="Cerrar"]').attributes('disabled')).toBeDefined()
   })
+
+  // I5 (ola F2b): la X antes emitía update:modelValue=false directo, sin
+  // pasar por ningún cierre propio de la vista.
+  it('la X también emite "cerrar", para que la vista limpie su propio estado', async () => {
+    const wrapper = montar()
+    await wrapper.find('button[aria-label="Cerrar"]').trigger('click')
+    expect(wrapper.emitted('cerrar')).toHaveLength(1)
+  })
+
+  it('el cierre por el backdrop/Esc (update:model-value del v-dialog) también emite "cerrar"', async () => {
+    const wrapper = montar()
+    // Simula lo que hace v-dialog al cerrarse por backdrop/Esc.
+    await wrapper.vm.actualizarModelo(false)
+    expect(wrapper.emitted('update:modelValue')).toContainEqual([false])
+    expect(wrapper.emitted('cerrar')).toHaveLength(1)
+  })
+
+  it('no emite "cerrar" cuando el modelo pasa a true', async () => {
+    const wrapper = montar()
+    await wrapper.vm.actualizarModelo(true)
+    expect(wrapper.emitted('cerrar')).toBeFalsy()
+  })
 })
