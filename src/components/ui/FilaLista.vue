@@ -26,7 +26,10 @@
       </v-chip>
     </div>
 
-    <div v-if="$slots.acciones" class="fila-lista__acciones" @click.stop>
+    <!-- M7 (ola F2b): solo "click" tenía .stop; un Enter/Espacio sobre un
+         botón del slot "acciones" subía hasta la fila clicable y disparaba
+         también su propio evento "click". -->
+    <div v-if="$slots.acciones" class="fila-lista__acciones" @click.stop @keydown.enter.stop @keydown.space.stop>
       <slot name="acciones" />
     </div>
   </div>

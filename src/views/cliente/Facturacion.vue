@@ -378,7 +378,7 @@
             :key="item.id"
             class="ad-move-entrada"
             :style="{ animationDelay: `calc(var(--ad-move-escalon-lista) * ${Math.min(i, 12)})` }"
-            :quien="item.flow === 'VENTA' ? item.client?.companyName : item.issuer?.companyName"
+            :quien="(item.flow === 'VENTA' ? item.client?.companyName : item.issuer?.companyName) || 'Sin nombre'"
             :subtitulo="item.invoiceNumber"
             :fecha="item.issueDate"
             :monto="getDisplayAmountYMoneda(item).monto"

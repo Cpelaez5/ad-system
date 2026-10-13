@@ -310,7 +310,7 @@
               v-for="item in filteredProducts"
               :key="item.id"
               :titulo="item.name"
-              :subtitulo="(item.code ? item.code + ' · ' : '') + (item.deleted_at ? 'Eliminado' : item.stock + ' ' + item.unit)"
+              :subtitulo="(item.code ? item.code + ' · ' : '') + (item.deleted_at ? 'Eliminado' : item.stock + ' ' + (item.unit || 'Und'))"
               :valor="formatCurrency(item.sale_price, item.currency)"
               :estado="item.deleted_at ? '' : (item.stock <= 0 ? 'Agotado' : (item.stock <= item.min_stock ? 'Stock bajo' : ''))"
               :color-estado="item.stock <= 0 ? 'error' : 'warning'"

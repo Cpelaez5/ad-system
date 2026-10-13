@@ -3,7 +3,7 @@
     class="fila-movimiento ad-move-press"
     role="button"
     tabindex="0"
-    :aria-label="`${quien}, ${montoFormateado}, ${estado || ''}`"
+    :aria-label="`${quien || 'Sin nombre'}, ${montoFormateado}, ${estado || ''}`"
     @click="$emit('abrir', $event)"
     @keydown.enter="$emit('abrir', $event)"
     @keydown.space.prevent="$emit('abrir', $event)"
@@ -13,7 +13,9 @@
         <v-icon :icon="icono" :color="colorIcono" size="22" aria-hidden="true" />
       </template>
 
-      <v-card-title class="fila-movimiento__quien">{{ quien }}</v-card-title>
+      <!-- M7 (ola F2b): `quien` es obligatorio, pero si al emisor/cliente le
+           falta companyName llega undefined (warning de Vue + título vacío). -->
+      <v-card-title class="fila-movimiento__quien">{{ quien || 'Sin nombre' }}</v-card-title>
       <v-card-subtitle v-if="subtitulo || fechaFormateada" class="fila-movimiento__detalle">
         <span v-if="subtitulo">{{ subtitulo }}</span>
         <span v-if="subtitulo && fechaFormateada"> · </span>
