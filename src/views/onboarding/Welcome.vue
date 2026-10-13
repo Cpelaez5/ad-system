@@ -1,113 +1,167 @@
 <template>
   <div class="welcome-container">
-    <div class="welcome-content animate-fade-in">
-      <div class="header-section text-center mb-8">
-        <h1 class="text-h3 font-weight-bold mb-2">¡Bienvenido, {{ firstName }}!</h1>
-        <p class="text-h6 text-medium-emphasis">
-          <span v-if="daysLeft > 0">
-            Tienes <span class="text-primary font-weight-bold">{{ daysLeft }} días</span> de prueba gratuita.
-          </span>
-          <span v-else class="text-error font-weight-bold">
-            Tu periodo de prueba ha finalizado.
-          </span>
-        </p>
-      </div>
+    <div class="welcome-header d-flex justify-end pa-4">
+      <button @click="finishWelcome" aria-label="Saltar introducción" class="btn-saltar">
+        Saltar
+      </button>
+    </div>
+    
+    <div class="welcome-content px-4 pb-8">
+      <v-window 
+        v-model="step" 
+        :transition="transitionName" 
+        :reverse-transition="reverseTransitionName"
+      >
+        <!-- Paso 1 -->
+        <v-window-item :value="1">
+          <div class="text-center px-2">
+            <LogoAdSystem :alto="80" variante="completo" class="mb-6" />
+            <h1 class="text-h4 font-weight-bold mb-4">Bienvenido a AD System</h1>
+            <p class="text-body-1 text-medium-emphasis mx-auto" style="max-width: 400px; font-size: 16px;">
+              Aquí llevas las cuentas de tu negocio y te mantienes al día con el SENIAT, sin complicarte.
+            </p>
+          </div>
+        </v-window-item>
 
-      <div class="features-grid mb-8">
-        <div class="feature-card">
-          <v-icon color="primary" size="32" class="mb-2">mdi-file-document-outline</v-icon>
-          <h3 class="font-weight-bold mb-1">Facturas con IA</h3>
-          <p class="text-body-2 text-medium-emphasis">Sube una foto o PDF y deja que la IA complete los datos.</p>
-        </div>
-        <div class="feature-card">
-          <v-icon color="primary" size="32" class="mb-2">mdi-robot</v-icon>
-          <h3 class="font-weight-bold mb-1">Chatbot Inteligente</h3>
-          <p class="text-body-2 text-medium-emphasis">Resuelve tus dudas sobre el sistema al instante.</p>
-        </div>
-        <div class="feature-card">
-          <v-icon color="primary" size="32" class="mb-2">mdi-cloud-upload</v-icon>
-          <h3 class="font-weight-bold mb-1">5 GB de Espacio</h3>
-          <p class="text-body-2 text-medium-emphasis">Almacenamiento inicial para tus documentos.</p>
-        </div>
-      </div>
+        <!-- Paso 2 -->
+        <v-window-item :value="2">
+          <div class="text-center px-2">
+            <v-icon size="120" color="primary" class="mb-4">mdi-camera</v-icon>
+            <h2 class="text-h4 font-weight-bold mb-4">Registra con una foto</h2>
+            <p class="text-body-1 text-medium-emphasis mx-auto" style="max-width: 400px; font-size: 16px;">
+              Cuando compres o vendas algo, tómale una foto a la factura. Nosotros leemos los datos por ti.
+            </p>
+          </div>
+        </v-window-item>
 
-      <div class="actions-section">
-        <v-btn
-          v-if="daysLeft > 0"
-          color="primary"
-          size="x-large"
-          block
-          class="mb-4"
-          @click="startTrial"
+        <!-- Paso 3 -->
+        <v-window-item :value="3">
+          <div class="text-center px-2">
+            <v-icon size="120" color="primary" class="mb-4">mdi-chart-box-outline</v-icon>
+            <h2 class="text-h4 font-weight-bold mb-4">Mira cómo vas</h2>
+            <p class="text-body-1 text-medium-emphasis mx-auto" style="max-width: 400px; font-size: 16px;">
+              En Inicio ves cuánto vendiste, cuánto gastaste y lo que tienes pendiente.
+            </p>
+          </div>
+        </v-window-item>
+      </v-window>
+
+      <!-- Indicadores -->
+      <div class="d-flex justify-center align-center mt-8 mb-8" aria-hidden="true">
+        <v-icon 
+          v-for="n in 3" 
+          :key="n"
+          size="small"
+          :color="n === step ? 'primary' : 'grey-lighten-2'"
+          class="mx-1 transition-colors"
         >
-          Comenzar mi prueba
-          <v-icon end>mdi-arrow-right</v-icon>
-        </v-btn>
-        
-        <v-btn
+          mdi-circle
+        </v-icon>
+      </div>
+
+      <!-- Controles -->
+      <div class="d-flex flex-column gap-4 align-center mt-4 w-100">
+        <BotonAccion 
+          v-if="step < 3"
+          texto="Siguiente"
+          tamano="principal"
+          ancho="completo"
+          @click="step++"
+        />
+        <BotonAccion 
           v-else
-          color="primary"
-          size="x-large"
-          block
-          class="mb-4"
-          to="/pricing"
-        >
-          Ver planes disponibles
-          <v-icon end>mdi-arrow-right</v-icon>
-        </v-btn>
-
-        <v-btn
-          v-if="daysLeft > 0"
-          variant="outlined"
-          block
-          to="/pricing"
-        >
-          Ver planes disponibles
-        </v-btn>
+          texto="Empezar"
+          tamano="principal"
+          ancho="completo"
+          @click="finishWelcome"
+        />
+        
+        <BotonAccion 
+          v-if="step > 1"
+          texto="Atrás"
+          variante="terciaria"
+          ancho="completo"
+          @click="step--"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { supabase } from '@/lib/supabaseClient'
+import BotonAccion from '@/components/ui/BotonAccion.vue';
+import LogoAdSystem from '@/components/ui/LogoAdSystem.vue';
+import userService from '@/services/userService';
 
 export default {
   name: 'Welcome',
+  components: {
+    BotonAccion,
+    LogoAdSystem,
+  },
   data() {
     return {
-      firstName: '',
-      daysLeft: 15
+      step: 1,
+      reducedMotion: false,
     }
   },
-  async mounted() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      this.firstName = user.user_metadata.first_name || 'Usuario';
-      
-      // Calculate days left
-      const { data: profile } = await supabase
-        .from('users')
-        .select('trial_end')
-        .eq('id', user.id)
-        .single();
-        
-      if (profile?.trial_end) {
-        const end = new Date(profile.trial_end);
-        const now = new Date();
-        if (now > end) {
-          this.daysLeft = 0;
-        } else {
-          const diffTime = end - now;
-          this.daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-        }
+  computed: {
+    transitionName() {
+      return this.reducedMotion ? 'none' : 'v-window-x-transition';
+    },
+    reverseTransitionName() {
+      return this.reducedMotion ? 'none' : 'v-window-x-reverse-transition';
+    }
+  },
+  mounted() {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      this.reducedMotion = mediaQuery.matches;
+      // Escuchar cambios de preferencia (compatibilidad según navegador)
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', this.handleMotionChange);
+      } else if (mediaQuery.addListener) {
+        mediaQuery.addListener(this.handleMotionChange); // Safari antiguo
+      }
+    }
+  },
+  beforeUnmount() {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', this.handleMotionChange);
+      } else if (mediaQuery.removeListener) {
+        mediaQuery.removeListener(this.handleMotionChange);
       }
     }
   },
   methods: {
-    startTrial() {
+    handleMotionChange(e) {
+      this.reducedMotion = e.matches;
+    },
+    async finishWelcome() {
       localStorage.setItem('welcome_seen', 'true');
-      this.$router.push('/dashboard');
+      
+      const currentUser = await userService.getCurrentUser();
+      
+      if (currentUser && currentUser.role === 'cliente') {
+        const client = currentUser.client || {};
+        const hasActivity = Boolean(client.activity_type && String(client.activity_type).trim());
+        const hasLicencia = Boolean(client.licencia_actividad_economica && String(client.licencia_actividad_economica).trim());
+        const hasMunicipio = Boolean(client.municipio || client.municipio_id);
+        const hasEstado = Boolean(client.estado || hasMunicipio);
+
+        const isFiscalIncomplete = !hasActivity || !hasLicencia || !hasMunicipio || !hasEstado;
+
+        if (isFiscalIncomplete) {
+          this.$router.push({ path: '/cliente/mi-area', query: { required: 'fiscal' } });
+        } else {
+          this.$router.push('/cliente/inicio');
+        }
+      } else {
+        // Fallback for non-client or unexpected missing data, as per original logic
+        this.$router.push('/dashboard');
+      }
     }
   }
 }
@@ -117,45 +171,58 @@ export default {
 .welcome-container {
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  padding: 20px;
+  flex-direction: column;
+  background-color: var(--background, #efefef);
+}
+
+.welcome-header {
+  height: 60px;
 }
 
 .welcome-content {
-  background: white;
-  padding: 48px;
-  border-radius: 32px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-  max-width: 800px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 480px;
   width: 100%;
+  margin: 0 auto;
 }
 
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 24px;
+.gap-4 {
+  gap: 16px;
 }
 
-.feature-card {
-  padding: 24px;
-  background: #f8f9fa;
-  border-radius: 16px;
-  text-align: center;
-  transition: transform 0.2s;
+.btn-saltar {
+  background: transparent;
+  border: none;
+  color: rgba(0,0,0,0.6);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 4px;
+  text-decoration: underline;
+  transition: color 0.2s ease;
 }
 
-.feature-card:hover {
-  transform: translateY(-5px);
+.btn-saltar:focus-visible {
+  outline: 3px solid #1F355C;
+  outline-offset: 2px;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out;
+.btn-saltar:hover {
+  color: rgba(0,0,0,0.87);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+.transition-colors {
+  transition: color 0.3s ease;
+}
+
+/* Fallback general de reduced motion por si Vuetify inyecta transiciones inline */
+@media (prefers-reduced-motion: reduce) {
+  .transition-colors {
+    transition: none !important;
+  }
 }
 </style>
