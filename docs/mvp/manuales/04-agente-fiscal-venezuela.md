@@ -25,3 +25,4 @@
 - [ ] **C6. ISLR persona natural en la vista previa:** `SimpleInvoiceForm.calcularRetenciones()` no resta el sustraendo (el RPC al guardar sí) y no carga `tipo_persona` del proveedor → lo mostrado difiere de lo guardado. Unificar con la regla del RPC.
 - [ ] **C7. Municipal en la vista previa:** calcula sin verificar mismo municipio. Ver también W5 (`backlog-cliente-whatsapp.md`): la contadora pidió **advertir sin bloquear**; decisión del orquestador: advertencia visible + permitir, registrando la confirmación del usuario.
 - [ ] **C8. Cashea multi-moneda:** las cuotas no tienen moneda/tasa propias (GEMINI.md lo exige). Agregar moneda y tasa por cuota con la tasa BCV de la fecha de pago.
+- [ ] **C9. Estado de cuotas en compras:** las cuotas de crédito usan 'POR_COBRAR' también en COMPRA (deberían ser 'por pagar'). Revisar impacto en cuentas por cobrar/Cashea antes de cambiar (QA 2026-10-13).
