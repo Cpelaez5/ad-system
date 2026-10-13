@@ -1,15 +1,22 @@
 <template>
-  <v-card class="mb-4 rounded-xl overflow-hidden" elevation="0" variant="outlined">
+  <v-card class="mb-2 rounded-xl overflow-hidden tracker-periodos" elevation="0" border>
     <!-- ══════════════════════════════════════════ -->
     <!-- Encabezado: Tipo de Documento              -->
     <!-- ══════════════════════════════════════════ -->
+    <!-- Plegado por defecto: el encabezado es el resumen; tocarlo despliega los períodos -->
     <div
-      class="px-4 py-3 d-flex align-center flex-wrap"
-      style="background: linear-gradient(90deg, #f8f9fa 0%, #fff 100%); border-bottom: 1px solid rgba(0,0,0,0.07)"
+      class="px-4 py-3 d-flex align-center flex-wrap tracker-periodos__cabecera"
+      :class="{ 'tracker-periodos__cabecera--abierta': abierto }"
+      role="button"
+      tabindex="0"
+      :aria-expanded="abierto ? 'true' : 'false'"
+      @click="abierto = !abierto"
+      @keydown.enter.prevent="abierto = !abierto"
+      @keydown.space.prevent="abierto = !abierto"
     >
-      <v-icon :icon="categoryIcon" color="primary" class="mr-3" size="22" />
+      <v-icon :icon="categoryIcon" class="mr-3" size="22" />
       <div class="flex-grow-1">
-        <div class="text-subtitle-1 font-weight-bold text-secondary">{{ type.label }}</div>
+        <div class="text-subtitle-1 font-weight-bold">{{ type.label }}</div>
         <div class="text-caption text-grey-darken-1 d-flex align-center">
           <v-icon size="x-small" class="mr-1">mdi-refresh</v-icon>
           Frecuencia:
@@ -23,7 +30,7 @@
         size="small"
         color="primary"
         variant="tonal"
-        class="mt-2 mt-sm-0"
+        class="mt-2 mt-sm-0 tracker-periodos__chip"
       >
         <v-icon start size="x-small">mdi-upload-multiple</v-icon>
         {{ flexDocs.length }} cargado(s)
@@ -35,15 +42,22 @@
         size="small"
         :color="completionColor"
         variant="tonal"
-        class="mt-2 mt-sm-0"
+        class="mt-2 mt-sm-0 tracker-periodos__chip"
       >
         <v-icon start size="x-small">
           {{ uploadedCount === passedPeriods ? 'mdi-check-all' : 'mdi-chart-arc' }}
         </v-icon>
         {{ uploadedCount }} / {{ passedPeriods }} Completados
       </v-chip>
+      <v-icon
+        icon="mdi-chevron-down"
+        class="ml-2 tracker-periodos__chevron"
+        :class="{ 'tracker-periodos__chevron--abierto': abierto }"
+      />
     </div>
 
+    <v-expand-transition>
+    <div v-show="abierto">
     <!-- ══════════════════════════════════════════ -->
     <!-- MODO FLEXIBLE: solo muestra docs cargados  -->
     <!-- ══════════════════════════════════════════ -->
@@ -270,11 +284,13 @@
         </v-list-item>
       </v-list>
     </template>
+    </div>
+    </v-expand-transition>
   </v-card>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { FREQUENCIES, isFlexibleType } from '@/constants/fiscalDocuments'
 
 // ──────────────────────────────────────────────
@@ -288,8 +304,12 @@ const props = defineProps({
   /** Documentos del sistema correspondientes a este tipo */
   documents: { type: Array, required: true },
   /** Año fiscal seleccionado en la vista padre */
-  year: { type: Number, required: true }
+  year: { type: Number, required: true },
+  /** Desplegado al cargar (por defecto plegado, para no abrumar con 12 meses por tipo). */
+  abiertoInicial: { type: Boolean, default: false }
 })
+
+const abierto = ref(props.abiertoInicial)
 
 const emit = defineEmits(['open-preview', 'open-dialog'])
 
@@ -552,6 +572,38 @@ const getPeriodIcon = (period) => {
 </script>
 
 <style scoped>
+.tracker-periodos__cabecera {
+  cursor: pointer;
+  transition: background-color var(--ad-move-rapido) var(--ad-move-curva-entrada);
+}
+.tracker-periodos__cabecera:hover {
+  background: rgba(var(--v-theme-on-surface), 0.035);
+}
+.tracker-periodos__cabecera:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -2px;
+}
+.tracker-periodos__cabecera--abierta {
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+.tracker-periodos__chevron {
+  transition: transform var(--ad-move-normal) var(--ad-move-curva-entrada);
+}
+.tracker-periodos__chevron--abierto {
+  transform: rotate(180deg);
+}
+/* Teléfono: la flecha queda arriba a la derecha y el avance baja bajo el nombre */
+@media (max-width: 599px) {
+  .tracker-periodos__chevron { order: 2; margin-left: auto !important; align-self: flex-start; }
+  .tracker-periodos__chip { order: 3; margin-left: 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tracker-periodos__cabecera,
+  .tracker-periodos__chevron { transition: none; }
+}
+
+
 .cursor-pointer { cursor: pointer; }
 .opacity-50 { opacity: 0.5; }
 </style>

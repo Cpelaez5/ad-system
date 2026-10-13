@@ -154,7 +154,7 @@
                 <v-icon color="secondary">mdi-stamper</v-icon>
               </v-avatar>
             </template>
-            <v-card-title class="text-h6 font-weight-bold" style="color: #1F355C;">
+            <v-card-title class="text-h6 font-weight-bold" style="color: #2A2A2E;">
               Sello y Firma Digital
             </v-card-title>
             <v-card-subtitle>
@@ -797,7 +797,7 @@ export default {
 }
 
 .seal-upload-box:hover {
-  border-color: #1F355C !important;
+  border-color: #2A2A2E !important;
   box-shadow: 0 4px 12px rgba(31, 53, 92, 0.06);
 }
 

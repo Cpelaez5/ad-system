@@ -894,7 +894,7 @@ export default {
 
 .filter-slide-group :deep(.v-slide-group__prev .v-icon),
 .filter-slide-group :deep(.v-slide-group__next .v-icon) {
-  color: #1F355C !important;
+  color: #2A2A2E !important;
   font-size: 22px !important;
 }
 </style>

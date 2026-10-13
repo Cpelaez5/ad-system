@@ -93,7 +93,7 @@ h1 *, h2 *, h3 *, h4 *, h5 *, h6 *, p *, span *, div *, a *, button *, input *, 
    selector de ícono tiene más especificidad y se pinta después, así que
    los íconos sí se quedan dorados. */
 .text-warning {
-  color: #1F355C !important;
+  color: #2A2A2E !important;
 }
 .v-icon.text-warning {
   color: #E0B04F !important;

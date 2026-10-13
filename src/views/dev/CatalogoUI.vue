@@ -10,11 +10,11 @@
       <h2 class="mb-4">LogoAdSystem</h2>
       <div class="d-flex flex-wrap ga-6 align-center">
         <LogoAdSystem variante="completo" tono="color" />
-        <div style="background: #1F355C; padding: 8px; border-radius: 8px;">
+        <div style="background: #2A2A2E; padding: 8px; border-radius: 8px;">
           <LogoAdSystem variante="completo" tono="blanco" />
         </div>
         <LogoAdSystem variante="icono" tono="color" :alto="48" />
-        <div style="background: #1F355C; padding: 8px; border-radius: 8px;">
+        <div style="background: #2A2A2E; padding: 8px; border-radius: 8px;">
           <LogoAdSystem variante="icono" tono="blanco" :alto="48" />
         </div>
       </div>

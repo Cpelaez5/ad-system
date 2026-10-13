@@ -28,7 +28,7 @@
         </v-card>
       </v-col>
       <v-col cols="12" sm="6" md="3">
-        <v-card rounded="xl" class="pa-4 stat-card" style="background: #E0B04F; color: #1F355C;">
+        <v-card rounded="xl" class="pa-4 stat-card" style="background: #E0B04F; color: #2A2A2E;">
           <div class="text-caption text-uppercase opacity-80 mb-1">Pendiente</div>
           <div class="text-h5 font-weight-bold">${{ formatMoney(balance.totalPendiente) }}</div>
         </v-card>

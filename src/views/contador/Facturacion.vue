@@ -375,7 +375,7 @@
     <v-dialog v-model="viewDialog" max-width="900px" scrollable>
       <v-card v-if="viewingInvoice" class="rounded-xl elevation-0" style="border-radius: 20px !important;">
         <!-- Header con gradiente sutil -->
-        <div class="pa-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
+        <div class="pa-6" style="background: linear-gradient(135deg, #2A2A2E 0%, #3F3F46 100%);">
             <div class="d-flex align-center">
                 <v-avatar color="white" size="48" class="mr-4">
                     <v-icon icon="mdi-receipt-text-outline" color="secondary" size="24"></v-icon>

@@ -11,7 +11,7 @@
             <v-icon size="28" color="white">mdi-cog</v-icon>
           </div>
           <div>
-            <h1 class="text-h5 font-weight-bold" style="color:#1F355C;">Configuración</h1>
+            <h1 class="text-h5 font-weight-bold" style="color:#2A2A2E;">Configuración</h1>
             <p class="text-body-2 text-grey-darken-1 ma-0">
               Personaliza cómo se comporta el sistema según tus preferencias.
             </p>
@@ -753,7 +753,7 @@ export default {
 }
 
 .settings-card-header {
-  background: linear-gradient(135deg, #1F355C, #2d4a7a);
+  background: linear-gradient(135deg, #2A2A2E, #2d4a7a);
   padding: 16px 24px;
   display: flex;
   align-items: center;
@@ -831,8 +831,8 @@ export default {
   justify-content: center;
   flex-shrink: 0;
 }
-.currency-icon-wrap.usd { background: linear-gradient(135deg, #1F355C, #2d4a7a); }
-.currency-icon-wrap.eur { background: linear-gradient(135deg, #02254d, #1F355C); }
+.currency-icon-wrap.usd { background: linear-gradient(135deg, #2A2A2E, #2d4a7a); }
+.currency-icon-wrap.eur { background: linear-gradient(135deg, #02254d, #2A2A2E); }
 .currency-icon-wrap.cny { background: linear-gradient(135deg, #c0392b, #e74c3c); }
 .currency-icon-wrap.try { background: linear-gradient(135deg, #A81C22, #d63031); }
 .currency-icon-wrap.rub { background: linear-gradient(135deg, #2980b9, #3498db); }
