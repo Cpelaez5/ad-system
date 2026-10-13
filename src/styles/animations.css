@@ -28,6 +28,9 @@
   --ad-move-duracion-press: 150ms;
   --ad-move-escala-press: 0.98;
   --ad-move-curva-entrada: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Duraciones de la navegación (barra, menú lateral, chips) */
+  --ad-move-rapido: 150ms;
+  --ad-move-normal: 250ms;
 }
 
 /* ========================================

@@ -36,6 +36,10 @@ export const ESCALA_PRESS = 0.98
 /** Curva "suave" de entrada — easeOutExpo-like, más marcada que el --ease-out de animations.css. */
 export const CURVA_ENTRADA = 'cubic-bezier(0.22, 1, 0.36, 1)'
 
+/** Duraciones de la navegación (barra, menú lateral, chips) — espejo de --ad-move-rapido / --ad-move-normal. */
+export const DURACION_RAPIDA_MS = 150
+export const DURACION_NORMAL_MS = 250
+
 /** AnimatedNumber al cambiar de período (números que cuentan, no saltan). */
 export const DURACION_NUMERO_MS = 600
 

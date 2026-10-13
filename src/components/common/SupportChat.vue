@@ -4,10 +4,13 @@
   <!-- ═══════════════════════════════════════════════ -->
   <div v-if="isCliente" class="support-chat-wrapper">
 
-    <!-- Botón flotante -->
+    <!-- Botón flotante: oculto en móvil (<600px), donde tapaba el botón
+         "Más" de la barra inferior del cliente. En móvil se abre desde la
+         hoja "Más" → "Ayuda" (ver ClienteBottomNav.vue/HojaMas.vue), que
+         dispara el evento 'ad-open-support-chat' escuchado abajo. -->
     <transition name="fab-bounce">
       <v-btn
-        v-if="!isChatOpen"
+        v-if="!isChatOpen && !isMobile"
         class="chat-fab"
         icon
         size="56"
@@ -282,11 +285,15 @@ export default {
     this.checkMobile()
     window.addEventListener('resize', this.checkMobile)
     window.addEventListener('userUpdated', this.loadUser)
+    // Disparado por el ítem "Ayuda" de la hoja "Más" en móvil (la burbuja
+    // flotante está oculta ahí), ver ClienteBottomNav.vue/HojaMas.vue.
+    window.addEventListener('ad-open-support-chat', this.openChat)
   },
 
   beforeUnmount() {
     window.removeEventListener('resize', this.checkMobile)
     window.removeEventListener('userUpdated', this.loadUser)
+    window.removeEventListener('ad-open-support-chat', this.openChat)
   },
 
   methods: {

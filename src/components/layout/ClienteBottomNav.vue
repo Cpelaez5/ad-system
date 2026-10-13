@@ -16,6 +16,14 @@
       role="navigation"
       aria-label="Navegación principal"
     >
+      <!-- Indicador activo: se desliza entre los 4 ítems (solo decorativo). -->
+      <div
+        class="cliente-bottom-nav__indicador"
+        :class="{ 'cliente-bottom-nav__indicador--visible': activeIndex !== null }"
+        :style="activeIndex !== null ? { transform: `translateX(${activeIndex * 100}%)` } : null"
+        aria-hidden="true"
+      />
+
       <v-btn value="inicio" aria-label="Inicio" @click="irA('/cliente/inicio')">
         <v-icon>mdi-home-variant</v-icon>
         <span>Inicio</span>
@@ -62,47 +70,20 @@
       </div>
     </HojaInferior>
 
-    <!-- Hoja "Más": resto del menú + cerrar sesión -->
+    <!-- Hoja "Más": resto del menú + tasas del día + ayuda + cerrar sesión. -->
     <HojaInferior v-model="sheetMas" titulo="Más opciones">
-      <v-list>
-        <v-list-item
-          prepend-icon="mdi-file-certificate-outline"
-          title="Mis papeles"
-          @click="irA('/cliente/fiscal-360'); sheetMas = false"
-        />
-        <v-list-item
-          v-if="!isServicesCompany"
-          prepend-icon="mdi-package-variant-closed"
-          title="Mi mercancía"
-          @click="irA('/cliente/inventario'); sheetMas = false"
-        />
-        <v-list-item
-          prepend-icon="mdi-truck-delivery-outline"
-          title="Mis proveedores"
-          @click="irA('/cliente/proveedores'); sheetMas = false"
-        />
-        <v-list-item
-          prepend-icon="mdi-domain"
-          title="Mi negocio"
-          @click="irA('/cliente/mi-area'); sheetMas = false"
-        />
-        <v-list-item
-          prepend-icon="mdi-crown-outline"
-          title="Mi plan"
-          @click="irA('/cliente/planes'); sheetMas = false"
-        />
-        <v-list-item
-          prepend-icon="mdi-chart-line"
-          title="¿Cómo voy?"
-          @click="irA('/cliente/dashboard'); sheetMas = false"
-        />
-        <v-divider class="my-2" />
-        <v-list-item
-          prepend-icon="mdi-logout"
-          title="Cerrar sesión"
-          @click="logout"
-        />
-      </v-list>
+      <HojaMas
+        :is-services-company="isServicesCompany"
+        :bcv-rate="bcvRate"
+        :show-usd-rate="showUsdRate"
+        :show-eur-rate="showEurRate"
+        :show-cny-rate="showCnyRate"
+        :show-try-rate="showTryRate"
+        :show-rub-rate="showRubRate"
+        @navegar="navegarDesdeMas"
+        @ayuda="abrirAyuda"
+        @logout="logout"
+      />
     </HojaInferior>
   </template>
 </template>
@@ -110,16 +91,27 @@
 <script>
 import HojaInferior from '@/components/ui/HojaInferior.vue';
 import TarjetaAccion from '@/components/ui/TarjetaAccion.vue';
+import HojaMas from './HojaMas.vue';
 
 /**
  * ClienteBottomNav — barra de navegación inferior fija, solo para el rol
  * `cliente` en móvil (<600px). Reemplaza el drawer lateral en ese breakpoint
- * (ver Sidebar.vue, que se oculta por completo para cliente+móvil).
+ * (ver MenuLateral.vue, que no se renderiza para cliente+móvil).
  */
 export default {
   name: 'ClienteBottomNav',
 
-  components: { HojaInferior, TarjetaAccion },
+  components: { HojaInferior, TarjetaAccion, HojaMas },
+
+  props: {
+    /** Tasa BCV actual (ver bcvService.getCurrentRate()), cargada por AppShell. */
+    bcvRate: { type: Object, default: null },
+    showUsdRate: { type: Boolean, default: true },
+    showEurRate: { type: Boolean, default: true },
+    showCnyRate: { type: Boolean, default: false },
+    showTryRate: { type: Boolean, default: false },
+    showRubRate: { type: Boolean, default: false },
+  },
 
   data() {
     return {
@@ -155,6 +147,10 @@ export default {
       if (path.startsWith('/cliente/facturacion')) return 'mis-numeros';
       return null;
     },
+    activeIndex() {
+      const indices = { inicio: 0, registrar: 1, 'mis-numeros': 2, mas: 3 };
+      return this.activeTab !== null ? indices[this.activeTab] ?? null : null;
+    },
   },
 
   mounted() {
@@ -187,6 +183,16 @@ export default {
       this.sheetRegistrar = false;
       this.$router.push({ path: '/cliente/inicio', query: { registrar: tipo } });
     },
+    navegarDesdeMas(path) {
+      this.sheetMas = false;
+      this.irA(path);
+    },
+    abrirAyuda() {
+      this.sheetMas = false;
+      // SupportChat.vue escucha este evento para abrirse como panel fullscreen
+      // en móvil (su burbuja flotante está oculta ahí, ver SupportChat.vue).
+      window.dispatchEvent(new CustomEvent('ad-open-support-chat'));
+    },
     async logout() {
       this.sheetMas = false;
       try {
@@ -207,6 +213,7 @@ export default {
   padding-bottom: env(safe-area-inset-bottom, 0px);
   height: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  position: relative;
 }
 
 .cliente-bottom-nav :deep(.v-btn) {
@@ -218,5 +225,32 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Ícono activo: leve rebote (solo transform, barato y corto). */
+.cliente-bottom-nav :deep(.v-btn .v-icon) {
+  transition: transform var(--ad-move-rapido) var(--ad-move-curva-entrada);
+}
+
+.cliente-bottom-nav :deep(.v-btn--selected .v-icon) {
+  transform: scale(1.14);
+}
+
+/* Indicador activo: barra fina que se desliza entre los 4 ítems iguales
+   (grow). Puramente decorativo (aria-hidden), no afecta el layout. */
+.cliente-bottom-nav__indicador {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25%;
+  height: 3px;
+  background: var(--color-primary, #8E1818);
+  opacity: 0;
+  transition: transform var(--ad-move-normal) var(--ad-move-curva-entrada), opacity var(--ad-move-rapido) var(--ad-move-curva-entrada);
+  pointer-events: none;
+}
+
+.cliente-bottom-nav__indicador--visible {
+  opacity: 1;
 }
 </style>

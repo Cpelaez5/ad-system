@@ -164,6 +164,19 @@ Duraciones y curvas ya definidas en `src/styles/animations.css` (`--animation-du
 - `@media (prefers-reduced-motion: reduce)` ya está implementado globalmente (reduce toda animación/transición a 0,01ms) — **no quitar esa regla**.
 - Nunca animar accesos repetidos (barra inferior, tabs) — solo transiciones de entrada/salida de contenido nuevo.
 
+**Tokens de movimiento de los componentes de dashboard** (`TarjetaKPI`, `SeccionPanel`, `ListaRanking`, `SelectorPeriodo`, `GraficoBarras` — pantalla "¿Cómo voy?"). Aditivo, no un segundo sistema: mismos números en CSS (`src/styles/animations.css`, variables `--ad-move-*`) y en JS (`src/components/ui/movimiento.js`, para lo que no es CSS puro: duración de `AnimatedNumber` y de la animación de `chart.js`).
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--ad-move-duracion-entrada` / `DURACION_ENTRADA_MS` | 280ms | Fade + `translateY(10px)` al aparecer una tarjeta/sección, una vez al montar (clase `.ad-move-entrada`). |
+| `--ad-move-escalon-lista` / `ESCALON_LISTA_MS` | 50ms | Escalón entre ítems de una lista o tarjetas de una fila (`animation-delay: calc(escalón * índice)`). |
+| `--ad-move-duracion-press` / `DURACION_PRESS_MS` | 150ms | Feedback táctil al presionar (clase `.ad-move-press`, `scale(0.98)`). |
+| `--ad-move-curva-entrada` / `CURVA_ENTRADA` | `cubic-bezier(0.22, 1, 0.36, 1)` | Curva de toda entrada suave (más marcada que `--ease-out`). |
+| `DURACION_NUMERO_MS` (JS) | 600ms | `AnimatedNumber` al cambiar de período en `TarjetaKPI`/`ResumenMonto` (prop `animar`). |
+| `DURACION_CHART_MS` / `EASING_CHART` (JS) | 600ms / `easeOutQuart` | Animación de entrada de `GraficoBarras` (chart.js). |
+
+Barras de `ListaRanking` crecen desde 0 al aparecer (y al cambiar de período) vía un `model-value` que pasa de 0 al valor real un frame después de montar. El cambio de período en el dashboard usa un fundido corto (`transition name="cruce"`, 280ms) en vez de un salto brusco de contenido a contenido. Todo lo anterior queda neutralizado por la regla global de `prefers-reduced-motion` ya vigente (`animations.css`); los dos casos en JS (`AnimatedNumber`, `chart.js`) se apagan además explícitamente con `prefiereMovimientoReducido()` porque esa regla CSS global no los alcanza.
+
 ### 3.6 Microcopy
 
 - **Tuteo siempre** ("Registra lo que gastaste", nunca "Registre lo que gastó").
@@ -200,12 +213,19 @@ Todos son **envoltorios delgados** sobre el componente de Vuetify equivalente: f
 | `ResumenMonto` | `<v-card>` + `formatMoney()` | Un monto grande destacado con su etiqueta y, debajo, el equivalente chico en bolívares (inicio del cliente, resumen de "¿Cómo voy?"). |
 | `PasoGuiado` | `<v-progress-linear>` + título | Cabecera "Paso X de Y" de un flujo tipo asistente (ej. modo simple de `SimpleInvoiceForm`). No es un `v-stepper` completo a propósito: en móvil solo hace falta la cabecera. |
 | `HojaInferior` | `<v-bottom-sheet>` (móvil) / `<v-dialog>` (escritorio) | Cualquier formulario o menú contextual que deba verse como hoja inferior en el teléfono y como diálogo centrado en escritorio, con la misma API (`v-model`, slot por defecto, slot `acciones`, prop `titulo`). |
+| `ChipTasa` | `<v-chip>` + `<v-tooltip>` | Tasa de cambio compacta SIN etiqueta larga ("$ 36,50"), tooltip fijo "Tasa oficial BCV de hoy". Usado en el app bar (`BarraSuperior`, ≥600px) y en la sección "Tasas del día" de la hoja "Más" del cliente. Pulso sutil cuando `rateValue` cambia. Para la etiqueta larga ("Dólar BCV hoy: Bs 36,50") sigue existiendo `ExchangeRateChip` en `components/common/`. |
+| `EncabezadoPagina` | `<h1>` + `<p>` + slot de acciones | Título editorial de una vista (dentro del contenido, no el app bar): h1 + subtítulo opcional + acciones a la derecha en escritorio (apiladas en móvil). Tipografía según §2.5 (32px móvil / 40px escritorio). |
+| `SelectorPeriodo` | `<v-chip-group>` | Elegir "Este mes" / "Mes pasado" / "Este año" con `v-model` (string) — las tres opciones son fijas, es el único período de la pantalla "¿Cómo voy?" del cliente. Combina con `obtenerRangoPeriodo` de `src/utils/resumenFinanciero.js`. |
+| `TarjetaKPI` | Extiende `ResumenMonto` | Una tarjeta resumen con monto animado (USD + Bs chico) y comparación contra el período anterior en lenguaje llano: flecha + color + texto, nunca solo color (`variacion`, `subirEsBueno` deciden el color; el texto sale de `textoComparacion`). Usada por "Vendí" / "Gasté" / "Me queda" en el dashboard del cliente. |
+| `SeccionPanel` | `<v-card>` + `<v-card-item>` | Una sección con título (h2) + subtítulo opcional + contenido (slot por defecto) + acción opcional en la cabecera (slot `accion`). Para cualquier bloque con nombre propio de un dashboard ("Últimos 6 meses", "¿En qué gasto más?") en vez de armar `<v-card><v-card-title>` a mano. |
+| `ListaRanking` | `<v-progress-linear>` | Top N (categorías de gasto, clientes...) como lista de nombre + monto (`formatMoney`) + barra horizontal relativa al primer ítem — las barras crecen desde 0 al aparecer. Recibe `items` ya ordenado (ver `topCategorias`/`topClientes`). |
+| `GraficoBarras` | `BarChart` (chart.js, `src/components/chart/`) | Comparar 2 series por mes (ej. "Vendí" vs "Gasté") con la paleta y las especificaciones de la skill `dataviz` ya aplicadas (barras ≤24px con esquina redondeada 4px, grilla en pelo, tooltip con `formatMoney`, leyenda siempre visible). No reescribe la lógica de chart.js del `BarChart` base. |
 
 **Regla para agregar un componente nuevo a este catálogo:** si Vuetify + un default global en `main.js` ya resuelven el caso, **no crear un componente** — documentar aquí "usa `<v-xxx>` directamente con tal prop" en su lugar.
 
 ### Cómo ver el catálogo en el navegador (`CatalogoUI.vue`)
 
-`src/views/dev/CatalogoUI.vue` muestra los 8 componentes con datos de ejemplo. **No está en el router a propósito** (es solo para desarrollo). Para verla temporalmente:
+`src/views/dev/CatalogoUI.vue` muestra los componentes de esta tabla con datos de ejemplo. **No está en el router a propósito** (es solo para desarrollo). Para verla temporalmente:
 
 1. Abre `src/router/index.js`.
 2. Agrega una ruta temporal, por ejemplo:
