@@ -23,9 +23,15 @@
       <template #append>
         <div class="fila-movimiento__derecha">
           <div class="fila-movimiento__monto">{{ montoFormateado }}</div>
+          <div v-if="equivalente" class="fila-movimiento__equivalente">≈ {{ equivalente }}</div>
           <v-chip v-if="estado" :color="colorEstado" variant="tonal" size="small" class="mt-1">
             {{ estado }}
           </v-chip>
+        </div>
+        <!-- C1 (ola F2b): acciones además de "ver detalle" (tocar la fila).
+             @click.stop para que tocar un botón de acá NO dispare "abrir". -->
+        <div v-if="$slots.acciones" class="fila-movimiento__acciones" @click.stop @keydown.enter.stop @keydown.space.stop>
+          <slot name="acciones" />
         </div>
       </template>
     </v-card-item>
@@ -89,6 +95,13 @@ export default {
       type: String,
       default: 'grey',
     },
+    /** Monto ya formateado en la OTRA moneda, para mostrar como referencia
+     * bajo el monto principal (p. ej. "≈ Bs 3.600,00" bajo "$100,00"). I1:
+     * igual que la tabla de escritorio, que siempre muestra el equivalente. */
+    equivalente: {
+      type: String,
+      default: '',
+    },
   },
 
   emits: ['abrir'],
@@ -147,6 +160,19 @@ export default {
   font-size: 0.95rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.fila-movimiento__equivalente {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.fila-movimiento__acciones {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {

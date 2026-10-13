@@ -56,4 +56,24 @@ describe('FilaMovimiento.vue', () => {
     await wrapper.find('.card').trigger('click')
     expect(wrapper.emitted('abrir')).toBeTruthy()
   })
+
+  it('muestra el equivalente cuando se pasa', () => {
+    const wrapper = montar({ equivalente: 'Bs 3.600,00' })
+    expect(wrapper.find('.append').text()).toContain('≈ Bs 3.600,00')
+  })
+
+  it('no muestra el equivalente si no se pasa', () => {
+    const wrapper = montar()
+    expect(wrapper.text()).not.toContain('≈')
+  })
+
+  it('C1: el slot "acciones" no dispara "abrir" al tocarlo (click.stop)', async () => {
+    const wrapper = mount(FilaMovimiento, {
+      props: { quien: 'Ferretería Lopez', monto: 150 },
+      slots: { acciones: '<button class="menu-acciones">⋮</button>' },
+      global: { stubs },
+    })
+    await wrapper.find('.menu-acciones').trigger('click')
+    expect(wrapper.emitted('abrir')).toBeFalsy()
+  })
 })
