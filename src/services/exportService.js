@@ -196,7 +196,11 @@ class ExportService {
 
       row.values = [
         index + 1, // N° secuencial
-        this.formatDate(inv.issueDate),
+        // C1: Libro de Compras se agrupa/declara según fecha_fiscal (mes en que
+        // corresponde declarar la operación) si existe; si no, cae a issueDate.
+        // Ver docs/mvp/backlog-contadora-2026-10-12.md punto 1 y
+        // supabase/migrations/20261013100000_fecha_fiscal.sql.
+        this.formatDate(inv.fecha_fiscal || inv.issueDate),
         'FACTURA',
         inv.invoiceNumber || '-',
         inv.controlNumber || '-',
@@ -333,6 +337,11 @@ class ExportService {
       { key: 'ventaGravadas', width: 14 },
       { key: 'debitoFiscal', width: 14 },
       { key: 'retencionIvaClientes', width: 14 },
+      // C3 (2026-10-13): número de comprobante de la retención de IVA que el
+      // cliente aplicó a esta venta (ingresado manualmente en SimpleInvoiceForm.vue,
+      // sección "Retenciones aplicadas por tu cliente" -> financial.ivaRetentionNumber).
+      // Ver docs/mvp/backlog-contadora-2026-10-12.md punto 5.
+      { key: 'comprobanteRetencionIva', width: 18 },
       { key: 'retencionIslr', width: 12 },
       { key: 'retencionMunicipal', width: 12 },
       { key: 'igtf', width: 10 },
@@ -378,7 +387,8 @@ class ExportService {
       'N°', 'Fecha', 'Tipo\nDocumento', 'N° Documento', 'N° Control',
       'Razón Social, Proveedor\ny/o cliente', 'Rif',
       'Total\nVentas', 'Venta No\nGravadas', 'Venta\nGravadas', 'Débito Fiscal',
-      'Retenciones IVA\nde Clientes', 'Retención\nISRL', 'Retención\nMunicipal', 'IGTF'
+      'Retenciones IVA\nde Clientes', 'N° Comprobante\nRet. IVA',
+      'Retención\nISRL', 'Retención\nMunicipal', 'IGTF'
     ];
 
     const hRow = worksheet.getRow(headerRow);
@@ -412,6 +422,8 @@ class ExportService {
       const taxableSales = this.formatCurrency(inv.financial?.taxableSales);
       const taxDebit = this.formatCurrency(inv.financial?.taxDebit);
       const ivaRetention = this.formatCurrency(inv.financial?.ivaRetention);
+      // C3: número de comprobante de la retención de IVA aplicada por el cliente
+      const ivaRetentionNumber = inv.financial?.ivaRetentionNumber || (ivaRetention > 0 ? '-' : '');
       const islrRetention = this.formatCurrency(inv.financial?.islrRetention);
       const municipalRetention = this.formatCurrency(inv.financial?.municipalRetention);
       const igtf = this.formatCurrency(inv.financial?.igtf);
@@ -438,13 +450,14 @@ class ExportService {
         taxableSales,
         taxDebit, // Débito fiscal
         ivaRetention,
+        ivaRetentionNumber,
         islrRetention,
         municipalRetention,
         igtf
       ];
 
       // Aplicar bordes a todas las celdas
-      for (let col = 1; col <= 15; col++) {
+      for (let col = 1; col <= 16; col++) {
         this.addBorders(row.getCell(col));
       }
 
@@ -466,11 +479,12 @@ class ExportService {
       totalRow.getCell(10).value = sumTaxableSales;
       totalRow.getCell(11).value = sumTaxDebit;
       totalRow.getCell(12).value = sumIvaRetention;
-      totalRow.getCell(13).value = sumIslrRetention;
-      totalRow.getCell(14).value = sumMunicipalRetention;
-      totalRow.getCell(15).value = sumIgtf;
+      // Columna 13 = N° comprobante Ret. IVA (texto por fila, no se totaliza)
+      totalRow.getCell(14).value = sumIslrRetention;
+      totalRow.getCell(15).value = sumMunicipalRetention;
+      totalRow.getCell(16).value = sumIgtf;
 
-      for (let col = 8; col <= 15; col++) {
+      for (let col = 8; col <= 16; col++) {
         totalRow.getCell(col).font = { bold: true };
         this.addBorders(totalRow.getCell(col));
       }
@@ -614,19 +628,20 @@ class ExportService {
     return await retentionPdfService.generarComprobanteIVA(invoice, companyInfo);
   }
 
-  async exportarComprobanteMunicipal(invoice, companyInfo) {
-    // Validar coincidencia de municipio antes de delegar al servicio PDF
+  async exportarComprobanteMunicipal(invoice, companyInfo, options = {}) {
+    // C7 (2026-10-13): advertir (no bloquear) si los municipios difieren. Si el
+    // usuario ya confirmó (options.confirmMismatch), se permite continuar.
     const tenantMunicipio = companyInfo?.municipio || companyInfo?.municipio_id || '';
     const issuerMunicipio = invoice.issuer?.municipio_id || invoice.issuer?.municipio || '';
-    if (!venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio)) {
+    if (!venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio) && !options.confirmMismatch) {
       const tenantNombre = venezuelaLocationsService.getCleanMunicipalityName(tenantMunicipio);
       const issuerNombre = venezuelaLocationsService.getCleanMunicipalityName(issuerMunicipio);
       throw {
         code: 'MUNICIPAL_MISMATCH',
-        message: `No se puede exportar comprobante municipal: la empresa está en ${tenantNombre} y el proveedor en ${issuerNombre}.`
+        message: `Tu proveedor está en ${issuerNombre} y tu empresa en ${tenantNombre}. Normalmente no corresponde retener impuesto municipal en este caso. ¿Continuar igual?`
       };
     }
-    return await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo);
+    return await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo, options);
   }
 }
 

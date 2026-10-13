@@ -2,6 +2,8 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
+import { logger } from './utils/logger'
+import { useNotificacionStore } from './store/notificacionStore'
 
 // --- Detectar tokens de auth/recovery en la URL muy temprano ---
 try {
@@ -81,13 +83,19 @@ const vuetify = createVuetify({
     themes: {
       light: {
         colors: {
-          primary: '#A81C22',        /* Rojo principal */
-          secondary: '#1F355C',      /* Azul oscuro */
-          accent: '#E0B04F',         /* Amarillo dorado */
-          error: '#A81C22',          /* Rojo para errores */
-          info: '#1F355C',           /* Azul oscuro para información */
-          success: '#4CAF50',        /* Verde para éxito */
-          warning: '#E0B04F',        /* Amarillo dorado para advertencias */
+          /* --- Identidad AD System (producto), tomada de los píxeles reales
+             de public/ADSystem/png/logo.png, icono.png, icono2.png y de los
+             favicons oficiales en public/logo/. Ver docs/mvp/diseno/sistema-diseno.md
+             §"Identidad visual AD System" para la verificación de contraste. --- */
+          primary: '#8E1818',        /* Granate AD System (marca, del logo) */
+          secondary: '#1F355C',      /* Azul — color de apoyo (firma AD Business Group), se conserva por contraste AA ya verificado */
+          accent: '#E0B04F',         /* Dorado — color de apoyo, SOLO fondo/ícono/borde, nunca texto sobre blanco */
+          metal: '#9CA3AF',          /* Gris "metal" del favicon oficial — fondos secundarios/bordes, siempre con texto oscuro encima */
+          granateOscuro: '#320B0B',  /* Variante oscura oficial del logo — estado activo/presionado, fondos oscuros */
+          error: '#D32F2F',          /* Rojo de error — tono distinto del granate de marca a propósito (ver doc) */
+          info: '#1F355C',           /* Azul de apoyo para información */
+          success: '#2E7D32',        /* Verde oscurecido: el verde Material estándar (#4CAF50) no pasa AA con texto blanco */
+          warning: '#E0B04F',        /* Dorado — advertencias: SIEMPRE con texto/ícono oscuro, nunca blanco */
           surface: '#FFFFFF',        /* Blanco */
           background: '#efefef',     /* Gris claro para fondo de aplicación */
         },
@@ -95,10 +103,12 @@ const vuetify = createVuetify({
       dark: {
         dark: true,
         colors: {
-          primary: '#E57373',        /* Rojo más claro para dark mode */
+          primary: '#C18080',        /* Granate AD System aclarado para fondos oscuros */
           secondary: '#90caf9',      /* Azul claro para textos oscuros */
           accent: '#E0B04F',         /* Dorado se mantiene bien */
-          error: '#EF5350',          /* Rojo error adaptado */
+          metal: '#9CA3AF',
+          granateOscuro: '#C18080',
+          error: '#EF5350',          /* Rojo error adaptado (distinto del granate) */
           info: '#90caf9',           /* Azul claro info */
           success: '#81C784',        /* Verde éxito adaptado */
           warning: '#FFD54F',        /* Amarillo adaptado */
@@ -166,6 +176,19 @@ app.component('VueDatePicker', VueDatePicker)
 app.use(createPinia())
 app.use(router)
 app.use(vuetify)
+
+// Manejador global de errores no capturados por un try/catch local.
+// Registra el error real (logger.error siempre imprime, también en producción)
+// y avisa al usuario sin bloquear la pantalla. No se "traga" el error en
+// desarrollo: logger.error ya lo manda a la consola con el stack completo.
+app.config.errorHandler = (err, instance, info) => {
+  logger.error('Error global no capturado por la app', err, info)
+  try {
+    useNotificacionStore().mostrar('Algo salió mal. Intenta de nuevo.', 'error')
+  } catch (notifyError) {
+    logger.error('No se pudo mostrar el aviso del error global', notifyError)
+  }
+}
 
 // Montar la aplicación
 app.mount('#app')

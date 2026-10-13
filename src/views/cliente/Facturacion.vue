@@ -1144,6 +1144,25 @@
       @saved="onCasheaSaved"
     />
 
+    <!-- ── Diálogo confirmación retención municipal ─────────── -->
+    <v-dialog v-model="municipalConfirmDialog" max-width="420" persistent>
+      <v-card>
+        <v-card-title class="text-h6 pb-2">Tu proveedor está en otro municipio</v-card-title>
+        <v-card-text>
+          Normalmente no corresponde retener el impuesto municipal cuando el proveedor está en otro municipio. ¿Quieres generar el comprobante igual?
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey-darken-1" variant="text" @click="resolverMunicipalConfirm(false)">
+            Cancelar
+          </v-btn>
+          <v-btn color="primary" variant="elevated" @click="resolverMunicipalConfirm(true)">
+            Generar igual
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- ── Sistema de Notificaciones Snackbar ─────────────────── -->
     <AppSnackbar
       v-model="snackbar.show"
@@ -1163,11 +1182,10 @@ import CurrencyStatsCard from '@/components/common/CurrencyStatsCard.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue'
 import invoiceService from '@/services/invoiceService.js';
+import { guardarRegistro } from '@/services/registroService.js';
 import { obtenerUrlFirmada } from '@/services/storageUrlService.js';
 import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
-import retentionRpcService from '@/services/retentionRpcService.js';
-import emailNotificationService from '@/services/email-notification-service.js';
 import ClientInvoiceForm from '@/components/forms/client/ClientInvoiceForm.vue';
 import SimpleInvoiceForm  from '@/components/forms/client/SimpleInvoiceForm.vue';
 import CasheaInstallmentsModal from '@/components/forms/client/CasheaInstallmentsModal.vue';
@@ -1240,6 +1258,8 @@ export default {
       deleteDialog: false,
       viewDialog: false,
       showExportDialog: false,
+      municipalConfirmDialog: false,
+      municipalConfirmResolver: null,
       // Modal rápido de cuotas Cashea
       casheaDialog: false,
       casheaInvoice: null,
@@ -1868,77 +1888,29 @@ export default {
       }
 
       // ── Formato nuevo (SimpleInvoiceForm emite el formData directamente) ─────
-      // El padre es responsable de la llamada al servicio (S de SOLID)
-      try {
-        const formData = result; // result ES el formData aquí
+      // La persistencia vive en registroService.guardarRegistro; esta vista solo
+      // decide qué hacer con la UI según el resultado.
+      const formData = result; // result ES el formData aquí
+      const saveResult = await guardarRegistro(formData);
 
-        let savedResult;
-        if (formData.id) {
-          savedResult = await invoiceService.updateInvoice(formData.id, formData);
-        } else {
-          // Fase 2: Si es un egreso (compra o gasto) y tiene retenciones, usar RPC seguro
-          const hasRetentions = (formData.financial?.ivaRetention > 0) || (formData.financial?.islrRetention > 0) || (formData.financial?.municipalRetention > 0);
-          if (formData.flow === 'COMPRA' && (formData.expense_type === 'COMPRA' || formData.expense_type === 'GASTO' || hasRetentions)) {
-            
-            // Construir el payload que espera el RPC
-            const rpcPayload = {
-              p_client_id: formData.client?.id || formData.client_id,
-              p_proveedor_id: formData.issuer?.id || formData.proveedor_id,
-              p_aplicar_iva: formData.financial?.ivaRetention > 0,
-              p_aplicar_islr: formData.financial?.islrRetention > 0,
-              p_aplicar_municipal: formData.financial?.municipalRetention > 0,
-              p_comprobante_iva: formData.financial?.ivaRetentionNumber || null,
-              p_comprobante_islr: formData.financial?.islrRetentionNumber || null,
-              p_comprobante_municipal: formData.financial?.municipalRetentionNumber || null,
-              p_factura: formData
-            };
-            
-            if (formData.islr_concept_id) {
-              rpcPayload.p_islr_concept_id = formData.islr_concept_id;
-            }
-            if (formData.concepto_municipal_id) {
-              rpcPayload.p_concepto_municipal_id = formData.concepto_municipal_id;
-            }
-
-            const rpcData = await retentionRpcService.registrarCompra(rpcPayload);
-            // Simular la respuesta de invoiceService para mantener compatibilidad con el resto de la vista
-            savedResult = { success: true, data: { id: rpcData.invoice_id, ...formData } };
-
-          } else {
-            savedResult = await invoiceService.createInvoice(formData);
-          }
-        }
-
-        if (!savedResult || !savedResult.success) {
-           throw new Error(savedResult?.message || 'Error desconocido al guardar factura en base de datos');
-        }
-
-        // Enviar notificación por email en background (solo al crear, no al editar)
-        if (savedResult?.data && !formData.id) {
-          emailNotificationService.notifyInvoiceCreated(savedResult.data)
-            .catch(err => console.warn('⚠️ Email no enviado:', err))
-        }
-
+      if (saveResult.success) {
         // Notificar al SimpleInvoiceForm que terminó con éxito
         if (this.$refs.simpleForm) {
           this.$refs.simpleForm.onSaveSuccess();
         }
 
         // Si fue una compra o gasto, notificar al módulo de proveedores para auto-sincronización
-        if (formData.flow === 'COMPRA' && typeof window !== 'undefined') {
+        if (saveResult.isCompra && typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('ad-proveedor-changed'));
         }
 
         this.closeInvoiceDialog();
         await this.loadInvoices();
-
-      } catch (err) {
-        console.error('❌ [Facturacion] Error al guardar factura:', err);
+      } else {
+        console.error('❌ [Facturacion] Error al guardar factura:', saveResult.message);
         // Notificar al SimpleInvoiceForm del error (no pierde los datos)
         if (this.$refs.simpleForm) {
-          this.$refs.simpleForm.onSaveFailed(
-            err?.message || 'Ocurrió un error al guardar. Por favor intenta de nuevo.'
-          );
+          this.$refs.simpleForm.onSaveFailed(saveResult.message);
         }
       }
     },
@@ -2230,20 +2202,25 @@ export default {
      */
     applyDateFilterToInvoices(invoices) {
       if (!invoices || invoices.length === 0) return [];
-      
+
       this.exportDateError = '';
-      
+
       if (this.exportDateMode === 'month') {
         // Modo mes: usar exportMonthDate {month: 0-11, year: YYYY}
         if (!this.exportMonthDate) return invoices;
-        
+
         const targetYear = this.exportMonthDate.year;
         const targetMonth = this.exportMonthDate.month; // 0-indexed
-        
+
         return invoices.filter(inv => {
-          if (!inv.issueDate) return false;
-          const invoiceDate = new Date(inv.issueDate);
-          return invoiceDate.getFullYear() === targetYear && 
+          // C1 (2026-10-13): el Libro de Compras se filtra/agrupa por fecha_fiscal
+          // (mes en que corresponde declarar la operación) si existe, con fallback
+          // a la fecha de emisión. Solo aplica a COMPRA; VENTA sigue por issueDate.
+          // Ver docs/mvp/backlog-contadora-2026-10-12.md punto 1.
+          const referenceDate = (inv.flow === 'COMPRA' && inv.fecha_fiscal) ? inv.fecha_fiscal : inv.issueDate;
+          if (!referenceDate) return false;
+          const invoiceDate = new Date(referenceDate);
+          return invoiceDate.getFullYear() === targetYear &&
                  invoiceDate.getMonth() === targetMonth;
         });
       } else {
@@ -2271,8 +2248,10 @@ export default {
         endNormalized.setHours(23, 59, 59, 999);
         
         return invoices.filter(inv => {
-          if (!inv.issueDate) return false;
-          const invoiceDate = new Date(inv.issueDate);
+          // C1: mismo criterio que el filtro por mes (fecha_fiscal para COMPRA, con fallback).
+          const referenceDate = (inv.flow === 'COMPRA' && inv.fecha_fiscal) ? inv.fecha_fiscal : inv.issueDate;
+          if (!referenceDate) return false;
+          const invoiceDate = new Date(referenceDate);
           return invoiceDate >= startNormalized && invoiceDate <= endNormalized;
         });
       }
@@ -2444,7 +2423,7 @@ export default {
       if (!invoice) return false;
 
       // 1. Debe existir retención municipal en la factura
-      const hasRetention = (invoice.retenciones && Number(invoice.retenciones.municipal) > 0) || 
+      const hasRetention = (invoice.retenciones && Number(invoice.retenciones.municipal) > 0) ||
                            (invoice.financial && Number(invoice.financial.municipalRetention) > 0);
       if (!hasRetention) return false;
 
@@ -2456,14 +2435,16 @@ export default {
       // 3. Municipio del proveedor (con fallback al mapa reactivo en memoria por si fue actualizado)
       const provId = invoice.issuer?.id || invoice.issuer_id || invoice.provider_id;
       const provRif = invoice.issuer?.rif;
-      const issuerMunicipio = (provId && this.proveedoresMap?.[provId]) || 
-                              (provRif && this.proveedoresMap?.[provRif]) || 
-                              invoice.issuer?.municipio_id || 
+      const issuerMunicipio = (provId && this.proveedoresMap?.[provId]) ||
+                              (provRif && this.proveedoresMap?.[provRif]) ||
+                              invoice.issuer?.municipio_id ||
                               invoice.issuer?.municipio || '';
       if (!issuerMunicipio) return false;
 
-      // 4. Solo mostrar si ambos están en el mismo municipio
-      return venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio);
+      // C7 (2026-10-13): ya NO se oculta la opción solo porque los municipios
+      // difieran. Se muestra siempre que haya retención y datos de municipio en
+      // ambas partes; downloadMunicipal() advierte y pide confirmación si no coinciden.
+      return true;
     },
 
     async downloadMunicipal(invoice) {
@@ -2495,22 +2476,42 @@ export default {
           }
         }
 
-        // 3. Validar que proveedor y cliente estén en el mismo municipio
+        // C7 (2026-10-13): antes se bloqueaba. Ahora se advierte y se permite
+        // continuar si el usuario confirma (la contadora pidió "sin bloquear",
+        // ver W5 en docs/mvp/backlog-cliente-whatsapp.md).
+        let confirmMismatch = false;
         if (!venezuelaLocationsService.areSameMunicipality(tenantMunicipio, issuerMunicipio)) {
           const tenantNombre = venezuelaLocationsService.getCleanMunicipalityName(tenantMunicipio);
           const issuerNombre = venezuelaLocationsService.getCleanMunicipalityName(issuerMunicipio);
           this.showNotification(
-            `No se puede generar comprobante municipal: tu empresa está en ${tenantNombre} y el proveedor en ${issuerNombre}. La retención municipal solo aplica dentro del mismo municipio.`,
+            `Tu proveedor está en ${issuerNombre} y tu empresa en ${tenantNombre}. Normalmente no corresponde retener impuesto municipal en este caso.`,
             'warning'
           );
-          return;
+          const continuar = await this.confirmarMunicipioDistinto();
+          if (!continuar) return;
+          confirmMismatch = true;
         }
 
-        await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo);
+        await retentionPdfService.generarComprobanteMunicipal(invoice, companyInfo, { confirmMismatch });
         this.showNotification('Comprobante Municipal exportado exitosamente', 'success');
       } catch (error) {
         console.error('Error exportando comprobante Municipal:', error);
         this.showNotification('Error al exportar comprobante Municipal', 'error');
+      }
+    },
+
+    confirmarMunicipioDistinto() {
+      this.municipalConfirmDialog = true;
+      return new Promise((resolve) => {
+        this.municipalConfirmResolver = resolve;
+      });
+    },
+
+    resolverMunicipalConfirm(value) {
+      this.municipalConfirmDialog = false;
+      if (this.municipalConfirmResolver) {
+        this.municipalConfirmResolver(value);
+        this.municipalConfirmResolver = null;
       }
     },
 

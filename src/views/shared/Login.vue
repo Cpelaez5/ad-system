@@ -4,7 +4,7 @@
     <div class="login-visual animate-fade-in">
       <div class="visual-content">
         <div class="brand-badge animate-slide-in-down">
-          <img src="/ADSystem/png/logo.png" alt="AD System" class="brand-logo-full" />
+          <LogoAnimado variante="completo" :alto="36" class="brand-logo-full" />
         </div>
         <h1 class="visual-title animate-slide-in-up animate-delay-200">
           Bienvenido de nuevo
@@ -23,7 +23,7 @@
     <div class="login-form-wrapper animate-slide-in-right">
       <div class="form-content">
         <div class="mobile-brand d-md-none mb-8 text-center">
-           <img src="/ADSystem/png/logo.png" alt="AD System" style="max-width: 200px; height: auto;" />
+           <LogoAnimado variante="completo" :alto="40" />
         </div>
 
         <div class="form-header">
@@ -162,9 +162,13 @@
 
 <script>
 import { analyticsService } from '@/services/analyticsService'
+import LogoAnimado from '@/components/ui/LogoAnimado.vue'
 
 export default {
   name: 'Login',
+  components: {
+    LogoAnimado,
+  },
   data() {
     return {
       cargando: false,
@@ -210,7 +214,7 @@ export default {
           
           window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }))
           if (result.user.role === 'cliente') {
-            this.$router.push('/cliente/dashboard')
+            this.$router.push('/cliente/inicio')
           } else {
             this.$router.push('/dashboard')
           }
@@ -274,7 +278,7 @@ export default {
        try {
          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
          if (currentUser.role === 'cliente') {
-           this.$router.push('/cliente/dashboard')
+           this.$router.push('/cliente/inicio')
          } else {
            this.$router.push('/dashboard')
          }
@@ -342,9 +346,10 @@ export default {
 }
 
 .brand-logo-full {
-  height: 36px;
-  width: auto;
-  filter: brightness(0) invert(1); /* Logo blanco sobre fondo oscuro */
+  /* Logo blanco sobre fondo oscuro: brightness(0) aplana granate+negro a
+     negro puro antes de invertir (si solo invirtiéramos, el granate
+     #8E1818 quedaría cian). El tamaño ya lo fija la prop `alto`. */
+  filter: brightness(0) invert(1);
 }
 
 .visual-title {

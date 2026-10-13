@@ -10,7 +10,7 @@
 ### L1. Código muerto (verifica cada archivo con grep antes de borrarlo)
 - [x] Borrar: `components/**/AppNavigation-old.vue`, `Sidebar-old.vue`, `TrialBanner-old.vue`, `views/cliente/DashboardOld.vue`, `views/cliente/InvoiceFormPage.vue`, `views/shared/SingUp.vue`, `AnimatedTable.vue`, `CountrySelector.vue`, `CurrencyConverter.vue`, `LoadingSpinner.vue`, `AnimatedForm.vue`, `components/sections/PricingSection.vue`, `services/userService.fixed.js`, `services/userService.new.js`, `countryConfig.js`, `localStorageService.js`, `src/test_export.js`.
 - [x] Router: quitar el import `ClienteArchivo` y la ruta comentada; ocultar `/ocr-demo` y `/test-form` con `import.meta.env.DEV`.
-- [ ] Router: `/profile` → vista real o eliminar.
+- [x] Router: `/profile` → vista real o eliminar. (Convertida en `redirect` por rol: `cliente` → `/cliente/mi-area`, resto → `/settings`, vía `src/router/profileRedirect.js`.)
 - [x] Raíz: mover a `scripts/legacy/` o borrar `debug_registration.js`, `test_*.{js,mjs,cjs,txt}`, `test-*.{js,mjs,cjs}`, `TEST_INVITATION.sql`, `INVITATION_SYSTEM.sql`, `supabase-schema.sql`, `supabase-seed-data.sql`.
 - [x] `npm test` + `npm run build` en verde después de cada bloque.
 
@@ -21,9 +21,9 @@
 
 ### L3. Robustez
 - [ ] Logger `src/utils/logger.js` (`debug/info/warn/error`, silencioso en producción salvo `error`) y `esbuild: { drop: ['console','debugger'] }` en el build de producción en `vite.config.js` (deja `console.error` si se decide así).
-- [ ] Router guard (`src/router/index.js` ~312-488): una sola obtención del usuario por navegación (cachear en el store Pinia), snackbar en vez de `alert()`, limpiar `operationalRoutes` y los console.log.
-- [ ] `router.onError`: si el error es "Failed to fetch dynamically imported module" / "Importing a module script failed", recargar la página una sola vez (pasa tras cada deploy de Netlify con chunks nuevos). Verificar antes si ocurre en producción.
-- [ ] Manejador global de errores: `app.config.errorHandler` → snackbar "Algo salió mal, intenta de nuevo" + logger.
+- [x] Router guard (`src/router/index.js` ~312-488): una sola obtención del usuario por navegación (caché en memoria dentro de `userService.getCurrentUser`, invalidada en login/logout/`onAuthStateChange`), snackbar (`useNotificacionStore` + `AppSnackbar` global en `App.vue`) en vez de `alert()`, `operationalRoutes` limpiado a solo rutas `/cliente/*` y console.log quitados (quedan `logger.error` en los catch).
+- [x] `router.onError`: si el error es de carga de chunk (helpers puros en `src/utils/chunkReloadGuard.js`), recarga la página una sola vez hacia la ruta destino, con marca en `sessionStorage` para no entrar en bucle (se limpia en `afterEach` cuando una navegación termina bien).
+- [x] Manejador global de errores: `app.config.errorHandler` en `src/main.js` → `logger.error` + snackbar "Algo salió mal. Intenta de nuevo." vía `useNotificacionStore`.
 
 ### L4. Errores visibles reportados por UX
 - [ ] Proveedores: la etiqueta "IVA: 75%" es el **% de retención de IVA** → "Retención IVA: 75%" (y en lenguaje llano en el modo cliente).

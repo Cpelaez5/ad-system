@@ -125,7 +125,35 @@ describe('Validación de Municipios en Servicios de Retención Municipal', () =>
 
       const result = await exportService.exportarComprobanteMunicipal(invoice, companyInfo);
 
-      expect(pdfSpy).toHaveBeenCalledWith(invoice, companyInfo);
+      // C7: ahora exportarComprobanteMunicipal reenvía siempre un tercer parámetro
+      // de opciones (confirmMismatch) a generarComprobanteMunicipal.
+      expect(pdfSpy).toHaveBeenCalledWith(invoice, companyInfo, {});
+      expect(result).toEqual({ success: true, filename: 'comprobante.pdf' });
+
+      pdfSpy.mockRestore();
+    });
+
+    // C7 (2026-10-13): la contadora pidió "sin bloquear" (W5). Ahora, si el
+    // llamador ya obtuvo confirmación del usuario y pasa confirmMismatch: true,
+    // se permite exportar aunque los municipios difieran.
+    it('permite exportar con municipios distintos si se pasa options.confirmMismatch = true', async () => {
+      const invoice = {
+        id: 'inv-exp-confirmado',
+        issuer: {
+          municipio_id: 'ae0fd71e-a052-4755-9a2b-fa148caa96d5' // Maracaibo
+        }
+      };
+
+      const companyInfo = {
+        municipio: 'c8921e1d-5407-4cc4-87f3-04f9ce46920f' // Libertador (Caracas)
+      };
+
+      const pdfSpy = vi.spyOn(retentionPdfService, 'generarComprobanteMunicipal')
+        .mockResolvedValueOnce({ success: true, filename: 'comprobante.pdf' });
+
+      const result = await exportService.exportarComprobanteMunicipal(invoice, companyInfo, { confirmMismatch: true });
+
+      expect(pdfSpy).toHaveBeenCalledWith(invoice, companyInfo, { confirmMismatch: true });
       expect(result).toEqual({ success: true, filename: 'comprobante.pdf' });
 
       pdfSpy.mockRestore();

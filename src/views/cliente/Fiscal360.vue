@@ -48,14 +48,22 @@
     <template v-else>
       <!-- HEADER -->
       <v-row no-gutters class="pb-2">
-        
-        <v-col cols="12" md="12" class="d-flex align-center justify-end flex-wrap mt-4 mt-md-0">
+        <v-col cols="12">
+          <div class="d-flex align-center flex-wrap" style="gap: 4px">
+            <h1 class="text-h4 font-weight-bold text-secondary mb-0">Mis papeles del negocio</h1>
+            <AyudaTermino clave="expediente_fiscal" />
+          </div>
+          <p class="text-body-1 text-grey-darken-2 mt-1 mb-0" style="max-width: 640px">
+            Aquí guardas los papeles de tu negocio y te avisamos antes de que se venzan.
+          </p>
+        </v-col>
+
+        <v-col cols="12" class="d-flex align-center flex-wrap mt-4" style="gap: 8px">
           <v-btn
             color="secondary"
             prepend-icon="mdi-file-pdf-box"
             variant="outlined"
             rounded="lg"
-            class="mb-2 mb-sm-0 mr-0 mr-sm-2"
             :block="$vuetify.display.smAndDown"
             @click="exportToPDF"
             :loading="exporting"
@@ -76,493 +84,160 @@
         </v-col>
       </v-row>
 
-      <!-- DASHBOARD -->
-      <v-row class="mb-6 animate-section" style="animation-delay: 0.1s">
-        
-        <!-- Chart -->
-        <v-col cols="12" md="4" lg="3">
-          <v-card class="rounded-xl h-100 pa-4" variant="outlined" style="border-color: rgba(0,0,0,0.05)">
-            <div class="d-flex align-center justify-space-between mb-4">
-              <h3 class="text-subtitle-1 font-weight-bold text-secondary">Progreso General</h3>
-            </div>
-            <div style="height: 180px; position: relative">
-              <canvas ref="chartCanvas" style="position: relative; z-index: 2"></canvas>
-              <div class="chart-center-text">
-                  <div class="text-h4 font-weight-bold text-secondary">{{ progressRate }}%</div>
-              </div>
-            </div>
-          </v-card>
-        </v-col>
-
-        <!-- Stats Cards -->
-        <v-col cols="12" md="8" lg="9">
-          <v-row class="fill-height">
-            <v-col cols="6" sm="3">
-              <StatsCard
-                 title="Vigentes"
-                 :value="stats.vigente"
-                 bg-color="#02254d"
-                 text-color="white"
-                 icon="mdi-check-circle"
-              />
-            </v-col>
-            <v-col cols="6" sm="3">
-              <StatsCard
-                 title="En Trámite"
-                 :value="stats.tramite"
-                 bg-color="#f2b648"
-                 text-color="#010101"
-                 icon="mdi-clock-outline"
-              />
-            </v-col>
-            <v-col cols="6" sm="3">
-              <StatsCard
-                 title="Vencidos / Por Vencer"
-                 :value="stats.vencido + stats.porVencer"
-                 bg-color="#961112"
-                 text-color="white"
-                 icon="mdi-alert-circle"
-              />
-            </v-col>
-            <v-col cols="6" sm="3">
-              <StatsCard
-                 title="No Aplica"
-                 :value="stats.noAplica"
-                 bg-color="#757575"
-                 text-color="white"
-                 icon="mdi-minus-circle-outline"
-              />
-            </v-col>
-            
-            <!-- Checklist Progress -->
-            <v-col cols="12">
-              <v-card class="rounded-xl pa-4 bg-surface" elevation="0">
-                <div class="d-flex justify-space-between mb-2">
-                  <span class="text-subtitle-2 font-weight-bold text-secondary">
-                    Progreso del Expediente
-                  </span>
-                </div>
-                <v-progress-linear
-                  :model-value="progressRate"
-                  height="12"
-                  rounded
-                  color="primary"
-                  bg-color="grey-lighten-3"
-                >
-                  <template v-slot:default="{ value }">
-                    <span class="text-white text-caption font-weight-bold">{{ Math.ceil(value) }}%</span>
-                  </template>
-                </v-progress-linear>
-                <v-tooltip activator="parent" location="top">
-                  Completados: {{ complianceDetail.total.covered }} / {{ complianceDetail.total.required }}
-                </v-tooltip>
-                <div class="d-flex mt-2 gap-2 overflow-x-auto py-2" style="max-width: 100%;">
-                   <v-chip 
-                      v-for="cat in categories" 
-                      :key="cat.value"
-                      size="small" 
-                      :variant="getCategoryVariant(cat.value)"
-                      :color="getCategoryColor(cat.value)"
-                      class="mr-2"
-                   >
-                      <v-icon start :icon="getCategoryIconStatus(cat.value)"></v-icon>
-                      {{ cat.title }} 
-                      <span v-if="complianceDetail[cat.value]" class="ml-1 font-weight-bold">
-                          ({{ complianceDetail[cat.value].rate }}%)
-                      </span>
-                   </v-chip>
-                </div>
-              </v-card>
-            </v-col>
-          </v-row>
-        </v-col>
-      </v-row>
+      <!-- PROGRESO: "Tu negocio está al día: X de Y" -->
+      <v-card class="rounded-xl pa-4 mb-6 animate-section" style="animation-delay: 0.1s" variant="outlined">
+        <div class="d-flex align-center justify-space-between flex-wrap mb-2" style="gap: 8px">
+          <div class="d-flex align-center" style="gap: 8px">
+            <v-icon :color="progresoColor" icon="mdi-shield-check-outline" />
+            <span class="text-subtitle-1 font-weight-bold text-secondary">
+              Tu negocio está al día: {{ progresoAlDia.covered }} de {{ progresoAlDia.required }}
+            </span>
+          </div>
+          <span class="text-caption text-grey-darken-1">Los documentos "No aplica" no cuentan aquí.</span>
+        </div>
+        <v-progress-linear
+          :model-value="progresoPorcentaje"
+          height="12"
+          rounded
+          :color="progresoColor"
+          bg-color="grey-lighten-3"
+        />
+      </v-card>
 
     <!-- CONTENT (LIST) -->
     <v-row class="pb-10">
       <v-col cols="12">
-        
-        <!-- Tabs de navegación por categoría -->
-        <v-card class="mb-4 animate-section" style="animation-delay: 0.2s" elevation="2">
-          <v-tabs
-            v-model="currentTab"
-            bg-color="white"
+
+        <!-- VISTA PAPELERA -->
+        <template v-if="currentTab === 'trash'">
+          <v-btn
+            variant="text"
+            size="small"
             color="primary"
-            show-arrows
-            height="64"
+            prepend-icon="mdi-arrow-left"
+            class="text-none mb-4"
+            @click="currentTab = 'all'"
           >
-            <v-tab value="all" class="text-none font-weight-medium px-2 px-sm-4">
-              <v-icon start size="20">mdi-view-list</v-icon>
-              <span class="d-none d-sm-inline text-caption">Todos</span>
-              <v-chip size="small" class="ml-1" color="primary" variant="tonal">
-                {{ stats.total }}
-              </v-chip>
-            </v-tab>
+            Volver a Mis papeles
+          </v-btn>
 
-            <v-tab v-for="cat in categories" :key="cat.value" :value="cat.value" class="text-none font-weight-medium px-2 px-sm-4">
-              <v-icon start size="20" :color="getCategoryChipColor(cat.value)">{{ getCategoryIcon(cat.value) }}</v-icon>
-              <span class="d-none d-sm-inline text-caption">{{ cat.title }}</span>
-              <v-chip size="small" class="ml-1" :color="getCategoryChipColor(cat.value)" variant="tonal">
-                {{ getCategoryCount(cat.value) }}
-              </v-chip>
-            </v-tab>
+          <EstadoVacio
+            v-if="filteredDocs.length === 0"
+            icono="mdi-delete-empty"
+            titulo="La papelera está vacía"
+          />
+          <TarjetaDocumentoFiscal
+            v-for="doc in filteredDocs"
+            :key="doc.id"
+            :doc="doc"
+            papelera
+            :restaurando="restoring"
+            :categoria-titulo="getCategoryTitle(doc.category)"
+            @restaurar="restoreDoc"
+            @eliminar-definitivo="confirmDelete"
+          />
+        </template>
 
-            <v-tab value="trash" class="text-none font-weight-medium px-2 px-sm-4">
-              <v-icon start size="20" color="grey">mdi-delete-outline</v-icon>
-              <span class="d-none d-sm-inline text-caption">Papelera</span>
-              <v-chip size="small" class="ml-1" color="grey" variant="tonal">
-                {{ stats.trash }}
-              </v-chip>
-            </v-tab>
-          </v-tabs>
-
-          <!-- Barra de período y filtro de estado - Solo para tabs con docs recurrentes -->
-          <v-slide-y-transition>
-            <div v-if="showPeriodSelector" class="pa-3 px-4 bg-grey-lighten-5">
-              <div class="d-flex align-center flex-wrap" style="gap: 12px">
-                <!-- Selector de año -->
-                <v-select
-                  v-model="selectedYear"
-                  :items="availableYears"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                  class="fiscal-select-year"
-                  bg-color="white"
-                  label="Año Fiscal"
-                  prepend-inner-icon="mdi-calendar"
-                />
-
-                <v-spacer class="d-none d-sm-block" />
-
-                <!-- Filtro de estado -->
-                <v-select
-                  v-model="statusFilter"
-                  :items="statusOptions"
-                  item-title="label"
-                  item-value="value"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                  class="fiscal-select-status"
-                  bg-color="white"
-                  prepend-inner-icon="mdi-filter-variant"
-                  label="Estado"
-                />
-              </div>
-            </div>
-          </v-slide-y-transition>
-        </v-card>
-
-        <!-- Document List -->
-        <v-card class="rounded-xl border-none animate-section" style="animation-delay: 0.3s" elevation="0" :loading="loading">
-
-          <!-- ===== MODO "TODOS" / "PAPELERA" ===== -->
-          <template v-if="currentTab === 'all' || currentTab === 'trash'">
-            <!-- View Mode Toggle -->
-            <div class="d-flex justify-end pa-2 border-b bg-grey-lighten-5">
-              <v-btn-toggle v-model="viewMode" color="primary" mandatory density="compact" variant="outlined">
-                <v-btn value="accordion" size="small" prepend-icon="mdi-view-sequential">Acordeón</v-btn>
-                <v-btn value="table" size="small" prepend-icon="mdi-table">Tabla</v-btn>
-              </v-btn-toggle>
-            </div>
-
-            <!-- TABLA RESUMEN -->
-            <template v-if="viewMode === 'table'">
-              <v-data-table
-                :headers="tableHeaders"
-                :items="filteredDocs"
-                :items-per-page="10"
-                class="bg-transparent"
-                hover
-                mobile-breakpoint="sm"
-              >
-                <template v-slot:item.category="{ item }">
-                  <v-chip size="small" :color="getCategoryChipColor(item.category)" variant="tonal">
-                    <v-icon start size="x-small">{{ getCategoryIcon(item.category) }}</v-icon>
-                    {{ getCategoryTitle(item.category) }}
-                  </v-chip>
-                </template>
-                <template v-slot:item.emission_date="{ item }">
-                  {{ formatDate(item.emission_date) || '--' }}
-                </template>
-                <template v-slot:item.expiration_date="{ item }">
-                  <span :class="getExpirationClass(item.expiration_date)">
-                    {{ formatDate(item.expiration_date) || '--' }}
-                  </span>
-                </template>
-                <template v-slot:item.status="{ item }">
-                  <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(item))">
-                    {{ getEffectiveStatus(item) }}
-                  </v-chip>
-                </template>
-                <template v-slot:item.actions="{ item }">
-                  <div class="d-flex justify-end">
-                    <template v-if="currentTab !== 'trash'">
-                      <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(item)" v-tooltip="'Ver detalle'" />
-                      <v-btn v-if="item.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="item.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" />
-                      <v-btn icon="mdi-pencil" variant="text" size="small" color="grey" @click.stop="openDialog(item)" v-tooltip="'Editar'" />
-                      <v-btn icon="mdi-delete" variant="text" size="small" color="error" @click.stop="confirmDelete(item)" v-tooltip="'Mover a Papelera'" />
-                    </template>
-                    <template v-else>
-                      <v-btn icon="mdi-refresh" variant="text" size="small" color="success" @click.stop="restoreDoc(item)" :loading="restoring" v-tooltip="'Restaurar'" />
-                      <v-btn icon="mdi-delete-forever" variant="text" size="small" color="error" @click.stop="confirmDelete(item)" v-tooltip="'Eliminar Definitivamente'" />
-                    </template>
-                  </div>
-                </template>
-              </v-data-table>
-            </template>
-
-            <!-- ACORDEÓN -->
-            <template v-else>
-              <v-data-iterator :items="filteredDocs" :items-per-page="-1">
-                <template v-slot:default="{ items }">
-                <v-expansion-panels variant="accordion" class="rounded-xl">
-                  <v-expansion-panel
-                    v-for="cat in groupedCategories"
-                    :key="cat.name"
-                    elevation="0"
-                    class="mb-2 border rounded-lg"
-                  >
-                    <v-expansion-panel-title>
-                      <div class="d-flex align-center w-100">
-                        <v-icon color="secondary" class="mr-3">{{ getCategoryIcon(cat.id) }}</v-icon>
-                        <span class="text-subtitle-1 font-weight-bold">{{ cat.name }}</span>
-                        <v-spacer />
-                        <v-chip size="small" variant="tonal" class="mr-4">
-                          {{ cat.docs.length }} docs
-                        </v-chip>
-                      </div>
-                    </v-expansion-panel-title>
-                    <v-expansion-panel-text>
-                      <v-list lines="two">
-                        <v-list-item
-                          v-for="doc in cat.docs"
-                          :key="doc.id"
-                          class="py-3 rounded-lg mb-1 hover-bg cursor-pointer"
-                          border
-                          @click="openPreview(doc)"
-                        >
-                          <template v-slot:prepend>
-                            <div class="mr-4 text-center d-flex align-center justify-center" style="width: 50px; height: 50px">
-                              <template v-if="doc.expiration_date">
-                                <div>
-                                  <div class="text-h6 font-weight-bold mb-n1" :class="getExpirationClass(doc.expiration_date)">
-                                    {{ getDay(doc.expiration_date) }}
-                                  </div>
-                                  <div class="text-caption text-uppercase" :class="getExpirationClass(doc.expiration_date)">
-                                    {{ getMonth(doc.expiration_date) }}
-                                  </div>
-                                </div>
-                              </template>
-                              <v-icon v-else :icon="getCategoryIcon(doc.category)" size="32" color="primary" />
-                            </div>
-                          </template>
-
-                          <v-list-item-title class="font-weight-bold mb-1">{{ doc.name }}</v-list-item-title>
-                          <v-list-item-subtitle class="d-flex align-center flex-wrap">
-                            <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2 mb-1">
-                              {{ getEffectiveStatus(doc) }}
-                            </v-chip>
-                            
-                            <!-- Expiration Warning -->
-                            <template v-if="doc.expiration_date">
-                                <v-chip
-                                    size="x-small"
-                                    variant="flat"
-                                    :color="getExpirationInfo(doc.expiration_date).color"
-                                    class="mr-2 mb-1"
-                                >
-                                    <v-icon start size="x-small">{{ getExpirationInfo(doc.expiration_date).icon }}</v-icon>
-                                    {{ getExpirationInfo(doc.expiration_date).label }}
-                                </v-chip>
-                            </template>
-
-                            <!-- Missing Dates Warning -->
-                            <template v-else-if="!doc.expiration_date || !doc.emission_date">
-                                  <v-chip
-                                    size="x-small"
-                                    variant="tonal"
-                                    color="warning"
-                                    class="mb-1 cursor-pointer"
-                                    @click.stop="openDialog(doc)"
-                                >
-                                    <v-icon start size="x-small">mdi-calendar-alert</v-icon>
-                                    Completar fechas
-                                </v-chip>
-                            </template>
-                          </v-list-item-subtitle>
-
-                          <template v-slot:append>
-                            <div class="d-flex align-center flex-wrap justify-end" style="max-width: 120px;">
-                              <template v-if="currentTab !== 'trash'">
-                                <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(doc)" v-tooltip="'Ver detalle'" class="mr-1" />
-                                <v-btn v-if="doc.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="doc.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" class="mr-1" />
-                                <v-btn icon="mdi-pencil" variant="text" size="small" color="grey" @click.stop="openDialog(doc)" v-tooltip="'Editar'" class="mr-1" />
-                                <v-btn icon="mdi-delete" variant="text" size="small" color="error" @click.stop="confirmDelete(doc)" v-tooltip="'Mover a Papelera'" />
-                              </template>
-                              <template v-else>
-                                <v-btn prepend-icon="mdi-refresh" variant="text" size="small" color="success" @click.stop="restoreDoc(doc)" :loading="restoring">Restaurar</v-btn>
-                                <v-btn icon="mdi-delete-forever" variant="text" size="small" color="error" @click.stop="confirmDelete(doc)" v-tooltip="'Eliminar Definitivamente'" />
-                              </template>
-                            </div>
-                          </template>
-                        </v-list-item>
-                      </v-list>
-                    </v-expansion-panel-text>
-                  </v-expansion-panel>
-                </v-expansion-panels>
-                </template>
-              </v-data-iterator>
-            </template>
-          </template>
-
-          <!-- ===== MODO PERÍODOS: Tabs de categoría individual ===== -->
-          <template v-else>
-            <div class="pa-4">
-              <!-- Documentos Recurrentes / Trackers -->
-              <template v-if="getRecurringTypes(currentTab).length > 0">
-                <FiscalPeriodTracker
-                    v-for="type in getRecurringTypes(currentTab)"
-                    :key="type.id"
-                    :type="type"
-                    :category="currentTab"
-                    :documents="getDocsForType(type.id)"
-                    :year="selectedYear"
-                    @open-preview="openPreview"
-                    @open-dialog="handleTrackerDialog"
-                    @delete-doc="confirmDelete"
-                />
-              </template>
-              
-              <!-- Documentos No Recurrentes (Únicos / Permanentes) -->
-              <v-card v-if="getNonRecurringDocs().length > 0 || nonRecurringPendingDocs.length > 0" variant="outlined" class="rounded-xl mt-6 border-dashed" style="border-color: #e0e0e0 !important;">
-                <v-card-title class="text-subtitle-1 font-weight-bold text-secondary bg-grey-lighten-4 py-3 d-flex align-center">
-                  <v-icon start size="small">mdi-pin</v-icon>
-                  Documentos Permanentes / Ad-hoc
-                  <v-spacer />
-                  <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-plus" @click="openDialog({ category: currentTab, status: 'VIGENTE' })">Añadir</v-btn>
-                </v-card-title>
-                <v-list lines="two" class="bg-transparent pa-2">
-                  <!-- Documentos existentes -->
-                  <v-list-item
-                    v-for="doc in getNonRecurringDocs()"
-                    :key="doc.id"
-                    class="py-3 rounded-lg mb-1 hover-bg cursor-pointer"
-                    border
-                    @click="openPreview(doc)"
-                  >
-                    <template v-slot:prepend>
-                      <div class="mr-4 text-center d-flex align-center justify-center" style="width: 50px; height: 50px">
-                        <template v-if="doc.expiration_date">
-                          <div>
-                            <div class="text-h6 font-weight-bold mb-n1" :class="getExpirationClass(doc.expiration_date)">
-                              {{ getDay(doc.expiration_date) }}
-                            </div>
-                            <div class="text-caption text-uppercase" :class="getExpirationClass(doc.expiration_date)">
-                              {{ getMonth(doc.expiration_date) }}
-                            </div>
-                          </div>
-                        </template>
-                        <v-icon v-else :icon="getCategoryIcon(doc.category)" size="32" color="primary" />
-                      </div>
-                    </template>
-
-                    <v-list-item-title class="font-weight-bold mb-1">{{ doc.name }}</v-list-item-title>
-                    <v-list-item-subtitle class="d-flex align-center flex-wrap">
-                      <v-chip size="x-small" :color="getStatusColor(getEffectiveStatus(doc))" class="mr-2 mb-1">
-                        {{ getEffectiveStatus(doc) }}
-                      </v-chip>
-                      
-                      <!-- Expiration Warning -->
-                      <template v-if="doc.expiration_date">
-                          <v-chip
-                              size="x-small"
-                              variant="flat"
-                              :color="getExpirationInfo(doc.expiration_date).color"
-                              class="mr-2 mb-1"
-                          >
-                              <v-icon start size="x-small">{{ getExpirationInfo(doc.expiration_date).icon }}</v-icon>
-                              {{ getExpirationInfo(doc.expiration_date).label }}
-                          </v-chip>
-                      </template>
-
-                      <!-- Missing Dates Warning -->
-                      <template v-else-if="!doc.expiration_date || !doc.emission_date">
-                            <v-chip
-                              size="x-small"
-                              variant="tonal"
-                              color="warning"
-                              class="mb-1 cursor-pointer"
-                              @click.stop="openDialog(doc)"
-                          >
-                              <v-icon start size="x-small">mdi-calendar-alert</v-icon>
-                              Completar fechas
-                          </v-chip>
-                      </template>
-                      </v-list-item-subtitle>
-  
-                    <template v-slot:append>
-                      <div class="d-flex align-center flex-wrap justify-end" style="max-width: 120px;">
-                        <v-btn icon="mdi-eye" variant="text" size="small" color="info" @click.stop="openPreview(doc)" v-tooltip="'Ver detalle'" class="mr-1" />
-                        <v-btn v-if="doc.documents?.file_url" icon="mdi-download" variant="text" size="small" color="primary" :href="doc.documents.file_url" target="_blank" @click.stop v-tooltip="'Descargar'" class="mr-1" />
-                        <v-btn icon="mdi-pencil" variant="text" size="small" color="grey" @click.stop="openDialog(doc)" v-tooltip="'Editar'" class="mr-1" />
-                        <v-btn icon="mdi-delete" variant="text" size="small" color="error" @click.stop="confirmDelete(doc)" v-tooltip="'Mover a Papelera'" />
-                      </div>
-                    </template>
-                  </v-list-item>
-
-                  <!-- Documentos pendientes (requeridos pero no subidos) -->
-                  <template v-if="nonRecurringPendingDocs.length > 0">
-                    <v-list-item
-                      v-for="pending in nonRecurringPendingDocs"
-                      :key="pending.id"
-                      class="py-3 rounded-lg mt-2 border-dashed"
-                      style="opacity: 0.7; border-color: #ffd54f !important;"
-                    >
-                      <template v-slot:prepend>
-                        <div class="mr-4 d-flex align-center justify-center" style="width: 50px; height: 50px">
-                          <v-icon icon="mdi-alert-circle-outline" size="28" color="warning" />
-                        </div>
-                      </template>
-
-                      <v-list-item-title class="font-weight-medium text-warning-darken-2 mb-1">
-                        {{ pending.label }}
-                      </v-list-item-title>
-                      <v-list-item-subtitle class="text-grey-darken-1">
-                        Documento permanente requerido
-                      </v-list-item-subtitle>
-
-                      <template v-slot:append>
-                        <v-btn
-                          prepend-icon="mdi-upload"
-                          variant="tonal"
-                          size="small"
-                          color="warning"
-                          class="text-none"
-                          @click.stop="openDialogForPending(pending)"
-                        >
-                          Subir Ahora
-                        </v-btn>
-                      </template>
-                    </v-list-item>
-                  </template>
-                </v-list>
-              </v-card>
-            </div>
-          </template>
-          
-          <!-- Estado vacío -->
-          <div v-if="!hasAnyDocs" class="text-center py-10">
-            <v-icon size="64" color="grey-lighten-2" class="mb-4">
-                {{ currentTab === 'trash' ? 'mdi-delete-empty' : 'mdi-file-document-outline' }}
-            </v-icon>
-            <h3 class="text-h6 text-grey">
-                {{ currentTab === 'trash' ? 'La papelera está vacía' : 'No hay documentos en esta categoría' }}
-            </h3>
+        <!-- VISTA PRINCIPAL: agrupada por categoría -->
+        <template v-else>
+          <!-- Filtros: año fiscal, estado, acceso a papelera -->
+          <div class="d-flex align-center flex-wrap mb-6" style="gap: 12px">
+            <v-select
+              v-model="selectedYear"
+              :items="availableYears"
+              density="compact"
+              variant="outlined"
+              hide-details
+              class="fiscal-select-year"
+              bg-color="white"
+              label="Año Fiscal"
+              prepend-inner-icon="mdi-calendar"
+            />
+            <v-select
+              v-model="statusFilter"
+              :items="statusFilterOptions"
+              item-title="text"
+              item-value="value"
+              density="compact"
+              variant="outlined"
+              hide-details
+              class="fiscal-select-status"
+              bg-color="white"
+              prepend-inner-icon="mdi-filter-variant"
+              label="Estado"
+            />
+            <v-spacer class="d-none d-sm-block" />
+            <v-btn
+              variant="text"
+              size="small"
+              color="grey-darken-1"
+              prepend-icon="mdi-delete-outline"
+              class="text-none"
+              @click="currentTab = 'trash'"
+            >
+              Papelera
+              <v-chip size="x-small" class="ml-1" color="grey" variant="tonal">{{ stats.trash }}</v-chip>
+            </v-btn>
           </div>
 
-        </v-card>
+          <!-- ATIENDE ESTO PRIMERO -->
+          <section v-if="urgentes.length > 0" class="mb-8">
+            <h2 class="text-h6 font-weight-bold text-error mb-3 d-flex align-center">
+              <v-icon start icon="mdi-alert-circle" color="error" />
+              Atiende esto primero
+            </h2>
+            <TarjetaDocumentoFiscal
+              v-for="item in urgentes"
+              :key="'urgente-' + (item.doc ? item.doc.id : item.pendiente.id + item.categoriaTitulo)"
+              :doc="item.doc"
+              :pendiente="item.pendiente"
+              :categoria-titulo="item.categoriaTitulo"
+              @ver="openPreview"
+              @editar="openDialog"
+              @eliminar="confirmDelete"
+              @subir="openDialogForPending"
+            />
+          </section>
+
+          <!-- CATEGORÍAS: Legal, Municipal, SENIAT, Nómina, Libros Contables, Otros -->
+          <section v-for="cat in categories" :key="cat.value" class="mb-8">
+            <h2 class="text-h6 font-weight-bold text-secondary mb-3 d-flex align-center">
+              <v-icon start :icon="getCategoryIcon(cat.value)" color="secondary" />
+              {{ cat.title }}
+            </h2>
+
+            <!-- Documentos periódicos (mensual, trimestral, quincenal, semestral, anual) -->
+            <FiscalPeriodTracker
+              v-for="type in getRecurringTypes(cat.value)"
+              :key="type.id"
+              :type="type"
+              :category="cat.value"
+              :documents="getDocsForType(type.id)"
+              :year="selectedYear"
+              @open-preview="openPreview"
+              @open-dialog="handleTrackerDialog"
+              @delete-doc="confirmDelete"
+            />
+
+            <!-- Documentos únicos / permanentes ya subidos -->
+            <TarjetaDocumentoFiscal
+              v-for="doc in getNonRecurringDocsForCategory(cat.value)"
+              :key="doc.id"
+              :doc="doc"
+              @ver="openPreview"
+              @editar="openDialog"
+              @eliminar="confirmDelete"
+            />
+
+            <!-- Documentos únicos / permanentes requeridos pero aún sin subir -->
+            <TarjetaDocumentoFiscal
+              v-for="pending in getPendingDocsForCategory(cat.value)"
+              :key="'pendiente-' + pending.id"
+              :pendiente="pending"
+              @subir="openDialogForPending"
+            />
+          </section>
+        </template>
       </v-col>
     </v-row>
 
@@ -776,16 +451,18 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import Chart from 'chart.js/auto'
 import { jsPDF } from 'jspdf'
-import StatsCard from '@/components/common/StatsCard.vue'
 import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
 import FiscalPeriodTracker from '@/components/fiscal/FiscalPeriodTracker.vue'
+import TarjetaDocumentoFiscal from '@/components/fiscal/TarjetaDocumentoFiscal.vue'
+import AyudaTermino from '@/components/ui/AyudaTermino.vue'
+import EstadoVacio from '@/components/ui/EstadoVacio.vue'
 import fiscalService from '@/services/fiscalService'
 import userService from '@/services/userService'
 import { obtenerUrlFirmada } from '@/services/storageUrlService.js'
 import systemLogo from '/ADSystem/logo.png'
-import { FISCAL_TYPES, MONTHS, isRecurringFrequency, getExpirationInfo } from '@/constants/fiscalDocuments'
+import { FISCAL_TYPES, isRecurringFrequency } from '@/constants/fiscalDocuments'
+import { semaforoDocumento } from '@/utils/semaforoDocumento'
 
 // Data
 const initialLoading = ref(true)
@@ -796,16 +473,13 @@ const restoring = ref(false)
 const exporting = ref(false)
 const docs = ref([])
 const stats = reactive({ total: 0, vigente: 0, tramite: 0, vencido: 0, noAplica: 0, porVencer: 0, trash: 0 })
-const currentTab = ref('all') // 'all' | 'LEGAL' | 'MUNICIPAL' | 'SENIAT' | 'NOMINA' | 'OTROS' | 'trash'
-const viewMode = ref('accordion') // 'accordion' | 'table'
+const currentTab = ref('all') // 'all' | 'trash' — la vista principal ahora agrupa todas las categorías en una sola pantalla
 const dialogOpen = ref(false)
 const deleteDialog = ref(false)
 const previewDialog = ref(false)
 const editingItem = ref(null)
 const itemToDelete = ref(null)
 const previewItem = ref(null)
-const chartCanvas = ref(null)
-let chartInstance = null
 const snackbar = ref({ show: false, message: '', color: 'error' })
 
 // Selector de período
@@ -821,15 +495,6 @@ const statusFilterOptions = [
     { text: 'No Aplica', value: 'NO_APLICA' }
 ]
 
-const tableHeaders = [
-    { title: 'Documento', key: 'name', sortable: true },
-    { title: 'Categoría', key: 'category', sortable: true },
-    { title: 'Emisión', key: 'emission_date', sortable: true },
-    { title: 'Vencimiento', key: 'expiration_date', sortable: true },
-    { title: 'Estado', key: 'status', sortable: true },
-    { title: 'Acciones', key: 'actions', sortable: false, align: 'end' }
-]
-
 // Años disponibles para el selector (desde 2020 hasta el próximo año)
 const availableYears = computed(() => {
     const current = new Date().getFullYear()
@@ -841,21 +506,15 @@ const availableYears = computed(() => {
 // (Meses eliminados ya que FiscalPeriodTracker maneja los períodos internamente)
 
 
+// Orden pedido por la contadora: Legal, Municipal, SENIAT, Nómina primero.
 const categories = [
     { title: 'Legal', value: 'LEGAL' },
-    { title: 'Libros Contables', value: 'LIBROS' },
     { title: 'Municipal', value: 'MUNICIPAL' },
     { title: 'Seniat', value: 'SENIAT' },
     { title: 'Parafiscales y nómina', value: 'NOMINA' },
+    { title: 'Libros Contables', value: 'LIBROS' },
     { title: 'Otros', value: 'OTROS' }
 ]
-
-// Determinar si el tab actual tiene documentos recurrentes (necesita selector de período)
-const showPeriodSelector = computed(() => {
-    if (currentTab.value === 'trash' || currentTab.value === 'all') return false
-    const catTypes = FISCAL_TYPES[currentTab.value] || []
-    return catTypes.some(t => isRecurringFrequency(t.frequency))
-})
 
 const getCategoryTitle = (catValue) => {
     const cat = categories.find(c => c.value === catValue)
@@ -879,31 +538,11 @@ const getDocsForType = (typeId) => {
     return docs.value.filter(d => d.doc_type === typeId)
 }
 
-const getNonRecurringDocs = () => {
-    if (currentTab.value === 'all' || currentTab.value === 'trash') return []
-    const nrTypes = getNonRecurringTypes(currentTab.value).map(t => t.id)
-    return filteredDocs.value.filter(d => {
-        if (!d.doc_type) return true // Ad-hoc sin tipo estricto
-        return nrTypes.includes(d.doc_type)
-    })
-}
-
-const hasAnyDocs = computed(() => {
-    if (currentTab.value === 'all' || currentTab.value === 'trash') {
-        return filteredDocs.value.length > 0
-    }
-    return getRecurringTypes(currentTab.value).length > 0 || getNonRecurringDocs().length > 0
-})
-
-const filteredDocs = computed(() => {
-    let filtered = docs.value
-    
-    if (currentTab.value === 'trash') return filtered
-    
-    if (currentTab.value !== 'all') {
-        filtered = filtered.filter(d => d.category === currentTab.value)
-    }
-    
+// Documentos de una categoría que ya pasaron el filtro de estado global.
+// A diferencia de la versión anterior, NO depende de una pestaña activa:
+// la pantalla ahora muestra todas las categorías a la vez (una debajo de otra).
+const getDocsForCategory = (cat) => {
+    let filtered = docs.value.filter(d => d.category === cat)
     if (statusFilter.value !== 'ALL') {
         filtered = filtered.filter(d => {
             const st = getEffectiveStatus(d)
@@ -911,22 +550,29 @@ const filteredDocs = computed(() => {
             return st === statusFilter.value
         })
     }
-    
     return filtered
-})
+}
 
-// Documentos permanentes pendientes (los recurrentes pendientes los maneja FiscalPeriodTracker)
-const nonRecurringPendingDocs = computed(() => {
-    if (currentTab.value === 'all' || currentTab.value === 'trash') return []
-    if (statusFilter.value !== 'ALL') return [] 
-    
+const getNonRecurringDocsForCategory = (cat) => {
+    const nrTypes = getNonRecurringTypes(cat).map(t => t.id)
+    return getDocsForCategory(cat).filter(d => {
+        if (!d.doc_type) return true // Ad-hoc sin tipo estricto
+        return nrTypes.includes(d.doc_type)
+    })
+}
+
+// Documentos permanentes/únicos requeridos pero aún sin subir (los recurrentes
+// pendientes los maneja FiscalPeriodTracker con su propia lógica de "Falta").
+const getPendingDocsForCategory = (cat) => {
+    if (statusFilter.value !== 'ALL') return []
+
     const pending = []
-    const nrTypes = getNonRecurringTypes(currentTab.value)
-    
+    const nrTypes = getNonRecurringTypes(cat)
+
     nrTypes.forEach(type => {
         if (!type.required) return
         const exists = docs.value.some(d => {
-            if (d.category !== currentTab.value) return false
+            if (d.category !== cat) return false
             if (d.doc_type === type.id) return true
             // Fallback fuzzy match only if doc_type is missing
             let isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
@@ -936,52 +582,92 @@ const nonRecurringPendingDocs = computed(() => {
             }
             return isNameMatch
         })
-        
+
         if (!exists) {
-            pending.push({ ...type, category: currentTab.value, isPending: true })
+            pending.push({ ...type, category: cat, isPending: true })
         }
     })
-    
-    return pending
-})
 
-// Conteo de documentos por categoría
-const getCategoryCount = (catValue) => {
-    return docs.value.filter(d => d.category === catValue).length
+    return pending
 }
 
-const groupedCategories = computed(() => {
-    const groups = {}
-    
-    // Inicializar grupos con el orden definido y títulos correctos
-    categories.forEach(cat => {
-        groups[cat.value] = {
-            title: cat.title,
-            docs: []
-        }
+// Documentos que necesitan atención ahora: rojo/naranja por fecha, o
+// requeridos y nunca subidos. Se muestran primero (fuera del orden por
+// categoría) en la sección "Atiende esto primero".
+const urgentes = computed(() => {
+    if (currentTab.value === 'trash') return []
+    const items = []
+
+    categories.forEach(catObj => {
+        const cat = catObj.value
+
+        getNonRecurringDocsForCategory(cat).forEach(doc => {
+            if (doc.status === 'NO_APLICA' || doc.status === 'TRAMITE') return
+            const s = semaforoDocumento(doc.emission_date, doc.expiration_date)
+            if (s.color === 'error' || s.color === 'warning') {
+                items.push({ doc, categoriaTitulo: catObj.title })
+            }
+        })
+
+        getPendingDocsForCategory(cat).forEach(pending => {
+            items.push({ pendiente: pending, categoriaTitulo: catObj.title })
+        })
     })
 
-    filteredDocs.value.forEach(doc => {
-        if (groups[doc.category]) {
-            groups[doc.category].docs.push(doc)
-        }
+    return items
+})
+
+// Filtro de documentos para la vista de PAPELERA (la vista principal ya no
+// usa una lista plana: se agrupa por categoría con getDocsForCategory).
+const filteredDocs = computed(() => docs.value)
+
+// Progreso "Tu negocio está al día: X de Y" — a diferencia de
+// complianceDetail (usado en el PDF), los documentos NO_APLICA no cuentan
+// ni en el numerador ni en el denominador, y solo lo "vigente" (no "en
+// trámite") cuenta como al día.
+const progresoAlDia = computed(() => {
+    let required = 0
+    let covered = 0
+
+    categories.forEach(catObj => {
+        const cat = catObj.value
+        if (cat === 'OTROS') return
+        const types = FISCAL_TYPES[cat] || []
+
+        types.filter(t => t.required).forEach(type => {
+            const matchingDocs = docs.value.filter(d => {
+                if (d.category !== cat) return false
+                const isTypeMatch = d.doc_type === type.id
+                let isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
+                if (isNameMatch && type.id === 'RIF' && d.name.toLowerCase().includes('socios')) {
+                    isNameMatch = false
+                }
+                return isTypeMatch || isNameMatch
+            })
+
+            // Los NO_APLICA no cuentan ni como requeridos ni como cubiertos.
+            if (matchingDocs.some(d => d.status === 'NO_APLICA')) return
+
+            required++
+            const vigente = matchingDocs.some(d => {
+                const status = getEffectiveStatus(d)
+                return status === 'VIGENTE' || status === 'PRESENTADO'
+            })
+            if (vigente) covered++
+        })
     })
 
-    return Object.keys(groups).map(key => ({
-        name: groups[key].title,
-        id: key,
-        docs: groups[key].docs
-    })).filter(g => g.docs.length > 0)
+    return { required, covered }
 })
 
-const complianceRate = computed(() => {
-    if (stats.total === 0) return 0
-    return Math.round((stats.vigente / stats.total) * 100)
+const progresoPorcentaje = computed(() => {
+    if (progresoAlDia.value.required === 0) return 100
+    return Math.round((progresoAlDia.value.covered / progresoAlDia.value.required) * 100)
 })
 
-const complianceColor = computed(() => {
-    if (progressRate.value >= 80) return 'success'
-    if (progressRate.value >= 50) return 'warning'
+const progresoColor = computed(() => {
+    if (progresoPorcentaje.value >= 80) return 'success'
+    if (progresoPorcentaje.value >= 50) return 'warning'
     return 'error'
 })
 
@@ -1054,14 +740,6 @@ const progressRate = computed(() => {
     return complianceDetail.value.total ? complianceDetail.value.total.rate : 0
 })
 
-const chartCenterValue = computed(() => {
-    return complianceDetail.value.total ? complianceDetail.value.total.covered : 0
-})
-
-const chartCenterTotal = computed(() => {
-    return complianceDetail.value.total ? complianceDetail.value.total.required : 0
-})
-
 // Methods
 const loadData = async () => {
     loading.value = true
@@ -1092,13 +770,6 @@ const loadData = async () => {
     }
 }
 
-// Asegurar que la gráfica se inicialice cuando termina la carga
-watch(initialLoading, (isLoading) => {
-    if (!isLoading) {
-        setTimeout(updateChart, 100) // Pequeño delay para asegurar renderizado de Vuetify
-    }
-})
-
 // Watch tab change - recargar datos si cambia hacia/desde papelera
 watch(currentTab, (newTab, oldTab) => {
     statusFilter.value = 'ALL' // Reset filtro de estado al cambiar tab
@@ -1111,92 +782,6 @@ watch(currentTab, (newTab, oldTab) => {
     }
     // Para otros tabs, no es necesario recargar de la BD
 })
-
-const updateChart = () => {
-    if (!chartCanvas.value) return
-    if (chartInstance) chartInstance.destroy()
-    
-    // Calcular desglose de estatus para la gráfica
-    let cVigente = 0
-    let cTramite = 0
-    let cVencido = 0
-    let cPendiente = 0
-
-    // Iterar todas las categorías para contar documentos requeridos
-    const cats = ['LEGAL', 'MUNICIPAL', 'SENIAT', 'NOMINA']
-    cats.forEach(cat => {
-        const types = FISCAL_TYPES[cat] || []
-        const requiredTypes = types.filter(t => t.required)
-        
-        requiredTypes.forEach(type => {
-            // Buscar documentos coincidentes
-            const matchingDocs = docs.value.filter(d => {
-                if (d.category !== cat) return false
-                const isTypeMatch = d.doc_type === type.id
-                let isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
-                if (isNameMatch && type.id === 'RIF' && d.name.toLowerCase().includes('socios')) isNameMatch = false
-                return isTypeMatch || isNameMatch
-            })
-
-            // Prioridad: 1. Vigente, 2. Trámite, 3. Vencido, 4. Pendiente
-            const validDoc = matchingDocs.find(d => {
-                const s = getEffectiveStatus(d)
-                return s === 'VIGENTE' || s === 'PRESENTADO' || s === 'TRAMITE'
-            })
-            
-            if (validDoc) {
-                const s = getEffectiveStatus(validDoc)
-                if (s === 'VIGENTE') cVigente++
-                else if (s === 'PRESENTADO') cVigente++
-                else if (s === 'TRAMITE') cTramite++
-            } else {
-                const expiredDoc = matchingDocs.find(d => getEffectiveStatus(d) === 'VENCIDO')
-                if (expiredDoc) {
-                    cVencido++
-                } else {
-                    cPendiente++
-                }
-            }
-        })
-
-    })
-
-    // Documentos NO_APLICA (se muestran en gris en la gráfica)
-    const cNoAplica = docs.value.filter(d => d.status === 'NO_APLICA').length
-
-    // Configurar gráfica
-    chartInstance = new Chart(chartCanvas.value, {
-        type: 'doughnut',
-        data: {
-             labels: ['Vigentes', 'En Trámite', 'Vencidos', 'Pendientes', 'No Aplica'],
-             datasets: [{
-                 data: [cVigente, cTramite, cVencido, cPendiente, cNoAplica],
-                 backgroundColor:      ['#4CAF50', '#FFC107', '#F44336', '#E0E0E0', '#9E9E9E'],
-                 hoverBackgroundColor: ['#66BB6A', '#FFD54F', '#EF5350', '#BDBDBD', '#757575'],
-                 borderWidth: 0,
-                 hoverOffset: 4
-             }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '75%',
-            plugins: {
-                legend: { 
-                    display: false
-                },
-                tooltip: { 
-                    enabled: true,
-                    callbacks: {
-                        label: function(context) {
-                            return ` ${context.label}: ${context.raw}`;
-                        }
-                    }
-                }
-            }
-        }
-    })
-}
 
 const openDialog = (item = null) => {
     editingItem.value = item
@@ -1393,35 +978,9 @@ const getCategoryIcon = (cat) => {
     return map[cat] || 'mdi-file'
 }
 
-const getCategoryChipColor = (cat) => {
-    const map = {
-        'LEGAL': 'deep-purple',
-        'MUNICIPAL': 'blue',
-        'SENIAT': 'teal',
-        'NOMINA': 'orange',
-        'LIBROS': 'brown',
-        'OTROS': 'grey'
-    }
-    return map[cat] || 'grey'
-}
-
-const hasCategory = (cat) => {
-    return docs.value.some(d => d.category === cat)
-}
-
 const formatDate = (dateStr) => {
     if (!dateStr) return ''
     return new Date(dateStr).toLocaleDateString()
-}
-
-const getDay = (dateStr) => {
-    if (!dateStr) return '--'
-    return new Date(dateStr).getDate()
-}
-
-const getMonth = (dateStr) => {
-    if (!dateStr) return '--'
-    return new Date(dateStr).toLocaleString('es-ES', { month: 'short' })
 }
 
 const getExpirationClass = (dateStr) => {
@@ -1430,27 +989,6 @@ const getExpirationClass = (dateStr) => {
     if (days < 0) return 'text-error font-weight-bold'
     if (days < 30) return 'text-warning font-weight-bold'
     return 'text-grey'
-}
-
-const getCategoryVariant = (cat) => {
-    if (!complianceDetail.value[cat]) return 'outlined'
-    return complianceDetail.value[cat].rate === 100 ? 'tonal' : 'outlined'
-}
-
-const getCategoryColor = (cat) => {
-    if (!complianceDetail.value[cat]) return 'grey'
-    const rate = complianceDetail.value[cat].rate
-    if (rate === 100) return 'success'
-    if (rate > 0) return 'warning'
-    return 'grey'
-}
-
-const getCategoryIconStatus = (cat) => {
-    if (!complianceDetail.value[cat]) return 'mdi-circle-outline'
-    const rate = complianceDetail.value[cat].rate
-    if (rate === 100) return 'mdi-check-all'
-    if (rate > 0) return 'mdi-chart-arc'
-    return 'mdi-circle-outline'
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1956,26 +1494,11 @@ const exportToPDF = async () => {
 onMounted(async () => {
     await loadData()
     initialLoading.value = false
-    updateChart()
 })
 
 </script>
 
 <style scoped>
-.chart-center-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    pointer-events: none;
-    z-index: 0;
-}
-
-.hover-bg:hover {
-    background-color: #f5f5f5;
-}
-
 /* Selectores de período — Responsive */
 .fiscal-select-year {
     width: 130px;

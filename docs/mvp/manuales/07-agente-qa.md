@@ -18,3 +18,8 @@
 - [ ] **Seguridad (tras la Fase 0):** usuario de la org A no ve filas ni archivos de la org B; signUp con rol forzado termina en `cliente`; anónimo no puede ejecutar RPCs de billing.
 - [ ] **Prueba de la abuela** (7 principios de `PLAN-MVP.md §2`): puntuar 1-10 por pantalla.
 - [ ] Informe breve en `docs/mvp/auditorias/qa-<fecha>.md` (hallazgos con severidad + puntuación) y línea en `BITACORA.md`.
+
+## Facturas reales para probar el OCR
+`examples/facturas-prueba/` (fuera de git, datos reales del usuario: no copiar su contenido a informes):
+Corpelec ×2 (luz, Bs), Inter ×2 (internet, Bs), factura de imprenta digital (formato Providencia), courier internacional, Amazon y GitHub (USD).
+Para cada una: subirla en "Gasté o compré algo" (modo simple), medir cuántos de los 4 datos salen bien sin corregir, si detecta la moneda y la tasa, y si trae los ítems. Registrar resultados en el informe de QA. No guardar los registros salvo que el usuario lo pida (y si se guardan, anotarlos para borrarlos).

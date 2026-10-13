@@ -70,19 +70,26 @@ Es el corazón del MVP y el diferenciador.
 - Bandeja de "pagos reportados" con aprobar o rechazar en 1 clic (activa la suscripción y notifica).
 - Gestión de usuarios con invitación (ya construida) y estados claros.
 - Ocultar `/ocr-demo` y `/test-form` en producción.
+- **Adelantado de la Fase 5 (decisión 2026-10-12): avisos de vencimiento por correo.** Job diario (`pg_cron` + Edge Function) que avisa al cliente 30, 7 y 1 días antes de que venza un papel de "Mis papeles" (`fiscal_docs.expiration_date`) o su plan. Plantilla corta en lenguaje llano con botón "Ver mis papeles".
+- **Adelantado de la Fase 5: registrar un gasto mandando la foto por WhatsApp** (gancho de lanzamiento). WhatsApp Business Cloud API (Meta) → webhook en Edge Function → identifica al cliente por su número verificado → reutiliza `gemini-ocr` → guarda como **borrador** y responde "Listo, registré tu gasto de $X en *Proveedor*. Revísalo aquí: <enlace>". Requisitos del usuario: cuenta de Meta Business verificada, número de teléfono dedicado y plantillas aprobadas (lo gestiona el usuario; el código no depende de eso para probarse en modo sandbox).
 
 ### Fase 4 — Lanzamiento comercial (1-2 semanas, en paralelo con la Fase 3) → `06-agente-producto-marketing.md`
 - Decisión de precios (ver §5), landing reescrita con el posicionamiento, comparativa con Fina y testimonios.
+- **Landing nueva enfocada en ventas (último paso del MVP, pedido del usuario 2026-10-13):** rehacer `LandingPage.vue` desde cero tomando como referencia lo que funciona en Fina Partner (`auditorias/competencia-fina-profundo.md`) y superándolo: capturas reales de la app dentro de marcos tipo Mac/iPhone, animaciones con **GSAP + ScrollTrigger** (secciones que se revelan, demo "foto → registrado" que se reproduce al hacer scroll, contadores, logo animado), elementos dinámicos, prueba social, comparativa, precios reales y CTA a la prueba gratis. Móvil primero, rendimiento (Lighthouse ≥90) y `prefers-reduced-motion`. Skills: `gsap-scrolltrigger`, `gsap-core`, `gsap-timeline`, `impeccable`, `copywriting`, `cro`.
 - Términos, privacidad y política de reembolso (diferenciarse de "cero reembolsos").
 - Botón de soporte por WhatsApp, analítica básica (activación, registro del primer gasto), monitoreo de errores y backups verificados.
 
 ### Fase 5 — Diferenciadores post-MVP (backlog priorizado)
-1. Registrar gastos enviando la foto **por WhatsApp** (reutiliza el OCR).
-2. Alertas de vencimientos y pagos por WhatsApp y correo (motor proactivo del Roadmap v2.0).
+1. ~~Foto por WhatsApp~~ → adelantado a la Fase 3.
+2. Alertas por **WhatsApp** (las de correo se adelantan a la Fase 3) y motor proactivo del Roadmap v2.0 (alerta de gasto +15 %, reporte semanal "Salud de tu negocio").
 3. Modo contador multi-cliente y exportación para Profit, Gálac o Saint.
 4. Registro por voz ("Gasté 20 dólares en gasolina").
 5. Conciliación bancaria con CSV + IA.
 6. Integración con imprenta digital autorizada (Providencia SNAT/2024/000102).
+
+7. **Paridad con Fina** (de `auditorias/competencia-fina-profundo.md`): asistente de IA conversacional con lenguaje llano fiscal ("¿debo retener? ¿cuánto?") — ya existe base en `SupportChat` + `ai-chat`; comisiones por vendedor; CRM con mensajes masivos; conciliación bancaria real.
+8. **Facturación fiscal vía imprenta digital autorizada** (Providencia SNAT/2024/000102): Fina la promete y la tiene retrasada; ser primeros es una ventaja grande. Requiere alianza con una imprenta digital (decisión de negocio del usuario). Modelo real de formato: `examples/facturas-prueba/factura-imprenta-digital.pdf`.
+9. **Contenido y confianza (Fase 4):** centro de tutoriales en video por tipo de negocio, blog SEO fiscal venezolano, Shorts de 15-20 s con usuarios 60+, y reseñas verificables (Google Business).
 
 ### Transversal — QA → `07-agente-qa.md`
 Cierra cada fase: vitest verde, recorrido en navegador de los flujos cliente y super admin (escritorio y móvil) y checklist "prueba de la abuela".

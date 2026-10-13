@@ -20,7 +20,7 @@ export const FISCAL_TYPES = {
         { id: 'CONFORMIDAD_USO',        label: 'Conformidad de Uso',                 frequency: 'PERMANENT', required: true,  allowMultiple: false },
         { id: 'CONFORMIDAD_BOMBEROS',   label: 'Conformidad de Bomberos',            frequency: 'VIGENTE',   required: true,  allowMultiple: false },
         { id: 'PERMISO_SANITARIO',      label: 'Permiso Sanitario',                  frequency: 'ANNUAL',    required: false, allowMultiple: false }, // Solo si vende alimentos
-        { id: 'PUBLICIDAD',             label: 'Publicidad y Propaganda',            frequency: 'SEMESTRAL', required: true,  allowMultiple: false },
+        { id: 'PUBLICIDAD',             label: 'Publicidad y Propaganda',            frequency: 'MONTHLY', required: true,  allowMultiple: false },
         { id: 'SOLVENCIA_INMUEBLE',     label: 'Solvencia de Inmueble',              frequency: 'VIGENTE',   required: true,  allowMultiple: false },
         { id: 'ARRENDAMIENTO',          label: 'Contrato de Arrendamiento / Propiedad', frequency: 'VIGENTE', required: true, allowMultiple: false },
         // LICENCIA_AE: duración real 3 años → medir por fecha de vencimiento, no exigir anualmente

@@ -31,9 +31,9 @@
     <div class="plan-pricing text-center py-5">
       <div class="d-flex justify-center align-baseline mb-2">
         <span class="text-h3 font-weight-black" :style="{ color: priceColor }">
-          $<AnimatedNumber :value="currentPrice" locale="en-US" :minimum-fraction-digits="2" :maximum-fraction-digits="2" />
+          {{ precioTexto }}
         </span>
-        <span class="text-body-2 text-medium-emphasis ml-1">/ mes</span>
+        <span class="text-body-2 text-medium-emphasis ml-1">/ {{ billingPeriod === 'annual' ? 'año' : 'mes' }}</span>
       </div>
       <span class="text-caption" :class="isFeatured || isEnterprise ? 'text-white-50' : 'text-medium-emphasis'">
         {{ billingPeriod === 'annual' ? 'Facturado anualmente' : 'Facturado mes a mes' }}
@@ -76,10 +76,9 @@
 </template>
 
 <script>
-import AnimatedNumber from '@/components/common/AnimatedNumber.vue';
+import { formatMoney } from '@/utils/formatMoney';
 
 export default {
-  components: { AnimatedNumber },
   name: 'PlanCard',
   props: {
     plan: { type: Object, required: true },
@@ -98,6 +97,10 @@ export default {
     },
     currentPrice() {
       return this.billingPeriod === 'annual' ? this.plan.price_annual : this.plan.price_monthly;
+    },
+    // Precio fijo con formato venezolano (antes AnimatedNumber recibía texto y podía quedar en $0)
+    precioTexto() {
+      return formatMoney(Number(this.currentPrice), 'USD');
     },
     features() {
       if (Array.isArray(this.plan.features)) return this.plan.features;

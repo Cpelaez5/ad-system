@@ -10,21 +10,27 @@ html, body {
 
 /* Variables CSS para la paleta de colores - Basada en la identidad visual */
 :root {
-  /* Colores principales - Paleta del sistema */
-  --color-primary: #A81C22;
-  /* Rojo principal */
+  /* Colores principales - Identidad AD System (producto). Verificados por
+     píxel desde public/ADSystem/png/logo.png, icono.png, icono2.png y los
+     favicons oficiales — ver docs/mvp/diseno/sistema-diseno.md. */
+  --color-primary: #8E1818;
+  /* Granate AD System (marca) */
   --color-secondary: #1F355C;
-  /* Azul oscuro */
+  /* Azul de apoyo (contraste AA ya verificado) */
   --color-accent: #E0B04F;
-  /* Amarillo dorado */
-  --color-error: #A81C22;
-  /* Rojo para errores */
+  /* Dorado de apoyo — solo fondo/ícono/borde, nunca texto sobre blanco */
+  --color-metal: #9CA3AF;
+  /* Gris "metal" oficial del favicon — fondo/borde, siempre con texto oscuro */
+  --color-granate-oscuro: #320B0B;
+  /* Variante oscura oficial del logo — estado presionado/activo */
+  --color-error: #D32F2F;
+  /* Rojo de error: distinto del granate de marca (ver sistema-diseno.md) */
   --color-info: #1F355C;
   /* Azul oscuro para información */
-  --color-success: #4CAF50;
-  /* Verde para éxito */
+  --color-success: #2E7D32;
+  /* Verde oscurecido: el verde Material estándar no pasa AA con texto blanco */
   --color-warning: #E0B04F;
-  /* Amarillo dorado para advertencias */
+  /* Amarillo dorado para advertencias (siempre con texto oscuro encima) */
 
   /* Colores de superficie */
   --color-surface: #E0E0E0;
@@ -80,9 +86,11 @@ html, body {
 
 /* Variables CSS para Modo Oscuro (se activan cuando Vuetify añade la clase v-theme--dark) */
 .v-theme--dark {
-  --color-primary: #E57373;
+  --color-primary: #C18080;
   --color-secondary: #90caf9;
   --color-accent: #E0B04F;
+  --color-metal: #9CA3AF;
+  --color-granate-oscuro: #C18080;
   --color-error: #EF5350;
   --color-info: #90caf9;
   --color-success: #81C784;
@@ -600,10 +608,9 @@ select * {
 /* Responsive */
 @media (max-width: 768px) {
 
-  html,
-  body {
-    font-size: 14px;
-  }
+  /* Antes el cuerpo bajaba a 14px en móvil, por debajo del mínimo legible
+     (PLAN-MVP.md §2, regla 6: cuerpo ≥16px). Se deja el tamaño base y solo
+     se reducen los títulos más grandes para que sigan cabiendo. */
 
   h1 {
     font-size: 2rem;
@@ -729,5 +736,30 @@ select * {
 .badge-error {
   background-color: var(--color-error);
   color: var(--text-on-secondary);
+}
+
+/* ========================================================================
+   ACCESIBILIDAD TÁCTIL: alturas mínimas (ver sistema-diseno.md §Tokens).
+   Solo AUMENTAN el tamaño de botones/campos que estuvieran por debajo del
+   mínimo recomendado (44-48px); nunca encogen nada, así que no debería
+   romper ninguna pantalla existente. Los botones icon/small/x-small (los
+   que se usan en tablas densas) quedan afuera a propósito.
+   ======================================================================== */
+.v-btn:not(.v-btn--icon):not(.v-btn--size-x-small):not(.v-btn--size-small) {
+  min-height: 44px;
+}
+
+.v-btn--size-default:not(.v-btn--icon),
+.v-btn--size-large:not(.v-btn--icon),
+.v-btn--size-x-large:not(.v-btn--icon) {
+  min-height: 48px;
+}
+
+/* Foco visible para navegación por teclado en toda la app. */
+.v-btn:focus-visible,
+a:focus-visible,
+.v-field:focus-within {
+  outline: 3px solid var(--color-secondary);
+  outline-offset: 2px;
 }
 

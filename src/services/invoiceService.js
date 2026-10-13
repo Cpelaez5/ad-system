@@ -66,6 +66,7 @@ class InvoiceService {
             name
           ),
           issue_date,
+          fecha_fiscal,
           due_date,
           status,
           issuer,
@@ -136,6 +137,7 @@ class InvoiceService {
         expense_type: invoice.expense_type,
         expenseCategory: invoice.expense_categories || null,
         issueDate: invoice.issue_date,
+        fecha_fiscal: invoice.fecha_fiscal || null,
         dueDate: invoice.due_date,
         status: invoice.status,
         issuer: invoice.issuer || {},
@@ -198,6 +200,7 @@ class InvoiceService {
             name
           ),
           issue_date,
+          fecha_fiscal,
           due_date,
           status,
           issuer,
@@ -241,6 +244,7 @@ class InvoiceService {
         expense_type: invoice.expense_type,
         expenseCategory: invoice.expense_categories || null,
         issueDate: invoice.issue_date,
+        fecha_fiscal: invoice.fecha_fiscal || null,
         dueDate: invoice.due_date,
         status: invoice.status,
         issuer: invoice.issuer || {},
@@ -308,6 +312,10 @@ class InvoiceService {
         expense_type: invoiceData.expense_type,
         expense_category_id: invoiceData.expense_category_id || null,
         issue_date: invoiceData.issueDate,
+        // C1: mes de declaración en el Libro de Compras (solo relevante en COMPRA;
+        // si no viene del formulario, el trigger set_fecha_fiscal_default() la
+        // calcula igual al guardar — ver supabase/migrations/20261013100000_fecha_fiscal.sql).
+        fecha_fiscal: invoiceData.fecha_fiscal || null,
         due_date: invoiceData.dueDate || null,
         status: invoiceData.status || 'BORRADOR',
         issuer: invoiceData.issuer || {},
@@ -469,6 +477,7 @@ class InvoiceService {
         expense_type: newInvoice.expense_type,
         expense_category_id: newInvoice.expense_category_id,
         issueDate: newInvoice.issue_date,
+        fecha_fiscal: newInvoice.fecha_fiscal || null,
         dueDate: newInvoice.due_date,
         status: newInvoice.status,
         issuer: newInvoice.issuer || {},
@@ -548,6 +557,8 @@ class InvoiceService {
         expense_type: invoiceData.expense_type,
         expense_category_id: invoiceData.expense_category_id || null,
         issue_date: invoiceData.issueDate,
+        // C1 / W20: permitir corregir la fecha fiscal al editar una compra ya guardada.
+        fecha_fiscal: invoiceData.fecha_fiscal || null,
         due_date: invoiceData.dueDate || null,
         status: invoiceData.status,
         issuer: invoiceData.issuer || {},
@@ -631,6 +642,7 @@ class InvoiceService {
         expense_type: updatedInvoice.expense_type,
         expense_category_id: updatedInvoice.expense_category_id,
         issueDate: updatedInvoice.issue_date,
+        fecha_fiscal: updatedInvoice.fecha_fiscal || null,
         dueDate: updatedInvoice.due_date,
         status: updatedInvoice.status,
         issuer: updatedInvoice.issuer || {},
@@ -1011,6 +1023,7 @@ class InvoiceService {
           document_type,
           flow,
           issue_date,
+          fecha_fiscal,
           due_date,
           status,
           issuer,
@@ -1059,6 +1072,7 @@ class InvoiceService {
         documentType: invoice.document_type,
         flow: invoice.flow || 'VENTA',
         issueDate: invoice.issue_date,
+        fecha_fiscal: invoice.fecha_fiscal || null,
         dueDate: invoice.due_date,
         status: invoice.status,
         issuer: invoice.issuer || {},

@@ -2,8 +2,120 @@
   <v-card class="sif-card" @submit.prevent="handleSubmit">
   <v-form ref="form">
 
+    <!-- ══════════════════════════════════════════════════════════════════
+         MODO SIMPLE — pantalla de éxito (tras guardar, ver handleSubmit /
+         onSaveSuccess). "Registrar otro" vuelve al paso 1 con form limpio;
+         "Volver al inicio" solo emite 'cancel' (lo maneja Inicio.vue).
+    ══════════════════════════════════════════════════════════════════ -->
+    <div v-if="simple && simpleSuccess" class="sif-simple-success pa-6 text-center" data-testid="simple-success">
+      <v-icon color="success" size="72" class="mb-4">mdi-check-circle</v-icon>
+      <h2 class="text-h5 font-weight-bold mb-2">
+        ¡Listo! Guardamos tu {{ formData.flow === 'VENTA' ? 'venta' : 'gasto' }}.
+      </h2>
+      <p class="text-body-1 text-medium-emphasis mb-6">
+        Ya puedes verlo en Mis movimientos.
+      </p>
+
+      <div v-if="simpleMostrarAvisoRetencion" class="mb-3">
+        <BotonAccion
+          texto="Descargar comprobante"
+          icono="mdi-file-download-outline"
+          variante="secundaria"
+          tamano="principal"
+          :cargando="simpleDescargandoComprobante"
+          @click="simpleDescargarComprobante"
+        />
+      </div>
+
+      <BotonAccion
+        texto="Registrar otro"
+        icono="mdi-plus"
+        variante="primaria"
+        tamano="principal"
+        class="mb-3"
+        @click="simpleResetForm"
+      />
+      <BotonAccion
+        texto="Volver al inicio"
+        variante="terciaria"
+        tamano="normal"
+        @click="$emit('cancel')"
+      />
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         MODO SIMPLE — Paso 1: ¿Tienes la factura? (fase2-spec.md §3.1-2)
+         Reutiliza el FileUploadZone/handleExtractedData de siempre (ver
+         simpleHandleFileSelect): no se duplica el flujo OCR.
+    ══════════════════════════════════════════════════════════════════ -->
+    <template v-else-if="simple && simpleStep === 1">
+      <v-card-title class="sif-header pa-5 pb-4">
+        <div class="d-flex align-center ga-3">
+          <PasoGuiado
+            :paso-actual="1"
+            :total-pasos="2"
+            titulo="¿Tienes la factura o el recibo?"
+            subtitulo="Elige una opción para empezar"
+            class="flex-grow-1"
+          />
+          <v-btn icon="mdi-close" variant="text" color="grey" @click="$emit('cancel')" />
+        </div>
+      </v-card-title>
+      <v-divider />
+      <v-card-text class="pa-5">
+        <template v-if="extracting">
+          <div class="text-center py-6" data-testid="simple-leyendo">
+            <v-progress-circular indeterminate color="primary" size="56" width="5" class="mb-4" />
+            <p class="text-body-1 font-weight-medium mb-5">{{ simpleReadingMessage }}</p>
+            <v-skeleton-loader type="article" class="mx-auto" max-width="340" />
+          </div>
+        </template>
+        <template v-else>
+          <TarjetaAccion
+            icono="mdi-camera"
+            titulo="Tomarle foto"
+            subtitulo="Usa la cámara de tu teléfono"
+            color="primary"
+            class="mb-3"
+            @click="simpleTomarFoto"
+          />
+          <TarjetaAccion
+            icono="mdi-paperclip"
+            titulo="Subir archivo"
+            subtitulo="Un PDF o una imagen guardada"
+            color="secondary"
+            class="mb-3"
+            @click="simpleSubirArchivo"
+          />
+          <TarjetaAccion
+            icono="mdi-pencil-outline"
+            titulo="No tengo factura"
+            subtitulo="Registro los datos a mano"
+            color="grey-darken-1"
+            @click="simpleSinFactura"
+          />
+        </template>
+
+        <!-- Inputs ocultos: mismo FileUploadZone/flujo OCR, solo cambia quién lo dispara -->
+        <div style="display:none">
+          <FileUploadZone
+            ref="fileUploadZone"
+            accept="application/pdf,image/jpeg,image/png,image/jpg"
+            :max-size-m-b="10"
+            @file-selected="simpleHandleFileSelect"
+          />
+        </div>
+      </v-card-text>
+    </template>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Paso 2 del modo simple, o formulario completo (simple=false, igual
+         que siempre: lo usa Facturacion.vue sin ningún cambio de aspecto).
+    ══════════════════════════════════════════════════════════════════ -->
+    <template v-else>
+
     <!-- ═══════════════════════════════════════════════════════╗
-         HEADER                                               
+         HEADER
     ═══════════════════════════════════════════════════════════ -->
     <!-- HEADER fijo -->
     <v-card-title class="sif-header pa-5 pb-4">
@@ -30,6 +142,105 @@
     <!-- CUERPO scrollable (v-card-text maneja el scroll automáticamente con scrollable en el dialog) -->
     <v-card-text class="sif-body pa-0">
 
+      <!-- ══════════════════════════════════════════════════════════════════
+           MODO SIMPLE — Paso 2: Confirma estos datos (fase2-spec.md §3.3)
+           4 campos grandes; el resto del formulario (idéntico al de hoy)
+           queda debajo, en "Ver detalles contables" (eager: siempre montado
+           para que los cálculos/validaciones de siempre sigan funcionando).
+      ══════════════════════════════════════════════════════════════════ -->
+      <div v-if="simple" class="sif-section sif-simple-fields" data-testid="simple-paso2">
+        <PasoGuiado
+          :paso-actual="2"
+          :total-pasos="2"
+          titulo="Confirma estos datos"
+          :subtitulo="simplePaso2Subtitulo"
+          class="mb-4"
+        />
+
+        <v-row dense>
+          <!-- COMPRA/GASTO: proveedor. VENTA: cliente -->
+          <v-col cols="12">
+            <p class="sif-section-label">
+              {{ formData.flow === 'VENTA' ? '¿A quién le vendiste?' : '¿A quién le pagaste?' }}
+            </p>
+            <ProveedorAutocomplete
+              v-if="formData.flow === 'COMPRA'"
+              v-model="proveedor"
+              @add-new="showProveedorModal = true"
+            />
+            <v-text-field
+              v-else
+              v-model="counterpartName"
+              placeholder="Ej: Distribuidora López"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+              :rules="[v => !!v || 'Este campo es obligatorio']"
+            />
+          </v-col>
+
+          <!-- ¿Cuánto? (total con impuesto incluido; reutiliza el motor fiscal
+               de siempre en reversa, ver onSimpleTotalInput) -->
+          <v-col cols="12" sm="6">
+            <p class="sif-section-label">
+              ¿Cuánto?
+              <AyudaTermino clave="iva" />
+            </p>
+            <NumericInput
+              :model-value="formData.financial.totalSales"
+              @update:model-value="onSimpleTotalInput"
+              :prefix="currencySymbol"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-col>
+
+          <!-- ¿Cuándo? -->
+          <v-col cols="12" sm="6">
+            <p class="sif-section-label">¿Cuándo?</p>
+            <CustomDatePicker
+              v-model="formData.issueDate"
+              :rules="[v => !!v || 'La fecha es requerida']"
+            />
+          </v-col>
+
+          <!-- COMPRA/GASTO: ¿En qué? · VENTA: ¿Cómo te pagaron? -->
+          <v-col cols="12" v-if="formData.flow === 'COMPRA'">
+            <p class="sif-section-label">¿En qué?</p>
+            <ExpenseCategorySelector
+              v-model="formData.expense_category_id"
+              :client-id="currentUser?.client?.id"
+              :rules="[v => !!v || 'La categoría es requerida']"
+            />
+          </v-col>
+          <v-col cols="12" v-else>
+            <p class="sif-section-label">¿Cómo te pagaron?</p>
+            <v-select
+              v-model="formData.financial.paymentMethod"
+              :items="paymentMethods"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              clearable
+            />
+          </v-col>
+        </v-row>
+
+        <!-- Retenciones: solo si el cliente es agente de retención (ver
+             clienteEsAgenteRetencion) y hay algo que retener en esta compra. -->
+        <div v-if="simpleMostrarAvisoRetencion" class="d-flex align-center ga-1 mt-3 text-body-2 text-medium-emphasis" data-testid="simple-aviso-retencion">
+          <v-icon size="18" color="primary">mdi-file-certificate-outline</v-icon>
+          <span>También preparamos tu comprobante de retención.</span>
+          <AyudaTermino clave="comprobante_de_retencion" />
+        </div>
+      </div>
+
+      <EnvolturaDetallesContables
+        :simple="simple"
+        :abierto="simpleDetailsOpen"
+        @update:abierto="v => { simpleDetailsOpen = v }"
+      >
       <!-- ══════════════════════════════════════════════════════
            SECCIÓN 0: ESCANEAR CON IA (siempre visible arriba)
       ══════════════════════════════════════════════════════════ -->
@@ -150,7 +361,7 @@
         <p class="sif-section-label">Datos del documento</p>
         <v-row dense>
           <!-- Número de factura -->
-          <v-col cols="12" sm="5">
+          <v-col cols="12" sm="5" ref="simpleDetalleInvoiceNumber">
             <v-text-field
               v-model="formData.invoiceNumber"
               label="Número de factura o recibo"
@@ -503,7 +714,7 @@
       <!-- ══════════════════════════════════════════════════════
            SECCIÓN 4: PRODUCTOS / ÍTEMS
       ══════════════════════════════════════════════════════════ -->
-      <div class="sif-section">
+      <div class="sif-section" ref="simpleDetalleItems">
         <div class="d-flex align-center justify-space-between mb-3">
           <p class="sif-section-label ma-0">Productos o servicios</p>
           <v-btn
@@ -830,15 +1041,35 @@
       ══════════════════════════════════════════════════════════ -->
       <!-- Resumen de Retenciones (solo COMPRA) -->
       <div v-if="formData.flow === 'COMPRA'" class="mt-4 mx-3">
-        <!-- Fecha de Emisión del Comprobante de Retención -->
-        <v-row dense class="mb-1" v-if="retencionesResult && (retencionesResult.iva > 0 || retencionesResult.islr > 0 || retencionesResult.municipal > 0)">
+        <!-- Fecha de Emisión del Comprobante de Retención.
+             W20: antes solo se mostraba con retencionesResult (cálculo en vivo), que
+             queda null al editar una factura ya guardada (el proveedor no se
+             recarga). Ahora también se muestra si la factura YA TIENE montos de
+             retención guardados, para poder corregir la fecha del comprobante. -->
+        <v-row dense class="mb-1" v-if="hasRetencionesRegistradas">
           <v-col cols="12" sm="6" md="4">
             <CustomDatePicker
               v-model="formData.financial.retentionDate"
               label="Fecha de Emisión de Retención"
               :min="formData.issueDate"
               :max="todayDate"
-              hint="Fecha de emisión del comprobante (no puede ser futura ni anterior a la factura)"
+              hint="Fecha de emisión del comprobante (no puede ser futura ni anterior a la factura). Editable también al corregir una compra ya guardada."
+              persistent-hint
+            />
+          </v-col>
+        </v-row>
+
+        <!-- C1: Fecha fiscal (mes en que se declara esta compra en el Libro de
+             Compras). Solo COMPRA. Se prellena con la fecha del comprobante de
+             retención de IVA si existe, o con la fecha de emisión si no; el
+             usuario puede corregirla manualmente. -->
+        <v-row dense class="mb-1">
+          <v-col cols="12" sm="6" md="4">
+            <CustomDatePicker
+              :model-value="formData.fecha_fiscal"
+              @update:model-value="val => { formData.fecha_fiscal = val; fechaFiscalManuallyEdited = true; }"
+              label="Fecha fiscal (mes en que declaras esta compra)"
+              hint="Determina en qué Libro de Compras (mes) aparece esta operación. Por defecto usa la fecha del comprobante de retención de IVA; si no hay retención, usa la fecha de emisión."
               persistent-hint
             />
           </v-col>
@@ -854,15 +1085,43 @@
           @adjust="showAdjustSheet = true"
         />
 
+        <!-- C7: advertencia de municipio distinto (no bloquea, se puede confirmar) -->
+        <v-alert
+          v-if="municipalMismatch.detected"
+          type="warning"
+          variant="tonal"
+          density="comfortable"
+          class="mt-2 mb-2"
+        >
+          <div class="text-body-2">
+            Tu proveedor está en <strong>{{ municipalMismatch.issuerNombre }}</strong> y tu empresa en
+            <strong>{{ municipalMismatch.tenantNombre }}</strong>. Normalmente no corresponde retener
+            impuesto municipal en este caso.
+          </div>
+          <v-btn
+            v-if="!municipalMismatchConfirmed"
+            size="small"
+            color="warning"
+            variant="flat"
+            class="mt-2"
+            @click="confirmMunicipalMismatch"
+          >
+            Continuar igual
+          </v-btn>
+          <div v-else class="text-caption mt-1">
+            Confirmaste continuar con la retención municipal pese a la diferencia de municipio.
+          </div>
+        </v-alert>
+
         <!-- Números de Comprobante de Retención (COMPRA) -->
-        <v-card v-if="retencionesResult && (retencionesResult.iva > 0 || retencionesResult.islr > 0 || retencionesResult.municipal > 0)" class="mt-4 pa-4 rounded-lg" variant="outlined" color="grey-lighten-2">
+        <v-card v-if="hasRetencionesRegistradas" ref="simpleDetalleRetenciones" class="mt-4 pa-4 rounded-lg" variant="outlined" color="grey-lighten-2">
           <p class="sif-section-label text-black">Comprobantes de Retención</p>
           <div class="text-caption text-grey-darken-1 mb-3">
             Números auto-generados. Activa la edición manual si necesitas modificarlos.
           </div>
           <v-row dense class="mx-0 mt-1">
             <!-- IVA comprobante -->
-            <v-col cols="12" sm="4" v-if="retencionesResult.iva > 0">
+            <v-col cols="12" sm="4" v-if="showIvaComprobante">
               <v-text-field
                 v-model="formData.financial.ivaRetentionNumber"
                 label="Nro. Comprobante IVA"
@@ -892,7 +1151,7 @@
               </v-text-field>
             </v-col>
             <!-- ISLR comprobante -->
-            <v-col cols="12" sm="4" v-if="retencionesResult.islr > 0">
+            <v-col cols="12" sm="4" v-if="showIslrComprobante">
               <v-text-field
                 v-model="formData.financial.islrRetentionNumber"
                 label="Nro. Comprobante ISLR"
@@ -922,7 +1181,7 @@
               </v-text-field>
             </v-col>
             <!-- Municipal comprobante -->
-            <v-col cols="12" sm="4" v-if="retencionesResult.municipal > 0">
+            <v-col cols="12" sm="4" v-if="showMunicipalComprobante">
               <v-text-field
                 v-model="formData.financial.municipalRetentionNumber"
                 label="Nro. Comprobante Municipal"
@@ -1052,7 +1311,7 @@
           />
         </v-expand-transition>
       </div>
-
+      </EnvolturaDetallesContables>
     </v-card-text><!-- /sif-body -->
 
     <v-divider />
@@ -1071,7 +1330,20 @@
         </div>
       </v-expand-transition>
 
-      <div class="d-flex align-center ga-3 w-100">
+      <!-- Modo simple: un solo botón "Guardar" fijo de 56px (BotonAccion) -->
+      <div v-if="simple" class="w-100" data-testid="simple-guardar">
+        <BotonAccion
+          texto="Guardar"
+          icono="mdi-content-save"
+          variante="primaria"
+          tamano="principal"
+          :cargando="saving"
+          :deshabilitado="saving"
+          @click="simpleHandleSubmit"
+        />
+      </div>
+
+      <div v-else class="d-flex align-center ga-3 w-100">
         <v-btn variant="text" color="grey-darken-1" @click="$emit('cancel')" :disabled="saving">
           Cancelar
         </v-btn>
@@ -1091,7 +1363,10 @@
       </div>
     </v-card-actions>
 
-    <!-- Snackbar -->
+    </template>
+    <!-- /v-else: Paso 2 del modo simple, o formulario completo -->
+
+    <!-- Snackbar: siempre presente, sin importar el paso del modo simple -->
     <AppSnackbar
       v-model="snackbar.show"
       :type="snackbar.type"
@@ -1137,6 +1412,15 @@ import RetentionAdjustSheet from '@/components/forms/RetentionAdjustSheet.vue';
 import NumericInput from '@/components/common/NumericInput.vue';
 import { supabase } from '@/lib/supabaseClient';
 import { municipalConceptsService } from '@/services/municipalConceptsService.js';
+import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
+import BotonAccion from '@/components/ui/BotonAccion.vue';
+import PasoGuiado from '@/components/ui/PasoGuiado.vue';
+import TarjetaAccion from '@/components/ui/TarjetaAccion.vue';
+import AyudaTermino from '@/components/ui/AyudaTermino.vue';
+import EnvolturaDetallesContables from './EnvolturaDetallesContables.vue';
+import { hoyISO } from '@/utils/fechas';
+import GLOSARIO from '@/constants/glosario.js';
+import retentionPdfService from '@/services/retention-pdf-service.js';
 
 export function normalizeDateToYMD(dateInput) {
   if (!dateInput) return '';
@@ -1164,15 +1448,22 @@ let _itemKey = 0;
 
 export default {
   name: 'SimpleInvoiceForm',
-  components: { 
-    AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete, 
+  components: { EnvolturaDetallesContables,
+    AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete,
     ExpenseCategorySelector, ProveedorAutocomplete, ProveedorModalForm,
-    RetentionSummaryCard, RetentionAdjustSheet, NumericInput
+    RetentionSummaryCard, RetentionAdjustSheet, NumericInput,
+    BotonAccion, PasoGuiado, TarjetaAccion, AyudaTermino
   },
 
   props: {
     invoice: { type: Object, default: null },
-    flow:    { type: String, default: 'VENTA' }
+    flow:    { type: String, default: 'VENTA' },
+    // Fase 2 — modo simple (ver docs/mvp/diseno/fase2-spec.md §3).
+    // false (por defecto): el formulario se ve y funciona EXACTAMENTE igual que
+    // hoy (lo usa Facturacion.vue). true: presenta un asistente de 2 pasos
+    // (¿Tienes la factura? → Confirma 4 datos) con el resto del formulario
+    // disponible, sin cambios de lógica, dentro de "Ver detalles contables".
+    simple:  { type: Boolean, default: false }
   },
 
   emits: ['submit', 'cancel', 'saved'],
@@ -1217,10 +1508,18 @@ export default {
       proveedor: null,
       retentionConfig: {
         aplicarIva: false, porcentajeIva: 75, baseIva: 0,
-        aplicarIslr: false, conceptoIslr: null, baseIslr: 0, conceptoIslrNombre: '',
+        aplicarIslr: false, conceptoIslr: null, baseIslr: 0, conceptoIslrNombre: '', tipoPersona: 'JURIDICA',
         aplicarMunicipal: false, porcentajeMunicipal: 0, baseMunicipal: 0, concepto_municipal_id: null, conceptoMunicipalNombre: ''
       },
       retencionesResult: null,
+      // C6: valor de la Unidad Tributaria vigente (configuracion_fiscal_global), para
+      // replicar en la vista previa el sustraendo que aplica el RPC registrar_compra_con_retenciones.
+      valorUT: null,
+      // C7: advertencia de municipio distinto entre proveedor y empresa (no bloquea, se puede confirmar)
+      municipalMismatch: { detected: false, tenantNombre: '', issuerNombre: '' },
+      municipalMismatchConfirmed: false,
+      // C1: si el usuario edita manualmente "Fecha fiscal", dejar de sobrescribirla automáticamente.
+      fechaFiscalManuallyEdited: false,
       showProveedorModal: false,
       proveedorInitialData: null,
       showAdjustSheet: false,
@@ -1236,6 +1535,26 @@ export default {
 
       // Snackbar
       snackbar: { show: false, message: '', type: 'info', timeout: 4000 },
+
+      // ──── Modo simple (Fase 2) ────────────────────────────────────────────────
+      // Paso del asistente (1 = ¿Tienes la factura?, 2 = Confirma estos datos).
+      simpleStep: 1,
+      // true tras un guardado exitoso en modo simple: muestra la pantalla de éxito.
+      simpleSuccess: false,
+      // true/false: si el acordeón "Ver detalles contables" está abierto.
+      simpleDetailsOpen: false,
+      // Mensajes humanos rotativos mientras se lee el documento (sin jerga de OCR).
+      simpleReadingMessages: [
+        'Leyendo tu documento...',
+        'Buscando el total...',
+        'Revisando los datos...',
+        'Ya casi está...'
+      ],
+      simpleReadingMsgIndex: 0,
+      simpleReadingTimer: null,
+      // true si en algún momento se registró una retención (para ofrecer "Descargar comprobante").
+      simpleHuboRetencion: false,
+      simpleDescargandoComprobante: false,
 
       // ──── Opciones de flujo (lenguaje humano) ────────────────────────────────
       flowOptions: [
@@ -1285,7 +1604,11 @@ export default {
         flow:            'VENTA',
         expense_type:    null,
         expense_category_id: null,
-        issueDate:       new Date().toISOString().split('T')[0],
+        issueDate:       hoyISO(),
+        // C1: mes en que se declara esta compra en el Libro de Compras (solo
+        // COMPRA; se prellena en prefillFechaFiscal() con la fecha del
+        // comprobante de retención de IVA, o con issueDate si no hay retención).
+        fecha_fiscal:    hoyISO(),
         dueDate:         '',
         status:          'BORRADOR',
 
@@ -1297,7 +1620,7 @@ export default {
           taxDebit: 0, ivaRetention: 0, islrRetention: 0,
           municipalRetention: 0, igtf: 0,
           ivaRetentionNumber: '', islrRetentionNumber: '', municipalRetentionNumber: '',
-          retentionDate: new Date().toISOString().split('T')[0],
+          retentionDate: hoyISO(),
           currency: 'VES', exchangeRate: 1, exchangeRateEur: null,
           paymentMethod: null, paymentReference: '',
           credit: null
@@ -1393,7 +1716,7 @@ export default {
     },
 
     todayDate() {
-      return new Date().toISOString().split('T')[0];
+      return hoyISO();
     },
 
     currentExchangeRateValue() {
@@ -1440,6 +1763,58 @@ export default {
       const calculated = parseFloat((base + exento + iva + igtf).toFixed(2));
       const current = parseFloat(Number(this.formData.financial.totalSales || 0).toFixed(2));
       return Math.abs(calculated - current) >= 0.01;
+    },
+
+    // W20: antes esta sección dependía SOLO de retencionesResult (cálculo en
+    // vivo), que queda en null al editar una factura ya guardada porque el
+    // proveedor no se recarga automáticamente. Ahora también cuenta lo que ya
+    // está guardado en formData.financial, para poder corregir la fecha/número
+    // del comprobante de una compra ya registrada.
+    hasRetencionesRegistradas() {
+      const r = this.retencionesResult;
+      const f = this.formData.financial || {};
+      return !!(
+        (r && (r.iva > 0 || r.islr > 0 || r.municipal > 0)) ||
+        (Number(f.ivaRetention) > 0 || Number(f.islrRetention) > 0 || Number(f.municipalRetention) > 0)
+      );
+    },
+    showIvaComprobante() {
+      return !!((this.retencionesResult && this.retencionesResult.iva > 0) || Number(this.formData.financial.ivaRetention) > 0);
+    },
+    showIslrComprobante() {
+      return !!((this.retencionesResult && this.retencionesResult.islr > 0) || Number(this.formData.financial.islrRetention) > 0);
+    },
+    showMunicipalComprobante() {
+      return !!((this.retencionesResult && this.retencionesResult.municipal > 0) || Number(this.formData.financial.municipalRetention) > 0);
+    },
+
+    // ──── Modo simple (Fase 2) ──────────────────────────────────────────────
+    // Mensaje humano que se muestra mientras se lee el documento (rota cada
+    // ~1.8s, ver iniciarMensajesLectura()). Nunca jerga de OCR.
+    simpleReadingMessage() {
+      const msgs = this.simpleReadingMessages;
+      return msgs[this.simpleReadingMsgIndex % msgs.length];
+    },
+
+    // Perfil fiscal del cliente (el perfil del NEGOCIO que usa el sistema, no
+    // el del proveedor): si ninguno de estos tres está activo, el cliente
+    // nunca está obligado a retener impuestos, así que en modo simple no vale
+    // la pena mostrarle nada sobre retenciones (ver fase2-spec.md §3.4).
+    clienteEsAgenteRetencion() {
+      const c = this.currentUser?.client || {};
+      return !!(c.es_contribuyente_especial || c.es_agente_retencion_municipal || c.retains_islr);
+    },
+
+    // En modo simple: si corresponde mostrar la línea "También preparamos tu
+    // comprobante de retención" en el paso 2 (COMPRA, cliente agente de
+    // retención y hay algo que retener).
+    simpleMostrarAvisoRetencion() {
+      return this.simple && this.formData.flow === 'COMPRA' && this.clienteEsAgenteRetencion && this.hasRetencionesRegistradas;
+    },
+
+    // Subtítulo humano del paso 2 (igual para compra/gasto y venta).
+    simplePaso2Subtitulo() {
+      return 'Solo necesitamos estos 4 datos. El resto lo calculamos nosotros.';
     }
   },
 
@@ -1447,18 +1822,22 @@ export default {
   watch: {
     proveedor: {
       async handler(nuevoProveedor) {
+        // C7: cambiar de proveedor invalida cualquier confirmación previa de municipio distinto
+        this.municipalMismatchConfirmed = false;
+        this.municipalMismatch = { detected: false, tenantNombre: '', issuerNombre: '' };
+
         if (!nuevoProveedor) {
-          this.retentionConfig = { aplicarIva: false, porcentajeIva: 75, aplicarIslr: false, conceptoIslr: null, aplicarMunicipal: false, porcentajeMunicipal: 0 };
+          this.retentionConfig = { aplicarIva: false, porcentajeIva: 75, aplicarIslr: false, conceptoIslr: null, tipoPersona: 'JURIDICA', aplicarMunicipal: false, porcentajeMunicipal: 0 };
           this.calcularRetenciones();
           return;
         }
-        
+
         this.loadingRetentionConfig = true;
         try {
           const id = nuevoProveedor.id;
           const { data, error } = await supabase.from('proveedores').select('*').eq('id', id).single();
           if (error) throw error;
-          
+
           const ivaRate = data.iva_retention_rate ? parseFloat(data.iva_retention_rate) : 0;
           const municipalRate = data.municipal_rate ? parseFloat(data.municipal_rate) : 0;
 
@@ -1468,12 +1847,15 @@ export default {
             aplicarIslr: !!data.islr_concept_id,
             conceptoIslr: data.islr_concept_id || null,
             conceptoIslrNombre: '',
+            // C6: tipo_persona del proveedor, necesario para aplicar el sustraendo ISLR
+            // (persona natural) igual que lo hace el RPC registrar_compra_con_retenciones.
+            tipoPersona: data.tipo_persona || 'JURIDICA',
             aplicarMunicipal: municipalRate > 0,
             porcentajeMunicipal: municipalRate,
             concepto_municipal_id: null,
             conceptoMunicipalNombre: ''
           };
-          
+
           this.formData.issuer.id = data.id || '';
           this.formData.issuer.companyName = data.nombre || '';
           this.formData.issuer.rif = data.rif || '';
@@ -1497,6 +1879,7 @@ export default {
     },
     'formData.issueDate'(date) {
       if (date) this.fetchExchangeRate(date);
+      this.prefillFechaFiscal();
     },
     'formData.financial.retentionDate'(newDate) {
       if (newDate && this.retencionesResult && !this.retentionCorrelativoManuallyEdited) {
@@ -1506,6 +1889,7 @@ export default {
           this.retencionesResult.municipal
         );
       }
+      this.prefillFechaFiscal();
     },
     'formData.documentType'(t) {
       this.formData.documentCategory = t === 'RECIBO' ? 'RECIBO' : 'FACTURA';
@@ -1556,6 +1940,13 @@ export default {
         this.fetchExchangeRate(this.formData.issueDate);
       }
     },
+    // Modo simple: arranca/detiene los mensajes humanos rotativos ("Leyendo tu
+    // documento...") exactamente mientras el OCR está trabajando (`extracting`),
+    // sin tocar la lógica del OCR en sí.
+    extracting(val) {
+      if (val) this.iniciarMensajesLectura();
+      else this.detenerMensajesLectura();
+    },
     manualMode(val) {
       this.manualTotalOverride = false;
       if (!val) {
@@ -1569,11 +1960,15 @@ export default {
       immediate: true,
       handler(inv) {
         if (inv) {
-          const today = new Date().toISOString().split('T')[0];
+          const today = hoyISO();
+          // C1: al editar, si la factura ya trae fecha_fiscal (guardada en BD) se
+          // respeta; si no (registros previos a la migración), se recalcula abajo.
+          this.fechaFiscalManuallyEdited = !!inv.fecha_fiscal;
           this.formData = {
             ...inv,
             expense_type: inv.expense_type || (inv.flow === 'COMPRA' ? 'COMPRA' : null),
             expense_category_id: inv.expense_category_id || null,
+            fecha_fiscal: inv.fecha_fiscal || inv.issueDate || today,
             financial: {
               ...(inv.financial || {}),
               retentionDate: inv.financial?.retentionDate || today
@@ -1588,6 +1983,9 @@ export default {
                 : (typeof it.product === 'string' ? it.product : null)
             }))
           };
+          if (!inv.fecha_fiscal) {
+            this.$nextTick(() => this.prefillFechaFiscal());
+          }
         }
       }
     }
@@ -1599,8 +1997,26 @@ export default {
       this.formData.flow = this.flow;
       this.formData.items = [ this.newItem() ];
     }
+    // Modo simple: la pantalla "¿En qué?" (ExpenseCategorySelector) solo se ve
+    // hoy cuando expense_type === 'GASTO'. En modo simple no le pedimos al
+    // usuario distinguir "mercancía" de "otro gasto" en la primera capa, así
+    // que toda COMPRA se trata como un gasto por categoría salvo que la IA
+    // detecte lo contrario al leer el documento (ver handleExtractedData).
+    if (this.simple && !this.isEditing && this.formData.flow === 'COMPRA' && !this.formData.expense_type) {
+      this.formData.expense_type = 'GASTO';
+    }
     await this.loadCurrentUser();
     this.fetchExchangeRate(this.formData.issueDate);
+    // Modo simple: guarda una foto del formulario ya pre-llenado (mis datos,
+    // flow, expense_type) para que "Registrar otro" (simpleResetForm) vuelva
+    // a este mismo punto de partida en vez de a un formulario vacío de cero.
+    if (this.simple && !this.isEditing) {
+      this._simpleInitialFormData = JSON.parse(JSON.stringify(this.formData));
+    }
+  },
+
+  beforeUnmount() {
+    this.detenerMensajesLectura();
   },
 
   // ─── METHODS ─────────────────────────────────────────────────────────────────
@@ -1679,7 +2095,7 @@ export default {
       if (remaining < 0) return;
       
       const amountPerInst = parseFloat((remaining / count).toFixed(2));
-      const issueDate = new Date(this.formData.issueDate || new Date().toISOString().split('T')[0]);
+      const issueDate = new Date(this.formData.issueDate || hoyISO());
       
       const oldInstallments = this.formData.financial.credit.installments || [];
       const newInstallments = [];
@@ -1729,6 +2145,191 @@ export default {
 
     isStockError(item) {
       return this.formData.flow === 'VENTA' && item.product && item.quantity > item.product.stock;
+    },
+
+    // ── Modo simple (Fase 2) ───────────────────────────────────────────────────
+    // Paso 1, botón "Tomarle foto": reutiliza el input de cámara que ya vive
+    // dentro de FileUploadZone (misma ref que el panel OCR de siempre), solo
+    // cambiamos quién lo dispara.
+    simpleTomarFoto() {
+      this.$refs.fileUploadZone?.triggerCameraInput?.();
+    },
+    // Paso 1, botón "Subir archivo" (PDF o imagen).
+    simpleSubirArchivo() {
+      this.$refs.fileUploadZone?.triggerFileInput?.();
+    },
+    // Paso 1, al elegir foto/archivo: dispara el mismo flujo OCR de siempre
+    // (handleExtractedData, sin duplicarlo) pero sin esperar un segundo toque
+    // en "Extraer automáticamente" — en modo simple la lectura arranca sola.
+    // Al terminar (con o sin éxito) avanza al paso 2 para que la usuaria
+    // confirme/corrija los 4 datos; si el OCR falló, los deja vacíos para
+    // llenarlos a mano, pero nunca la deja atascada en el paso 1.
+    async simpleHandleFileSelect(file) {
+      this.uploadedFile = file;
+      this.ocrResult = null;
+      await this.handleExtractedData(file);
+      this.simpleIrAPaso2();
+    },
+    // Paso 1, botón "No tengo factura": documento tipo RECIBO, sin pasar por el OCR.
+    simpleSinFactura() {
+      this.formData.documentType = 'RECIBO';
+      this.simpleIrAPaso2();
+    },
+    // Avanza al paso 2 asegurando que el formulario tenga un número de
+    // factura/recibo válido (en modo simple el usuario nunca lo escribe a
+    // mano salvo que abra "Ver detalles contables").
+    simpleIrAPaso2() {
+      this.ensureInvoiceNumberForSimple();
+      this.simpleStep = 2;
+    },
+    // Genera un número de recibo interno cuando el usuario no tiene uno (o el
+    // OCR no lo detectó), para que la validación de siempre (que exige
+    // invoiceNumber) nunca le pida ese dato en la primera capa.
+    ensureInvoiceNumberForSimple() {
+      if (!this.simple || this.formData.invoiceNumber) return;
+      const sello = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+      const azar = Math.floor(100 + Math.random() * 900);
+      this.formData.invoiceNumber = `REC-${sello}${azar}`;
+    },
+    // Mensajes humanos rotativos mientras se lee el documento (watcher de
+    // `extracting` más abajo los arranca/detiene; nunca jerga de OCR).
+    iniciarMensajesLectura() {
+      this.simpleReadingMsgIndex = 0;
+      this.detenerMensajesLectura();
+      this.simpleReadingTimer = setInterval(() => {
+        this.simpleReadingMsgIndex++;
+      }, 1800);
+    },
+    detenerMensajesLectura() {
+      if (this.simpleReadingTimer) {
+        clearInterval(this.simpleReadingTimer);
+        this.simpleReadingTimer = null;
+      }
+    },
+    // Paso 2, campo "¿Cuánto?": el usuario solo ve el total (con impuesto
+    // incluido). Reutilizamos el mismo cálculo de siempre (16% de IVA sobre la
+    // base) en reversa para no duplicar la lógica fiscal: fijamos la base
+    // imponible y dejamos que los watchers existentes (calculateFromBase →
+    // calculateTotals → calcularRetenciones) hagan el resto.
+    onSimpleTotalInput(val) {
+      const total = parseFloat(val);
+      const totalValido = isNaN(total) ? 0 : total;
+      this.manualTotalOverride = false;
+      this.formData.financial.taxableSales = parseFloat((totalValido / 1.16).toFixed(2));
+    },
+    // Determina si un error de validación corresponde a un campo que vive
+    // dentro de "Ver detalles contables" (no a los 4 campos del paso 2). Si es
+    // así, hay que abrir el acordeón y llevar la vista hasta ese campo.
+    simpleCampoDeDetalleConError() {
+      if (this.isDuplicate) return 'invoiceNumber';
+      if (this.formData.flow === 'VENTA') {
+        const overflow = this.formData.items.find(i => i.product && i.quantity > i.product.stock);
+        if (overflow) return 'items';
+      }
+      if (this.formData.flow === 'COMPRA') {
+        if (this.comprobanteDuplicado.iva || this.comprobanteDuplicado.islr || this.comprobanteDuplicado.municipal) {
+          return 'retenciones';
+        }
+      }
+      return null;
+    },
+    // Abre el acordeón de detalles y hace scroll al campo problemático.
+    simpleAbrirDetallesYScroll(campo) {
+      this.simpleDetailsOpen = true;
+      this.$nextTick(() => {
+        const refs = {
+          invoiceNumber: 'simpleDetalleInvoiceNumber',
+          items: 'simpleDetalleItems',
+          retenciones: 'simpleDetalleRetenciones'
+        };
+        const el = this.$refs[refs[campo]];
+        const nodo = el?.$el || el;
+        if (nodo && typeof nodo.scrollIntoView === 'function') {
+          nodo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    },
+    // Botón "Guardar" del modo simple: valida igual que siempre, pero si la
+    // causa del error vive dentro de "Ver detalles contables", abre el
+    // acordeón y hace scroll en vez de dejar al usuario buscando a ciegas.
+    async simpleHandleSubmit() {
+      this.ensureInvoiceNumberForSimple();
+      if (!this.validate()) {
+        const campo = this.simpleCampoDeDetalleConError();
+        if (campo) this.simpleAbrirDetallesYScroll(campo);
+        return;
+      }
+      await this.handleSubmit();
+    },
+    // "Registrar otro": vuelve al paso 1 con un formulario en blanco, sin
+    // perder la pestaña/flow (VENTA o COMPRA) con la que se abrió el diálogo.
+    simpleResetForm() {
+      if (this._simpleInitialFormData) {
+        this.formData = JSON.parse(JSON.stringify(this._simpleInitialFormData));
+      }
+      this.formData.items = [ this.newItem() ];
+      this.formData.flow = this.flow;
+      if (this.formData.flow === 'COMPRA' && !this.formData.expense_type) {
+        this.formData.expense_type = 'GASTO';
+      }
+      this.proveedor = null;
+      this.uploadedFile = null;
+      this.ocrResult = null;
+      this.aiFieldsStatus = {};
+      this.isDuplicate = false;
+      this.manualTotalOverride = false;
+      this.fechaFiscalManuallyEdited = false;
+      this.retentionCorrelativoManuallyEdited = false;
+      this.editarComprobanteIva = false;
+      this.editarComprobanteIslr = false;
+      this.editarComprobanteMunicipal = false;
+      this.simpleDetailsOpen = false;
+      this.simpleHuboRetencion = false;
+      this.simpleSuccess = false;
+      this.simpleStep = 1;
+      this.fetchExchangeRate(this.formData.issueDate);
+    },
+    // Datos de la empresa del cliente para los PDF de comprobante — mismo
+    // criterio que Facturacion.vue → _buildCompanyInfo(), para no inventar un
+    // formato nuevo de comprobante.
+    simpleBuildCompanyInfo() {
+      const clientProfile = this.currentUser?.client || {};
+      const orgProfile = Array.isArray(this.currentUser?.organization)
+        ? this.currentUser.organization[0]
+        : (this.currentUser?.organization || {});
+      return {
+        name: clientProfile.company_name || orgProfile.name || this.currentUser?.companyName || 'Mi Empresa',
+        rif: clientProfile.rif || orgProfile.rif || this.currentUser?.rif || 'J-00000000-0',
+        address: clientProfile.address || orgProfile.address || 'DIRECCIÓN NO REGISTRADA',
+        phone: clientProfile.phone || orgProfile.phone || '',
+        licencia_actividad_economica: clientProfile.licencia_actividad_economica || '',
+        municipio: clientProfile.municipio_id || clientProfile.municipio || '',
+        estado: clientProfile.estado || '',
+        activity_type: clientProfile.activity_type || ''
+      };
+    },
+    // Pantalla de éxito, botón "Descargar comprobante": reutiliza el mismo
+    // servicio de PDF que ya usa Facturacion.vue (retention-pdf-service), no
+    // genera un documento nuevo.
+    async simpleDescargarComprobante() {
+      this.simpleDescargandoComprobante = true;
+      try {
+        const companyInfo = this.simpleBuildCompanyInfo();
+        if (this.showIvaComprobante) await retentionPdfService.generarComprobanteIVA(this.formData, companyInfo);
+        if (this.showIslrComprobante) await retentionPdfService.generarComprobanteISLR(this.formData, companyInfo);
+        if (this.showMunicipalComprobante) await retentionPdfService.generarComprobanteMunicipal(this.formData, companyInfo);
+        this.showSnackbar('¡Listo! Descargamos tu comprobante de retención.', 'success');
+      } catch (err) {
+        console.error('❌ [SimpleInvoiceForm] Error al descargar comprobante:', err);
+        this.showSnackbar('No pudimos generar el comprobante. Puedes descargarlo luego desde "Mis movimientos".', 'error');
+      } finally {
+        this.simpleDescargandoComprobante = false;
+      }
+    },
+    // Término del glosario (src/constants/glosario.js) para los (?) de ayuda
+    // de la primera capa del modo simple. Nunca crea un término nuevo.
+    simpleGlosario(clave) {
+      return GLOSARIO[clave] || null;
     },
 
     // ── Selección de flujo ────────────────────────────────────────────────────
@@ -1806,7 +2407,7 @@ export default {
       const date = this.normalizeDateToYMD ? this.normalizeDateToYMD(rawDate) : normalizeDateToYMD(rawDate);
       if (!date) return;
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = hoyISO();
         let r;
         
         // Si se fuerza hoy o la fecha de la factura es de hoy, usamos la tasa EN VIVO
@@ -1872,7 +2473,7 @@ export default {
     },
 
     async applyTodayRate() {
-      const today = new Date().toISOString().split('T')[0];
+      const today = hoyISO();
       await this.fetchExchangeRate(today, true, true);
       this.isEditingExchangeRate = false;
     },
@@ -1989,6 +2590,47 @@ export default {
       this.calculateTotals();
     },
     
+    // C6: obtiene (y cachea en memoria) el valor vigente de la Unidad Tributaria
+    // desde configuracion_fiscal_global, igual que lo consulta el RPC SQL
+    // registrar_compra_con_retenciones, para aplicar el mismo sustraendo en la vista previa.
+    async getValorUT() {
+      if (this.valorUT !== null && this.valorUT !== undefined) return this.valorUT;
+      try {
+        const { data } = await supabase
+          .from('configuracion_fiscal_global')
+          .select('valor_unidad_tributaria')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        this.valorUT = parseFloat(data?.valor_unidad_tributaria) || 0;
+      } catch (e) {
+        console.warn('No se pudo obtener el valor de la Unidad Tributaria:', e);
+        this.valorUT = 0;
+      }
+      return this.valorUT;
+    },
+
+    // C7: el usuario confirma que quiere aplicar la retención municipal aunque el
+    // proveedor esté en un municipio distinto. Se recalcula para que el monto
+    // vuelva a incluirse (ver aviso en el template, sección de retenciones COMPRA).
+    confirmMunicipalMismatch() {
+      this.municipalMismatchConfirmed = true;
+      this.calcularRetenciones();
+    },
+
+    // C1: prellena "Fecha fiscal" (solo COMPRA) con la fecha del comprobante de
+    // retención de IVA si existe, o con la fecha de emisión si no hay retención
+    // de IVA — misma regla que el backfill/trigger de la migración
+    // 20261013100000_fecha_fiscal.sql. No sobrescribe si el usuario ya la editó
+    // manualmente (fechaFiscalManuallyEdited).
+    prefillFechaFiscal() {
+      if (this.formData.flow !== 'COMPRA' || this.fechaFiscalManuallyEdited) return;
+      const tieneRetencionIva = (this.retencionesResult && this.retencionesResult.iva > 0) || Number(this.formData.financial.ivaRetention) > 0;
+      this.formData.fecha_fiscal = tieneRetencionIva
+        ? (this.formData.financial.retentionDate || this.formData.issueDate)
+        : this.formData.issueDate;
+    },
+
     // ── Retenciones ───────────────────────────────────────────────────────────
     async calcularRetenciones() {
       if (this.formData.flow !== 'COMPRA' || !this.proveedor) {
@@ -2022,10 +2664,20 @@ export default {
              const baseMonto = amount * (baseAplicable / 100);
              const rate = parseFloat(concepto.porcentaje_retencion) || 0;
              islr = parseFloat((baseMonto * (rate / 100)).toFixed(2));
+
+             // C6 (2026-10-13): igualar la vista previa a la regla del RPC SQL
+             // registrar_compra_con_retenciones: para proveedores PERSONA NATURAL se
+             // resta el sustraendo en UT (si el concepto ISLR define uno), con piso en 0.
+             const sustraendoUt = parseFloat(concepto.sustraendo_ut) || 0;
+             if (config.tipoPersona === 'NATURAL' && sustraendoUt > 0) {
+               const valorUT = await this.getValorUT();
+               const sustraendoBs = Math.round(sustraendoUt * valorUT * 100) / 100;
+               islr = Math.max(0, parseFloat((islr - sustraendoBs).toFixed(2)));
+             }
           }
         } catch(e) { console.error("Error calculando ISLR", e); }
       }
-      
+
       let municipal = 0;
       if (config.aplicarMunicipal && amount > 0) {
         try {
@@ -2040,16 +2692,37 @@ export default {
              this.retentionConfig.conceptoMunicipalNombre = '';
           }
         } catch(e) { console.error("Error calculando Municipal", e); }
-        
+
         if (this.retentionConfig.porcentajeMunicipal > 0) {
            municipal = parseFloat((amount * (this.retentionConfig.porcentajeMunicipal / 100)).toFixed(2));
         }
       }
-      
+
+      // C7 (2026-10-13): advertir (no bloquear) si proveedor y empresa están en
+      // municipios distintos. Mientras el usuario no confirme explícitamente
+      // ("Continuar igual"), el monto NO se aplica (queda en 0) para que el RPC no
+      // lo registre por accidente (financial.municipalRetention > 0 => p_aplicar_municipal=true).
+      this.municipalMismatch = { detected: false, tenantNombre: '', issuerNombre: '' };
+      if (municipal > 0) {
+        const tenantMun = this.formData.client?.municipio_id || this.formData.client?.municipio || '';
+        const issuerMun = this.formData.issuer?.municipio_id || this.formData.issuer?.municipio || '';
+        if (tenantMun && issuerMun && !venezuelaLocationsService.areSameMunicipality(tenantMun, issuerMun)) {
+          this.municipalMismatch = {
+            detected: true,
+            tenantNombre: venezuelaLocationsService.getCleanMunicipalityName(tenantMun),
+            issuerNombre: venezuelaLocationsService.getCleanMunicipalityName(issuerMun)
+          };
+          if (!this.municipalMismatchConfirmed) {
+            municipal = 0;
+          }
+        }
+      }
+
       this.retencionesResult = { iva, islr, municipal };
       this.formData.financial.ivaRetention = iva;
       this.formData.financial.islrRetention = islr;
       this.formData.financial.municipalRetention = municipal;
+      this.prefillFechaFiscal();
 
       // Sugerir números de comprobante (solo si no se editó manualmente)
       await this.sugerirCorrelativosRetencion(iva, islr, municipal);
@@ -2059,7 +2732,7 @@ export default {
     async sugerirCorrelativosRetencion(iva, islr, municipal) {
       try {
         const clientId = this.currentUser?.client?.id || this.currentUser?.client_id;
-        const fecha = this.formData.financial.retentionDate || this.formData.issueDate || new Date().toISOString().split('T')[0];
+        const fecha = this.formData.financial.retentionDate || this.formData.issueDate || hoyISO();
         if (!clientId) return;
 
         // Solo sugerir si el campo no fue editado manualmente
@@ -2600,6 +3273,20 @@ export default {
         this.showSnackbar('El total de la factura debe ser mayor a 0. Agrega al menos un producto o ajusta los montos.', 'error');
         return false;
       }
+      // 4b. Moneda extranjera: la tasa del día de la factura es obligatoria. Con tasa 1
+      //     los montos en bolívares (libros, retenciones) saldrían mal sin que nadie lo note.
+      const moneda = this.formData.financial.currency;
+      const tasa = Number(this.formData.financial.exchangeRate);
+      if (moneda && moneda !== 'VES' && !esAnulada && (!tasa || tasa <= 1)) {
+        this.isEditingExchangeRate = true;
+        if (this.simple) this.simpleDetailsOpen = true;
+        this.showSnackbar(
+          'Falta la tasa del dólar del día de la factura. Escríbela en "Tasa de cambio" (la encuentras en bcv.org.ve) o toca "Usar tasa de hoy".',
+          'error',
+          8000
+        );
+        return false;
+      }
       // 5. Stock suficiente (solo en VENTA)
       if (this.formData.flow === 'VENTA') {
         const overflow = this.formData.items.find(i => i.product && i.quantity > i.product.stock);
@@ -2681,6 +3368,12 @@ export default {
     onSaveSuccess() {
       this.saving = false;
       this.savingStep = '';
+      // Modo simple: mostrar la pantalla de éxito propia del componente
+      // ("Registrar otro" / "Volver al inicio"), ver fase2-spec.md §3.5.
+      if (this.simple) {
+        this.simpleHuboRetencion = this.hasRetencionesRegistradas;
+        this.simpleSuccess = true;
+      }
     },
 
     // Llamado al crear un nuevo proveedor desde el ProveedorModalForm

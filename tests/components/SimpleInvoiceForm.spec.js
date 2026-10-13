@@ -1,4 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+// SimpleInvoiceForm.vue ahora importa retention-pdf-service.js (modo simple, botón
+// "Descargar comprobante"), que a su vez importa el logo con una ruta absoluta
+// ('/ADSystem/logo.png'); sin este mock, Vitest intenta resolverla como archivo real
+// y falla en Windows. Mismo mock que ya usan otros specs que tocan ese servicio.
+vi.mock('/ADSystem/logo.png', () => ({ default: 'mock-logo.png' }));
+vi.mock('/ADSystem/png/svg_logo_ADADAD_3000x3000.png', () => ({ default: 'mock-watermark.png' }));
 import SimpleInvoiceForm from '@/components/forms/client/SimpleInvoiceForm.vue';
 
 // Mock de dependencias para permitir instanciar o probar la lógica del componente
@@ -51,7 +57,11 @@ describe('SimpleInvoiceForm - Watcher de Invoice en Modo Edición', () => {
 
     // Simulación directa del handler del watcher invoice
     const vm = {
-      formData: null
+      formData: null,
+      // C1: el handler llama a $nextTick(() => this.prefillFechaFiscal()) cuando
+      // la factura no trae fecha_fiscal. Se simula síncrono para el test.
+      $nextTick: (fn) => fn(),
+      prefillFechaFiscal: vi.fn()
     };
 
     const handler = SimpleInvoiceForm.watch.invoice.handler;
@@ -82,7 +92,9 @@ describe('SimpleInvoiceForm - Watcher de Invoice en Modo Edición', () => {
     };
 
     const vm = {
-      formData: null
+      formData: null,
+      $nextTick: (fn) => fn(),
+      prefillFechaFiscal: vi.fn()
     };
 
     const handler = SimpleInvoiceForm.watch.invoice.handler;
@@ -96,7 +108,8 @@ describe('SimpleInvoiceForm - Watcher de Invoice en Modo Edición', () => {
     const vm = {
       retencionesResult: { iva: 48, islr: 10, municipal: 5 },
       retentionCorrelativoManuallyEdited: false,
-      sugerirCorrelativosRetencion: vi.fn()
+      sugerirCorrelativosRetencion: vi.fn(),
+      prefillFechaFiscal: vi.fn()
     };
 
     const retentionDateWatcher = SimpleInvoiceForm.watch['formData.financial.retentionDate'];
@@ -109,7 +122,8 @@ describe('SimpleInvoiceForm - Watcher de Invoice en Modo Edición', () => {
     const vm = {
       retencionesResult: { iva: 48, islr: 10, municipal: 5 },
       retentionCorrelativoManuallyEdited: true,
-      sugerirCorrelativosRetencion: vi.fn()
+      sugerirCorrelativosRetencion: vi.fn(),
+      prefillFechaFiscal: vi.fn()
     };
 
     const retentionDateWatcher = SimpleInvoiceForm.watch['formData.financial.retentionDate'];
