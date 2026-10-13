@@ -187,7 +187,7 @@
                   density="comfortable"
                   persistent-hint
                   hint="Para reportes periódicos, indica una fecha dentro del mes a declarar."
-                  :rules="[v => !!v || 'La fecha es requerida']"
+                  :rules="[v => !!v || 'Indica cuándo se emitió este documento.']"
                   required
                 />
               </v-col>
@@ -201,14 +201,14 @@
                   variant="outlined"
                   density="comfortable"
                   persistent-hint
-                  hint="Indique cuándo vence este documento"
+                  hint="Indica cuándo vence este documento, para avisarte antes."
                   :rules="expirationDateRules"
                   :disabled="formData.isPermanent"
                   :required="!formData.isPermanent"
                 />
                 <v-checkbox
                   v-model="formData.isPermanent"
-                  label="No aplica"
+                  label="Este documento nunca vence"
                   color="primary"
                   density="compact"
                   hide-details
@@ -366,11 +366,12 @@ const existingFile = computed(() => {
   return null
 })
 
-// Validación: fecha de vencimiento requerida solo si no es No Aplica y no es permanente
+// Validación: fecha de vencimiento requerida salvo "No Aplica" o "Nunca vence"
+// (tipos con frequency 'PERMANENT' en fiscalDocuments.js, ver handleTypeChange).
 const expirationDateRules = computed(() => {
-    if (formData.noAplica || formData.isPermanent) return [] // No se exige fecha cuando No Aplica o es permanente
+    if (formData.noAplica || formData.isPermanent) return [] // No se exige fecha cuando No Aplica o nunca vence
     return [
-        v => !!v || 'La fecha de vencimiento es requerida',
+        v => !!v || 'Indica cuándo vence este documento, o marca "Este documento nunca vence".',
         v => {
             if (!v || !formData.emission_date) return true
             const emission   = new Date(formData.emission_date)
@@ -385,8 +386,17 @@ const handleCategoryChange = () => {
     formData.doc_type = null
 }
 
-const handleTypeChange = (_typeId) => {
-    // El nombre personalizado es opcional; no auto-llenamos
+// Si el tipo elegido es de los que "nunca vencen" (frequency: 'PERMANENT' en
+// fiscalDocuments.js, ej. Publicación Mercantil, Conformidad de Uso), marcamos
+// automáticamente "Este documento nunca vence" para no pedir una fecha que no existe.
+const handleTypeChange = (typeId) => {
+    const type = availableTypes.value.find(t => t.id === typeId)
+    if (type && type.frequency === 'PERMANENT') {
+        formData.isPermanent = true
+        formData.expiration_date = null
+    } else {
+        formData.isPermanent = false
+    }
 }
 
 // Al activar/desactivar el toggle, sincronizamos el status
