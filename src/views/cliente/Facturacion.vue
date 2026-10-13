@@ -2704,7 +2704,7 @@ export default {
 }
 
 .detalle-factura__encabezado {
-  background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);
+  background: linear-gradient(135deg, #2A2A2E 0%, #3F3F46 100%);
 }
 
 .detalle-factura__numero {

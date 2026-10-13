@@ -926,7 +926,7 @@ const getPeriodRowsForPdf = (type, catDocs, year) => {
 const pdfDrawCategoryHeader = (doc, pageWidth, margin, catName, progress, y) => {
     // Fondo con borde redondeado para el header de categoría
     const headerHeight = 10
-    doc.setFillColor(31, 53, 92) // #1F355C azul corporativo
+    doc.setFillColor(31, 53, 92) // #2A2A2E azul corporativo
     doc.roundedRect(margin, y - 6, pageWidth - margin * 2, headerHeight, 3, 3, 'F')
 
     doc.setFontSize(11)
@@ -953,7 +953,7 @@ const pdfDrawTypeHeader = (doc, margin, label, freqLabel, y) => {
 
     doc.setFontSize(10)
     doc.setFont(undefined, 'bold')
-    doc.setTextColor(31, 53, 92) // #1F355C
+    doc.setTextColor(31, 53, 92) // #2A2A2E
     doc.text(`  ${label}`, margin + 8, y)
 
     doc.setFontSize(8)
@@ -1063,7 +1063,7 @@ const exportToPDF = async () => {
         }
 
         // ── Franja superior decorativa ──
-        doc.setFillColor(31, 53, 92) // #1F355C
+        doc.setFillColor(31, 53, 92) // #2A2A2E
         doc.rect(0, 0, pageWidth, 4, 'F')
         doc.setFillColor(168, 28, 34) // #A81C22
         doc.rect(0, 4, pageWidth, 2, 'F')
@@ -1083,7 +1083,7 @@ const exportToPDF = async () => {
         // Título centrado debajo del logo
         y = 26
         doc.setFontSize(16)
-        doc.setTextColor(31, 53, 92) // #1F355C
+        doc.setTextColor(31, 53, 92) // #2A2A2E
         doc.setFont(undefined, 'bold')
         doc.text('Expediente Fiscal 360', pageWidth / 2, y, { align: 'center' })
         
@@ -1118,7 +1118,7 @@ const exportToPDF = async () => {
         y += 10
         doc.setFontSize(11)
         doc.setFont(undefined, 'bold')
-        doc.setTextColor(31, 53, 92) // #1F355C
+        doc.setTextColor(31, 53, 92) // #2A2A2E
         doc.text(`Progreso General: ${progressRate.value}%`, margin, y)
         
         // Barra de progreso con bordes redondeados

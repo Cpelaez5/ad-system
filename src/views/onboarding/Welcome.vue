@@ -207,7 +207,7 @@ export default {
 }
 
 .btn-saltar:focus-visible {
-  outline: 3px solid #1F355C;
+  outline: 3px solid #2A2A2E;
   outline-offset: 2px;
 }
 

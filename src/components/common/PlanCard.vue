@@ -120,8 +120,8 @@ export default {
     cardStyle() {
       if (this.isFeatured) {
         return {
-          border: '2px solid #1F355C',
-          background: '#1F355C',
+          border: '2px solid #2A2A2E',
+          background: '#2A2A2E',
           color: '#ffffff'
         };
       }
@@ -151,7 +151,7 @@ export default {
       if (this.isPending) return '#FF9800'; // Orange for pending
       if (this.isFeatured) return '#E0B04F'; // Gold button for Featured
       if (this.isEnterprise) return '#ffffff'; // White button for Enterprise
-      return '#1F355C'; // Dark Blue button for Basic
+      return '#2A2A2E'; // Dark Blue button for Basic
     },
     btnVariant() {
       if (this.isCurrent) return 'flat';
@@ -205,7 +205,7 @@ export default {
   padding: 4px 14px 4px 12px;
   border-radius: 20px 0 0 20px;
   background: #E0B04F;
-  color: #1F355C;
+  color: #2A2A2E;
 }
 
 .current-ribbon {

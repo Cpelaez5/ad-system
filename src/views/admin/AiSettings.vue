@@ -57,7 +57,7 @@
           <v-card 
             v-for="profile in profiles" 
             :key="profile.id"
-            :color="profile.is_active ? '#1F355C' : 'rgba(255,255,255,0.05)'" 
+            :color="profile.is_active ? '#2A2A2E' : 'rgba(255,255,255,0.05)'" 
             theme="dark" 
             elevation="2" 
             class="rounded-lg transition-fast-in-fast-out"
@@ -82,7 +82,7 @@
                   <template v-slot:activator="{ props }">
                     <v-btn icon="mdi-dots-vertical" variant="text" size="small" color="grey-lighten-1" v-bind="props"></v-btn>
                   </template>
-                  <v-list density="compact" bg-color="#1F355C" theme="dark">
+                  <v-list density="compact" bg-color="#2A2A2E" theme="dark">
                     <v-list-item @click="openEditModal(profile)">
                       <template v-slot:prepend><v-icon icon="mdi-pencil" size="small" class="mr-2"></v-icon></template>
                       <v-list-item-title>Editar</v-list-item-title>
@@ -132,7 +132,7 @@
           <v-btn icon="mdi-refresh" variant="text" size="small" color="grey-lighten-1" @click="loadUsageLogs" :loading="loadingLogs"></v-btn>
         </h3>
         
-        <v-card color="#1F355C" theme="dark" elevation="4" class="rounded-lg fill-height border-thin">
+        <v-card color="#2A2A2E" theme="dark" elevation="4" class="rounded-lg fill-height border-thin">
           <v-card-text class="pa-0">
             <!-- Vista Móvil (Tarjetas) -->
             <div class="d-md-none pa-4">
@@ -240,7 +240,7 @@
 
     <!-- Modal de Edición/Creación -->
     <v-dialog v-model="showEditModal" max-width="500px" persistent>
-      <v-card color="#1F355C" theme="dark" class="rounded-lg border-thin">
+      <v-card color="#2A2A2E" theme="dark" class="rounded-lg border-thin">
         <v-card-title class="text-h6 font-weight-bold pa-5 pb-3">
           {{ editForm.id ? 'Editar Perfil IA' : 'Nuevo Perfil IA' }}
         </v-card-title>

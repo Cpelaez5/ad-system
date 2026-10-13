@@ -172,7 +172,7 @@ export default {
 
 .period-btn--active {
   background: #ffffff;
-  color: #1F355C;
+  color: #2A2A2E;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
