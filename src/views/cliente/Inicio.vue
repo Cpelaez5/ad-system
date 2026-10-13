@@ -157,6 +157,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import userService from '@/services/userService'
+import { hoyISO, parseFechaLocal } from '@/utils/fechas'
 import invoiceService from '@/services/invoiceService'
 import fiscalService from '@/services/fiscalService'
 import billingService from '@/services/billingService'
@@ -170,6 +171,23 @@ import EstadoVacio from '@/components/ui/EstadoVacio.vue'
 import AvisoAmable from '@/components/ui/AvisoAmable.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import SimpleInvoiceForm from '@/components/forms/client/SimpleInvoiceForm.vue'
+
+/** Días enteros desde hoy hasta la fecha (local); negativo si ya pasó. */
+function diasHasta(fecha) {
+  const objetivo = parseFechaLocal(fecha)
+  if (!objetivo) return null
+  const hoy = parseFechaLocal(hoyISO())
+  return Math.round((new Date(objetivo.getFullYear(), objetivo.getMonth(), objetivo.getDate()) - hoy) / 86400000)
+}
+
+/** "vence hoy", "vence mañana", "vence en 5 días", "venció ayer", "venció hace 66 días". */
+function textoVencimiento(dias) {
+  if (dias === 0) return 'vence hoy'
+  if (dias === 1) return 'vence mañana'
+  if (dias > 1) return `vence en ${dias} días`
+  if (dias === -1) return 'venció ayer'
+  return `venció hace ${Math.abs(dias)} días`
+}
 
 export default {
   name: 'ClienteInicio',
@@ -337,8 +355,9 @@ export default {
     filtrarPorPeriodo(facturas, inicio, fin) {
       if (!facturas || !inicio || !fin) return []
       return facturas.filter(inv => {
-        const fecha = new Date(inv.issueDate || inv.createdAt)
-        return fecha >= inicio && fecha <= fin
+        // Fecha local: new Date('YYYY-MM-DD') movía las facturas del día 1 al mes anterior
+        const fecha = parseFechaLocal(inv.issueDate || inv.createdAt)
+        return !!fecha && fecha >= inicio && fecha <= fin
       })
     },
 
@@ -365,53 +384,35 @@ export default {
     /** Construye hasta 3 pendientes: documentos fiscales por vencer/vencidos + plan de suscripción. */
     construirPendientes(docsFiscales, facturasSistema) {
       const items = []
-      const ahora = new Date()
 
       // Documentos fiscales por vencer (≤30 días) o vencidos, misma regla que fiscalService/Dashboard.
       ;(docsFiscales || []).forEach(doc => {
         if (!doc.expiration_date || doc.status !== 'VIGENTE') return
-        const expDate = new Date(doc.expiration_date)
-        const diffDays = Math.ceil((expDate - ahora) / (1000 * 60 * 60 * 24))
-
-        if (diffDays < 0) {
-          items.push({
-            id: 'doc-' + doc.id,
-            texto: `Tu ${doc.name || 'documento'} venció hace ${Math.abs(diffDays)} día(s)`,
-            color: 'error',
-            accionTexto: 'Ver',
-            accionRuta: '/cliente/fiscal-360',
-            prioridad: 0,
-            dias: diffDays,
-          })
-        } else if (diffDays <= 30) {
-          items.push({
-            id: 'doc-' + doc.id,
-            texto: diffDays === 0
-              ? `Tu ${doc.name || 'documento'} vence hoy`
-              : `Tu ${doc.name || 'documento'} vence en ${diffDays} día(s)`,
-            color: 'warning',
-            accionTexto: 'Ver',
-            accionRuta: '/cliente/fiscal-360',
-            prioridad: 1,
-            dias: diffDays,
-          })
-        }
+        const diffDays = diasHasta(doc.expiration_date)
+        if (diffDays === null || diffDays > 30) return
+        const nombre = doc.name || 'documento'
+        items.push({
+          id: 'doc-' + doc.id,
+          texto: `Tu ${nombre} ${textoVencimiento(diffDays)}`,
+          color: diffDays < 0 ? 'error' : 'warning',
+          accionTexto: 'Ver',
+          accionRuta: '/cliente/fiscal-360',
+          prioridad: diffDays < 0 ? 0 : 1,
+          dias: diffDays,
+        })
       })
 
       // Factura de suscripción pendiente o vencida.
       const facturaPendiente = (facturasSistema || []).find(f => f.status === 'pending' || f.status === 'overdue')
       if (facturaPendiente) {
         const vencida = facturaPendiente.status === 'overdue'
-        let diffDays = null
-        if (facturaPendiente.due_date) {
-          diffDays = Math.ceil((new Date(facturaPendiente.due_date) - ahora) / (1000 * 60 * 60 * 24))
-        }
+        const diffDays = facturaPendiente.due_date ? diasHasta(facturaPendiente.due_date) : null
         items.push({
           id: 'plan-' + facturaPendiente.id,
           texto: vencida
             ? 'Tu factura del plan está vencida'
-            : (diffDays !== null ? `Tu plan vence en ${diffDays} día(s)` : 'Tienes una factura del plan pendiente'),
-          color: vencida ? 'error' : 'warning',
+            : (diffDays !== null ? `Tu plan ${textoVencimiento(diffDays)}` : 'Tienes una factura del plan pendiente'),
+          color: vencida || (diffDays !== null && diffDays < 0) ? 'error' : 'warning',
           accionTexto: 'Pagar',
           accionRuta: '/cliente/facturacion-suscripcion',
           prioridad: vencida ? 0 : 1,
