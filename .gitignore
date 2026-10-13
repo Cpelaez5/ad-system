@@ -5,3 +5,13 @@ node_modules
 docs/mvp/auditorias/
 docs/mvp/manuales/01-agente-seguridad-bd.md
 dist/
+
+# E2E (Playwright)
+e2e/.env.e2e.local
+e2e/.auth/
+playwright-report/
+test-results/
+
+# Worktrees de otros agentes anidados en esta carpeta (ver manual
+# 00-REGLAS-COMUNES.md §5.0) — no son código propio de esta rama.
+.claude/worktrees/

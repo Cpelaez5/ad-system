@@ -58,7 +58,7 @@
             subtitulo="Elige una opción para empezar"
             class="flex-grow-1"
           />
-          <v-btn icon="mdi-close" variant="text" color="grey" @click="$emit('cancel')" />
+          <v-btn icon="mdi-close" variant="text" color="grey" aria-label="Cerrar" @click="$emit('cancel')" />
         </div>
       </v-card-title>
       <v-divider />
@@ -133,7 +133,7 @@
             </div>
           </div>
         </div>
-        <v-btn icon="mdi-close" variant="text" color="grey" @click="$emit('cancel')" />
+        <v-btn icon="mdi-close" variant="text" color="grey" aria-label="Cerrar" @click="$emit('cancel')" />
       </div>
     </v-card-title>
 
