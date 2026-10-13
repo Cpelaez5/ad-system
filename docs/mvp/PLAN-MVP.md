@@ -127,3 +127,7 @@ Cierra cada fase: vitest verde, recorrido en navegador de los flujos cliente y s
 - [ ] Los libros de compra y venta y los comprobantes de retención coinciden con los modelos de la contadora (`examples/*.xls`, `RET *.pdf`).
 - [ ] Landing con precios reales, términos y privacidad publicados, soporte por WhatsApp visible.
 - [ ] Puntuación UX de novato ≥8/10 en los flujos del cliente (re-auditoría del agente QA).
+
+
+## Ideas nuevas del 2026-10-13 (análisis Norkut)
+Análisis completo, roadmap por olas y decisiones abiertas: `docs/mvp/estrategia/analisis-norkut-y-roadmap-2026-10-13.md`. Pre-lanzamiento suma: tasa con fuente propia + preferencia del cliente, notificaciones + ayuda contextual + medidores de suscripción, `contactos` + cobros + recordatorios, insights v1 por reglas, asistente v1 con herramientas sobre sus datos, planes segmentados, modelo de ubicaciones (sin UI).
