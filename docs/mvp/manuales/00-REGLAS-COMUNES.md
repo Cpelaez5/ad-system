@@ -44,3 +44,18 @@ Las 17 decisiones de `GEMINI.md` (patrón adaptador de IA, schema OCR en inglés
 - Cualquier cambio en producción (SQL, Storage, Auth, Edge Functions, Netlify).
 - Cualquier duda de regla fiscal: pregúntala y la responde la contadora. No inventes alícuotas ni porcentajes.
 - Si una tarea exige tocar más de ~5 archivos que no son de tu área.
+
+## 7. Skills obligatorias por tipo de tarea
+Antes de empezar, invoca con la herramienta Skill las que apliquen. Si falta una que haría el resultado claramente mejor, instálala (`npx skills add …`) y anótalo en la bitácora.
+
+| Tarea | Skills |
+|---|---|
+| Pantallas, componentes, rediseños | `impeccable`, `emil-design-eng`, `ui-ux-pro-max` (accesibilidad), `minimalist-ui` si aplica |
+| Animación y micro-interacciones | `emil-design-eng`, `animate`, `find-animation-opportunities`, `improve-animations` |
+| Gráficos y dashboards | `dataviz` (siempre antes del primer gráfico) |
+| Landing con GSAP | `gsap-core`, `gsap-scrolltrigger`, `gsap-timeline`, `gsap-performance`, `copywriting`, `cro` |
+| Base de datos, RLS, migraciones, Edge Functions | `supabase`, `supabase-postgres-best-practices` |
+| Videos y piezas animadas de marketing | `hyperframes`, `hyperframes-animation`, `video` |
+| Precios, onboarding, correos, legal | `pricing`, `onboarding`, `emails`, `copywriting` |
+| Pruebas en navegador | `webapp-testing` (si aplica) + Claude in Chrome |
+| Revisión de cambios grandes | `code-review` |
