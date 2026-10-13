@@ -171,6 +171,53 @@ class InvoiceService {
     }
   }
 
+  /**
+   * M9 (ola F2b): historial ligero de categorías usadas en compras, para que
+   * `sugerirCategoria` (OCR) pueda aplicar "última categoría usada con este
+   * proveedor" sin traer TODAS las columnas (items, attachments, financial,
+   * el join de clients...) de TODAS las compras del cliente en cada escaneo.
+   * `clientId` es OBLIGATORIO: si no se resolvió, devuelve [] en vez de
+   * filtrar solo por organización (antes `getInvoices` sin clientId devolvía
+   * las compras de TODOS los clientes de la organización).
+   * @param {{ clientId: string, limit?: number }} params
+   * @returns {Promise<Array<{ proveedorRif: string|null, proveedorNombre: string|null, categoriaNombre: string, fecha: string }>>}
+   */
+  async getHistorialCategoriasCompras({ clientId, limit = 50 } = {}) {
+    if (!clientId) return []
+    try {
+      const organizationId = getCurrentOrganizationId()
+      if (!organizationId) return []
+
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('issuer, issue_date, expense_category_id, expense_categories(name)')
+        .eq('organization_id', organizationId)
+        .eq('client_id', clientId)
+        .eq('flow', 'COMPRA')
+        .not('expense_category_id', 'is', null)
+        .is('deleted_at', null)
+        .order('issue_date', { ascending: false })
+        .limit(limit)
+
+      if (error) {
+        console.warn('⚠️ [invoiceService] Error en getHistorialCategoriasCompras:', error.message)
+        return []
+      }
+
+      return (data || [])
+        .filter(f => f.expense_categories?.name)
+        .map(f => ({
+          proveedorRif: f.issuer?.rif || null,
+          proveedorNombre: f.issuer?.companyName || null,
+          categoriaNombre: f.expense_categories.name,
+          fecha: f.issue_date || ''
+        }))
+    } catch (error) {
+      console.warn('⚠️ [invoiceService] Error inesperado en getHistorialCategoriasCompras:', error)
+      return []
+    }
+  }
+
   // Obtener factura por ID
   async getInvoiceById(id) {
     try {

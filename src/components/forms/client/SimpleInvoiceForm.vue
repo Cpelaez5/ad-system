@@ -3739,15 +3739,12 @@ export default {
      */
     async _obtenerHistorialCategoriasProveedor(clientId) {
       try {
-        const facturas = await invoiceService.getInvoices({ flow: 'COMPRA', clientId });
-        return (facturas || [])
-          .filter(f => f.expense_category_id && f.expense_categories?.name)
-          .map(f => ({
-            proveedorRif: f.issuer?.rif || null,
-            proveedorNombre: f.issuer?.companyName || null,
-            categoriaNombre: f.expense_categories.name,
-            fecha: f.issue_date || ''
-          }));
+        // M9: consulta ligera y con client_id OBLIGATORIO (si no se resolvió,
+        // getHistorialCategoriasCompras devuelve [] en vez de traer compras
+        // de otros clientes de la organización). Antes usaba getInvoices,
+        // que trae TODAS las columnas (items, attachments, financial...) de
+        // TODAS las compras del cliente en cada escaneo.
+        return await invoiceService.getHistorialCategoriasCompras({ clientId });
       } catch (err) {
         console.warn('[OCR] No se pudo cargar el historial de categorías:', err);
         return [];
