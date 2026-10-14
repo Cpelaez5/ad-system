@@ -227,9 +227,15 @@ export async function guardarRegistro(formData) {
     // Mis clientes: la venta se enlaza con su cliente (o crea el nuevo, solo
     // ahora que se guarda de verdad). "Consumidor final" deja el id en null.
     if (formData?.flow === 'VENTA') {
+      // Si no se pudo enlazar o crear el cliente, la venta se guarda igual (perder
+      // la venta es peor que dejarla sin enlace); el aviso llega en `warning`.
       const cliente = await clientesNegocioService.asegurarClienteDeVenta(formData)
-      if (!cliente.success) return { success: false, message: cliente.message }
-      formData.cliente_negocio_id = cliente.id
+      if (cliente.success) {
+        formData.cliente_negocio_id = cliente.id
+      } else {
+        logger.warn('[registroService]', 'No se pudo enlazar el cliente de la venta', cliente.message)
+        avisoCompra = `La venta se guardó, pero no pudimos guardar al cliente en Mis clientes: ${cliente.message || 'error desconocido'}`
+      }
     }
 
     // Proveedor nuevo sugerido por el OCR, nunca creado hasta este punto

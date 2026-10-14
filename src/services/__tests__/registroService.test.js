@@ -89,11 +89,13 @@ describe('registroService.guardarRegistro', () => {
       expect(invoiceService.updateInvoice).toHaveBeenCalledWith('i1', expect.objectContaining({ cliente_negocio_id: 'cn-2' }))
     })
 
-    it('si no se puede resolver el cliente, no guarda la venta', async () => {
+    it('si no se puede resolver el cliente, guarda la venta sin enlace y avisa', async () => {
       clientesNegocioService.asegurarClienteDeVenta.mockResolvedValue({ success: false, id: null, message: 'Sin conexión' })
+      invoiceService.createInvoice.mockResolvedValue({ success: true, data: { id: 'v1' } })
       const r = await guardarRegistro({ flow: 'VENTA', client: { companyName: 'Ana' }, financial: {} })
-      expect(r).toEqual({ success: false, message: 'Sin conexión' })
-      expect(invoiceService.createInvoice).not.toHaveBeenCalled()
+      expect(r.success).toBe(true)
+      expect(r.warning).toMatch(/no pudimos guardar al cliente/)
+      expect(invoiceService.createInvoice.mock.calls[0][0].cliente_negocio_id).toBeUndefined()
     })
 
     it('las COMPRAS no tocan clientes', async () => {
