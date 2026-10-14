@@ -63,3 +63,33 @@ Una sola foto de un estante, nevera o mostrador sirve para dos cosas:
    - **"Crear N productos nuevos":** usa el recorte como foto (se sube al bucket). Precio opcional: los que quedan sin precio se guardan y aparecen en "Tu siguiente paso: N productos sin precio → Ponles precio".
    - **"Ajustar existencias de N productos":** muestra antes → después por producto y registra el ajuste como movimiento de inventario con el servicio existente y el motivo "Conteo por foto". Nunca se pisa el stock en silencio: la persona confirma.
 4. Si la confianza es baja o hay más de 40 productos: "Toma la foto más de cerca o por partes".
+
+## 7. Importar desde Excel o CSV (pedido del usuario 2026-10-14)
+Referencia: Norkut ofrece una plantilla por rubro (Supermercado, Hogar, Ferretería, Electrónicos, Moda, Farmacia, Librería, Mascotas y Otros) en XLS, XLSX o CSV. **Nuestro diferencial: no obligamos a usar la plantilla.**
+
+**Flujo (pensado para el teléfono, en 3 pasos):**
+1. **Subir.** Mi mercancía → ⋮ / "Importar desde Excel". Se acepta `.xlsx`, `.xls` o `.csv` (máx. 5 MB, 2.000 filas). Abajo, el enlace **"Descargar plantilla de mi rubro"**: genera en el navegador un `.xlsx` (con `exceljs`, que ya está en el proyecto) con:
+   - una hoja **Productos** con los encabezados esenciales y los del rubro (`camposDe(rubro)`), con 2 o 3 filas de ejemplo propias del rubro;
+   - una hoja **Instrucciones** que explica cada columna en lenguaje llano y los valores válidos.
+2. **Reconocer columnas.** Se lee el archivo con `xlsx` (SheetJS) y se detecta la fila de encabezados. Cada columna se asocia sola por sinónimos normalizados (sin acentos ni mayúsculas): por ejemplo, "Precio", "P. Venta", "PVP" y "Precio $" van a precio; "Costo", "P. Costo" y "Costo unitario" a costo; "Existencia", "Stock", "Cantidad" e "Inv." a existencias; "Código", "SKU" y "Ref" a código; "Código de barras", "EAN" y "UPC" a código de barras. También reconoce las claves del rubro. La persona ve **"Encontramos estas columnas"** con un selector por columna para corregir o ignorar. Si el precio o el costo traen "$" o "USD", la moneda es USD; si traen "Bs", es VES.
+3. **Revisar e importar.**
+   - Resumen: "**120 productos**: 98 nuevos · 18 se actualizarán · 4 con problemas".
+   - Las filas con problemas se muestran con el error en lenguaje llano ("Fila 14: el precio 'diez' no es un número"). Se pueden corregir ahí mismo u omitir.
+   - Botón **"Importar 116 productos"**. Coincidencia con lo existente por código o código de barras (igual que la API).
+   - Las existencias de los productos nuevos quedan como movimiento `INITIAL`. A los existentes **no se les pisan las existencias**: se ofrece aparte "Ajustar existencias de N productos" (movimiento `ADJUSTMENT`, motivo "Importación").
+   - Se registra en `importaciones_productos` (origen `archivo`, con `ids_creados`).
+   - Al terminar: "Listo, importamos 116 productos" y el botón **"Deshacer importación"**, disponible 24 h desde el historial. Mueve a la papelera (`deleted_at`) los creados que aún no tienen movimientos de venta.
+
+Lógica pura en `src/utils/importacionProductos.js`: detección de encabezados, sinónimos, normalización de números ("1.234,56" y "1,234.56"), validación por fila y plan crear/actualizar. Todo con tests.
+
+## 8. API de productos (pedido del usuario 2026-10-14)
+- Edge Function **`api-productos`** v1 (desplegada, `verify_jwt=false`; se autentica con `x-api-key`).
+  - `GET /functions/v1/api-productos?pagina=&por_pagina=&codigo=` → `{ productos, pagina, por_pagina }`.
+  - `POST` con `{ productos: [...] }` (máx. 500 por llamada) → `{ creados, actualizados, errores: [{ fila, mensaje }] }`.
+  - Campos en español: `nombre`, `codigo`, `codigo_barras`, `tipo`, `categoria`, `marca`, `descripcion`, `precio`, `costo`, `moneda` (VES/USD/EUR), `iva` (general/reducido/lujo/exento → `IVA_G`/`IVA_R`/`IVA_A`/`EXENTO`), `unidad`, `existencias` (solo al crear), `existencias_minimas`, `atributos`.
+- **Llaves:** tabla `api_keys`. Solo se guarda el hash SHA-256, que la app no puede leer. Las RPC son `crear_api_key(nombre)`, que devuelve la llave **una sola vez**, y `revocar_api_key(id)`, con un máximo de 5 activas. Migración `20261014120000`.
+- **UI:** Mi negocio → sección **"Conexiones"** (plegada por defecto, para no asustar):
+  - texto "Conecta tu tienda en línea u otro sistema";
+  - lista de llaves (nombre, `ads_xxxxxxxx…`, último uso, Revocar);
+  - "Crear llave": un diálogo que muestra la llave una vez, con Copiar y el aviso "Guárdala, no la volveremos a mostrar";
+  - enlace "Cómo usar la API", hacia la documentación pública (fase final).
