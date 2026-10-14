@@ -15,6 +15,19 @@ export function aUSD(monto, moneda, tasa) {
   return 0 // EUR: sin tasa disponible todavía
 }
 
+/**
+ * Monto en bolívares (para totales fiscales como los de proveedores, que van en Bs).
+ * VES queda igual; USD se multiplica por la tasa BCV; sin tasa, o en EUR, devuelve 0
+ * (no se inventa un monto).
+ */
+export function aVES(monto, moneda, tasa) {
+  const n = Number(monto) || 0
+  if (!n) return 0
+  if (moneda === 'VES' || !moneda) return n
+  if (moneda === 'USD') return tasa > 0 ? n * tasa : 0
+  return 0
+}
+
 function cuenta(inv) {
   return inv.status !== 'ANULADA' && inv.status !== 'BORRADOR'
 }

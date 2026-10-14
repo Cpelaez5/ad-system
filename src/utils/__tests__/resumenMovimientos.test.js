@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aUSD, resumenDelMes, porCobrar, siguientePasoMovimientos } from '../resumenMovimientos.js'
+import { aUSD, aVES, resumenDelMes, porCobrar, siguientePasoMovimientos } from '../resumenMovimientos.js'
 
 const ahora = new Date(2026, 9, 14)
 const inv = (o) => ({ status: 'EMITIDA', flow: 'VENTA', issueDate: '2026-10-05', financial: { totalSales: 100, currency: 'USD' }, ...o })
@@ -37,5 +37,16 @@ describe('resumenMovimientos', () => {
     expect(siguientePasoMovimientos([inv({ status: 'CRÉDITO' }), ret], 36).tipo).toBe('cobrar')
     expect(siguientePasoMovimientos([ret], 36)).toEqual({ tipo: 'retenciones', cantidad: 1 })
     expect(siguientePasoMovimientos([inv({})], 36).tipo).toBe('listo')
+  })
+})
+
+describe('aVES', () => {
+  it('deja los bolívares igual y convierte dólares con la tasa', () => {
+    expect(aVES(100, 'VES', 36)).toBe(100)
+    expect(aVES(10, 'USD', 36)).toBe(360)
+  })
+  it('sin tasa o en euros no inventa un monto', () => {
+    expect(aVES(10, 'USD', 0)).toBe(0)
+    expect(aVES(10, 'EUR', 36)).toBe(0)
   })
 })

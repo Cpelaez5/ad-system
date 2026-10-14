@@ -12,6 +12,25 @@
 import { supabase } from '@/lib/supabaseClient'
 import { getCurrentOrganizationId, getCurrentClientId } from '@/utils/tenantHelpers'
 import { normalizarRif } from '@/utils/rif.js'
+import { aVES } from '@/utils/resumenMovimientos.js'
+import bcvService from '@/services/bcvService.js'
+
+/** Tasa BCV (Bs por USD) para convertir compras en dólares; 0 si no hay. */
+async function tasaBcv() {
+  try {
+    const r = await bcvService.getCurrentRate()
+    return Number(r?.data?.dollar) || 0
+  } catch {
+    return 0
+  }
+}
+
+/** Total de una factura de compra en Bs, respetando su moneda. */
+function totalCompraEnBs(inv, tasa) {
+  const f = inv.financial || {}
+  const monto = f.totalSales || f.total || f.totalAmount || inv.total_amount || 0
+  return aVES(monto, f.currency || 'VES', tasa)
+}
 
 // Caché en memoria
 let cachedConceptosIslr = null
@@ -359,6 +378,8 @@ class ProveedorService {
       // Las compras sin efecto (BORRADOR/ANULADA) no cuentan en los totales.
       invoices = invoices.filter(i => !['BORRADOR', 'ANULADA'].includes(String(i.status || '').toUpperCase()))
 
+      const tasa = await tasaBcv()
+
       // 2. Calcular acumulados de compras y retenciones vinculando facturas y retenciones
       return existingProveedores.map(p => {
         const pRifClean = cleanAlphanumeric(p.rif)
@@ -374,10 +395,8 @@ class ProveedorService {
         })
 
         // Totales de compras: suma de facturas o respaldo con base imponible de retenciones
-        let totalCompras = matchingInvoices.reduce((acc, inv) => {
-          const val = Number(inv.financial?.totalSales || inv.financial?.total || inv.financial?.totalAmount || inv.total_amount || 0)
-          return acc + val
-        }, 0)
+        // En Bs: las compras en dólares se convierten con la tasa BCV (antes se sumaban tal cual).
+        let totalCompras = matchingInvoices.reduce((acc, inv) => acc + totalCompraEnBs(inv, tasa), 0)
 
         if (totalCompras === 0 && matchingRetenciones.length > 0) {
           totalCompras = matchingRetenciones.reduce((acc, r) => acc + Number(r.base_imponible || 0), 0)
@@ -477,7 +496,8 @@ class ProveedorService {
       )
       const facturas = todasLasCompras.slice(0, 10) // solo el listado se limita; los totales suman todo
 
-      const totalCompras = todasLasCompras.reduce((acc, f) => acc + Number(f.financial?.totalSales || 0), 0)
+      const tasa = await tasaBcv()
+      const totalCompras = todasLasCompras.reduce((acc, f) => acc + totalCompraEnBs(f, tasa), 0)
       const totalRetenido = (retenciones || []).reduce((acc, r) => acc + Number(r.monto_retenido || 0), 0)
 
       // Obtener conceptos ISLR y municipios para resolver nombres
