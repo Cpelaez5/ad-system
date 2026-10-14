@@ -44,3 +44,22 @@ Referencias: el formulario de producto y la importación por rubro de Norkut (vi
 - Switch en la barra de Mi mercancía (íconos lista/cuadrícula, `v-btn-toggle`). La preferencia se recuerda en localStorage (`ad_mercancia_vista`). Por defecto: cuadrícula si hay fotos, lista si no.
 - **Cuadrícula:** tarjetas con la foto cuadrada (o un espacio con el ícono del tipo), nombre en 2 líneas, precio, stock con semáforo (o chip "Servicio") y el tipo arriba a la izquierda. En el teléfono, 2 columnas; en escritorio, 4 a 5. Tocar la tarjeta abre el detalle o la edición.
 - **Lista:** la fila actual, con miniatura de la foto.
+
+## 6. Foto del estante (pedido del usuario 2026-10-14)
+Una sola foto de un estante, nevera o mostrador sirve para dos cosas:
+- **Armar el catálogo:** crear los productos que aún no existen.
+- **Contar el inventario:** ajustar la cantidad de los que ya existen.
+
+**IA:** `{ accion: 'estante', foto_path }` → `{ productos: [{ nombre, marca, categoria, presentacion, unidad, cantidad_visible, box_2d, confianza }] }`. `box_2d` = [ymin, xmin, ymax, xmax] en 0–1000, o `null`. Máximo 40 productos (función `producto-ia` v2, desplegada).
+
+**Flujo (pensado para el teléfono):**
+1. **Mi mercancía → "Foto del estante"** (cámara). Mensaje: "Contando lo que hay en tu estante…".
+2. **Resultado:** "Encontramos 14 productos". Lista de tarjetas, cada una con:
+   - el **recorte** de ese producto, hecho en el navegador con `box_2d` sobre la foto original (canvas);
+   - el nombre editable y la cantidad vista con +/−;
+   - una marca automática: **"Nuevo"** o **"Ya lo tienes: Harina PAN 1 kg (stock 6)"**. La coincidencia con el inventario se busca en el navegador por código de barras, nombre normalizado o marca + presentación. La persona puede corregirla eligiendo otro producto o "Es nuevo".
+   - Un switch para incluir u omitir cada tarjeta.
+3. **Dos acciones claras abajo, fijas:**
+   - **"Crear N productos nuevos":** usa el recorte como foto (se sube al bucket). Precio opcional: los que quedan sin precio se guardan y aparecen en "Tu siguiente paso: N productos sin precio → Ponles precio".
+   - **"Ajustar existencias de N productos":** muestra antes → después por producto y registra el ajuste como movimiento de inventario con el servicio existente y el motivo "Conteo por foto". Nunca se pisa el stock en silencio: la persona confirma.
+4. Si la confianza es baja o hay más de 40 productos: "Toma la foto más de cerca o por partes".
