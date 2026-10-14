@@ -53,6 +53,10 @@ vi.mock('@/services/inventoryService.js', () => ({
   }
 }))
 
+vi.mock('@/services/catalogoService', () => ({
+  buscarProveedorPorRif: vi.fn().mockResolvedValue(null)
+}))
+
 const supabaseUpdate = { eq: vi.fn().mockResolvedValue({ error: null }) }
 vi.mock('@/lib/supabaseClient', () => ({
   supabase: { from: vi.fn(() => ({ update: vi.fn(() => supabaseUpdate) })) }
@@ -64,6 +68,7 @@ import retentionRpcService from '@/services/retentionRpcService.js'
 import emailNotificationService from '@/services/email-notification-service.js'
 import proveedorService from '@/services/proveedorService.js'
 import clientesNegocioService from '@/services/clientesNegocioService.js'
+import { buscarProveedorPorRif } from '@/services/catalogoService'
 import { guardarRegistro } from '@/services/registroService.js'
 
 describe('registroService.guardarRegistro', () => {
@@ -261,6 +266,46 @@ describe('registroService.guardarRegistro', () => {
         expect.objectContaining({ p_proveedor_id: 'prov-nuevo-1' })
       )
       expect(result.success).toBe(true)
+    })
+
+    it('completa con el catálogo global lo que el OCR no trajo (razón social y domicilio)', async () => {
+      const formData = {
+        flow: 'COMPRA',
+        expense_type: 'GASTO',
+        client: { id: 'client-abc' },
+        issuer: { _proveedorPendiente: { nombre: '', rif: 'j123456784' } },
+        financial: { ivaRetention: 0, islrRetention: 0, municipalRetention: 0 }
+      }
+      proveedorService.buscarPorRifNormalizado.mockResolvedValue(null)
+      buscarProveedorPorRif.mockResolvedValueOnce({ razon_social: 'Corpelec, C.A.', domicilio_fiscal: 'Av. Catálogo' })
+      proveedorService.createProveedor.mockResolvedValue({ success: true, data: { id: 'prov-n', rif: RIF_VALIDO } })
+      retentionRpcService.registrarCompra.mockResolvedValue({ invoice_id: 'inv-1' })
+
+      await guardarRegistro(formData)
+
+      expect(proveedorService.createProveedor).toHaveBeenCalledWith(
+        expect.objectContaining({ nombre: 'Corpelec, C.A.', direccion: 'Av. Catálogo' })
+      )
+    })
+
+    it('lo que leyó el OCR manda sobre el catálogo', async () => {
+      const formData = {
+        flow: 'COMPRA',
+        expense_type: 'GASTO',
+        client: { id: 'client-abc' },
+        issuer: { _proveedorPendiente: { nombre: 'Del OCR', rif: 'j123456784', direccion: 'Dir OCR' } },
+        financial: { ivaRetention: 0, islrRetention: 0, municipalRetention: 0 }
+      }
+      proveedorService.buscarPorRifNormalizado.mockResolvedValue(null)
+      buscarProveedorPorRif.mockResolvedValueOnce({ razon_social: 'Del catálogo', domicilio_fiscal: 'Dir catálogo' })
+      proveedorService.createProveedor.mockResolvedValue({ success: true, data: { id: 'prov-n', rif: RIF_VALIDO } })
+      retentionRpcService.registrarCompra.mockResolvedValue({ invoice_id: 'inv-1' })
+
+      await guardarRegistro(formData)
+
+      expect(proveedorService.createProveedor).toHaveBeenCalledWith(
+        expect.objectContaining({ nombre: 'Del OCR', direccion: 'Dir OCR' })
+      )
     })
 
     it('reutiliza un proveedor existente por RIF en vez de duplicarlo', async () => {

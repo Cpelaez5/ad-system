@@ -20,6 +20,7 @@ import inventoryService from '@/services/inventoryService.js'
 import clientesNegocioService from '@/services/clientesNegocioService.js'
 import { supabase } from '@/lib/supabaseClient'
 import { logger } from '@/utils/logger'
+import { buscarProveedorPorRif } from '@/services/catalogoService'
 import { normalizarRif, tipoPersonaPorLetra } from '@/utils/rif.js'
 
 /**
@@ -62,11 +63,14 @@ async function resolverProveedorPendiente(pendiente) {
     return { success: true, id: existente.id, rif: existente.rif, creado: false }
   }
 
+  // Catálogo global: completa solo lo que el OCR no trajo (nunca lanza)
+  const delCatalogo = await buscarProveedorPorRif(rifNormalizado)
+
   try {
     const creado = await proveedorService.createProveedor({
-      nombre: pendiente.nombre || '',
+      nombre: pendiente.nombre || delCatalogo?.razon_social || '',
       rif: rifNormalizado,
-      direccion: pendiente.direccion || null,
+      direccion: pendiente.direccion || delCatalogo?.domicilio_fiscal || null,
       telefono: pendiente.telefono || null,
       email: pendiente.email || null,
       tipo_persona: tipoPersonaPorLetra(rifNormalizado)
