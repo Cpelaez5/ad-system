@@ -104,6 +104,9 @@
             </template>
             <v-list-item-title class="text-wrap font-weight-bold">{{ f.datos.name || '(sin nombre)' }}</v-list-item-title>
             <v-list-item-subtitle class="text-wrap">{{ detalleFila(f) }}</v-list-item-subtitle>
+            <div v-if="f.completadoCatalogo" class="imp__catalogo" data-testid="importar-completado-catalogo">
+              <v-icon size="14" icon="mdi-check-decagram-outline" class="mr-1" />Completado con el catálogo
+            </div>
             <div v-if="f.estado === 'error'" class="imp__error">
               <div v-for="e in f.errores" :key="e.campo + e.mensaje" class="imp__error-texto">Fila {{ f.fila }}: {{ e.mensaje }}</div>
               <div class="imp__arreglo">
@@ -206,7 +209,7 @@ import { formatMoney } from '@/utils/formatMoney.js'
 import { formatFechaLocal } from '@/utils/fechas.js'
 import {
   MAX_FILAS, camposDestino, detectarEncabezados, sugerirMapeo, monedasPorColumna,
-  filasDesdeMatriz, planificar, resumir, textoResumen, puedeDeshacer as puedeDeshacerUtil,
+  filasDesdeMatriz, planificar, completarConCatalogo, resumir, textoResumen, puedeDeshacer as puedeDeshacerUtil,
 } from '@/utils/importacionProductos.js'
 import servicio from '@/services/importacionProductosService.js'
 import { descargarPlantilla } from './plantillaRubro.js'
@@ -263,7 +266,8 @@ const monedasColumna = computed(() => monedasPorColumna(encabezados.value, mapeo
 const monedaDetectada = computed(() => !!(monedasColumna.value.precio || monedasColumna.value.costo || mapeo.value.includes('moneda')))
 const ctx = computed(() => ({ rubro: rubro.value, monedaDefecto: monedaDefecto.value, monedasColumna: monedasColumna.value }))
 
-const plan = computed(() => planificar(filasCrudas.value, ctx.value, existentes.value).filas)
+const catalogoPorCodigo = ref(new Map())
+const plan = computed(() => completarConCatalogo(planificar(filasCrudas.value, ctx.value, existentes.value).filas, catalogoPorCodigo.value))
 const resumen = computed(() => resumir(plan.value))
 const aImportar = computed(() => plan.value.filter((f) => (f.estado === 'nuevo' || f.estado === 'actualizar') && !omitidas.value.has(f.fila)))
 const filasConAjuste = computed(() => plan.value.filter((f) => f.ajuste && f.estado === 'actualizar'))
@@ -381,6 +385,7 @@ async function irARevisar() {
     if (filasCrudas.value.length > MAX_FILAS) {
       filasCrudas.value = filasCrudas.value.slice(0, MAX_FILAS)
     }
+    catalogoPorCodigo.value = await servicio.cargarCatalogo(filasCrudas.value)
     omitidas.value = new Set()
     filtro.value = 'todos'
     limiteFilas.value = 50
@@ -498,6 +503,14 @@ async function bajarPlantilla() {
 </script>
 
 <style scoped>
+.imp__catalogo {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+  font-size: 0.8125rem;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+}
+
 .imp { display: flex; flex-direction: column; gap: 4px; }
 .imp__intro { font-size: 1rem; line-height: 1.5; margin: 0 0 16px; }
 .imp__ayuda { font-size: 0.9rem; color: rgba(var(--v-theme-on-surface), 0.72); margin: 8px 0 16px; }

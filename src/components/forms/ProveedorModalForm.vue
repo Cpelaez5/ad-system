@@ -129,6 +129,22 @@
                   ></v-select>
                 </v-col>
 
+                <!-- Marca del catálogo global (solo si llenó algo) -->
+                <v-col v-if="catalogoMarca" cols="12" class="pt-0 pb-2">
+                  <div class="catalogo-marca" data-testid="catalogo-marca-proveedor">
+                    <v-icon size="16" class="mr-1">mdi-check-decagram-outline</v-icon>
+                    <span>{{ catalogoMarca }}</span>
+                    <v-btn
+                      variant="text"
+                      size="small"
+                      color="primary"
+                      class="text-none ml-1 px-2"
+                      data-testid="catalogo-no-es-este"
+                      @click="deshacerCatalogo"
+                    >No es este</v-btn>
+                  </div>
+                </v-col>
+
                 <!-- Teléfono y Correo -->
                 <v-col cols="12" sm="6">
                   <v-text-field
@@ -362,6 +378,7 @@
 
 <script>
 import proveedorService from '@/services/proveedorService.js'
+import { buscarProveedorPorRif, rifParaCatalogo } from '@/services/catalogoService'
 
 export default {
   name: 'ProveedorModalForm',
@@ -391,6 +408,11 @@ export default {
       activeTab: 'general',
       valid: true,
       saving: false,
+      // Catálogo global: marca y campos que llenó (para poder deshacer)
+      catalogoMarca: '',
+      catalogoLlenado: [],
+      catalogoRifConsultado: '',
+      catalogoTimer: null,
       conceptosIslr: [],
       municipios: [],
       rules: {
@@ -446,7 +468,13 @@ export default {
     },
     'formData.tipo_persona'() {
       this.loadISLRConcepts()
+    },
+    'formData.rif'(val) {
+      this.programarConsultaCatalogo(val)
     }
+  },
+  beforeUnmount() {
+    clearTimeout(this.catalogoTimer)
   },
   async mounted() {
     await Promise.all([
@@ -457,6 +485,10 @@ export default {
   methods: {
     initForm() {
       this.activeTab = 'general'
+      clearTimeout(this.catalogoTimer)
+      this.catalogoMarca = ''
+      this.catalogoLlenado = []
+      this.catalogoRifConsultado = ''
       if (this.proveedor) {
         this.formData = {
           id: this.proveedor.id || null,
@@ -544,6 +576,46 @@ export default {
         this.formData.tipo_persona = 'JURIDICA'
       }
     },
+    /** Catálogo global: espera ~400 ms tras dejar de escribir y consulta si el RIF tiene formato válido. */
+    programarConsultaCatalogo(rif) {
+      clearTimeout(this.catalogoTimer)
+      if (this.isEdit) return
+      const limpio = rifParaCatalogo(rif)
+      if (!limpio) {
+        this.catalogoRifConsultado = ''
+        return
+      }
+      if (limpio === this.catalogoRifConsultado) return
+      this.catalogoTimer = setTimeout(() => this.consultarCatalogo(limpio), 400)
+    },
+    async consultarCatalogo(limpio) {
+      this.catalogoRifConsultado = limpio
+      const hallado = await buscarProveedorPorRif(limpio)
+      // Si mientras tanto cambió el RIF, se descarta la respuesta vieja
+      if (!hallado || rifParaCatalogo(this.formData.rif) !== limpio) return
+      const llenado = []
+      const nombre = hallado.razon_social || hallado.nombre_comercial
+      if (nombre && !String(this.formData.nombre || '').trim()) {
+        this.formData.nombre = nombre
+        llenado.push('nombre')
+      }
+      if (hallado.domicilio_fiscal && !String(this.formData.direccion || '').trim()) {
+        this.formData.direccion = hallado.domicilio_fiscal
+        llenado.push('direccion')
+      }
+      if (!llenado.length) return
+      this.catalogoLlenado = llenado
+      const n = Number(hallado.confirmaciones) || 0
+      this.catalogoMarca = hallado.verificado
+        ? 'Datos de AD System · verificados'
+        : `Datos de AD System · confirmados por ${n} ${n === 1 ? 'negocio' : 'negocios'}`
+    },
+    /** "No es este": vacía solo lo que llenó el catálogo. */
+    deshacerCatalogo() {
+      for (const campo of this.catalogoLlenado) this.formData[campo] = ''
+      this.catalogoLlenado = []
+      this.catalogoMarca = ''
+    },
     close() {
       this.internalValue = false
     },
@@ -586,6 +658,13 @@ export default {
 </script>
 
 <style scoped>
+.catalogo-marca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+}
 .proveedor-modal-card {
   overflow: hidden;
 }
