@@ -35,24 +35,28 @@
         @cerrar="avisoFiscalPendiente = null"
       />
 
-      <ListaPasos
-        :titulo="tituloAvance"
-        :pasos="bloques"
-        class="mb-5"
-        @ir="irABloque"
-      />
-
-      <PanelSiguientePaso
-        :listo="todoListo"
-        :titulo="siguienteBloque ? `Completa «${siguienteBloque.titulo}»` : ''"
-        :detalle="siguienteBloque ? siguienteBloque.detalle : ''"
-        :texto-boton="siguienteBloque ? siguienteBloque.textoBoton : ''"
-        :icono-boton="siguienteBloque ? siguienteBloque.icono : ''"
-        titulo-listo="¡Tu negocio está completo!"
-        detalle-listo="Ya tenemos todo lo que necesitamos para tus facturas y comprobantes de retención."
-        class="mb-6"
-        @accion="irABloque(siguienteBloque)"
-      />
+      <!-- Mientras falte algo: avance + siguiente paso. Completo: una sola línea de logro
+           (antes se repetían la lista tachada y el panel "completo"). -->
+      <template v-if="!todoListo">
+        <div class="mi-negocio__panel">
+          <ListaPasos
+            :titulo="tituloAvance"
+            :pasos="bloques"
+            @ir="irABloque"
+          />
+          <PanelSiguientePaso
+            :titulo="siguienteBloque ? `Completa «${siguienteBloque.titulo}»` : ''"
+            :detalle="siguienteBloque ? siguienteBloque.detalle : ''"
+            :texto-boton="siguienteBloque ? siguienteBloque.textoBoton : ''"
+            :icono-boton="siguienteBloque ? siguienteBloque.icono : ''"
+            @accion="irABloque(siguienteBloque)"
+          />
+        </div>
+      </template>
+      <div v-else class="mi-negocio__logro" role="status">
+        <v-icon icon="mdi-check-decagram" color="success" size="26" />
+        <span><strong>Tu negocio está completo.</strong> Ya tenemos todo para tus facturas y comprobantes de retención.</span>
+      </div>
 
       <!-- ═════════════ BLOQUE A: DATOS DE LA EMPRESA ═════════════ -->
       <section ref="refEmpresa" class="bloque-negocio">
@@ -1115,5 +1119,28 @@ export default {
 
 @media (prefers-reduced-motion: reduce) {
   .seal-upload-box { transition: none; }
+}
+
+/* Avance + siguiente paso lado a lado en escritorio */
+.mi-negocio__panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (min-width: 960px) {
+  .mi-negocio__panel { grid-template-columns: 7fr 5fr; align-items: start; }
+}
+
+.mi-negocio__logro {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(var(--v-theme-success), 0.3);
+  background: linear-gradient(0deg, rgba(var(--v-theme-success), 0.06), rgba(var(--v-theme-success), 0.06)), rgb(var(--v-theme-surface));
 }
 </style>
