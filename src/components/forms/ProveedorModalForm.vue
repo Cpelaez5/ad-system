@@ -67,7 +67,14 @@
       <!-- ══════════════════════════════════════════════════════ -->
       <!-- 2. CUERPO DEL FORMULARIO CON SCROLL INDEPENDIENTE      -->
       <!-- ══════════════════════════════════════════════════════ -->
-      <v-card-text class="flex-grow-1 pa-4 pa-md-6 bg-white overflow-y-auto">
+      <!-- I-E2E (ola F2b): el alto máximo del 90vh del v-card no bastaba para
+           que este v-card-text (hijo flex) se achicara por debajo de su
+           alto de contenido — un v-card-text "flex-grow-1 overflow-y-auto"
+           solo ignora su min-height automático si overflow es no-visible en
+           AMBOS ejes (spec de flexbox); con overflow-y-auto únicamente el
+           eje X seguía "visible" y el pie de acciones terminaba fuera de la
+           pantalla en escritorios bajos (ver e2e/11-mi-negocio.spec.js). -->
+      <v-card-text class="flex-grow-1 pa-4 pa-md-6 bg-white overflow-auto" style="min-height: 0;">
         <v-form ref="form" v-model="valid" @submit.prevent="save">
           <v-window v-model="activeTab">
             <!-- PESTAÑA 1: DATOS GENERALES -->
