@@ -39,7 +39,7 @@ export function getMenuPorRol({ role, isServicesCompany = false } = {}) {
     items.push(
       { key: 'contador-area', titulo: 'Área de Contador', icono: 'mdi-calculator', to: { name: 'ContadorArea' } },
       { key: 'clientes', titulo: 'Clientes', icono: 'mdi-account-group', to: { name: 'Clientes' } },
-      { key: 'facturacion', titulo: 'Facturación', icono: 'mdi-receipt', to: { name: 'Facturacion' } },
+      { key: 'facturacion', titulo: 'Facturación', icono: 'mdi-receipt-text-outline', to: { name: 'Facturacion' } },
       {
         key: 'organizacion',
         titulo: 'Organización',
@@ -79,7 +79,7 @@ export function getMenuPorRol({ role, isServicesCompany = false } = {}) {
 export function getMenuCliente({ isServicesCompany = false } = {}) {
   const items = [
     { key: 'cliente-inicio', titulo: 'Inicio', icono: 'mdi-home-variant', to: '/cliente/inicio' },
-    { key: 'cliente-facturacion', titulo: 'Mis movimientos', icono: 'mdi-receipt', to: { name: 'ClienteFacturacion', query: { tab: 'all' } } },
+    { key: 'cliente-facturacion', titulo: 'Mis movimientos', icono: 'mdi-receipt-text-outline', to: { name: 'ClienteFacturacion', query: { tab: 'all' } } },
     { key: 'cliente-dashboard', titulo: '¿Cómo voy?', icono: 'mdi-chart-line', to: { name: 'ClienteDashboard' } },
     { key: 'cliente-fiscal-360', titulo: 'Mis papeles', icono: 'mdi-file-certificate', to: { name: 'ClienteFiscal360' } },
   ]

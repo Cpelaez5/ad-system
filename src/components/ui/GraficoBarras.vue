@@ -61,7 +61,7 @@ export default {
             labels: {
               usePointStyle: true,
               padding: 16,
-              font: { family: 'Open Sans, sans-serif', size: 12 },
+              font: { family: 'Montserrat, sans-serif', size: 12 },
             },
           },
           tooltip: {
@@ -71,7 +71,7 @@ export default {
             cornerRadius: 10,
             padding: 10,
             titleFont: { family: 'Montserrat' },
-            bodyFont: { family: 'Open Sans' },
+            bodyFont: { family: 'Montserrat' },
             callbacks: {
               label: (ctx) => ` ${ctx.dataset.label}: ${formatMoney(ctx.parsed.y || 0, moneda)}`,
             },
@@ -80,13 +80,13 @@ export default {
         scales: {
           x: {
             grid: { display: false },
-            ticks: { font: { family: 'Open Sans, sans-serif', size: 11 } },
+            ticks: { font: { family: 'Montserrat, sans-serif', size: 11 } },
           },
           y: {
             beginAtZero: true,
             grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false },
             ticks: {
-              font: { family: 'Open Sans, sans-serif', size: 11 },
+              font: { family: 'Montserrat, sans-serif', size: 11 },
               callback: (v) => formatMoney(v, moneda, { abreviar: true, sinDecimales: true }),
             },
           },

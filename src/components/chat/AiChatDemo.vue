@@ -127,7 +127,7 @@ async function sendMessage() {
 <style scoped>
 .gap-3 { gap: 12px; }
 .bg-surface-dark { background-color: #121212 !important; }
-.bg-primary { background-color: #1F355C !important; }
+.bg-primary { background-color: #2A2A2E !important; }
 .text-gold { color: #e0b04f !important; }
 .border-thin { border: 1px solid rgba(255, 255, 255, 0.1) !important; }
 

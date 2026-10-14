@@ -1,38 +1,17 @@
 <template>
   <v-container fluid class="planes-page pa-4 pa-md-6">
     <!-- Banner de suscripción actual -->
-    <v-alert
+    <AvisoAmable
       v-if="currentSubscription && currentSubscription.plan"
-      color="secondary"
-      variant="tonal"
-      class="mb-6 rounded-xl"
-      border="start"
-      border-color="primary"
-    >
-      <div class="d-flex align-center justify-space-between flex-wrap">
-        <div>
-          <h3 class="text-h6 font-weight-bold mb-1">
-            Plan Actual: {{ currentSubscription.plan.name }}
-            <v-chip size="small" :color="isActive ? 'success' : 'error'" class="ml-2 font-weight-bold">
-              {{ isActive ? 'Activo' : 'Expirado' }}
-            </v-chip>
-          </h3>
-          <p class="mb-0 text-body-2 opacity-80">
-            <template v-if="formattedExpirationDate">
-              Tu suscripción es válida hasta el <strong>{{ formattedExpirationDate }}</strong>.
-            </template>
-            <template v-else>
-              Tu suscripción se encuentra activa.
-            </template>
-          </p>
-        </div>
-        <div class="mt-3 mt-md-0" v-if="!isActive">
-          <v-btn color="primary" variant="flat" rounded="pill" @click="scrollToPlans">
-            Renovar Ahora
-          </v-btn>
-        </div>
-      </div>
-    </v-alert>
+      :tipo="isActive ? 'info' : 'advertencia'"
+      :titulo="`Plan actual: ${currentSubscription.plan.name} (${isActive ? 'Activo' : 'Expirado'})`"
+      :mensaje="formattedExpirationDate
+        ? `Tu suscripción es válida hasta el ${formattedExpirationDate}.`
+        : 'Tu suscripción se encuentra activa.'"
+      :texto-accion="!isActive ? 'Renovar ahora' : ''"
+      class="mb-6"
+      @accion="scrollToPlans"
+    />
 
     <PricingSection
       title="Planes de Suscripción"
@@ -61,12 +40,14 @@
 
 <script>
 import PricingSection from '@/components/common/PricingSection.vue';
+import AvisoAmable from '@/components/ui/AvisoAmable.vue';
 import plansService from '@/services/plansService';
 import userService from '@/services/userService';
+import { parseFechaLocal, formatFechaLocal } from '@/utils/fechas.js';
 
 export default {
   name: 'Planes',
-  components: { PricingSection },
+  components: { PricingSection, AvisoAmable },
   data() {
     return {
       processingPlan: null,
@@ -85,14 +66,17 @@ export default {
       if (!this.currentSubscription) return false;
       if (this.currentSubscription.status === 'active' || this.currentSubscription.status === 'trial') return true;
       if (this.currentSubscription.next_billing_date) {
-        return new Date(this.currentSubscription.next_billing_date) > new Date();
+        // Menor (ola F2b): new Date('YYYY-MM-DD') interpreta medianoche UTC,
+        // que en Caracas ya es el día anterior — parseFechaLocal la trata
+        // como medianoche LOCAL.
+        const fecha = parseFechaLocal(this.currentSubscription.next_billing_date);
+        return fecha ? fecha > new Date() : false;
       }
       return false;
     },
     formattedExpirationDate() {
       if (this.currentSubscription?.next_billing_date) {
-        const date = new Date(this.currentSubscription.next_billing_date);
-        return date.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+        return formatFechaLocal(this.currentSubscription.next_billing_date, { year: 'numeric', month: 'long', day: 'numeric' }, 'es-ES');
       }
       return null;
     }

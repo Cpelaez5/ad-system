@@ -5,20 +5,41 @@
     :permanent="esPermanente"
     :temporary="esTemporal"
     :rail="railActivo"
-    color="#010101"
+    :expand-on-hover="railActivo"
+    :rail-width="72"
+    :width="264"
+    color="#0b0b0b"
     theme="dark"
-    class="menu-lateral animate-slide-in-left"
+    class="menu-lateral"
+    :class="{ 'menu-lateral--recogido': railActivo }"
     @update:model-value="$emit('update:modelValue', $event)"
   >
     <template #prepend>
       <div class="menu-lateral__header">
-        <LogoAdSystem variante="icono" tono="blanco" :alto="logoAlto" class="menu-lateral__logo" />
+        <!-- Logo vectorial blanco: completo cuando el menú está abierto, solo el ícono cuando está recogido -->
+        <router-link to="/" class="menu-lateral__marca" aria-label="AD System, ir al inicio">
+          <LogoAnimado class="menu-lateral__logo-completo" variante="completo" tono="blanco" :alto="28" :reproducir="false" />
+          <LogoAnimado class="menu-lateral__logo-icono" variante="icono" tono="blanco" :alto="30" :reproducir="false" />
+        </router-link>
+
+        <v-tooltip v-if="esPermanente" location="end" :text="textoBotonModo">
+          <template #activator="{ props: tooltipProps }">
+            <v-btn
+              v-bind="tooltipProps"
+              class="menu-lateral__boton-modo"
+              :icon="modo === 'fijo' ? 'mdi-pin' : 'mdi-pin-outline'"
+              variant="text"
+              size="small"
+              :aria-label="textoBotonModo"
+              :aria-pressed="modo === 'fijo' ? 'true' : 'false'"
+              @click="$emit('cambiar-modo', modo === 'fijo' ? 'auto' : 'fijo')"
+            />
+          </template>
+        </v-tooltip>
       </div>
     </template>
 
-    <v-divider />
-
-    <v-list density="compact" nav>
+    <v-list density="comfortable" nav class="menu-lateral__lista">
       <template v-for="item in items" :key="item.key">
         <v-list-group v-if="item.grupo" :value="item.key">
           <template #activator="{ props: activatorProps }">
@@ -39,57 +60,50 @@
           />
         </v-list-group>
 
-        <v-tooltip v-else :disabled="!railActivo" location="end" :text="item.titulo">
-          <template #activator="{ props: tooltipProps }">
-            <v-list-item
-              v-bind="tooltipProps"
-              :to="item.to"
-              :prepend-icon="item.icono"
-              :title="item.titulo"
-              :value="item.key"
-            />
-          </template>
-        </v-tooltip>
+        <v-list-item
+          v-else
+          :to="item.to"
+          :prepend-icon="item.icono"
+          :title="item.titulo"
+          :value="item.key"
+        />
       </template>
     </v-list>
 
     <template #append>
-      <v-divider class="mb-1" />
-      <v-list density="compact" nav>
-        <v-list-item @click="$emit('logout')" prepend-icon="mdi-logout" title="Cerrar Sesión" value="logout" />
+      <v-divider class="menu-lateral__divisor" />
+      <v-list density="comfortable" nav class="menu-lateral__lista">
+        <v-list-item prepend-icon="mdi-logout" title="Cerrar sesión" value="logout" @click="$emit('logout')" />
       </v-list>
     </template>
   </v-navigation-drawer>
 </template>
 
 <script>
-import LogoAdSystem from '@/components/ui/LogoAdSystem.vue'
+import LogoAnimado from '@/components/ui/LogoAnimado.vue'
 import { getMenuPorRol } from './menuPorRol.js'
 
 /**
- * MenuLateral — reemplaza a Sidebar.vue. Drawer de navegación nativo de
- * Vuetify, con los ítems de `menuPorRol.js` según el rol actual.
+ * MenuLateral — drawer de navegación nativo de Vuetify con los ítems de
+ * `menuPorRol.js` según el rol.
  *
- * Breakpoints (unificados para todos los roles, feedback del shell):
+ * Breakpoints:
  *  - <600px (xs) + rol `cliente`: NO se renderiza (usa la barra inferior).
- *  - <1280px (xs/sm/md, "tablet" + móvil no-cliente): drawer temporary,
- *    abierto por el botón de menú del app bar (`modelValue`).
- *  - ≥1280px (lg+): drawer permanent, empuja el contenido; modo rail
- *    (solo íconos + tooltip) plegable con el botón de `BarraSuperior`
- *    (prop `collapsed`, preferencia persistida por el padre).
+ *  - <1280px: drawer temporary, abierto por el botón de menú del app bar (`modelValue`).
+ *  - ≥1280px: drawer permanent a TODO el alto de la pantalla (AppShell lo registra
+ *    antes que la barra superior), con dos modos que elige la persona con el pin
+ *    de la cabecera (preferencia persistida por AppShell, como en Norkut):
+ *      · 'fijo': abierto, empuja el contenido.
+ *      · 'auto': recogido (solo íconos) y se expande al pasar el mouse, por encima
+ *        del contenido sin moverlo (`rail` + `expand-on-hover` de Vuetify).
  *
- * Corrección (revisión del shell, hallazgo #1 Crítico): `VNavigationDrawer`
- * solo se autoactiva cuando su `model-value` es `null` — con `false` (el
- * valor inicial de `AppShell.drawerOpen`) queda oculto incluso siendo
- * `permanent`, porque el watch de `permanent` solo corre cuando ese prop
- * *cambia*, no al montar ya en escritorio. Por eso el `:model-value` fuerza
- * `true` cuando el drawer es permanente, sin depender del valor que venga
- * del padre (ver MenuLateral.spec.js, "no queda oculto en escritorio").
+ * Nota (revisión del shell, hallazgo #1): `VNavigationDrawer` solo se autoactiva
+ * con `model-value` null; por eso se fuerza `true` cuando es permanente.
  */
 export default {
   name: 'MenuLateral',
 
-  components: { LogoAdSystem },
+  components: { LogoAnimado },
 
   props: {
     /** Abierto/cerrado cuando el drawer es temporary (tablet / móvil no-cliente). */
@@ -105,14 +119,15 @@ export default {
       type: Boolean,
       default: false,
     },
-    /** Preferencia de modo rail en escritorio (persistida por AppShell). */
-    collapsed: {
-      type: Boolean,
-      default: false,
+    /** Modo en escritorio: 'fijo' (abierto) | 'auto' (recogido, se expande con hover). */
+    modo: {
+      type: String,
+      default: 'fijo',
+      validator: (v) => ['fijo', 'auto'].includes(v),
     },
   },
 
-  emits: ['update:modelValue', 'logout'],
+  emits: ['update:modelValue', 'logout', 'cambiar-modo'],
 
   computed: {
     items() {
@@ -135,68 +150,143 @@ export default {
       return !this.isLgUp
     },
     railActivo() {
-      return this.isLgUp && this.collapsed
+      return this.isLgUp && this.modo === 'auto'
     },
-    logoAlto() {
-      return this.railActivo ? 24 : 40
+    textoBotonModo() {
+      return this.modo === 'fijo'
+        ? 'Recoger el menú y expandir al pasar el mouse'
+        : 'Dejar el menú siempre abierto'
     },
   },
 }
 </script>
 
 <style>
-/* Bloque NO scoped a propósito (revisión del shell, hallazgo #2 Importante):
-   `VNavigationDrawer` renderiza un Fragment como raíz, así que el atributo
-   `data-v-*` de scope de este componente nunca llega al <nav> real — los
-   selectores "deep" (".v-navigation-drawer...") de un `<style scoped>` exigen
-   ese atributo como ancestro y por eso nunca aplicaban (11 de 14 reglas
-   quedaban muertas, incluida toda la animación del plegado en rail). La
-   clase propia `.menu-lateral` SÍ llega al <nav> (Vuetify reenvía `class`
-   como prop explícita, no por scopeId), así que cada regla queda acotada a
-   ese selector + las clases de modificador nativas de Vuetify
-   (`.v-navigation-drawer--rail`), sin depender de scoping. Ver
-   MenuLateral.spec.js, "el modo rail aplica sus estilos". */
+/* Bloque NO scoped a propósito: VNavigationDrawer renderiza un Fragment como raíz,
+   así que el data-v-* de scope nunca llega al <nav>. La clase propia .menu-lateral
+   sí llega; cada regla queda acotada a ella y a los modificadores nativos de Vuetify
+   (.v-navigation-drawer--rail, --is-hovering). Ver MenuLateral.spec.js. */
 .menu-lateral {
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-  transition: width var(--ad-move-normal) var(--ad-move-curva-entrada) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  transition:
+    width var(--ad-move-normal) var(--ad-move-curva-entrada),
+    box-shadow var(--ad-move-normal) var(--ad-move-curva-entrada) !important;
 }
 
-.menu-lateral .v-list-item-title {
+/* Expandido por hover (modo 'auto'): flota sobre el contenido con sombra suave */
+.menu-lateral.v-navigation-drawer--rail.v-navigation-drawer--is-hovering {
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* ---- Cabecera: mismo alto que la barra superior ---- */
+.menu-lateral .menu-lateral__header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px 0 20px;
+}
+
+.menu-lateral .menu-lateral__marca {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.menu-lateral .menu-lateral__marca .logo-animado {
+  margin: 0 !important;
+}
+
+.menu-lateral .menu-lateral__logo-icono,
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .menu-lateral__logo-completo,
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .menu-lateral__boton-modo {
+  display: none !important;
+}
+
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .menu-lateral__logo-icono {
+  display: inline-block !important;
+}
+
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .menu-lateral__header {
+  justify-content: center;
+  padding: 0;
+}
+
+.menu-lateral .menu-lateral__boton-modo {
+  color: rgba(255, 255, 255, 0.7) !important;
+  flex-shrink: 0;
+}
+
+/* ---- Ítems: píldora; la activa en granate de marca ---- */
+.menu-lateral .menu-lateral__lista {
+  padding: 8px 12px !important;
+}
+
+.menu-lateral .menu-lateral__lista .v-list-item {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.78) !important;
+  transition: background-color var(--ad-move-rapido) var(--ad-move-curva-entrada);
+}
+
+.menu-lateral .menu-lateral__lista .v-list-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.menu-lateral .menu-lateral__lista .v-list-item .v-list-item-title {
+  font-size: 0.95rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
   transition: opacity var(--ad-move-rapido) var(--ad-move-curva-entrada);
 }
 
-.menu-lateral.v-navigation-drawer--rail .v-list-item-title {
+.menu-lateral .menu-lateral__lista .v-list-item--active {
+  background: #8e1818 !important;
+  color: #ffffff !important;
+}
+
+.menu-lateral .menu-lateral__lista .v-list-item--active > .v-list-item__overlay {
+  opacity: 0 !important;
+}
+
+.menu-lateral .menu-lateral__lista .v-list-item--active .v-icon {
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+/* Recogido: solo íconos centrados en la píldora (el texto se oculta, no se corta) */
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .menu-lateral__lista {
+  padding: 8px 12px !important;
+}
+
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .v-list-item-title {
   opacity: 0;
 }
 
-.menu-lateral .menu-lateral__header {
-  padding: 20px 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: padding var(--ad-move-normal) var(--ad-move-curva-entrada);
+/* El espaciador del ícono (32px) no cabe en la píldora de 48px: sin él, el ícono queda
+   centrado (antes se salía 20px a la izquierda y desaparecía). */
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .v-list-item__spacer {
+  display: none !important;
 }
 
-.menu-lateral.v-navigation-drawer--rail .menu-lateral__header {
-  padding: 10px 0;
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .menu-lateral__lista .v-list-item {
+  padding-inline: 12px !important;
 }
 
-.menu-lateral .menu-lateral__logo {
-  transition: height var(--ad-move-normal) var(--ad-move-curva-entrada);
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .v-list-group__header .v-list-item__append {
+  display: none;
 }
 
-.menu-lateral .v-list-item--active {
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white !important;
+.menu-lateral .menu-lateral__divisor {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  opacity: 1;
 }
 
-.menu-lateral .v-list-item--active .v-icon {
-  color: #e0b04f !important;
-}
-
-.menu-lateral.v-navigation-drawer--rail .v-list-item {
-  justify-content: center;
+.menu-lateral:not(.v-navigation-drawer--rail) .v-list-group__items .v-list-item {
+  padding-left: 32px !important;
 }
 
 .menu-lateral::-webkit-scrollbar {
@@ -208,11 +298,11 @@ export default {
   border-radius: 2px;
 }
 
-.menu-lateral:not(.v-navigation-drawer--rail) .v-list-group__items .v-list-item {
-  padding-left: 32px;
-}
-
-.menu-lateral.v-navigation-drawer--rail .v-list-group__header .v-list-item__append {
-  display: none;
+@media (prefers-reduced-motion: reduce) {
+  .menu-lateral,
+  .menu-lateral .v-list-item,
+  .menu-lateral .v-list-item-title {
+    transition: none !important;
+  }
 }
 </style>

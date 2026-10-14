@@ -2,7 +2,7 @@
   <v-form ref="form" v-model="valid" @submit.prevent="handleSubmit">
     <v-card>
       <v-card-title class="d-flex align-center">
-        <v-icon left>mdi-receipt-long</v-icon>
+        <v-icon left>mdi-receipt-text-outline</v-icon>
         {{ isEditing ? 'Editar Documento' : 'Nuevo Documento' }}
       </v-card-title>
       

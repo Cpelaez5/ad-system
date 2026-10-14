@@ -67,12 +67,6 @@ import '@fontsource/montserrat/600.css'
 import '@fontsource/montserrat/700.css'
 import '@fontsource/montserrat/800.css'
 
-import '@fontsource/open-sans/300.css'
-import '@fontsource/open-sans/400.css'
-import '@fontsource/open-sans/500.css'
-import '@fontsource/open-sans/600.css'
-import '@fontsource/open-sans/700.css'
-import '@fontsource/open-sans/800.css'
 
 // Crear instancia de Vuetify
 const vuetify = createVuetify({
@@ -88,7 +82,7 @@ const vuetify = createVuetify({
              favicons oficiales en public/logo/. Ver docs/mvp/diseno/sistema-diseno.md
              §"Identidad visual AD System" para la verificación de contraste. --- */
           primary: '#8E1818',        /* Granate AD System (marca, del logo) */
-          secondary: '#1F355C',      /* Azul — color de apoyo (firma AD Business Group), se conserva por contraste AA ya verificado */
+          secondary: '#2A2A2E',      /* Carbón — neutro de apoyo (2026-10-13: antes azul #1F355C, que es de AD Business Group, no de AD System) */
           accent: '#E0B04F',         /* Dorado — color de apoyo, SOLO fondo/ícono/borde, nunca texto sobre blanco */
           metal: '#9CA3AF',          /* Gris "metal" del favicon oficial — fondos secundarios/bordes, siempre con texto oscuro encima */
           granateOscuro: '#320B0B',  /* Variante oscura oficial del logo — estado activo/presionado, fondos oscuros */
@@ -104,7 +98,7 @@ const vuetify = createVuetify({
         dark: true,
         colors: {
           primary: '#C18080',        /* Granate AD System aclarado para fondos oscuros */
-          secondary: '#90caf9',      /* Azul claro para textos oscuros */
+          secondary: '#D4D4D8',      /* Gris claro de apoyo para fondos oscuros */
           accent: '#E0B04F',         /* Dorado se mantiene bien */
           metal: '#9CA3AF',
           granateOscuro: '#C18080',

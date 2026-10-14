@@ -1,6 +1,6 @@
 <template>
   <v-card class="sif-card" @submit.prevent="handleSubmit">
-  <v-form ref="form">
+  <v-form ref="form" class="sif-form">
 
     <!-- ══════════════════════════════════════════════════════════════════
          MODO SIMPLE — pantalla de éxito (tras guardar, ver handleSubmit /
@@ -163,13 +163,36 @@
             <p class="sif-section-label">
               {{ formData.flow === 'VENTA' ? '¿A quién le vendiste?' : '¿A quién le pagaste?' }}
             </p>
+            <div v-if="mostrarProveedorPendienteOcr" class="sif-proveedor-pendiente" data-testid="proveedor-pendiente-ocr">
+              <v-icon color="primary" size="22">mdi-domain-plus</v-icon>
+              <div class="flex-grow-1">
+                <div class="font-weight-medium">{{ proveedorPendienteOcr.nombre }}</div>
+                <v-chip size="x-small" color="primary" variant="tonal" class="mt-1">
+                  Nuevo proveedor — se guardará al registrar
+                </v-chip>
+              </div>
+              <v-btn size="small" variant="text" color="primary" @click="cancelarProveedorPendienteOcr">
+                Buscar otro
+              </v-btn>
+            </div>
+            <!-- C2: con un proveedor pendiente, las retenciones se calculan con
+                 valores por defecto (IVA 75%) — avisar para que la persona las
+                 confirme en "Ver detalles" antes de guardar. -->
+            <AvisoAmable
+              v-if="mostrarProveedorPendienteOcr && clienteEsAgenteRetencion"
+              tipo="info"
+              mensaje="Proveedor nuevo: revisamos las retenciones con valores por defecto; confírmalas en Ver detalles."
+              texto-accion="Ver detalles"
+              class="mt-2"
+              @accion="simpleDetailsOpen = true"
+            />
             <ProveedorAutocomplete
-              v-if="formData.flow === 'COMPRA'"
+              v-if="!mostrarProveedorPendienteOcr && formData.flow === 'COMPRA'"
               v-model="proveedor"
               @add-new="showProveedorModal = true"
             />
             <v-text-field
-              v-else
+              v-if="formData.flow !== 'COMPRA'"
               v-model="counterpartName"
               placeholder="Ej: Distribuidora López"
               variant="outlined"
@@ -207,11 +230,17 @@
 
           <!-- COMPRA/GASTO: ¿En qué? · VENTA: ¿Cómo te pagaron? -->
           <v-col cols="12" v-if="formData.flow === 'COMPRA'">
-            <p class="sif-section-label">¿En qué?</p>
+            <p class="sif-section-label">
+              ¿En qué?
+              <v-chip v-if="categoriaSugerida" size="x-small" color="info" variant="tonal" class="ml-1">
+                Sugerido
+              </v-chip>
+            </p>
             <ExpenseCategorySelector
               v-model="formData.expense_category_id"
               :client-id="currentUser?.client?.id"
               :rules="[v => !!v || 'La categoría es requerida']"
+              @category-selected="categoriaSugerida = false"
             />
           </v-col>
           <v-col cols="12" v-else>
@@ -430,12 +459,17 @@
 
           <!-- Categoría del Gasto -->
           <v-col cols="12" sm="6" v-if="formData.flow === 'COMPRA' && formData.expense_type === 'GASTO'">
+            <div class="d-flex align-center ga-1 mb-1">
+              <span class="text-caption text-medium-emphasis">Categoría del Gasto</span>
+              <v-chip v-if="categoriaSugerida" size="x-small" color="info" variant="tonal">Sugerido</v-chip>
+            </div>
             <ExpenseCategorySelector
               v-model="formData.expense_category_id"
               :client-id="currentUser?.client?.id"
               label="Categoría del Gasto"
               class="mb-2"
               :rules="[v => !!v || 'La categoría es requerida']"
+              @category-selected="categoriaSugerida = false"
             />
           </v-col>
 
@@ -622,7 +656,20 @@
         <v-row dense>
           <!-- COMPRA: Selector de Proveedor -->
           <v-col cols="12" v-if="formData.flow === 'COMPRA'">
+            <div v-if="mostrarProveedorPendienteOcr" class="sif-proveedor-pendiente" data-testid="proveedor-pendiente-ocr-detalle">
+              <v-icon color="primary" size="22">mdi-domain-plus</v-icon>
+              <div class="flex-grow-1">
+                <div class="font-weight-medium">{{ proveedorPendienteOcr.nombre }}</div>
+                <v-chip size="x-small" color="primary" variant="tonal" class="mt-1">
+                  Nuevo proveedor — se guardará al registrar
+                </v-chip>
+              </div>
+              <v-btn size="small" variant="text" color="primary" @click="cancelarProveedorPendienteOcr">
+                Buscar otro
+              </v-btn>
+            </div>
             <ProveedorAutocomplete
+              v-else
               ref="proveedorAutocomplete"
               v-model="proveedor"
               @add-new="showProveedorModal = true"
@@ -1417,10 +1464,15 @@ import BotonAccion from '@/components/ui/BotonAccion.vue';
 import PasoGuiado from '@/components/ui/PasoGuiado.vue';
 import TarjetaAccion from '@/components/ui/TarjetaAccion.vue';
 import AyudaTermino from '@/components/ui/AyudaTermino.vue';
+import AvisoAmable from '@/components/ui/AvisoAmable.vue';
 import EnvolturaDetallesContables from './EnvolturaDetallesContables.vue';
 import { hoyISO } from '@/utils/fechas';
 import GLOSARIO from '@/constants/glosario.js';
 import retentionPdfService from '@/services/retention-pdf-service.js';
+import { normalizarRif, tipoPersonaPorLetra } from '@/utils/rif.js';
+import { decidirMatchProveedor, construirProveedorPendiente } from '@/utils/matchProveedorOcr.js';
+import { sugerirCategoria, resolverCategoriaPorNombre } from '@/utils/sugerirCategoria.js';
+import expenseCategoryService from '@/services/expenseCategoryService.js';
 
 export function normalizeDateToYMD(dateInput) {
   if (!dateInput) return '';
@@ -1452,7 +1504,7 @@ export default {
     AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete,
     ExpenseCategorySelector, ProveedorAutocomplete, ProveedorModalForm,
     RetentionSummaryCard, RetentionAdjustSheet, NumericInput,
-    BotonAccion, PasoGuiado, TarjetaAccion, AyudaTermino
+    BotonAccion, PasoGuiado, TarjetaAccion, AyudaTermino, AvisoAmable
   },
 
   props: {
@@ -1524,6 +1576,15 @@ export default {
       proveedorInitialData: null,
       showAdjustSheet: false,
       loadingRetentionConfig: false,
+
+      // Categoría de gasto sugerida automáticamente a partir del OCR (Tarea C,
+      // punto 2). Se limpia en cuanto el usuario toca el selector a mano.
+      // Solo se prellena con confianza ALTA (historial del proveedor o
+      // palabra clave fuerte). Con confianza MEDIA se deja en
+      // `categoriaSugerenciaPendiente` y se muestra un chip "¿Es «X»?" que
+      // el usuario debe tocar para aceptarla (I9).
+      categoriaSugerida: false,
+      categoriaSugerenciaPendiente: null,
 
       // Números de comprobante de retención — edición manual
       editarComprobanteIva: false,
@@ -1652,6 +1713,17 @@ export default {
         this.formData.flow === 'VENTA' ||
         (this.formData.flow === 'COMPRA' && this.formData.expense_type === 'COMPRA')
       );
+    },
+
+    // Tarea C (OCR), punto 1: el OCR leyó un proveedor (RIF/nombre) que no
+    // está en el directorio del cliente. En vez del autocompletar normal se
+    // muestra su nombre con una marca "Nuevo proveedor"; se crea de verdad
+    // recién al guardar (ver registroService.guardarRegistro).
+    proveedorPendienteOcr() {
+      return this.formData?.issuer?._proveedorPendiente || null;
+    },
+    mostrarProveedorPendienteOcr() {
+      return this.formData.flow === 'COMPRA' && !this.proveedor && !!this.proveedorPendienteOcr;
     },
 
     // Datos del la contraparte (cliente o proveedor) según el flujo
@@ -1825,8 +1897,15 @@ export default {
         // C7: cambiar de proveedor invalida cualquier confirmación previa de municipio distinto
         this.municipalMismatchConfirmed = false;
         this.municipalMismatch = { detected: false, tenantNombre: '', issuerNombre: '' };
+        // Si había un proveedor "nuevo" pendiente de crear (OCR sin match), al
+        // elegir uno real (o volver a vaciar el campo) ya no aplica.
+        if (this.formData.issuer) delete this.formData.issuer._proveedorPendiente;
 
         if (!nuevoProveedor) {
+          // I3: al vaciar el campo, limpiar también issuer.id — si no, un
+          // escaneo posterior de OTRO proveedor (sin match) deja el id del
+          // proveedor anterior, y la compra se enlaza mal.
+          if (this.formData.issuer) this.formData.issuer.id = '';
           this.retentionConfig = { aplicarIva: false, porcentajeIva: 75, aplicarIslr: false, conceptoIslr: null, tipoPersona: 'JURIDICA', aplicarMunicipal: false, porcentajeMunicipal: 0 };
           this.calcularRetenciones();
           return;
@@ -2287,6 +2366,8 @@ export default {
       this.simpleHuboRetencion = false;
       this.simpleSuccess = false;
       this.simpleStep = 1;
+      this.categoriaSugerida = false;
+      this.categoriaSugerenciaPendiente = null;
       this.fetchExchangeRate(this.formData.issueDate);
     },
     // Datos de la empresa del cliente para los PDF de comprobante — mismo
@@ -2334,6 +2415,11 @@ export default {
 
     // ── Selección de flujo ────────────────────────────────────────────────────
     selectFlow(opt) {
+      // I3: cambiar de flujo (Gasté ↔ Vendí) descarta cualquier proveedor
+      // pendiente de un escaneo anterior — en VENTA el campo `issuer` pasa a
+      // ser "yo" (el emisor), no tiene sentido arrastrar ahí un proveedor
+      // que se iba a crear para una COMPRA.
+      if (this.formData.issuer) delete this.formData.issuer._proveedorPendiente;
       this.formData.flow        = opt.value;
       this.formData.expense_type = opt.expenseType;
       this.showFlowError = false;
@@ -2631,9 +2717,34 @@ export default {
         : this.formData.issueDate;
     },
 
+    // C2: valores por defecto de retención para un proveedor pendiente del
+    // OCR (aún no existe en el directorio, se crea recién al guardar). La
+    // decisión del orquestador: IVA 75% (el porcentaje legal por defecto,
+    // igual que cualquier proveedor creado con el botón "Nuevo"), tipo de
+    // persona deducido de la letra del RIF, y sin concepto ISLR salvo que la
+    // persona lo elija a mano. El proveedor se crea después con estos
+    // mismos valores (ver registroService.resolverProveedorPendiente).
+    _configRetencionPorDefectoPendiente(pendiente) {
+      return {
+        aplicarIva: true, porcentajeIva: 75, baseIva: 0,
+        aplicarIslr: false, conceptoIslr: null, baseIslr: 0, conceptoIslrNombre: '',
+        tipoPersona: tipoPersonaPorLetra(normalizarRif(pendiente?.rif)),
+        aplicarMunicipal: false, porcentajeMunicipal: 0, baseMunicipal: 0,
+        concepto_municipal_id: null, conceptoMunicipalNombre: ''
+      };
+    },
+
     // ── Retenciones ───────────────────────────────────────────────────────────
     async calcularRetenciones() {
-      if (this.formData.flow !== 'COMPRA' || !this.proveedor) {
+      // C2: con un proveedor pendiente del OCR (sin match en el directorio),
+      // calculamos la retención igual que con un proveedor existente, con
+      // valores por defecto — antes `calcularRetenciones` solo miraba
+      // `this.proveedor` (null en este caso) y ponía todo en 0 sin avisar,
+      // así que la compra se guardaba sin retención ni comprobante.
+      const pendiente = this.proveedorPendienteOcr;
+      const usaPendiente = this.formData.flow === 'COMPRA' && !this.proveedor && !!pendiente;
+
+      if (this.formData.flow !== 'COMPRA' || (!this.proveedor && !usaPendiente)) {
         this.retencionesResult = null;
         this.formData.financial.ivaRetention = 0;
         this.formData.financial.islrRetention = 0;
@@ -2643,8 +2754,8 @@ export default {
         this.formData.financial.municipalRetentionNumber = '';
         return;
       }
-      
-      const config = this.retentionConfig;
+
+      const config = usaPendiente ? this._configRetencionPorDefectoPendiente(pendiente) : this.retentionConfig;
       const amount = parseFloat(this.formData.financial.taxableSales) || 0;
       const tax = parseFloat(this.formData.financial.taxDebit) || 0;
       
@@ -2866,6 +2977,12 @@ export default {
       this.extracting = true;
       this.ocrResult  = null;
       this.aiFieldsStatus = {}; // Resetear estado visual de IA
+      // M8: un escaneo nuevo siempre empieza limpio. Si el escaneo anterior
+      // dejó un proveedor pendiente sin resolver (el usuario volvió a
+      // escanear sin guardar), no debe arrastrarse al nuevo documento.
+      if (this.formData.issuer) delete this.formData.issuer._proveedorPendiente;
+      this.categoriaSugerida = false;
+      this.categoriaSugerenciaPendiente = null;
 
       try {
         const userContext = {
@@ -3098,13 +3215,20 @@ export default {
               if (match) {
                 matchedCount++;
                 console.log(`✅ [OCR Match] "${baseItem.description}" → ${match.name} (ID: ${match.id})`);
+                // I6: en VENTA no se reemplaza el precio leído de la factura
+                // por el del inventario (eso descuadraba base/IVA/total,
+                // porque calculateFromItems() sumaba el precio nuevo pero el
+                // resto de los montos financieros seguían siendo los del
+                // OCR). En COMPRA sí usamos el costo del inventario como
+                // antes, porque ahí no hay base/IVA ya calculados por ítem.
+                const precioAplicado = isPurchase ? (match.cost_price || price) : price;
                 foundMatch = {
                   ...baseItem,
                   code:        match.code || it.code || null,
                   description: match.name,
                   unit:        match.unit || it.unit || null,
-                  unitPrice:   isPurchase ? (match.cost_price || price) : (match.sale_price || price),
-                  total:       parseFloat((qty * (isPurchase ? (match.cost_price || price) : (match.sale_price || price))).toFixed(2)),
+                  unitPrice:   precioAplicado,
+                  total:       parseFloat((qty * precioAplicado).toFixed(2)),
                   product:     match,
                   product_id:  match.id
                 };
@@ -3118,50 +3242,39 @@ export default {
               continue;
             }
 
-            // ── 2. No existe: auto-crear en inventario (solo en COMPRA) ──
-            let createdMatch = null;
+            // ── 2. No existe: marcar para crear en inventario SOLO al guardar
+            // (I7). Antes se creaba aquí mismo con stock 0, así que escanear y
+            // cancelar (o volver a intentar) dejaba productos fantasma en el
+            // inventario. Ahora solo se deja la marca `_productoPendiente`
+            // (mismo patrón que el proveedor pendiente, I3); el producto real
+            // se crea en registroService.guardarRegistro, y nunca se guarda
+            // dentro de la factura.
+            let pendingMatch = null;
             if (isPurchase && baseItem.description) {
-              try {
-                console.log(`🆕 [OCR Auto-Create] Creando producto: "${baseItem.description}" (${price} ${itemCur})`);
-
-                const nativePrice = parseFloat(price);
-                let autoCode = it.code || null;
-                if (!autoCode) {
-                  try { autoCode = await inventoryService.getNextProductSku(); }
-                  catch { autoCode = `PROD-${Date.now().toString().slice(-5)}`; }
-                }
-
-                const newProduct = await inventoryService.createProduct({
+              const nativePrice = parseFloat(price) || 0;
+              pendingMatch = {
+                ...baseItem,
+                code:       it.code || null,
+                unit:       it.unit || 'UND',
+                product_id: null,
+                product:    null,
+                _productoPendiente: {
                   name:       baseItem.description,
-                  code:       autoCode,
-                  currency:   itemCur,          
-                  cost_price: nativePrice,       
-                  sale_price: parseFloat((nativePrice * 1.30).toFixed(2)), 
-                  stock:      0,                 
+                  code:       it.code || null,
+                  currency:   itemCur,
+                  cost_price: nativePrice,
+                  sale_price: parseFloat((nativePrice * 1.30).toFixed(2)),
+                  stock:      0,
                   unit:       it.unit || 'UND',
                   min_stock:  0,
                   status:     'ACTIVE'
-                });
-
-                const newId = newProduct?.data?.[0]?.id || newProduct?.id;
-                if (newId) {
-                  createdCount++;
-                  console.log(`✅ [OCR Auto-Create] Producto creado: ${baseItem.description} → ID ${newId} (SKU: ${autoCode})`);
-                  createdMatch = {
-                    ...baseItem,
-                    code:       autoCode,
-                    unit:       it.unit || 'UND',
-                    product_id: newId,
-                    product:    { id: newId, name: baseItem.description, code: autoCode, currency: itemCur, cost_price: nativePrice, sale_price: parseFloat((nativePrice * 1.3).toFixed(2)) }
-                  };
                 }
-              } catch (createErr) {
-                console.error(`❌ [OCR Auto-Create] Error creando "${baseItem.description}":`, createErr);
-              }
+              };
+              createdCount++;
             }
 
-            if (createdMatch) {
-              mappedItems.push(createdMatch);
+            if (pendingMatch) {
+              mappedItems.push(pendingMatch);
             } else {
               // Fallback: ítem como texto libre si todo falla
               mappedItems.push(baseItem);
@@ -3170,7 +3283,24 @@ export default {
 
           this.formData.items = mappedItems;
           this.syncItemsInventoryMode(); // Asegurar isInventory según el flujo detectado
-          this.calculateFromItems();
+
+          // I6: si el OCR ya trajo la base imponible, los ítems son solo
+          // detalle — no se recalcula la base a partir de su suma (eso
+          // duplicaba los exentos y descuadraba base/IVA/total). Si la suma
+          // de los ítems no coincide con la base leída, se avisa en vez de
+          // corregirla en silencio.
+          const baseYaLeidaDelOcr = data.financial && data.financial.taxableAmount !== undefined;
+          this._avisoBaseItemsNoCoincide = false;
+          if (!baseYaLeidaDelOcr) {
+            this.calculateFromItems();
+          } else {
+            const sumaItems = mappedItems.reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0);
+            const baseOcr = parseFloat(this.formData.financial.taxableSales) || 0;
+            if (Math.abs(sumaItems - baseOcr) > 0.5) {
+              this._avisoBaseItemsNoCoincide = true;
+              console.warn(`[OCR] La suma de los ítems (${sumaItems.toFixed(2)}) no coincide con la base imponible leída (${baseOcr.toFixed(2)}).`);
+            }
+          }
 
           this._ocrMatchedCount = matchedCount;
           this._ocrCreatedCount = createdCount;
@@ -3186,6 +3316,13 @@ export default {
         if (data.notes) {
           this.formData.notes = data.notes;
           this.notesExpanded = true;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PASO 6.5: SUGERIR CATEGORÍA DE GASTO (Tarea C, punto 2)
+        // ═══════════════════════════════════════════════════════════════
+        if (this.formData.flow === 'COMPRA') {
+          await this.sugerirYPrellenarCategoria(data);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -3208,7 +3345,7 @@ export default {
               if (!data.items?.length) return 'No detectados';
               const parts = [`${data.items.length} detectado(s)`];
               if (this._ocrMatchedCount > 0) parts.push(`${this._ocrMatchedCount} vinculado(s)`);
-              if (this._ocrCreatedCount > 0) parts.push(`${this._ocrCreatedCount} creado(s) en inventario`);
+              if (this._ocrCreatedCount > 0) parts.push(`${this._ocrCreatedCount} nuevo(s) — se registran en inventario al guardar`);
               return parts.join(' · ');
             })()
           }
@@ -3224,15 +3361,36 @@ export default {
         const mc = this._ocrMatchedCount || 0;
         const cc = this._ocrCreatedCount || 0;
         if (mc > 0 && cc > 0) {
-          matchMsg = `✅ ${mc} producto(s) vinculados y ${cc} registrado(s) automáticamente en inventario.`;
+          matchMsg = `✅ ${mc} producto(s) vinculados y ${cc} nuevo(s) que se registrarán en inventario al guardar.`;
         } else if (cc > 0) {
-          matchMsg = `✅ ${cc} producto(s) registrado(s) automáticamente en inventario. ¡Verifica los precios!`;
+          matchMsg = `✅ ${cc} producto(s) nuevo(s) listos; se registrarán en inventario al guardar. ¡Verifica los precios!`;
         } else if (mc > 0) {
           matchMsg = `✅ ${mc} producto(s) vinculados al inventario correctamente.`;
         }
 
+        // M8: el aviso de "proveedor nuevo" (ver _ofrecerCrearProveedor) ya se
+        // mostró en su propio snackbar; si quedó pendiente, lo reforzamos acá
+        // para que no se pierda entre los demás mensajes del resumen.
+        if (this.formData.issuer?._proveedorPendiente) {
+          matchMsg += ` Proveedor "${this.formData.issuer._proveedorPendiente.nombre}" nuevo — se registrará al guardar.`;
+        }
+
         this.ocrResult = { success: true, summary };
-        this.showSnackbar(matchMsg, 'success');
+
+        // I6: la base imponible y la suma de los ítems no coinciden — avisar
+        // en vez de corregir en silencio (ver _avisoBaseItemsNoCoincide más
+        // arriba). No bloquea el guardado: el usuario puede corregir a mano.
+        // showSnackbar no encola mensajes (sobreescribe el anterior), así
+        // que este aviso va en el MISMO snackbar que el resumen del OCR.
+        if (this._avisoBaseItemsNoCoincide) {
+          this.showSnackbar(
+            `${matchMsg} ⚠️ La suma de los productos no coincide con la base imponible de la factura: revisa los montos antes de guardar.`,
+            'warning',
+            9000
+          );
+        } else {
+          this.showSnackbar(matchMsg, 'success');
+        }
 
       } catch (err) {
         console.error('❌ [OCR] Error:', err);
@@ -3397,15 +3555,6 @@ export default {
     async matchProveedorFromOcr(issuerData) {
       if (!issuerData) return;
 
-      // Utilidades de normalización
-      const normalizeRif = (rif) => String(rif || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-      const normalizeName = (name) => String(name || '').toLowerCase().trim();
-
-      const ocrRif = normalizeRif(issuerData.rif);
-      const ocrName = normalizeName(issuerData.companyName);
-
-      console.log('[OCR] Iniciando matching de proveedor - RIF:', ocrRif, 'Nombre:', ocrName);
-
       // Esperar a que Vue renderice el ProveedorAutocomplete (tiene v-if="COMPRA")
       // El PASO 1 acaba de cambiar el flow, el componente aún no está en el DOM
       await this.$nextTick();
@@ -3437,35 +3586,11 @@ export default {
 
       console.log('[OCR] Proveedores disponibles para matching:', proveedores.length);
 
-      if (proveedores.length === 0) {
-        console.log('[OCR] No hay proveedores en el directorio para matching');
-        this._ofrecerCrearProveedor(issuerData);
-        return;
-      }
-
-      let matched = null;
-      let confidence = 'none';
-
-      // NIVEL 1: Match exacto por RIF (máxima confianza)
-      if (ocrRif && ocrRif.length >= 6) {
-        matched = proveedores.find(p => normalizeRif(p.rif) === ocrRif);
-        if (matched) confidence = 'exact-rif';
-      }
-
-      // NIVEL 2: Match por nombre exacto normalizado
-      if (!matched && ocrName && ocrName.length >= 3) {
-        matched = proveedores.find(p => normalizeName(p.nombre) === ocrName);
-        if (matched) confidence = 'exact-name';
-      }
-
-      // NIVEL 3: Match parcial por nombre (substring)
-      if (!matched && ocrName && ocrName.length >= 5) {
-        matched = proveedores.find(p => {
-          const pName = normalizeName(p.nombre);
-          return pName.includes(ocrName) || ocrName.includes(pName);
-        });
-        if (matched) confidence = 'partial-name';
-      }
+      // La DECISIÓN (match exacto por RIF / nombre / parcial, o pendiente) es
+      // una función pura compartida y probada de verdad en
+      // src/utils/__tests__/matchProveedorOcr.test.js (M10, ola F2b) — aquí
+      // solo quedan los efectos: cargar la lista y aplicar el resultado.
+      const { matched, confidence, pendiente } = decidirMatchProveedor(issuerData, proveedores);
 
       if (matched) {
         // Vincular proveedor encontrado (dispara el watcher que carga retenciones)
@@ -3476,25 +3601,38 @@ export default {
         this.showSnackbar(label, 'success');
         console.log(`[OCR] Proveedor vinculado (${confidence}):`, matched.nombre, matched.rif);
       } else {
-        // No hay match: ofrecer crear nuevo proveedor con datos del EMISOR (issuer)
-        console.log('[OCR] Sin match. RIF buscado:', ocrRif, '| Nombre buscado:', ocrName);
-        this._ofrecerCrearProveedor(issuerData);
+        console.log('[OCR] Sin match para el proveedor leído:', issuerData);
+        this._ofrecerCrearProveedor(issuerData, pendiente);
       }
     },
 
     /**
-     * Ofrece al usuario crear un nuevo proveedor pre-rellenando el formulario
-     * con los datos del EMISOR (issuer) extraídos por OCR.
+     * El OCR trajo un proveedor (RIF/nombre) que no está en el directorio del
+     * cliente. Tarea C (OCR), punto 1:
+     * - Si el RIF se pudo reconocer, prellena "¿A quién le pagaste?" con el
+     *   nombre leído y una marca "Nuevo proveedor — se guardará al registrar"
+     *   (`formData.issuer._proveedorPendiente`). El proveedor real recién se
+     *   crea al guardar (ver registroService.guardarRegistro) — nada se crea
+     *   si el usuario cancela.
+     * - Si no hay RIF reconocible, no podemos crear el proveedor (es un campo
+     *   obligatorio), así que solo dejamos los datos listos para el botón
+     *   "Nuevo" y avisamos al usuario.
      *
      * NUNCA usa data.client (que es el usuario/comprador).
      *
-     * @param {Object} issuerData - Datos del emisor del OCR: { companyName, rif, address, phone }
+     * @param {Object} issuerData - Datos del emisor del OCR: { companyName, rif, address, phone, email }
+     * @param {{nombre:string, rif:string, direccion:string, telefono:string, email:string}|null} pendiente
+     *   Ya construido por la función pura `construirProveedorPendiente`
+     *   (src/utils/matchProveedorOcr.js), o `null` si el RIF no se pudo
+     *   reconocer (no se puede autocrear sin RIF).
      */
-    _ofrecerCrearProveedor(issuerData) {
-      // Guardar datos del EMISOR (proveedor) para pre-rellenar el modal
+    _ofrecerCrearProveedor(issuerData, pendiente = null) {
+      const rifNormalizado = pendiente?.rif || null;
+
+      // Guardar datos del EMISOR (proveedor) para pre-rellenar el modal "Nuevo"
       this.proveedorInitialData = {
         nombre: issuerData.companyName || '',
-        rif: issuerData.rif || '',
+        rif: rifNormalizado || issuerData.rif || '',
         direccion: issuerData.address || '',
         telefono: issuerData.phone || '',
         email: issuerData.email || ''
@@ -3502,11 +3640,137 @@ export default {
 
       console.log('[OCR] Proveedor no encontrado en directorio. Datos del EMISOR para pre-rellenar:', this.proveedorInitialData);
 
-      this.showSnackbar(
-        `Proveedor "${issuerData.companyName || 'desconocido'}" no está en tu directorio. Haz clic en "Nuevo" para registrarlo.`,
-        'warning',
-        8000
-      );
+      // I3: si quedaba un issuer.id de un proveedor elegido antes (el usuario
+      // lo vació o escaneó un documento de otro proveedor), hay que limpiarlo
+      // ya — si no, registroService ve un issuer.id "viejo" y nunca crea el
+      // proveedor nuevo, y la compra queda enlazada al proveedor equivocado.
+      if (this.formData.issuer) this.formData.issuer.id = '';
+
+      if (pendiente) {
+        this.formData.issuer._proveedorPendiente = pendiente;
+        this.showSnackbar(
+          `"${issuerData.companyName}" no estaba en tu directorio: lo registraremos como proveedor nuevo al guardar.`,
+          'info',
+          6000
+        );
+        // C2: calcular la retención con los valores por defecto del
+        // proveedor pendiente, igual que con uno ya existente (si no, la
+        // vista previa se queda en 0 hasta que el usuario toque algún otro
+        // campo, y un cliente agente de retención podría guardar sin darse
+        // cuenta de que faltaba el comprobante).
+        this.calcularRetenciones();
+      } else {
+        this.showSnackbar(
+          `Proveedor "${issuerData.companyName || 'desconocido'}" no está en tu directorio. Haz clic en "Nuevo" para registrarlo.`,
+          'warning',
+          8000
+        );
+      }
+    },
+
+    // Tarea C (OCR): el usuario prefiere buscar un proveedor distinto al que
+    // sugirió el OCR. Cancela el "nuevo proveedor" pendiente (no se crea
+    // nada) y vuelve a mostrar el buscador normal.
+    cancelarProveedorPendienteOcr() {
+      if (this.formData.issuer) delete this.formData.issuer._proveedorPendiente;
+    },
+
+    /**
+     * Tarea C (OCR), punto 2: sugiere y prellena la categoría de gasto a
+     * partir de lo que leyó el OCR, usando la función pura
+     * `sugerirCategoria` (src/utils/sugerirCategoria.js). Solo prellena el
+     * campo cuando la categoría sugerida existe de verdad entre las
+     * categorías del cliente (nunca crea una categoría nueva sola); el
+     * usuario siempre puede cambiarla (chip "Sugerido").
+     * @param {Object} data - Respuesta cruda del OCR (procesarComprobanteOCR).
+     */
+    async sugerirYPrellenarCategoria(data) {
+      try {
+        const clientId = this.currentUser?.client?.id;
+
+        const proveedorInfo = this.proveedor
+          ? { nombre: this.proveedor.nombre, rif: this.proveedor.rif }
+          : (this.formData.issuer?._proveedorPendiente || (data.issuer ? { nombre: data.issuer.companyName, rif: data.issuer.rif } : null));
+
+        const textoOcr = [data.notes, data.expenseCategoryHint].filter(Boolean).join(' ');
+        const historial = await this._obtenerHistorialCategoriasProveedor(clientId);
+
+        const sugerencia = sugerirCategoria({
+          proveedor: proveedorInfo,
+          items: this.formData.items,
+          textoOcr,
+          historial,
+          categoriaIA: data.expenseCategoryHint || null
+        });
+
+        if (!sugerencia.categoria) return;
+
+        const categoriaEncontrada = await this._buscarCategoriaPorNombre(sugerencia.categoria, clientId);
+        if (!categoriaEncontrada) {
+          console.log('[OCR] Categoría sugerida pero no existe en el directorio del cliente:', sugerencia.categoria);
+          return;
+        }
+
+        // I9: confianza ALTA (historial del proveedor, 0.9+) se prellena
+        // directo. Confianza MEDIA (palabra clave o pista de la IA) solo se
+        // ofrece como chip "¿Es «X»?" que el usuario debe tocar para
+        // aceptarla; nunca se prellena sola.
+        if (sugerencia.confianza >= 0.9) {
+          this.formData.expense_category_id = categoriaEncontrada.id;
+          this.categoriaSugerida = true;
+          this.categoriaSugerenciaPendiente = null;
+          console.log('[OCR] Categoría sugerida (alta confianza):', sugerencia.motivo, '→', categoriaEncontrada.name);
+        } else {
+          this.categoriaSugerenciaPendiente = { id: categoriaEncontrada.id, nombre: categoriaEncontrada.name };
+          console.log('[OCR] Categoría sugerida (confianza media, pendiente de confirmar):', sugerencia.motivo, '→', categoriaEncontrada.name);
+        }
+      } catch (err) {
+        // Nunca bloquear el flujo de OCR por un problema al sugerir categoría
+        console.warn('[OCR] No se pudo sugerir categoría:', err);
+      }
+    },
+
+    /**
+     * Historial de facturas de COMPRA del cliente con su categoría, para que
+     * `sugerirCategoria` pueda aplicar la regla (a): "última categoría usada
+     * con este proveedor". Nunca lanza (si falla, se sugiere sin historial).
+     * @param {string} clientId
+     * @returns {Promise<Array>}
+     */
+    async _obtenerHistorialCategoriasProveedor(clientId) {
+      try {
+        // M9: consulta ligera y con client_id OBLIGATORIO (si no se resolvió,
+        // getHistorialCategoriasCompras devuelve [] en vez de traer compras
+        // de otros clientes de la organización). Antes usaba getInvoices,
+        // que trae TODAS las columnas (items, attachments, financial...) de
+        // TODAS las compras del cliente en cada escaneo.
+        return await invoiceService.getHistorialCategoriasCompras({ clientId });
+      } catch (err) {
+        console.warn('[OCR] No se pudo cargar el historial de categorías:', err);
+        return [];
+      }
+    },
+
+    /**
+     * Busca, entre las categorías reales del cliente, una cuyo nombre
+     * coincida (exacto o parcial, sin tildes) con la categoría sugerida.
+     * Nunca crea una categoría nueva: si no existe, el campo se deja vacío
+     * para que el usuario la elija o la cree a mano.
+     * @param {string} nombreSugerido
+     * @param {string} clientId
+     * @returns {Promise<Object|null>}
+     */
+    async _buscarCategoriaPorNombre(nombreSugerido, clientId) {
+      try {
+        const categorias = await expenseCategoryService.getCategories({ clientId });
+        // I9: la comparación (solo nombre EXACTO normalizado, sin tildes ni
+        // mayúsculas, nunca una coincidencia parcial) es una función pura
+        // compartida y probada de verdad (src/utils/sugerirCategoria.js).
+        return resolverCategoriaPorNombre(nombreSugerido, categorias);
+      } catch (err) {
+        console.warn('[OCR] No se pudo cargar las categorías del cliente:', err);
+        return null;
+      }
     },
 
     // ── Snackbar ──────────────────────────────────────────────────────────────
@@ -3525,12 +3789,25 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
+  max-height: 100%;
+  min-height: 0;
 }
 
-/* v-card-text: Vuetify agrega overflow-y:auto automáticamente cuando scrollable=true en el dialog */
+/* El <v-form> va entre la card y su contenido, así que el overflow automático de
+   Vuetify (que exige .v-card > .v-card-text directo) no aplicaba: en el teléfono el
+   formulario medía ~2500px y "Cancelar" quedaba fuera de alcance (E2E 2026-10-14).
+   El form es una columna flexible; solo .sif-body hace scroll; cabecera y pie fijos. */
+.sif-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .sif-body {
-  flex: 1;
-  /* NO establecer max-height aquí — lo maneja Vuetify con scrollable */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .sif-header { background: #fafafa; white-space: normal; }
@@ -3566,6 +3843,17 @@ export default {
   letter-spacing: 0.06em;
   color: #9e9e9e;
   margin-bottom: 12px;
+}
+
+/* ─── Proveedor nuevo sugerido por OCR (Tarea C) ──────────── */
+.sif-proveedor-pendiente {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f3f4ff;
+  border: 1px dashed #5c6bc0;
 }
 
 /* ─── OCR Banner ─────────────────────────────────────────── */

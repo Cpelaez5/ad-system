@@ -15,7 +15,7 @@ html, body {
      favicons oficiales — ver docs/mvp/diseno/sistema-diseno.md. */
   --color-primary: #8E1818;
   /* Granate AD System (marca) */
-  --color-secondary: #1F355C;
+  --color-secondary: #2A2A2E;
   /* Azul de apoyo (contraste AA ya verificado) */
   --color-accent: #E0B04F;
   /* Dorado de apoyo — solo fondo/ícono/borde, nunca texto sobre blanco */
@@ -25,7 +25,7 @@ html, body {
   /* Variante oscura oficial del logo — estado presionado/activo */
   --color-error: #D32F2F;
   /* Rojo de error: distinto del granate de marca (ver sistema-diseno.md) */
-  --color-info: #1F355C;
+  --color-info: #2A2A2E;
   /* Azul oscuro para información */
   --color-success: #2E7D32;
   /* Verde oscurecido: el verde Material estándar no pasa AA con texto blanco */
@@ -45,7 +45,7 @@ html, body {
   /* Colores de texto */
   --text-primary: #000000;
   /* Negro */
-  --text-secondary: #1F355C;
+  --text-secondary: #2A2A2E;
   /* Azul oscuro */
   --text-disabled: #999999;
   /* Gris */

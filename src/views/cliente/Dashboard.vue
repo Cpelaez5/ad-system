@@ -368,6 +368,10 @@ export default {
   },
 
   async mounted() {
+
+    // Primeros pasos del Inicio: ya conoce «¿Cómo voy?»
+
+    try { localStorage.setItem('ad_visto_como_voy', '1') } catch { /* sin almacenamiento: no pasa nada */ }
     await this.cargarDatos()
   },
 }

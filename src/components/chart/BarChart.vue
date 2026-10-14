@@ -143,7 +143,7 @@ export default {
             labels: {
               usePointStyle: true,
               padding: 20,
-              font: { family: 'Poppins, sans-serif', size: 12 }
+              font: { family: 'Montserrat, sans-serif', size: 12 }
             }
           },
           tooltip: {
@@ -159,12 +159,12 @@ export default {
         scales: {
           x: {
             grid: { display: false },
-            ticks: { font: { family: 'Poppins, sans-serif', size: 11 }, color: '#010101' }
+            ticks: { font: { family: 'Montserrat, sans-serif', size: 11 }, color: '#010101' }
           },
           y: {
             beginAtZero: true,
             grid: { color: 'rgba(237, 237, 237, 0.5)', drawBorder: false },
-            ticks: { font: { family: 'Poppins, sans-serif', size: 11 }, color: '#010101' }
+            ticks: { font: { family: 'Montserrat, sans-serif', size: 11 }, color: '#010101' }
           }
         },
         animation: { duration: 800, easing: 'easeOutCubic' }

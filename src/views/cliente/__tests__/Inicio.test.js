@@ -29,6 +29,9 @@ vi.mock('@/services/billingService', () => ({
 vi.mock('@/services/bcvService', () => ({
   default: { getCurrentRate: (...args) => mockGetCurrentRate(...args) },
 }))
+vi.mock('@/services/seal-service', () => ({
+  default: { getSealConfig: () => Promise.resolve({ sealUrl: null, signatureUrl: null }) },
+}))
 vi.mock('@/services/registroService', () => ({
   guardarRegistro: (...args) => mockGuardarRegistro(...args),
 }))
@@ -115,13 +118,26 @@ describe('Inicio.vue — pantalla de inicio del cliente', () => {
     expect(texto).toContain(formatMoney(420, 'USD'))
   })
 
-  it('muestra el estado vacío "Todo al día" cuando no hay pendientes', async () => {
+  it('sin pendientes y con datos del negocio incompletos, el siguiente paso es completarlos', async () => {
     const { wrapper } = montarInicio()
     await flushPromises()
 
-    const estadoVacio = wrapper.findComponent({ name: 'EstadoVacio' })
-    expect(estadoVacio.exists()).toBe(true)
-    expect(estadoVacio.props('titulo')).toBe('Todo al día')
+    const panel = wrapper.findComponent({ name: 'PanelSiguientePaso' })
+    expect(panel.exists()).toBe(true)
+    expect(panel.props('listo')).toBe(false)
+    expect(panel.props('titulo')).toBe('Completa los datos de tu negocio')
+  })
+
+  it('muestra "Primeros pasos" con avance calculado de los datos reales', async () => {
+    const { wrapper } = montarInicio()
+    await flushPromises()
+
+    const lista = wrapper.findComponent({ name: 'ListaPasos' })
+    expect(lista.exists()).toBe(true)
+    const pasos = lista.props('pasos')
+    expect(pasos.map(p => p.clave)).toEqual(['perfil', 'gasto', 'venta', 'rif', 'sello', 'comovoy'])
+    expect(pasos.find(p => p.clave === 'perfil').hecho).toBe(false)
+    expect(pasos.find(p => p.clave === 'sello').hecho).toBe(false)
   })
 
   it('abre el diálogo de registro en modo COMPRA al tocar "Gasté o compré algo"', async () => {

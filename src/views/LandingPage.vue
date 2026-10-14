@@ -118,7 +118,7 @@ export default {
   background-color: #f8f9fa;
   position: relative;
   overflow: hidden;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   color: #333;
 }
 

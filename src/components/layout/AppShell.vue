@@ -5,11 +5,20 @@
     style="z-index: 900 !important;"
   />
 
+  <!-- El menú va ANTES que la barra superior: Vuetify reparte el layout en orden de
+       registro, así el menú ocupa todo el alto en escritorio y la barra queda a su derecha. -->
+  <MenuLateral
+    v-model="drawerOpen"
+    :role="currentUser?.role"
+    :is-services-company="isServicesCompany"
+    :modo="modoMenu"
+    @cambiar-modo="cambiarModoMenu"
+    @logout="logout"
+  />
+
   <BarraSuperior
     :titulo-pagina="tituloPagina"
     :mostrar-menu="mostrarBotonMenu"
-    :mostrar-boton-rail="mostrarBotonRail"
-    :rail-collapsed="railCollapsed"
     :bcv-rate="bcvRate"
     :bcv-loading="bcvLoading"
     :bcv-error="bcvError"
@@ -22,16 +31,7 @@
     :user-plan="userPlan"
     :is-client-profile-incomplete="isClientProfileIncomplete"
     @toggle-drawer="drawerOpen = !drawerOpen"
-    @toggle-rail="toggleRail"
     @refresh-bcv="refreshBCVRate"
-  />
-
-  <MenuLateral
-    v-model="drawerOpen"
-    :role="currentUser?.role"
-    :is-services-company="isServicesCompany"
-    :collapsed="railCollapsed"
-    @logout="logout"
   />
 
   <!-- Barra inferior del cliente en móvil (<600px); no renderiza nada en
@@ -56,7 +56,9 @@ import MenuLateral from './MenuLateral.vue';
 import ClienteBottomNav from './ClienteBottomNav.vue';
 import TrialBanner from './TrialBanner.vue';
 
-const RAIL_STORAGE_KEY = 'ad_system_sidebar_rail_collapsed';
+const MENU_MODO_KEY = 'ad_system_menu_modo';
+// Clave anterior (rail sí/no): se respeta al migrar para no cambiarle el menú a nadie.
+const RAIL_STORAGE_KEY_ANTERIOR = 'ad_system_sidebar_rail_collapsed';
 
 /**
  * AppShell — armazón de la app (sustituye a AppNavigation.vue + Sidebar.vue).
@@ -69,8 +71,9 @@ const RAIL_STORAGE_KEY = 'ad_system_sidebar_rail_collapsed';
  * Breakpoints (unificados para todos los roles):
  *  - <600px (xs) + rol `cliente`: sin drawer ni botón de menú — manda la barra inferior.
  *  - <1280px (resto): drawer temporary, abierto con el botón de menú del app bar.
- *  - ≥1280px: drawer permanent que empuja el contenido; modo rail plegable con
- *    preferencia persistida en localStorage (clave `ad_system_sidebar_rail_collapsed`).
+ *  - ≥1280px: drawer permanent a todo el alto, con modo 'fijo' (abierto) o 'auto'
+ *    (recogido, se expande al pasar el mouse), elegido con el pin del propio menú y
+ *    persistido en localStorage (clave `ad_system_menu_modo`).
  */
 export default {
   name: 'AppShell',
@@ -83,7 +86,7 @@ export default {
     return {
       currentUser: this.getCurrentUserFromStorage(),
       drawerOpen: false,
-      railCollapsed: this.getStoredRailPreference(),
+      modoMenu: this.getModoMenuGuardado(),
       bcvRate: null,
       bcvLoading: false,
       bcvError: false,
@@ -115,12 +118,8 @@ export default {
       if (this.isCliente && this.isXs) return false;
       return !this.isLgUp;
     },
-    // El botón de plegar/desplegar (rail) solo existe cuando el drawer es permanent.
-    mostrarBotonRail() {
-      return this.isLgUp;
-    },
     sidebarExpanded() {
-      return this.isLgUp && !this.railCollapsed;
+      return this.isLgUp && this.modoMenu === 'fijo';
     },
     tituloPagina() {
       return this.$route?.meta?.title || 'Sistema Contable';
@@ -187,18 +186,20 @@ export default {
       }
     },
 
-    getStoredRailPreference() {
+    getModoMenuGuardado() {
       try {
-        return localStorage.getItem(RAIL_STORAGE_KEY) === '1';
+        const modo = localStorage.getItem(MENU_MODO_KEY);
+        if (modo === 'fijo' || modo === 'auto') return modo;
+        return localStorage.getItem(RAIL_STORAGE_KEY_ANTERIOR) === '1' ? 'auto' : 'fijo';
       } catch (error) {
-        return false;
+        return 'fijo';
       }
     },
 
-    toggleRail() {
-      this.railCollapsed = !this.railCollapsed;
+    cambiarModoMenu(modo) {
+      this.modoMenu = modo === 'auto' ? 'auto' : 'fijo';
       try {
-        localStorage.setItem(RAIL_STORAGE_KEY, this.railCollapsed ? '1' : '0');
+        localStorage.setItem(MENU_MODO_KEY, this.modoMenu);
       } catch (error) {
         // localStorage puede no estar disponible (modo privado, cuota llena...):
         // la preferencia simplemente no persiste entre sesiones.

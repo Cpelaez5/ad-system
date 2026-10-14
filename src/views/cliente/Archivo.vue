@@ -1,5 +1,10 @@
 <template>
   <v-container fluid class="pa-4 pa-md-6">
+    <EncabezadoPagina
+      titulo="Archivo"
+      subtitulo="Tus documentos y comprobantes en un solo lugar"
+    />
+
     <!-- Tarjetas de resumen -->
     <v-row class="mb-6">
       <v-col cols="12" sm="6" md="3">
@@ -178,7 +183,7 @@
         <!-- Navegación de carpetas -->
         <v-card>
           <v-card-title>
-            <v-icon left>mdi-folder-tree</v-icon>
+            <v-icon left>mdi-file-tree-outline</v-icon>
             Carpetas
           </v-card-title>
           <v-card-text>
@@ -206,7 +211,17 @@
             ({{ documentosFiltrados.length }})
           </v-card-title>
           
+          <EstadoVacio
+            v-if="!cargando && documentosFiltrados.length === 0"
+            icono="mdi-file-document-outline"
+            titulo="Todavía no tienes documentos"
+            mensaje="Sube tus facturas, comprobantes y contratos para tenerlos siempre a la mano."
+            texto-accion="Subir documentos"
+            @accion="abrirDialogoSubida"
+          />
+
           <v-data-table
+            v-else
             :headers="headers"
             :items="documentosFiltrados"
             :loading="cargando"
@@ -280,13 +295,13 @@
     </v-row>
 
     <!-- Diálogo para subir documentos -->
-    <v-dialog v-model="dialogoSubida" max-width="600px" :fullscreen="$vuetify.display.smAndDown">
-      <v-card>
-        <v-card-title>
-          <span class="text-h5">Subir Documentos</span>
-        </v-card-title>
-        
-        <v-card-text>
+    <DialogoAdaptable
+      v-model="dialogoSubida"
+      titulo="Subir documentos"
+      icono="mdi-upload"
+      max-width="600"
+      :cargando="subiendo"
+    >
           <v-form ref="formularioSubida" v-model="formularioValido">
             <v-row>
               <v-col cols="12">
@@ -327,39 +342,41 @@
               </v-col>
             </v-row>
           </v-form>
-        </v-card-text>
-        
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn
-            color="grey"
-            variant="text"
-            @click="cerrarDialogoSubida"
-          >
-            Cancelar
-          </v-btn>
-          <v-btn
-            color="primary"
-            :disabled="!formularioValido"
-            :loading="subiendo"
-            @click="subirDocumentos"
-          >
-            Subir Documentos
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+
+      <template #acciones>
+        <v-btn
+          color="grey"
+          variant="text"
+          :disabled="subiendo"
+          @click="cerrarDialogoSubida"
+        >
+          Cancelar
+        </v-btn>
+        <v-btn
+          color="primary"
+          variant="flat"
+          :disabled="!formularioValido"
+          :loading="subiendo"
+          @click="subirDocumentos"
+        >
+          Subir Documentos
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
   </v-container>
 </template>
 
 <script>
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import EstadoVacio from '@/components/ui/EstadoVacio.vue'
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import { supabase } from '@/lib/supabaseClient'
 import { obtenerUrlFirmada } from '@/services/storageUrlService.js'
 
 export default {
   name: 'ClienteArchivo',
-  components: { AnimatedNumber },
+  components: { AnimatedNumber, EncabezadoPagina, EstadoVacio, DialogoAdaptable },
   data() {
     return {
       busqueda: '',
@@ -712,7 +729,7 @@ export default {
         'PDF': 'mdi-file-pdf-box',
         'Excel': 'mdi-file-excel-box',
         'Word': 'mdi-file-word-box',
-        'Imagen': 'mdi-file-image-box',
+        'Imagen': 'mdi-file-image-outline',
         'Otro': 'mdi-file-document'
       }
       return iconos[tipo] || 'mdi-file-document'

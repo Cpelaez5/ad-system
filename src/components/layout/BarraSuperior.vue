@@ -3,17 +3,6 @@
     <!-- Tablet/móvil (no cliente en xs, que usa la barra inferior): abre el drawer temporal -->
     <v-app-bar-nav-icon v-if="mostrarMenu" aria-label="Abrir menú" @click="$emit('toggle-drawer')" />
 
-    <!-- Escritorio (≥1280px): plegar/desplegar el menú lateral (modo rail) -->
-    <v-btn
-      v-if="mostrarBotonRail"
-      icon
-      variant="text"
-      class="d-none d-lg-inline-flex"
-      :aria-label="railCollapsed ? 'Expandir menú' : 'Contraer menú'"
-      @click="$emit('toggle-rail')"
-    >
-      <v-icon>{{ railCollapsed ? 'mdi-menu' : 'mdi-menu-open' }}</v-icon>
-    </v-btn>
 
     <v-toolbar-title class="barra-superior__titulo">
       <transition name="titulo-fade" mode="out-in">
@@ -84,8 +73,8 @@ import MenuUsuario from './MenuUsuario.vue'
  * BarraSuperior — app bar del shell. En móvil (<600px) muestra solo el
  * título de la vista actual + el menú de usuario (sin tasas, que se mudan a
  * la hoja "Más"); en tablet/móvil no-cliente agrega el botón de menú para
- * el drawer temporal; en escritorio (≥1280px) agrega el botón para
- * plegar/desplegar el menú lateral en modo rail.
+ * el drawer temporal. En escritorio el modo del menú (fijo/recogido) se
+ * cambia con el pin del propio MenuLateral.
  */
 export default {
   name: 'BarraSuperior',
@@ -95,8 +84,6 @@ export default {
   props: {
     tituloPagina: { type: String, default: 'Sistema Contable' },
     mostrarMenu: { type: Boolean, default: false },
-    mostrarBotonRail: { type: Boolean, default: false },
-    railCollapsed: { type: Boolean, default: false },
     bcvRate: { type: Object, default: null },
     bcvLoading: { type: Boolean, default: false },
     bcvError: { type: Boolean, default: false },
@@ -110,7 +97,7 @@ export default {
     isClientProfileIncomplete: { type: Boolean, default: false },
   },
 
-  emits: ['toggle-drawer', 'toggle-rail', 'refresh-bcv'],
+  emits: ['toggle-drawer', 'refresh-bcv'],
 }
 </script>
 

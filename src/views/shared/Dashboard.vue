@@ -527,7 +527,7 @@ export default {
               usePointStyle: true,
               padding: 20,
               font: {
-                family: 'Poppins, sans-serif',
+                family: 'Montserrat, sans-serif',
                 size: 12
               }
             }
@@ -569,7 +569,7 @@ export default {
               usePointStyle: true,
               padding: 15,
               font: {
-                family: 'Poppins, sans-serif',
+                family: 'Montserrat, sans-serif',
                 size: 11
               }
             }

@@ -15,9 +15,6 @@ const SetPassword = () => import('@/views/auth/SetPassword.vue')
 const ClienteInicio = () => import('../views/cliente/Inicio.vue')
 const ClienteMiArea = () => import('../views/cliente/ClienteMiArea.vue')
 const ClienteDashboard = () => import('../views/cliente/Dashboard.vue')
-const ClienteCompras = () => import('../views/cliente/Compras.vue')
-const ClienteGastos = () => import('../views/cliente/Gastos.vue')
-const ClienteVentas = () => import('../views/cliente/Ventas.vue')
 const ClienteFacturacion = () => import('../views/cliente/Facturacion.vue')
 const Settings = () => import('../views/shared/Settings.vue')
 const MunicipalSettings = () => import('../views/shared/MunicipalSettings.vue')
@@ -84,7 +81,7 @@ const routes = [
     path: '/cliente/mi-area',
     name: 'ClienteMiArea',
     component: ClienteMiArea,
-    meta: { requiresAuth: true, title: 'Mi Área', roles: ['cliente'] }
+    meta: { requiresAuth: true, title: 'Mi negocio', roles: ['cliente'] }
   },
   {
     path: '/contador/area',
@@ -149,13 +146,13 @@ const routes = [
     path: '/cliente/dashboard',
     name: 'ClienteDashboard',
     component: ClienteDashboard,
-    meta: { requiresAuth: true, title: 'Dashboard', roles: ['cliente'] }
+    meta: { requiresAuth: true, title: '¿Cómo voy?', roles: ['cliente'] }
   },
   {
     path: '/cliente/facturacion',
     name: 'ClienteFacturacion',
     component: ClienteFacturacion,
-    meta: { requiresAuth: true, title: 'Facturación', roles: ['cliente'] }
+    meta: { requiresAuth: true, title: 'Mis movimientos', roles: ['cliente'] }
   },
   {
     path: '/cliente/compras',
@@ -176,13 +173,13 @@ const routes = [
     path: '/cliente/planes',
     name: 'ClientePlanes',
     component: () => import('../views/cliente/Planes.vue'),
-    meta: { requiresAuth: true, title: 'Planes y Suscripción', roles: ['cliente'] }
+    meta: { requiresAuth: true, title: 'Mi plan', roles: ['cliente'] }
   },
   {
     path: '/cliente/facturacion-suscripcion',
     name: 'ClienteFacturacionSuscripcion',
     component: () => import('../views/cliente/FacturacionSuscripcion.vue'),
-    meta: { requiresAuth: true, title: 'Facturación de Suscripción', roles: ['cliente'] }
+    meta: { requiresAuth: true, title: 'Pagos de mi plan', roles: ['cliente'] }
   },
   {
     path: '/cliente/checkout',
@@ -194,19 +191,19 @@ const routes = [
     path: '/cliente/fiscal-360',
     name: 'ClienteFiscal360',
     component: () => import('@/views/cliente/Fiscal360.vue'),
-    meta: { requiresAuth: true, title: 'Expediente Fiscal 360', roles: ['cliente'] }
+    meta: { requiresAuth: true, title: 'Mis papeles', roles: ['cliente'] }
   },
   {
     path: '/cliente/inventario',
     name: 'ClienteInventario',
     component: () => import('@/views/cliente/Inventario.vue'),
-    meta: { requiresAuth: true, title: 'Inventario de Mercancía', roles: ['cliente'] }
+    meta: { requiresAuth: true, title: 'Mi mercancía', roles: ['cliente'] }
   },
   {
     path: '/cliente/proveedores',
     name: 'ClienteProveedores',
     component: () => import('@/views/cliente/Proveedores.vue'),
-    meta: { requiresAuth: true, title: 'Directorio de Proveedores', roles: ['cliente'] }
+    meta: { requiresAuth: true, title: 'Mis proveedores', roles: ['cliente'] }
   },
   {
     path: '/clientes',

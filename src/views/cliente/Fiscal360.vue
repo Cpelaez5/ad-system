@@ -1,247 +1,155 @@
 <template>
-  <v-container fluid class="fill-height align-start pa-4 pa-md-6 bg-background">
-    
-    <!-- ═══════════════════════════════════════════════ -->
-    <!-- SKELETON LOADING                                -->
-    <!-- ═══════════════════════════════════════════════ -->
+  <div class="mis-papeles">
+    <!-- ═════════════ CARGANDO ═════════════ -->
     <template v-if="initialLoading">
-      <!-- Skeleton Header -->
-      <v-row no-gutters class="pb-2">
-        <v-col cols="12" md="8">
-          <v-skeleton-loader type="heading" width="300" class="mb-2" />
-          <v-skeleton-loader type="text" width="400" />
-        </v-col>
-        <v-col cols="12" md="4" class="d-flex align-center justify-start justify-md-end flex-wrap mt-4 mt-md-0">
-          <v-skeleton-loader type="button" width="150" class="mr-3" />
-          <v-skeleton-loader type="button" width="150" />
-        </v-col>
-      </v-row>
-
-      <!-- Skeleton Dashboard -->
-      <v-row class="mb-6">
-        <v-col cols="12" md="4" lg="3">
-          <v-skeleton-loader type="card" height="250" class="rounded-xl" />
-        </v-col>
-        <v-col cols="12" md="8" lg="9">
-          <v-row class="fill-height">
-            <v-col cols="6" sm="4" v-for="n in 3" :key="'f-sk-card-' + n">
-              <v-skeleton-loader type="card" height="120" class="rounded-xl" />
-            </v-col>
-            <v-col cols="12">
-              <v-skeleton-loader type="list-item-two-line" height="110" class="rounded-xl" />
-            </v-col>
-          </v-row>
-        </v-col>
-      </v-row>
-
-      <!-- Skeleton Content -->
+      <v-skeleton-loader type="heading, text" class="mb-6 bg-transparent" max-width="420" />
       <v-row>
-        <v-col cols="12">
-          <v-skeleton-loader type="table-thead, table-tbody" class="rounded-xl" />
-        </v-col>
+        <v-col cols="12" md="7"><v-skeleton-loader type="image" height="150" class="rounded-xl" /></v-col>
+        <v-col cols="12" md="5"><v-skeleton-loader type="image" height="150" class="rounded-xl" /></v-col>
       </v-row>
+      <v-skeleton-loader type="list-item-avatar-two-line@5" class="rounded-xl mt-6" />
     </template>
 
-    <!-- ═══════════════════════════════════════════════ -->
-    <!-- CONTENIDO PRINCIPAL                             -->
-    <!-- ═══════════════════════════════════════════════ -->
     <template v-else>
-      <!-- HEADER -->
-      <v-row no-gutters class="pb-2">
-        <v-col cols="12">
-          <div class="d-flex align-center flex-wrap" style="gap: 4px">
-            <h1 class="text-h4 font-weight-bold text-secondary mb-0">Mis papeles del negocio</h1>
-            <AyudaTermino clave="expediente_fiscal" />
-          </div>
-          <p class="text-body-1 text-grey-darken-2 mt-1 mb-0" style="max-width: 640px">
-            Aquí guardas los papeles de tu negocio y te avisamos antes de que se venzan.
-          </p>
-        </v-col>
-
-        <v-col cols="12" class="d-flex align-center flex-wrap mt-4" style="gap: 8px">
-          <v-btn
-            color="secondary"
-            prepend-icon="mdi-file-pdf-box"
-            variant="outlined"
-            rounded="lg"
-            :block="$vuetify.display.smAndDown"
-            @click="exportToPDF"
-            :loading="exporting"
-          >
-            <span class="d-none d-sm-inline mr-1">Exportar</span> Expediente
-          </v-btn>
-          <v-btn
-            color="primary"
-            prepend-icon="mdi-plus"
-            elevation="2"
-            class="text-none px-4"
-            rounded="lg"
-            :block="$vuetify.display.smAndDown"
-            @click="openDialog()"
-          >
-            Nuevo documento
-          </v-btn>
-        </v-col>
-      </v-row>
-
-      <!-- PROGRESO: "Tu negocio está al día: X de Y" -->
-      <v-card class="rounded-xl pa-4 mb-6 animate-section" style="animation-delay: 0.1s" variant="outlined">
-        <div class="d-flex align-center justify-space-between flex-wrap mb-2" style="gap: 8px">
-          <div class="d-flex align-center" style="gap: 8px">
-            <v-icon :color="progresoColor" icon="mdi-shield-check-outline" />
-            <span class="text-subtitle-1 font-weight-bold text-secondary">
-              Tu negocio está al día: {{ progresoAlDia.covered }} de {{ progresoAlDia.required }}
-            </span>
-          </div>
-          <span class="text-caption text-grey-darken-1">Los documentos "No aplica" no cuentan aquí.</span>
-        </div>
-        <v-progress-linear
-          :model-value="progresoPorcentaje"
-          height="12"
-          rounded
-          :color="progresoColor"
-          bg-color="grey-lighten-3"
-        />
-      </v-card>
-
-    <!-- CONTENT (LIST) -->
-    <v-row class="pb-10">
-      <v-col cols="12">
-
-        <!-- VISTA PAPELERA -->
-        <template v-if="currentTab === 'trash'">
-          <v-btn
-            variant="text"
-            size="small"
-            color="primary"
-            prepend-icon="mdi-arrow-left"
-            class="text-none mb-4"
-            @click="currentTab = 'all'"
-          >
+      <!-- ═════════════ PAPELERA ═════════════ -->
+      <template v-if="currentTab === 'trash'">
+        <EncabezadoPagina titulo="Papelera" subtitulo="Papeles que borraste. Puedes restaurarlos o eliminarlos para siempre.">
+          <v-btn variant="tonal" prepend-icon="mdi-arrow-left" class="text-none" @click="currentTab = 'all'">
             Volver a Mis papeles
           </v-btn>
+        </EncabezadoPagina>
 
-          <EstadoVacio
-            v-if="filteredDocs.length === 0"
-            icono="mdi-delete-empty"
-            titulo="La papelera está vacía"
-          />
-          <TarjetaDocumentoFiscal
-            v-for="doc in filteredDocs"
-            :key="doc.id"
-            :doc="doc"
-            papelera
-            :restaurando="restoring"
-            :categoria-titulo="getCategoryTitle(doc.category)"
-            @restaurar="restoreDoc"
-            @eliminar-definitivo="confirmDelete"
-          />
-        </template>
+        <EstadoVacio v-if="filteredDocs.length === 0" icono="mdi-delete-empty-outline" titulo="La papelera está vacía" />
+        <v-sheet v-else class="mis-papeles__lista" rounded="xl" border>
+          <template v-for="(doc, i) in filteredDocs" :key="doc.id">
+            <v-divider v-if="i > 0" />
+            <TarjetaDocumentoFiscal
+              :doc="doc"
+              papelera
+              :restaurando="restoring"
+              :categoria-titulo="getCategoryTitle(doc.category)"
+              @restaurar="restoreDoc"
+              @eliminar-definitivo="confirmDelete"
+            />
+          </template>
+        </v-sheet>
+      </template>
 
-        <!-- VISTA PRINCIPAL: agrupada por categoría -->
-        <template v-else>
-          <!-- Filtros: año fiscal, estado, acceso a papelera -->
-          <div class="d-flex align-center flex-wrap mb-6" style="gap: 12px">
+      <!-- ═════════════ VISTA PRINCIPAL ═════════════ -->
+      <template v-else>
+        <EncabezadoPagina
+          titulo="Mis papeles"
+          subtitulo="Ten los papeles de tu negocio al día. Te avisamos antes de que venzan."
+        >
+          <v-btn color="primary" size="large" prepend-icon="mdi-upload" class="text-none" @click="openDialog()">
+            Subir documento
+          </v-btn>
+          <v-menu location="bottom end">
+            <template #activator="{ props: menuProps }">
+              <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="large" aria-label="Más opciones" />
+            </template>
+            <v-list density="comfortable" min-width="240">
+              <v-list-item prepend-icon="mdi-file-pdf-box" title="Exportar expediente (PDF)" :disabled="exporting" @click="exportToPDF" />
+              <v-list-item prepend-icon="mdi-delete-outline" :title="`Papelera (${stats.trash})`" @click="currentTab = 'trash'" />
+            </v-list>
+          </v-menu>
+        </EncabezadoPagina>
+
+        <!-- AVANCE + SIGUIENTE PASO -->
+        <div class="mis-papeles__panel">
+          <section class="mis-papeles__avance" aria-label="Avance de tus papeles">
+            <BarraPapeles :papeles="papeles" @elegir="irAPapel" />
+          </section>
+
+          <PanelSiguientePaso
+            :listo="!paso"
+            :titulo="textoPaso.titulo"
+            :detalle="textoPaso.detalle"
+            :texto-boton="textoPaso.boton"
+            :icono-boton="paso ? paso.estado.accion.icono : ''"
+            titulo-listo="¡Tu negocio está al día!"
+            detalle-listo="Todos tus papeles están vigentes. Te avisaremos por correo antes de que algo venza."
+            @accion="ejecutarPaso(paso)"
+          >
+            <template #secundaria>
+              <v-btn v-if="pendientesDespuesDelPaso > 0" variant="text" class="text-none" @click="filtro = 'pendientes'">
+                Ver los {{ pendientesDespuesDelPaso }} que siguen
+              </v-btn>
+            </template>
+          </PanelSiguientePaso>
+        </div>
+
+        <!-- FILTROS -->
+        <FiltroChips v-model="filtro" :opciones="opcionesFiltro" etiqueta="Filtrar papeles" class="mb-2" />
+
+        <!-- LISTA POR CATEGORÍA -->
+        <TransitionGroup tag="div" name="seccion" class="mis-papeles__secciones">
+          <SeccionLista
+            v-for="seccion in seccionesVisibles"
+            :key="seccion.valor"
+            class="mis-papeles__seccion"
+            :titulo="seccion.titulo"
+            :icono="getCategoryIcon(seccion.valor)"
+            :meta="`${seccion.alDia} de ${seccion.total} al día`"
+            :meta-exito="seccion.alDia === seccion.total && seccion.total > 0"
+          >
+            <TarjetaDocumentoFiscal
+              v-for="papel in seccion.papeles"
+              :key="papel.id"
+              :doc="papel.doc"
+              :pendiente="papel.pendiente"
+              :frecuencia="papel.frecuencia"
+              :class="{ 'fila-papel--resaltada': resaltado === papel.id }"
+              @ver="openPreview"
+              @editar="openDialog"
+              @eliminar="confirmDelete"
+              @subir="openDialogForPending"
+            />
+          </SeccionLista>
+        </TransitionGroup>
+
+        <EstadoVacio
+          v-if="seccionesVisibles.length === 0"
+          icono="mdi-file-search-outline"
+          titulo="No hay papeles con este filtro"
+          mensaje="Prueba con «Todos» para ver la lista completa."
+        />
+
+        <!-- DECLARACIONES Y PAGOS PERIÓDICOS -->
+        <section v-if="filtro === 'todos' && tiposRecurrentes.length" class="mis-papeles__seccion mis-papeles__periodicos">
+          <header class="mis-papeles__seccion-cabecera">
+            <div>
+              <h2 class="mis-papeles__seccion-titulo">
+                <v-icon icon="mdi-calendar-sync-outline" size="20" class="mr-2" />Declaraciones y pagos periódicos
+              </h2>
+              <p class="mis-papeles__seccion-ayuda">Los que se presentan cada mes, trimestre o año. Elige el año que quieres revisar.</p>
+            </div>
             <v-select
               v-model="selectedYear"
               :items="availableYears"
-              density="compact"
+              density="comfortable"
               variant="outlined"
               hide-details
-              class="fiscal-select-year"
-              bg-color="white"
-              label="Año Fiscal"
-              prepend-inner-icon="mdi-calendar"
+              label="Año"
+              class="mis-papeles__anio"
             />
-            <v-select
-              v-model="statusFilter"
-              :items="statusFilterOptions"
-              item-title="text"
-              item-value="value"
-              density="compact"
-              variant="outlined"
-              hide-details
-              class="fiscal-select-status"
-              bg-color="white"
-              prepend-inner-icon="mdi-filter-variant"
-              label="Estado"
-            />
-            <v-spacer class="d-none d-sm-block" />
-            <v-btn
-              variant="text"
-              size="small"
-              color="grey-darken-1"
-              prepend-icon="mdi-delete-outline"
-              class="text-none"
-              @click="currentTab = 'trash'"
-            >
-              Papelera
-              <v-chip size="x-small" class="ml-1" color="grey" variant="tonal">{{ stats.trash }}</v-chip>
-            </v-btn>
-          </div>
+          </header>
+          <FiscalPeriodTracker
+            v-for="tipo in tiposRecurrentes"
+            :key="tipo.categoria + '-' + tipo.type.id"
+            :type="tipo.type"
+            :category="tipo.categoria"
+            :documents="getDocsForType(tipo.type.id)"
+            :year="selectedYear"
+            @open-preview="openPreview"
+            @open-dialog="handleTrackerDialog"
+            @delete-doc="confirmDelete"
+          />
+        </section>
+      </template>
+    </template>
 
-          <!-- ATIENDE ESTO PRIMERO -->
-          <section v-if="urgentes.length > 0" class="mb-8">
-            <h2 class="text-h6 font-weight-bold text-error mb-3 d-flex align-center">
-              <v-icon start icon="mdi-alert-circle" color="error" />
-              Atiende esto primero
-            </h2>
-            <TarjetaDocumentoFiscal
-              v-for="item in urgentes"
-              :key="'urgente-' + (item.doc ? item.doc.id : item.pendiente.id + item.categoriaTitulo)"
-              :doc="item.doc"
-              :pendiente="item.pendiente"
-              :categoria-titulo="item.categoriaTitulo"
-              @ver="openPreview"
-              @editar="openDialog"
-              @eliminar="confirmDelete"
-              @subir="openDialogForPending"
-            />
-          </section>
-
-          <!-- CATEGORÍAS: Legal, Municipal, SENIAT, Nómina, Libros Contables, Otros -->
-          <section v-for="cat in categories" :key="cat.value" class="mb-8">
-            <h2 class="text-h6 font-weight-bold text-secondary mb-3 d-flex align-center">
-              <v-icon start :icon="getCategoryIcon(cat.value)" color="secondary" />
-              {{ cat.title }}
-            </h2>
-
-            <!-- Documentos periódicos (mensual, trimestral, quincenal, semestral, anual) -->
-            <FiscalPeriodTracker
-              v-for="type in getRecurringTypes(cat.value)"
-              :key="type.id"
-              :type="type"
-              :category="cat.value"
-              :documents="getDocsForType(type.id)"
-              :year="selectedYear"
-              @open-preview="openPreview"
-              @open-dialog="handleTrackerDialog"
-              @delete-doc="confirmDelete"
-            />
-
-            <!-- Documentos únicos / permanentes ya subidos -->
-            <TarjetaDocumentoFiscal
-              v-for="doc in getNonRecurringDocsForCategory(cat.value)"
-              :key="doc.id"
-              :doc="doc"
-              @ver="openPreview"
-              @editar="openDialog"
-              @eliminar="confirmDelete"
-            />
-
-            <!-- Documentos únicos / permanentes requeridos pero aún sin subir -->
-            <TarjetaDocumentoFiscal
-              v-for="pending in getPendingDocsForCategory(cat.value)"
-              :key="'pendiente-' + pending.id"
-              :pendiente="pending"
-              @subir="openDialogForPending"
-            />
-          </section>
-        </template>
-      </v-col>
-    </v-row>
-
-    <!-- Dialogs -->
+    <!-- ═════════════ DIÁLOGOS ═════════════ -->
     <FiscalDocDialog
       v-model="dialogOpen"
       :editing-item="editingItem"
@@ -250,212 +158,105 @@
       @close="dialogOpen = false"
     />
 
-    <!-- Delete/Trash Confirmation Dialog -->
-    <v-dialog v-model="deleteDialog" max-width="400">
-        <v-card>
-            <v-card-title class="bg-error text-white">
-                {{ currentTab === 'trash' ? '¿Eliminar Definitivamente?' : '¿Mover a Papelera?' }}
-            </v-card-title>
-            <v-card-text class="pa-4">
-               <div v-if="currentTab === 'trash'">
-                   Esta acción <strong>no se puede deshacer</strong>. Se eliminará el registro y el archivo adjunto permanentemente.
-               </div>
-               <div v-else>
-                   El documento se moverá a la papelera. Podrás restaurarlo después si lo necesitas.
-               </div>
-               <div class="mt-4 font-weight-bold">
-                   {{ itemToDelete?.name }}
-               </div>
-            </v-card-text>
-            <v-card-actions>
-                <v-spacer />
-                <v-btn text @click="deleteDialog = false">Cancelar</v-btn>
-                <v-btn 
-                    color="error" 
-                    variant="elevated" 
-                    @click="executeDelete" 
-                    :loading="deleting"
-                >
-                    {{ currentTab === 'trash' ? 'Eliminar para siempre' : 'Mover a Papelera' }}
-                </v-btn>
-            </v-card-actions>
-        </v-card>
-    </v-dialog>
-
-    <!-- Preview Dialog -->
-    <v-dialog v-model="previewDialog" max-width="900" scrollable :fullscreen="$vuetify.display.smAndDown">
-        <v-card v-if="previewItem" class="rounded-xl elevation-0" style="border-radius: 20px !important;">
-            <!-- Header con gradiente sutil -->
-            <div class="preview-header pa-6" style="background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);">
-                <div class="d-flex align-center">
-                    <v-avatar color="white" size="48" class="mr-4">
-                        <v-icon :icon="getCategoryIcon(previewItem.category)" color="secondary" size="24"></v-icon>
-                    </v-avatar>
-                    <div class="flex-grow-1">
-                        <div class="text-h5 font-weight-bold text-white">{{ previewItem.name }}</div>
-                        <div class="text-caption text-white" style="opacity: 0.8">{{ getCategoryTitle(previewItem.category) }}</div>
-                    </div>
-                    <v-chip 
-                        :color="getStatusColor(getEffectiveStatus(previewItem))" 
-                        size="small" 
-                        class="font-weight-bold px-3"
-                        variant="elevated"
-                    >
-                        {{ getEffectiveStatus(previewItem) }}
-                    </v-chip>
-                </div>
-            </div>
-            
-            <v-card-text class="pa-0">
-                <v-row no-gutters>
-                    <!-- Document Info -->
-                    <v-col cols="12" :md="previewItem.documents?.file_url ? 4 : 12" class="pa-6 bg-grey-lighten-5">
-                        <div class="text-overline text-grey-darken-1 mb-4">
-                            <v-icon size="small" class="mr-1">mdi-information</v-icon>
-                            Detalles
-                        </div>
-                        
-                        <div class="d-flex flex-column" style="gap: 16px;">
-                            <div v-if="previewItem.doc_type" class="info-item">
-                                <div class="text-caption text-grey-darken-1 mb-1">Tipo de Documento</div>
-                                <div class="text-body-1 font-weight-medium">{{ previewItem.doc_type }}</div>
-                            </div>
-                            
-                            <div v-if="previewItem.emission_date" class="info-item">
-                                <div class="text-caption text-grey-darken-1 mb-1">
-                                    <v-icon size="x-small" class="mr-1">mdi-calendar-check</v-icon>
-                                    Fecha de Emisión
-                                </div>
-                                <div class="text-body-1 font-weight-medium">{{ formatDate(previewItem.emission_date) }}</div>
-                            </div>
-                            
-                            <div v-if="previewItem.expiration_date" class="info-item">
-                                <div class="text-caption text-grey-darken-1 mb-1">
-                                    <v-icon size="x-small" class="mr-1" :color="getExpirationIconColor(previewItem.expiration_date)">mdi-calendar-clock</v-icon>
-                                    Fecha de Vencimiento
-                                </div>
-                                <div class="text-body-1 font-weight-medium" :class="getExpirationClass(previewItem.expiration_date)">
-                                    {{ formatDate(previewItem.expiration_date) }}
-                                </div>
-                            </div>
-                            
-                            <div v-if="previewItem.notes" class="info-item">
-                                <div class="text-caption text-grey-darken-1 mb-1">
-                                    <v-icon size="x-small" class="mr-1">mdi-note-text</v-icon>
-                                    Notas
-                                </div>
-                                <div class="text-body-2 font-weight-medium text-wrap" style="white-space: pre-wrap;">{{ previewItem.notes }}</div>
-                            </div>
-                        </div>
-                    </v-col>
-                    
-                    <!-- File Preview -->
-                    <v-col v-if="previewItem.documents?.file_url" cols="12" md="8" class="pa-6">
-                        <div class="text-overline text-grey-darken-1 mb-4">
-                            <v-icon size="small" class="mr-1">mdi-file-document</v-icon>
-                            Vista Previa
-                        </div>
-                        
-                        <div class="preview-container rounded-xl overflow-hidden bg-grey-lighten-3" style="height: 420px;">
-                            <!-- PDF Preview -->
-                            <iframe 
-                                v-if="isFilePDF(previewItem.documents.file_url)"
-                                :src="previewItem.documents.file_url"
-                                width="100%"
-                                height="100%"
-                                style="border: none"
-                            ></iframe>
-                            
-                            <!-- Image Preview -->
-                            <v-img
-                                v-else
-                                :src="previewItem.documents.file_url"
-                                height="420"
-                                cover
-                            >
-                                <template v-slot:placeholder>
-                                    <div class="d-flex align-center justify-center fill-height">
-                                        <v-progress-circular indeterminate color="primary"></v-progress-circular>
-                                    </div>
-                                </template>
-                            </v-img>
-                        </div>
-                    </v-col>
-                    
-                    <!-- No file message -->
-                    <v-col v-else-if="!previewItem.documents?.file_url" cols="12" md="8" class="d-flex align-center justify-center pa-6">
-                        <div class="text-center py-12">
-                            <v-icon size="80" color="grey-lighten-2">mdi-file-hidden</v-icon>
-                            <div class="text-body-1 text-grey mt-4">Sin archivo adjunto</div>
-                            <div class="text-caption text-grey-lighten-1">Puedes agregar un archivo editando el documento</div>
-                        </div>
-                    </v-col>
-                </v-row>
-            </v-card-text>
-            
-            <v-divider />
-            
-            <v-card-actions class="px-6 py-4">
-                <v-btn
-                    v-if="previewItem.documents?.file_url"
-                    prepend-icon="mdi-download"
-                    color="primary"
-                    variant="tonal"
-                    rounded="lg"
-                    :href="previewItem.documents.file_url"
-                    target="_blank"
-                    class="text-none"
-                >
-                    Descargar Archivo
-                </v-btn>
-                <v-spacer />
-                <v-btn
-                    prepend-icon="mdi-pencil"
-                    color="secondary"
-                    variant="text"
-                    rounded="lg"
-                    @click="previewDialog = false; openDialog(previewItem)"
-                    class="text-none mr-2"
-                >
-                    Editar
-                </v-btn>
-                <v-btn 
-                    @click="previewDialog = false" 
-                    variant="elevated" 
-                    color="grey-darken-3"
-                    rounded="lg"
-                    class="text-none"
-                >
-                    Cerrar
-                </v-btn>
-            </v-card-actions>
-        </v-card>
-    </v-dialog>
-
-    <!-- Snackbar para notificaciones -->
-    <v-snackbar 
-        v-model="snackbar.show" 
-        :color="snackbar.color" 
-        :timeout="4000"
-        location="bottom"
+    <DialogoAdaptable
+      v-model="deleteDialog"
+      :titulo="currentTab === 'trash' ? '¿Eliminar para siempre?' : '¿Mover a la papelera?'"
+      icono="mdi-delete-outline"
+      max-width="460"
+      :cargando="deleting"
     >
-        {{ snackbar.message }}
-        <template v-slot:actions>
-            <v-btn variant="text" @click="snackbar.show = false">Cerrar</v-btn>
-        </template>
-    </v-snackbar>
+      <p class="mb-3">
+        <template v-if="currentTab === 'trash'">Esto <strong>no se puede deshacer</strong>: se borra el registro y su archivo.</template>
+        <template v-else>Podrás restaurarlo desde la papelera si lo necesitas.</template>
+      </p>
+      <p class="font-weight-bold mb-0">{{ itemToDelete?.name }}</p>
+      <template #acciones>
+        <v-btn variant="text" class="text-none" :disabled="deleting" @click="deleteDialog = false">Cancelar</v-btn>
+        <v-btn color="error" variant="flat" class="text-none" :loading="deleting" @click="executeDelete">
+          {{ currentTab === 'trash' ? 'Eliminar para siempre' : 'Mover a la papelera' }}
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
-    </template>
-  </v-container>
+    <DialogoAdaptable
+      v-model="previewDialog"
+      :titulo="previewItem?.name || 'Documento'"
+      :icono="previewItem ? getCategoryIcon(previewItem.category) : 'mdi-file-document-outline'"
+      max-width="960"
+    >
+      <template v-if="previewItem">
+        <div class="mis-papeles__detalle">
+          <dl class="mis-papeles__datos">
+            <div>
+              <dt>Estado</dt>
+              <dd :class="`text-${estadoPreview.semaforo.color === 'grey' ? 'medium-emphasis' : estadoPreview.semaforo.color}`">
+                <v-icon :icon="estadoPreview.semaforo.icono" size="18" class="mr-1" />{{ estadoPreview.semaforo.texto }}
+              </dd>
+            </div>
+            <div><dt>Categoría</dt><dd>{{ getCategoryTitle(previewItem.category) }}</dd></div>
+            <div v-if="previewItem.emission_date"><dt>Emitido</dt><dd>{{ formatDate(previewItem.emission_date) }}</dd></div>
+            <div v-if="previewItem.expiration_date"><dt>Vence</dt><dd>{{ formatDate(previewItem.expiration_date) }}</dd></div>
+            <div v-if="previewItem.notes" class="mis-papeles__datos-notas"><dt>Notas</dt><dd>{{ previewItem.notes }}</dd></div>
+          </dl>
+
+          <div class="mis-papeles__archivo">
+            <template v-if="previewItem.documents?.file_url">
+              <iframe
+                v-if="isFilePDF(previewItem.documents.file_url)"
+                :src="previewItem.documents.file_url"
+                title="Vista previa del documento"
+              />
+              <v-img v-else :src="previewItem.documents.file_url" contain max-height="520" />
+            </template>
+            <EstadoVacio
+              v-else
+              icono="mdi-file-hidden"
+              titulo="Sin archivo adjunto"
+              mensaje="Toca «Editar» para agregar una foto o un PDF."
+            />
+          </div>
+        </div>
+      </template>
+      <template #acciones>
+        <v-btn
+          v-if="previewItem?.documents?.file_url"
+          variant="tonal"
+          prepend-icon="mdi-download"
+          class="text-none"
+          :href="previewItem.documents.file_url"
+          target="_blank"
+        >
+          Descargar
+        </v-btn>
+        <v-spacer />
+        <v-btn variant="text" prepend-icon="mdi-pencil-outline" class="text-none" @click="previewDialog = false; openDialog(previewItem)">Editar</v-btn>
+        <v-btn color="primary" variant="flat" class="text-none" @click="previewDialog = false">Cerrar</v-btn>
+      </template>
+    </DialogoAdaptable>
+
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="4000" location="bottom">
+      {{ snackbar.message }}
+      <template #actions>
+        <v-btn variant="text" @click="snackbar.show = false">Cerrar</v-btn>
+      </template>
+    </v-snackbar>
+  </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { jsPDF } from 'jspdf'
 import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
 import FiscalPeriodTracker from '@/components/fiscal/FiscalPeriodTracker.vue'
 import TarjetaDocumentoFiscal from '@/components/fiscal/TarjetaDocumentoFiscal.vue'
-import AyudaTermino from '@/components/ui/AyudaTermino.vue'
+import BarraPapeles from '@/components/fiscal/BarraPapeles.vue'
+import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
+import FiltroChips from '@/components/ui/FiltroChips.vue'
+import SeccionLista from '@/components/ui/SeccionLista.vue'
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
+import { estadoPapel, siguientePaso, resumenPapeles, GRUPOS_POR_RESOLVER } from '@/utils/estadoPapel'
+import { formatFechaCorta } from '@/utils/fechas'
 import EstadoVacio from '@/components/ui/EstadoVacio.vue'
 import fiscalService from '@/services/fiscalService'
 import userService from '@/services/userService'
@@ -486,14 +287,6 @@ const snackbar = ref({ show: false, message: '', color: 'error' })
 const now = new Date()
 const selectedYear = ref(now.getFullYear())
 const statusFilter = ref('ALL')
-
-const statusFilterOptions = [
-    { text: 'Todos', value: 'ALL' },
-    { text: 'Vigentes / Presentados', value: 'VIGENTE' },
-    { text: 'En Trámite', value: 'TRAMITE' },
-    { text: 'Vencidos', value: 'VENCIDO' },
-    { text: 'No Aplica', value: 'NO_APLICA' }
-]
 
 // Años disponibles para el selector (desde 2020 hasta el próximo año)
 const availableYears = computed(() => {
@@ -591,85 +384,123 @@ const getPendingDocsForCategory = (cat) => {
     return pending
 }
 
-// Documentos que necesitan atención ahora: rojo/naranja por fecha, o
-// requeridos y nunca subidos. Se muestran primero (fuera del orden por
-// categoría) en la sección "Atiende esto primero".
-const urgentes = computed(() => {
-    if (currentTab.value === 'trash') return []
-    const items = []
+// ═══ Mis papeles (rediseño 2026-10-13): una lista unificada de papeles ═══
+// Cada papel = documento único subido o requerido sin subir. Los periódicos
+// (declaraciones mensuales, etc.) van aparte, en "Declaraciones y pagos".
+const filtro = ref('todos') // 'todos' | 'pendientes' | 'aldia'
+const resaltado = ref(null)
 
-    categories.forEach(catObj => {
-        const cat = catObj.value
+// Ciclo de un documento subido según su tipo (PERMANENT, VIGENTE, AdHoc…).
+const frecuenciaDe = (doc) => {
+    const tipo = (FISCAL_TYPES[doc.category] || []).find(t => t.id === doc.doc_type)
+    return tipo?.frequency || (doc.doc_type ? null : 'AdHoc')
+}
 
-        getNonRecurringDocsForCategory(cat).forEach(doc => {
-            if (doc.status === 'NO_APLICA' || doc.status === 'TRAMITE') return
-            const s = semaforoDocumento(doc.emission_date, doc.expiration_date)
-            if (s.color === 'error' || s.color === 'warning') {
-                items.push({ doc, categoriaTitulo: catObj.title })
-            }
+const papeles = computed(() => {
+    const lista = []
+    categories.forEach(cat => {
+        getNonRecurringDocsForCategory(cat.value).forEach(doc => {
+            lista.push({ id: doc.id, nombre: doc.name || 'Documento', categoria: cat.value, doc, pendiente: null, frecuencia: frecuenciaDe(doc), estado: estadoPapel({ doc, frecuencia: frecuenciaDe(doc) }) })
         })
-
-        getPendingDocsForCategory(cat).forEach(pending => {
-            items.push({ pendiente: pending, categoriaTitulo: catObj.title })
+        getPendingDocsForCategory(cat.value).forEach(pendiente => {
+            lista.push({ id: `pendiente-${cat.value}-${pendiente.id}`, nombre: pendiente.label, categoria: cat.value, doc: null, pendiente, frecuencia: pendiente.frequency, estado: estadoPapel({ pendiente }) })
         })
     })
-
-    return items
+    return lista
 })
+
+const resumen = computed(() => resumenPapeles(papeles.value))
+const paso = computed(() => siguientePaso(papeles.value))
+
+const pendientesDespuesDelPaso = computed(() => {
+    const r = resumen.value
+    return Math.max(0, r.porResolver - (paso.value ? 1 : 0))
+})
+
+const ORDEN_EN_SECCION = { atender: 0, falta: 1, completar: 2, tramite: 3, aldia: 4, noaplica: 5 }
+const pasaFiltro = (papel) => {
+    if (filtro.value === 'pendientes') return GRUPOS_POR_RESOLVER.includes(papel.estado.clave)
+    if (filtro.value === 'aldia') return papel.estado.clave === 'aldia'
+    return true
+}
+
+const seccionesVisibles = computed(() => categories
+    .map(cat => {
+        const todos = papeles.value.filter(p => p.categoria === cat.value)
+        const cuentan = todos.filter(p => p.estado.clave !== 'noaplica')
+        return {
+            valor: cat.value,
+            titulo: cat.title,
+            total: cuentan.length,
+            alDia: cuentan.filter(p => p.estado.clave === 'aldia').length,
+            papeles: todos.filter(pasaFiltro).sort((a, b) => ORDEN_EN_SECCION[a.estado.clave] - ORDEN_EN_SECCION[b.estado.clave]),
+        }
+    })
+    .filter(sec => sec.papeles.length > 0))
+
+const opcionesFiltro = computed(() => [
+    { valor: 'todos', texto: 'Todos', cantidad: resumen.value.total + resumen.value.noaplica },
+    { valor: 'pendientes', texto: 'Por resolver', cantidad: resumen.value.porResolver, deshabilitado: !resumen.value.porResolver },
+    { valor: 'aldia', texto: 'Al día', cantidad: resumen.value.aldia, deshabilitado: !resumen.value.aldia },
+])
+
+const tiposRecurrentes = computed(() => categories.flatMap(cat =>
+    getRecurringTypes(cat.value)
+        .filter(type => isRecurringFrequency(type.frequency) || type.frequency === 'ANNUAL')
+        .map(type => ({ categoria: cat.value, type }))))
+
+const textoPaso = computed(() => {
+    const p = paso.value
+    if (!p) return { titulo: '', detalle: '', boton: '' }
+    if (p.estado.clave === 'atender') {
+        return {
+            titulo: `Renueva: ${p.nombre}`,
+            detalle: `${p.estado.semaforo.texto}. Tenerlo al día te evita multas y problemas con el SENIAT o la alcaldía.`,
+            boton: 'Renovar ahora',
+        }
+    }
+    if (p.estado.clave === 'falta') {
+        const detalle = p.frecuencia === 'PERMANENT'
+            ? 'Se sube una sola vez y queda guardado. Basta con una foto o un PDF.'
+            : 'Súbelo con su fecha de vencimiento y te avisamos antes de que venza. Basta con una foto o un PDF.'
+        return { titulo: `Sube: ${p.nombre}`, detalle, boton: 'Subir ahora' }
+    }
+    if (p.estado.clave === 'completar') {
+        return {
+            titulo: `Completa: ${p.nombre}`,
+            detalle: 'Lo subiste sin fecha de vencimiento. Agrégala para que podamos avisarte antes de que venza.',
+            boton: 'Agregar fecha',
+        }
+    }
+    return {
+        titulo: `Actualiza: ${p.nombre}`,
+        detalle: 'Lo marcaste "en trámite". Cuando te lo entreguen, súbelo aquí con sus fechas.',
+        boton: 'Actualizar',
+    }
+})
+
+const ejecutarPaso = (p) => {
+    const evento = p.estado.accion.evento
+    if (evento === 'subir') openDialogForPending(p.pendiente)
+    else if (evento === 'editar') openDialog(p.doc)
+    else openPreview(p.doc)
+}
+
+// Desde la barra: muestra ese papel en la lista y lo resalta un momento.
+const irAPapel = async (papel) => {
+    filtro.value = 'todos'
+    resaltado.value = papel.id
+    await nextTick()
+    const fila = document.querySelector(`[data-papel-id="${papel.id}"]`)
+    fila?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => { if (resaltado.value === papel.id) resaltado.value = null }, 1600)
+}
+
+const estadoPreview = computed(() => estadoPapel({ doc: previewItem.value, frecuencia: previewItem.value ? frecuenciaDe(previewItem.value) : null }))
 
 // Filtro de documentos para la vista de PAPELERA (la vista principal ya no
 // usa una lista plana: se agrupa por categoría con getDocsForCategory).
 const filteredDocs = computed(() => docs.value)
-
-// Progreso "Tu negocio está al día: X de Y" — a diferencia de
-// complianceDetail (usado en el PDF), los documentos NO_APLICA no cuentan
-// ni en el numerador ni en el denominador, y solo lo "vigente" (no "en
-// trámite") cuenta como al día.
-const progresoAlDia = computed(() => {
-    let required = 0
-    let covered = 0
-
-    categories.forEach(catObj => {
-        const cat = catObj.value
-        if (cat === 'OTROS') return
-        const types = FISCAL_TYPES[cat] || []
-
-        types.filter(t => t.required).forEach(type => {
-            const matchingDocs = docs.value.filter(d => {
-                if (d.category !== cat) return false
-                const isTypeMatch = d.doc_type === type.id
-                let isNameMatch = !d.doc_type && d.name.toLowerCase().includes(type.label.toLowerCase())
-                if (isNameMatch && type.id === 'RIF' && d.name.toLowerCase().includes('socios')) {
-                    isNameMatch = false
-                }
-                return isTypeMatch || isNameMatch
-            })
-
-            // Los NO_APLICA no cuentan ni como requeridos ni como cubiertos.
-            if (matchingDocs.some(d => d.status === 'NO_APLICA')) return
-
-            required++
-            const vigente = matchingDocs.some(d => {
-                const status = getEffectiveStatus(d)
-                return status === 'VIGENTE' || status === 'PRESENTADO'
-            })
-            if (vigente) covered++
-        })
-    })
-
-    return { required, covered }
-})
-
-const progresoPorcentaje = computed(() => {
-    if (progresoAlDia.value.required === 0) return 100
-    return Math.round((progresoAlDia.value.covered / progresoAlDia.value.required) * 100)
-})
-
-const progresoColor = computed(() => {
-    if (progresoPorcentaje.value >= 80) return 'success'
-    if (progresoPorcentaje.value >= 50) return 'warning'
-    return 'error'
-})
 
 // Detailed Compliance Logic
 // VENCIDO documents count as 0.5, VIGENTE/TRAMITE count as 1.0
@@ -849,14 +680,6 @@ const isFilePDF = (url) => {
     return url.toLowerCase().includes('.pdf')
 }
 
-const getExpirationIconColor = (dateStr) => {
-    if (!dateStr) return 'grey'
-    const days = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24))
-    if (days < 0) return 'error'
-    if (days <= 30) return 'warning'
-    return 'success'
-}
-
 const handleSave = async (formData) => {
     saving.value = true
     try {
@@ -961,11 +784,6 @@ const getEffectiveStatus = (docItem) => {
     return docItem.status || 'VIGENTE'
 }
 
-const getStatusColor = (status) => {
-    const map = { 'VIGENTE': 'success', 'PRESENTADO': 'success', 'TRAMITE': 'warning', 'VENCIDO': 'error', 'NO_APLICA': 'grey' }
-    return map[status] || 'grey'
-}
-
 const getCategoryIcon = (cat) => {
     const map = {
         'LEGAL': 'mdi-gavel',
@@ -978,18 +796,7 @@ const getCategoryIcon = (cat) => {
     return map[cat] || 'mdi-file'
 }
 
-const formatDate = (dateStr) => {
-    if (!dateStr) return ''
-    return new Date(dateStr).toLocaleDateString()
-}
-
-const getExpirationClass = (dateStr) => {
-    if (!dateStr) return ''
-    const days = Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24))
-    if (days < 0) return 'text-error font-weight-bold'
-    if (days < 30) return 'text-warning font-weight-bold'
-    return 'text-grey'
-}
+const formatDate = (dateStr) => formatFechaCorta(dateStr)
 
 // ─────────────────────────────────────────────────────────────────
 // PDF Export — Helpers (S.O.L.I.D.: cada función tiene una sola tarea)
@@ -1106,7 +913,7 @@ const getPeriodRowsForPdf = (type, catDocs, year) => {
 const pdfDrawCategoryHeader = (doc, pageWidth, margin, catName, progress, y) => {
     // Fondo con borde redondeado para el header de categoría
     const headerHeight = 10
-    doc.setFillColor(31, 53, 92) // #1F355C azul corporativo
+    doc.setFillColor(31, 53, 92) // #2A2A2E azul corporativo
     doc.roundedRect(margin, y - 6, pageWidth - margin * 2, headerHeight, 3, 3, 'F')
 
     doc.setFontSize(11)
@@ -1133,7 +940,7 @@ const pdfDrawTypeHeader = (doc, margin, label, freqLabel, y) => {
 
     doc.setFontSize(10)
     doc.setFont(undefined, 'bold')
-    doc.setTextColor(31, 53, 92) // #1F355C
+    doc.setTextColor(31, 53, 92) // #2A2A2E
     doc.text(`  ${label}`, margin + 8, y)
 
     doc.setFontSize(8)
@@ -1243,7 +1050,7 @@ const exportToPDF = async () => {
         }
 
         // ── Franja superior decorativa ──
-        doc.setFillColor(31, 53, 92) // #1F355C
+        doc.setFillColor(31, 53, 92) // #2A2A2E
         doc.rect(0, 0, pageWidth, 4, 'F')
         doc.setFillColor(168, 28, 34) // #A81C22
         doc.rect(0, 4, pageWidth, 2, 'F')
@@ -1263,7 +1070,7 @@ const exportToPDF = async () => {
         // Título centrado debajo del logo
         y = 26
         doc.setFontSize(16)
-        doc.setTextColor(31, 53, 92) // #1F355C
+        doc.setTextColor(31, 53, 92) // #2A2A2E
         doc.setFont(undefined, 'bold')
         doc.text('Expediente Fiscal 360', pageWidth / 2, y, { align: 'center' })
         
@@ -1298,7 +1105,7 @@ const exportToPDF = async () => {
         y += 10
         doc.setFontSize(11)
         doc.setFont(undefined, 'bold')
-        doc.setTextColor(31, 53, 92) // #1F355C
+        doc.setTextColor(31, 53, 92) // #2A2A2E
         doc.text(`Progreso General: ${progressRate.value}%`, margin, y)
         
         // Barra de progreso con bordes redondeados
@@ -1499,24 +1306,157 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Selectores de período — Responsive */
-.fiscal-select-year {
-    width: 130px;
-    flex-shrink: 0;
+.mis-papeles {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 16px 96px;
 }
 
-.fiscal-select-status {
-    max-width: 180px;
-    flex-shrink: 0;
+@media (min-width: 960px) {
+  .mis-papeles { padding: 32px 32px 64px; }
 }
 
-/* En móvil XS: selectores toman ancho completo */
+/* ── Avance + siguiente paso ── */
+.mis-papeles__panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin: 8px 0 24px;
+}
+
+@media (min-width: 960px) {
+  .mis-papeles__panel { grid-template-columns: 7fr 5fr; }
+}
+
+.mis-papeles__avance {
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 20px;
+  padding: 22px 24px;
+}
+
 @media (max-width: 599px) {
-    .fiscal-select-year,
-    .fiscal-select-status {
-        width: 100% !important;
-        max-width: 100% !important;
-        flex: 1 1 100%;
-    }
+  .mis-papeles__avance { padding: 18px; }
+}
+
+/* ── Filtros ── */
+
+
+
+/* ── Secciones por categoría ── */
+.mis-papeles__seccion {
+  margin-top: 28px;
+}
+
+
+
+
+.mis-papeles__lista {
+  overflow: hidden;
+}
+
+/* Cabecera de la sección de periódicas (lleva el selector de año) */
+.mis-papeles__seccion-cabecera {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+
+.mis-papeles__seccion-titulo {
+  display: flex;
+  align-items: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.mis-papeles__seccion-ayuda {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: rgba(var(--v-theme-on-surface), 0.65);
+}
+
+
+.mis-papeles__anio {
+  max-width: 140px;
+}
+
+.mis-papeles__periodicos {
+  margin-top: 40px;
+}
+
+/* Cambio de filtro: las secciones entran y salen con un fundido breve */
+.seccion-enter-active,
+.seccion-leave-active {
+  transition: opacity var(--ad-move-normal) var(--ad-move-curva-entrada), transform var(--ad-move-normal) var(--ad-move-curva-entrada);
+}
+.seccion-enter-from,
+.seccion-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.seccion-leave-active { position: absolute; width: 100%; }
+
+/* ── Detalle (vista previa) ── */
+.mis-papeles__detalle {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 960px) {
+  .mis-papeles__detalle { grid-template-columns: 280px 1fr; }
+}
+
+.mis-papeles__datos {
+  margin: 0;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.mis-papeles__datos dt {
+  font-size: 0.85rem;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  margin-bottom: 2px;
+}
+
+.mis-papeles__datos dd {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.mis-papeles__datos-notas dd {
+  font-weight: 400;
+  white-space: pre-wrap;
+}
+
+.mis-papeles__archivo {
+  min-height: 320px;
+  border-radius: 16px;
+  background: rgba(var(--v-theme-on-surface), 0.04);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mis-papeles__archivo iframe {
+  width: 100%;
+  height: 520px;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seccion-enter-active,
+  .seccion-leave-active { transition: none; }
 }
 </style>

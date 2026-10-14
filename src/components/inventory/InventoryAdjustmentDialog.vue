@@ -1,22 +1,16 @@
 <template>
-  <v-dialog
+  <DialogoAdaptable
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
-    max-width="900px"
+    @cerrar="reset"
+    titulo="Asistente de inventario IA"
+    icono="mdi-robot"
+    max-width="900"
     persistent
+    :cargando="processing"
+    class="inventory-adjustment-dialog"
   >
-    <v-card class="inventory-adjustment-dialog">
-      <v-card-title class="bg-primary text-white d-flex align-center py-3">
-        <v-icon start icon="mdi-robot" class="mr-2" />
-        <span class="text-h6 font-weight-bold">
-          Asistente de Inventario IA
-        </span>
-        <v-spacer />
-        <v-btn icon="mdi-close" variant="text" color="white" @click="close" />
-      </v-card-title>
-
-      <v-card-text class="pa-0">
-        <v-stepper v-model="step" class="elevation-0">
+        <v-stepper v-model="step" class="elevation-0" flat>
           <v-stepper-header>
             <v-stepper-item title="Cargar Imagen" :value="1" :complete="step > 1" />
             <v-divider />
@@ -157,39 +151,37 @@
               </v-container>
             </v-stepper-window-item>
           </v-stepper-window>
-
-          <v-divider />
-
-          <v-card-actions class="pa-4">
-            <v-btn variant="text" @click="close">Cancelar</v-btn>
-            <v-spacer />
-            <v-btn
-                v-if="step === 2"
-                variant="text"
-                @click="step = 1"
-                class="mr-2"
-            >
-                Atrás
-            </v-btn>
-            <v-btn
-                v-if="step === 2"
-                color="primary"
-                variant="elevated"
-                @click="confirmAdjustment"
-                :loading="processing"
-                :disabled="unmatchedItemsCount > 0 || items.length === 0"
-            >
-                Confirmar Consumo
-            </v-btn>
-          </v-card-actions>
         </v-stepper>
-      </v-card-text>
-    </v-card>
-  </v-dialog>
+
+    <template #acciones>
+      <v-btn variant="text" :disabled="processing" @click="close">Cancelar</v-btn>
+      <v-spacer />
+      <v-btn
+          v-if="step === 2"
+          variant="text"
+          :disabled="processing"
+          @click="step = 1"
+          class="mr-2"
+      >
+          Atrás
+      </v-btn>
+      <v-btn
+          v-if="step === 2"
+          color="primary"
+          variant="elevated"
+          @click="confirmAdjustment"
+          :loading="processing"
+          :disabled="processing || unmatchedItemsCount > 0 || items.length === 0"
+      >
+          Confirmar Consumo
+      </v-btn>
+    </template>
+  </DialogoAdaptable>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import FiscalFileUpload from '@/components/fiscal/FiscalFileUpload.vue'
 import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue'
 import inventoryOCRService from '@/services/inventoryOCRService'
@@ -319,6 +311,10 @@ const onProductMatch = (item) => {
 }
 
 const confirmAdjustment = async () => {
+    // I5: evita que "Confirmar Consumo" se ejecute dos veces (doble toque
+    // antes de que :disabled="processing" se re-renderice) y descuente el
+    // stock por duplicado.
+    if (processing.value) return
     processing.value = true
     try {
         // Procesar todos los movimientos

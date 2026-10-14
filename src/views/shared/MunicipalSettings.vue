@@ -2,7 +2,7 @@
   <v-container fluid class="pa-6 municipal-settings-page">
     <div class="mb-6 d-flex justify-space-between align-center flex-wrap ga-4">
       <div>
-        <h1 class="text-h4 font-weight-bold" style="color:#1F355C;">Retenciones Municipales</h1>
+        <h1 class="text-h4 font-weight-bold" style="color:#2A2A2E;">Retenciones Municipales</h1>
         <p class="text-body-1 text-medium-emphasis">Gestiona tus Códigos de Actividad Económica y Porcentajes de Retención de Alcaldía</p>
       </div>
       <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialog()" rounded="lg" elevation="2">

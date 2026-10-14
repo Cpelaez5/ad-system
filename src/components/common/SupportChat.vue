@@ -67,7 +67,7 @@
           <!-- Mensaje de bienvenida -->
           <div class="message message--assistant message--welcome">
             <div class="message__avatar">
-              <v-icon color="#1F355C" size="18">mdi-face-agent</v-icon>
+              <v-icon color="#2A2A2E" size="18">mdi-face-agent</v-icon>
             </div>
             <div class="message__bubble">
               <p class="message__text" v-html="formatMessage(welcomeMessage)"></p>
@@ -99,7 +99,7 @@
             >
               <!-- Avatar del asistente -->
               <div v-if="msg.role === 'assistant'" class="message__avatar">
-                <v-icon color="#1F355C" size="18">mdi-face-agent</v-icon>
+                <v-icon color="#2A2A2E" size="18">mdi-face-agent</v-icon>
               </div>
 
               <!-- Burbuja del mensaje -->
@@ -113,7 +113,7 @@
           <!-- Indicador de "escribiendo..." -->
           <div v-if="isTyping" class="message message--assistant message--typing">
             <div class="message__avatar">
-              <v-icon color="#1F355C" size="18">mdi-face-agent</v-icon>
+              <v-icon color="#2A2A2E" size="18">mdi-face-agent</v-icon>
             </div>
             <div class="message__bubble typing-bubble">
               <div class="typing-dots">
@@ -535,10 +535,10 @@ export default {
    ═══════════════════════════════════════════════════ */
 
 .support-chat-wrapper {
-  --chat-primary: #1F355C;
+  --chat-primary: #2A2A2E;
   --chat-accent: #E0B04F;
   --chat-bg: #f8f9fa;
-  --chat-user-bg: #1F355C;
+  --chat-user-bg: #2A2A2E;
   --chat-assistant-bg: #ffffff;
   --chat-radius: 20px;
   --chat-width: 380px;
@@ -554,7 +554,7 @@ export default {
   bottom: 24px;
   right: 24px;
   z-index: 1500;
-  background: linear-gradient(135deg, #1F355C 0%, #2a4a7f 100%) !important;
+  background: linear-gradient(135deg, #2A2A2E 0%, #2a4a7f 100%) !important;
   box-shadow: 0 6px 24px rgba(31, 53, 92, 0.45) !important;
   transition: transform 0.3s ease, box-shadow 0.3s ease !important;
 }
@@ -615,7 +615,7 @@ export default {
   flex-direction: column;
   overflow: hidden;
   z-index: 1500;
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'Montserrat', sans-serif;
 }
 
 /* Versión móvil: fullscreen */
@@ -653,7 +653,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  background: linear-gradient(135deg, #1F355C 0%, #2a4a7f 100%);
+  background: linear-gradient(135deg, #2A2A2E 0%, #2a4a7f 100%);
   color: white;
   flex-shrink: 0;
 }
@@ -889,8 +889,8 @@ export default {
   border-radius: 20px;
   padding: 7px 14px;
   font-size: 12px;
-  font-family: 'Open Sans', sans-serif;
-  color: #1F355C;
+  font-family: 'Montserrat', sans-serif;
+  color: #2A2A2E;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -899,9 +899,9 @@ export default {
 }
 
 .quick-action-btn:hover {
-  background: #1F355C;
+  background: #2A2A2E;
   color: white;
-  border-color: #1F355C;
+  border-color: #2A2A2E;
   transform: translateY(-1px);
   box-shadow: 0 3px 10px rgba(31, 53, 92, 0.2);
 }
@@ -940,7 +940,7 @@ export default {
   background: transparent;
   outline: none;
   font-size: 13px;
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'Montserrat', sans-serif;
   color: #333;
   padding: 8px 0;
 }

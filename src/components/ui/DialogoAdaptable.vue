@@ -6,7 +6,7 @@
     :fullscreen="$vuetify.display.xs"
     scrollable
     :transition="$vuetify.display.xs ? 'dialog-bottom-transition' : 'dialog-transition'"
-    @update:model-value="$emit('update:modelValue', $event)"
+    @update:model-value="actualizarModelo"
   >
     <v-card class="dialogo-adaptable">
       <v-card-title class="dialogo-adaptable__titulo">
@@ -19,7 +19,7 @@
           size="small"
           aria-label="Cerrar"
           :disabled="cargando"
-          @click="$emit('update:modelValue', false)"
+          @click="actualizarModelo(false)"
         />
       </v-card-title>
 
@@ -54,6 +54,17 @@
  *
  * Para hojas cortas de opciones en móvil usar HojaInferior; para formularios
  * y cualquier cosa que pueda crecer, este.
+ *
+ * I5 (ola F2b): la X, el clic afuera y la tecla Esc pasaban por
+ * `@update:model-value` del propio v-dialog, pero la X llamaba a
+ * `$emit('update:modelValue', false)` DIRECTO — se saltaba cualquier cierre
+ * propio de la vista (reset de un asistente de varios pasos, resolver una
+ * promesa pendiente, revocar un objectURL...). Ahora los tres casos pasan
+ * por `actualizarModelo()`, que además de actualizar el v-model emite
+ * `cerrar` cada vez que el diálogo se cierra (por cualquier medio), para que
+ * la vista pueda escuchar un solo evento (`@cerrar="miLimpieza"`) en vez de
+ * duplicar su lógica de cierre en la X, el backdrop y su propio botón
+ * "Cancelar".
  */
 export default {
   name: 'DialogoAdaptable',
@@ -85,7 +96,14 @@ export default {
     },
   },
 
-  emits: ['update:modelValue'],
+  emits: ['update:modelValue', 'cerrar'],
+
+  methods: {
+    actualizarModelo(valor) {
+      this.$emit('update:modelValue', valor)
+      if (!valor) this.$emit('cerrar')
+    },
+  },
 }
 </script>
 

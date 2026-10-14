@@ -134,7 +134,7 @@ export default {
             labels: {
               usePointStyle: true,
               padding: 20,
-              font: { family: 'Poppins, sans-serif', size: 12 }
+              font: { family: 'Montserrat, sans-serif', size: 12 }
             }
           },
           tooltip: {

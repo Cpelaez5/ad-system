@@ -106,10 +106,9 @@ Los tonos de marca se tomaron leyendo los píxeles reales de los archivos oficia
 
 **Berlin Sans FB** (fuente del manual de marca, usada ahí solo para el wordmark "System" dibujado) no es una fuente web ni está instalada, y añadirla implicaría una licencia nueva. Se mantiene la decisión ya vigente del proyecto:
 
-- **Montserrat** (ya instalada vía `@fontsource`) para títulos, botones, tabs, nombres de tarjeta — es geométrica y de peso similar a Berlin Sans FB, la aproximación razonable sin fuente nueva.
-- **Open Sans** (ya instalada vía `@fontsource`) para texto de cuerpo/lectura — mejor legibilidad en párrafos largos y en pantallas pequeñas que una fuente geométrica.
-
-Esto ya estaba parcialmente en el CSS pero una regla `!important` más amplia (que forzaba Montserrat en *todo*) lo pisaba. Se corrigió en `src/styles/vuetify-overrides.css` (ver §4) sin tocar ninguna vista.
+- **Montserrat** (instalada vía `@fontsource`) en **toda** la interfaz: títulos, botones, cuerpo, montos y tablas. Es geométrica y de peso similar a Berlin Sans FB.
+- **Decisión del usuario (2026-10-13):** se quitó Open Sans para el cuerpo. Mezclaba dos fuentes dentro de una misma tarjeta y se percibía como "fuentes que no se aplican". Legibilidad: cuerpo ≥ 16px y peso 400-500.
+- Prohibido declarar otras familias (Poppins, Inter, Open Sans…): no se cargan y caen en la fuente del sistema. Los gráficos (Chart.js) usan `'Montserrat, sans-serif'`.
 
 #### Escala tipográfica (px)
 
@@ -121,8 +120,8 @@ Esto ya estaba parcialmente en el CSS pero una regla `!important` más amplia (q
 | H4 | 20px | 24px | Montserrat 600 |
 | H5 | 18px | 20px | Montserrat 500 |
 | H6 | 16px | 18px | Montserrat 500 |
-| Cuerpo | **16px** (mínimo, nunca menos) | 16px | Open Sans 400 |
-| Texto secundario / ayuda | 14px | 14px | Open Sans 400 |
+| Cuerpo | **16px** (mínimo, nunca menos) | 16px | Montserrat 400 |
+| Texto secundario / ayuda | 14px | 14px | Montserrat 400 |
 | Monto destacado (`ResumenMonto`) | 32px | 32px | Montserrat 700 |
 
 > Antes, una regla en `global.css` bajaba el cuerpo a 14px por debajo de 768px — se eliminó (ver §4): el cuerpo nunca baja de 16px, como pide `PLAN-MVP.md §2` regla 6.
@@ -193,7 +192,7 @@ Todos son **aditivos o de corrección de color/tipografía** — ninguno reestru
 
 - **`src/main.js`** (tema de Vuetify): `primary` → `#8E1818` (granate AD System, antes `#A81C22` de la firma contable); `error` → `#D32F2F` (antes igual al `primary`, ahora distinto a propósito); `success` → `#2E7D32` (antes `#4CAF50`, fallaba AA con texto blanco); se agregaron los tokens nuevos `metal` (`#9CA3AF`) y `granateOscuro` (`#320B0B`); tema oscuro con `primary` → `#C18080` (granate aclarado).
 - **`src/styles/global.css`**: mismas variables CSS (`--color-primary`, `--color-error`, `--color-success`, + `--color-metal`, `--color-granate-oscuro`) sincronizadas con el tema; se quitó la regla que bajaba el cuerpo a 14px en móvil; se agregó el bloque de alturas táctiles mínimas (aditivo, nunca encoge) y un foco visible (`:focus-visible`) consistente.
-- **`src/styles/vuetify-overrides.css`**: se agregó un bloque que devuelve Open Sans a los contenedores de texto de cuerpo (`p`, `.v-card-text`, `.v-alert`, `.v-field__input`, `.v-messages`, `.v-tooltip`, `.text-body-*`) sin tocar títulos/botones/menús (siguen en Montserrat); y la corrección de contraste del dorado como texto (`.text-warning` → `#1F355C`, íconos se quedan dorados).
+- **`src/styles/vuetify-overrides.css`**: ~~bloque Open Sans para el cuerpo~~ (quitado el 2026-10-13, todo es Montserrat); y la corrección de contraste del dorado como texto (`.text-warning` → `#1F355C`, íconos se quedan dorados).
 
 No se modificó `esbuild`/`drop console`, el `errorHandler` ni la lógica de notificaciones de `main.js`/`App.vue`.
 
@@ -213,13 +212,20 @@ Todos son **envoltorios delgados** sobre el componente de Vuetify equivalente: f
 | `ResumenMonto` | `<v-card>` + `formatMoney()` | Un monto grande destacado con su etiqueta y, debajo, el equivalente chico en bolívares (inicio del cliente, resumen de "¿Cómo voy?"). |
 | `PasoGuiado` | `<v-progress-linear>` + título | Cabecera "Paso X de Y" de un flujo tipo asistente (ej. modo simple de `SimpleInvoiceForm`). No es un `v-stepper` completo a propósito: en móvil solo hace falta la cabecera. |
 | `HojaInferior` | `<v-bottom-sheet>` (móvil) / `<v-dialog>` (escritorio) | Cualquier formulario o menú contextual que deba verse como hoja inferior en el teléfono y como diálogo centrado en escritorio, con la misma API (`v-model`, slot por defecto, slot `acciones`, prop `titulo`). |
-| `DialogoAdaptable` | `<v-dialog scrollable>` (pantalla completa en xs) | **Todo formulario o contenido que pueda crecer** (subir documento, editar proveedor, ajustar inventario, etc.). Título con ícono + cerrar, contenido con scroll, slot `acciones` fijo abajo, prop `cargando` bloquea el cierre. Regla: ningún `v-dialog` suelto en vistas del cliente. |
+| `DialogoAdaptable` | `<v-dialog scrollable>` (pantalla completa en xs) | **Todo formulario o contenido que pueda crecer** (subir documento, editar proveedor, ajustar inventario, etc.). Título con ícono + cerrar, contenido con scroll, slot `acciones` fijo abajo, prop `cargando` bloquea el cierre. Emite `@cerrar` cada vez que se cierra por CUALQUIER medio (X, clic afuera, Esc) — úsalo para el reset/limpieza propio de la vista en vez de solo el botón "Cancelar" del slot `acciones` (I5, ola F2b). Regla: ningún `v-dialog` suelto en vistas del cliente. |
+| `BarraSegmentos` | botones nativos | Avance como fila de segmentos (uno por elemento): success / error / warning / falta. Se llena en secuencia al montar. Ver `patron-cliente.md`. |
+| `PanelSiguientePaso` | `<v-btn>` | "Tu siguiente paso": UNA acción con botón grande; mensaje de logro cuando `listo`. |
+| `FiltroChips` | `<v-chip-group mandatory>` | Filtros de un toque con cantidad; el activo en negro sólido. |
+| `SeccionLista` | `<section>` | Título de sección + superficie con filas separadas por línea (no una tarjeta por fila). |
+| `ListaPasos` | `BarraSegmentos` + lista | "Primeros pasos" con avance; los pasos se marcan con datos reales. |
 | `ChipTasa` | `<v-chip>` + `<v-tooltip>` | Tasa de cambio compacta SIN etiqueta larga ("$ 36,50"), tooltip fijo "Tasa oficial BCV de hoy". Usado en el app bar (`BarraSuperior`, ≥600px) y en la sección "Tasas del día" de la hoja "Más" del cliente. Pulso sutil cuando `rateValue` cambia. Para la etiqueta larga ("Dólar BCV hoy: Bs 36,50") sigue existiendo `ExchangeRateChip` en `components/common/`. |
 | `EncabezadoPagina` | `<h1>` + `<p>` + slot de acciones | Título editorial de una vista (dentro del contenido, no el app bar): h1 + subtítulo opcional + acciones a la derecha en escritorio (apiladas en móvil). Tipografía según §2.5 (32px móvil / 40px escritorio). |
 | `SelectorPeriodo` | `<v-chip-group>` | Elegir "Este mes" / "Mes pasado" / "Este año" con `v-model` (string) — las tres opciones son fijas, es el único período de la pantalla "¿Cómo voy?" del cliente. Combina con `obtenerRangoPeriodo` de `src/utils/resumenFinanciero.js`. |
+| `FilaMovimiento` | `<v-card>` + `formatMoney()` + `fechas.js` | Fila de una lista de movimientos (facturas/compras/gastos/ventas) en **móvil**, reemplazando una `v-data-table` de muchas columnas que en xs queda ilegible. Quién + detalle (RIF/fecha) a la izquierda, monto + chip de estado a la derecha; toda la tarjeta es tocable (`@abrir`) y accesible por teclado. En escritorio se sigue usando la tabla. |
 | `TarjetaKPI` | Extiende `ResumenMonto` | Una tarjeta resumen con monto animado (USD + Bs chico) y comparación contra el período anterior en lenguaje llano: flecha + color + texto, nunca solo color (`variacion`, `subirEsBueno` deciden el color; el texto sale de `textoComparacion`). Usada por "Vendí" / "Gasté" / "Me queda" en el dashboard del cliente. |
 | `SeccionPanel` | `<v-card>` + `<v-card-item>` | Una sección con título (h2) + subtítulo opcional + contenido (slot por defecto) + acción opcional en la cabecera (slot `accion`). Para cualquier bloque con nombre propio de un dashboard ("Últimos 6 meses", "¿En qué gasto más?") en vez de armar `<v-card><v-card-title>` a mano. |
 | `ListaRanking` | `<v-progress-linear>` | Top N (categorías de gasto, clientes...) como lista de nombre + monto (`formatMoney`) + barra horizontal relativa al primer ítem — las barras crecen desde 0 al aparecer. Recibe `items` ya ordenado (ver `topCategorias`/`topClientes`). |
+| `FilaLista` | `<div>` + `<v-avatar>`/`<v-chip>` | Fila de un listado genérico en móvil (xs) en vez de tabla: ícono opcional + título + subtítulo a la izquierda, valor (`formatMoney`/texto ya formateado) + chip de estado a la derecha, slot `acciones` con botones ícono. Usada en Inventario (productos) y Facturación/Suscripción (historial de pagos del plan). Para movimientos de dinero (ventas/compras/gastos) usa `FilaMovimiento` en su lugar, no la dupliques. |
 | `GraficoBarras` | `BarChart` (chart.js, `src/components/chart/`) | Comparar 2 series por mes (ej. "Vendí" vs "Gasté") con la paleta y las especificaciones de la skill `dataviz` ya aplicadas (barras ≤24px con esquina redondeada 4px, grilla en pelo, tooltip con `formatMoney`, leyenda siempre visible). No reescribe la lógica de chart.js del `BarChart` base. |
 
 **Regla para agregar un componente nuevo a este catálogo:** si Vuetify + un default global en `main.js` ya resuelven el caso, **no crear un componente** — documentar aquí "usa `<v-xxx>` directamente con tal prop" en su lugar.

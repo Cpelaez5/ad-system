@@ -849,7 +849,7 @@ export default {
 
 <style scoped>
 .checkout-page {
-  font-family: 'Inter', 'Open Sans', sans-serif;
+  font-family: 'Montserrat', sans-serif;
 }
 .max-w-1200 {
   max-width: 1200px;

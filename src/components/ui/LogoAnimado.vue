@@ -5,6 +5,7 @@
       'logo-animado--reproduciendo': enMovimiento,
       'logo-animado--bucle': bucle && enMovimiento,
       'logo-animado--sin-movimiento': prefiereMovimientoReducido,
+      'logo-animado--blanco': tono === 'blanco',
     }"
     :style="estiloSvg"
     :viewBox="viewBoxFinal"
@@ -107,6 +108,12 @@ export default {
       type: Boolean,
       default: false,
     },
+    /** 'color' (negro + granate, para fondos claros) | 'blanco' (para fondos oscuros: el negro pasa a blanco y el granate se aclara). */
+    tono: {
+      type: String,
+      default: 'color',
+      validator: (v) => ['color', 'blanco'].includes(v),
+    },
   },
 
   data() {
@@ -156,6 +163,16 @@ export default {
 </script>
 
 <style scoped>
+/* Tono blanco (fondos oscuros, p. ej. el menú lateral): el negro del logo pasa a blanco
+   y el granate se aclara para mantener contraste sobre negro. */
+.logo-animado--blanco [fill='black'] {
+  fill: #ffffff;
+}
+
+.logo-animado--blanco [fill='#8E1818'] {
+  fill: #e05a5a;
+}
+
 .logo-animado {
   overflow: visible;
 }

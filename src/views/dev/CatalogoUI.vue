@@ -10,11 +10,11 @@
       <h2 class="mb-4">LogoAdSystem</h2>
       <div class="d-flex flex-wrap ga-6 align-center">
         <LogoAdSystem variante="completo" tono="color" />
-        <div style="background: #1F355C; padding: 8px; border-radius: 8px;">
+        <div style="background: #2A2A2E; padding: 8px; border-radius: 8px;">
           <LogoAdSystem variante="completo" tono="blanco" />
         </div>
         <LogoAdSystem variante="icono" tono="color" :alto="48" />
-        <div style="background: #1F355C; padding: 8px; border-radius: 8px;">
+        <div style="background: #2A2A2E; padding: 8px; border-radius: 8px;">
           <LogoAdSystem variante="icono" tono="blanco" :alto="48" />
         </div>
       </div>
@@ -48,6 +48,58 @@
         mensaje="Empieza tocando «Gasté o compré algo»."
         texto-accion="Registrar ahora"
       />
+    </section>
+
+    <section class="mb-10">
+      <h2 class="mb-4">FilaMovimiento</h2>
+      <div class="d-flex flex-column ga-2">
+        <FilaMovimiento
+          quien="Ferretería López C.A."
+          subtitulo="RIF J-12345678-9"
+          fecha="2026-10-05"
+          :monto="1250.5"
+          moneda="USD"
+          estado="Pagada"
+          color-estado="success"
+          icono="mdi-arrow-down"
+          color-icono="error"
+        />
+        <FilaMovimiento
+          quien="Comercial Reyes"
+          fecha="2026-10-01"
+          :monto="430"
+          moneda="USD"
+          estado="Crédito"
+          color-estado="warning"
+          icono="mdi-arrow-up"
+          color-icono="success"
+        />
+      </div>
+    </section>
+
+    <section class="mb-10">
+      <h2 class="mb-4">FilaLista</h2>
+      <div class="d-flex flex-column">
+        <FilaLista
+          icono="mdi-package-variant-closed"
+          titulo="Harina de trigo 1kg"
+          subtitulo="COD-001 · 12 Und"
+          valor="$ 2,50"
+          estado="Stock bajo"
+          color-estado="warning"
+        >
+          <template #acciones>
+            <v-btn icon="mdi-pencil" size="small" variant="text" />
+          </template>
+        </FilaLista>
+        <FilaLista
+          titulo="Plan Profesional — oct 2026"
+          subtitulo="01/10/2026 — 31/10/2026"
+          valor="$ 25,00"
+          estado="Pagada"
+          color-estado="success"
+        />
+      </div>
     </section>
 
     <section class="mb-10">
@@ -194,6 +246,8 @@ import ListaRanking from '@/components/ui/ListaRanking.vue'
 import GraficoBarras from '@/components/ui/GraficoBarras.vue'
 import ChipTasa from '@/components/ui/ChipTasa.vue'
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import FilaMovimiento from '@/components/ui/FilaMovimiento.vue'
+import FilaLista from '@/components/ui/FilaLista.vue'
 
 /**
  * CatalogoUI — vitrina de los componentes de src/components/ui/ para
@@ -219,6 +273,8 @@ export default {
     GraficoBarras,
     ChipTasa,
     EncabezadoPagina,
+    FilaMovimiento,
+    FilaLista,
   },
 
   data() {

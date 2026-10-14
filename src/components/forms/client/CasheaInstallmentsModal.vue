@@ -1,34 +1,19 @@
 <template>
   <!-- Modal Rápido de Cuotas Cashea -->
-  <v-dialog
+  <DialogoAdaptable
     :model-value="modelValue"
     @update:modelValue="$emit('update:modelValue', $event)"
-    max-width="480px"
+    titulo="Gestión de Cuotas Cashea"
+    icono="mdi-credit-card-clock-outline"
+    max-width="480"
     persistent
-    @keydown.esc="cancel"
+    :cargando="saving"
+    class="cashea-modal"
   >
-    <v-card class="cashea-modal rounded-xl" style="overflow: hidden;">
-
-      <!-- ── Header ─────────────────────────────────────────────── -->
-      <div class="cashea-header d-flex align-center px-4 py-4">
-        <!-- Badge con ícono Cashea (amarillo sobre azul) -->
-        <div class="cashea-icon-badge flex-shrink-0">
-          <img src="/Cashea-black-icon.svg" alt="Cashea" width="20" height="20" />
+        <div class="cashea-header-sub text-truncate mb-3">
+          <img src="/Cashea-black-icon.svg" alt="" width="14" height="14" class="mr-1" style="vertical-align: -2px;" />
+          {{ invoice?.invoiceNumber }} &middot; {{ invoice?.client?.companyName || invoice?.issuer?.companyName || '—' }}
         </div>
-        <!-- Título y subtítulo -->
-        <div class="ml-3 flex-grow-1" style="min-width: 0;">
-          <div class="cashea-header-title">Gestión de Cuotas Cashea</div>
-          <div class="cashea-header-sub text-truncate">
-            {{ invoice?.invoiceNumber }} &middot; {{ invoice?.client?.companyName || invoice?.issuer?.companyName || '—' }}
-          </div>
-        </div>
-        <!-- Botón cerrar (blanco sobre azul) -->
-        <v-btn icon="mdi-close" variant="text" size="small" color="white" style="opacity: 0.7;" class="ml-2 flex-shrink-0" @click="cancel" />
-      </div>
-      <v-divider style="border-color: rgba(255,255,255,0.15);" />
-
-      <!-- ── Body ────────────────────────────────────────────────── -->
-      <v-card-text class="px-4 pb-4 pt-3" style="max-height: 68vh; overflow-y: auto;">
 
         <!-- Resumen -->
         <div class="cashea-summary-row mb-4 pa-3 rounded-lg d-flex justify-space-between align-center">
@@ -130,37 +115,34 @@
           </div>
         </div>
 
-      </v-card-text>
-
-      <!-- ── Footer ──────────────────────────────────────────────── -->
-      <v-divider />
-      <v-card-actions class="px-4 py-3">
-        <v-btn variant="text" color="grey" size="small" @click="cancel">Cancelar</v-btn>
-        <v-spacer />
-        <v-btn
-          variant="flat"
-          size="small"
-          :loading="saving"
-          :disabled="!hasChanges"
-          class="cashea-save-btn px-4"
-          @click="save"
-        >
-          <img src="/Cashea-black-icon.svg" alt="" width="12" height="12" class="mr-1" />
-          Guardar Cambios
-        </v-btn>
-      </v-card-actions>
-
-    </v-card>
-  </v-dialog>
+    <template #acciones>
+      <v-btn variant="text" color="grey" size="small" :disabled="saving" @click="cancel">Cancelar</v-btn>
+      <v-spacer />
+      <v-btn
+        variant="flat"
+        size="small"
+        :loading="saving"
+        :disabled="!hasChanges"
+        class="cashea-save-btn px-4"
+        @click="save"
+      >
+        <img src="/Cashea-black-icon.svg" alt="" width="12" height="12" class="mr-1" />
+        Guardar Cambios
+      </v-btn>
+    </template>
+  </DialogoAdaptable>
 </template>
 
 
 
 <script>
 import invoiceService from '@/services/invoiceService.js';
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
 
 export default {
   name: 'CasheaInstallmentsModal',
+
+  components: { DialogoAdaptable },
 
   props: {
     /** Controla la visibilidad del modal (v-model) */
@@ -345,33 +327,11 @@ export default {
 </script>
 
 <style scoped>
-/* ── Header ──────────────────────────────────────────────────── */
-.cashea-header {
-  background: linear-gradient(135deg, #1F355C 0%, #2d4a7c 100%);
-}
-
-.cashea-icon-badge {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  background: #fdfa3d;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cashea-header-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #ffffff;
-  line-height: 1.3;
-}
-
+/* ── Subtítulo (factura/cliente) ──────────────────────────────── */
 .cashea-header-sub {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: 1px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
 }
 
 /* ── Etiqueta de sección ─────────────────────────────────────── */

@@ -1219,16 +1219,16 @@ export default {
   gap: 12px;
   background: #f0f7ff;
   border: 1px solid #bfdbfe;
-  border-left: 4px solid #1F355C;
+  border-left: 4px solid #2A2A2E;
   border-radius: 8px;
   padding: 14px 16px;
   margin: 16px 0;
-  color: #1F355C;
+  color: #2A2A2E;
 }
 
 .invite-info-icon {
   font-size: 22px;
-  color: #1F355C;
+  color: #2A2A2E;
   line-height: 1;
 }
 
@@ -1236,7 +1236,7 @@ export default {
   display: block;
   font-size: 13px;
   margin-bottom: 2px;
-  color: #1F355C;
+  color: #2A2A2E;
 }
 
 .invite-info-text p {
