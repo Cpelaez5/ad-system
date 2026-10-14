@@ -361,13 +361,19 @@
     />
 
     <template v-else>
+      <!-- M2: en móvil no había ningún indicador mientras loading estaba
+           activo (ni skeleton ni EstadoVacio) — se veía la pantalla en
+           blanco un instante. -->
+      <div v-if="loading && $vuetify.display.xs" class="d-flex flex-column ga-2">
+        <v-skeleton-loader v-for="n in 4" :key="n" type="list-item-two-line" />
+      </div>
       <EstadoVacio
-        v-if="!loading && filteredInvoices.length === 0"
+        v-else-if="!loading && filteredInvoices.length === 0"
         :icono="estadoVacioIcono"
         :titulo="estadoVacioTitulo"
         :mensaje="estadoVacioMensaje"
-        :texto-accion="(currentTab === 'trash' || currentTab === 'retenciones') ? '' : 'Nuevo Registro'"
-        @accion="openNewInvoiceDialog"
+        :texto-accion="estadoVacioPorFiltro ? 'Limpiar filtros' : ((currentTab === 'trash' || currentTab === 'retenciones') ? '' : 'Nuevo Registro')"
+        @accion="estadoVacioPorFiltro ? clearFilters() : openNewInvoiceDialog()"
       />
 
       <template v-else>
@@ -377,17 +383,18 @@
             v-for="(item, i) in filteredInvoices"
             :key="item.id"
             class="ad-move-entrada"
-            :style="{ animationDelay: `${Math.min(i, 12) * 50}ms` }"
-            :quien="item.flow === 'VENTA' ? item.client?.companyName : item.issuer?.companyName"
+            :style="{ animationDelay: `calc(var(--ad-move-escalon-lista) * ${Math.min(i, 12)})` }"
+            :quien="(item.flow === 'VENTA' ? item.client?.companyName : item.issuer?.companyName) || 'Sin nombre'"
             :subtitulo="item.invoiceNumber"
             :fecha="item.issueDate"
-            :monto="getDisplayAmount(item)"
-            :moneda="currencyDisplay"
+            :monto="getDisplayAmountYMoneda(item).monto"
+            :moneda="getDisplayAmountYMoneda(item).moneda"
+            :equivalente="getEquivalentAmount(item)"
             :estado="item.status"
             :color-estado="getStatusColor(item.status)"
             :icono="item.flow === 'VENTA' ? 'mdi-arrow-up' : 'mdi-arrow-down'"
             :color-icono="item.flow === 'VENTA' ? 'success' : 'error'"
-            @abrir="currentTab !== 'trash' && viewInvoice(item)"
+            @abrir="viewInvoice(item)"
           />
         </div>
 
@@ -884,38 +891,93 @@
       </template>
 
       <template #acciones>
-        <!-- Menú de Descargas Unificado (Modal) -->
-        <v-menu v-if="viewingInvoice">
-          <template v-slot:activator="{ props }">
-            <v-btn
-              color="success"
-              variant="tonal"
-              prepend-icon="mdi-download"
-              v-bind="props"
-            >
-              Descargas
-            </v-btn>
-          </template>
-          <v-list density="compact">
-            <v-list-item @click="downloadReceiptPdf(viewingInvoice)" prepend-icon="mdi-file-pdf-box">
-              <v-list-item-title>Ver / Descargar Resumen en PDF</v-list-item-title>
-            </v-list-item>
-            <v-list-item v-if="hasAttachment(viewingInvoice)" @click="downloadAttachment(viewingInvoice)" prepend-icon="mdi-paperclip">
-              <v-list-item-title>Ver / Descargar Foto Adjunta</v-list-item-title>
-            </v-list-item>
-            <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.islr > 0) || (viewingInvoice.financial && viewingInvoice.financial.islrRetention > 0)" @click="downloadISLR(viewingInvoice)" prepend-icon="mdi-file-percent">
-              <v-list-item-title>Descargar Comprobante ISLR (PDF)</v-list-item-title>
-            </v-list-item>
-            <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.iva > 0) || (viewingInvoice.financial && viewingInvoice.financial.ivaRetention > 0)" @click="downloadIVA(viewingInvoice)" prepend-icon="mdi-file-certificate">
-              <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
-            </v-list-item>
-            <v-list-item v-if="canDownloadMunicipal(viewingInvoice)" @click="downloadMunicipal(viewingInvoice)" prepend-icon="mdi-file-document-outline">
-              <v-list-item-title>Descargar Comprobante Municipal (PDF)</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-menu>
+        <!-- C1 (ola F2b): en móvil la tabla de escritorio se reemplaza por
+             FilaMovimiento, que solo abre este diálogo al tocar la fila — así
+             que las mismas acciones de la fila de escritorio (Editar, Cuotas
+             Cashea, Mover a papelera / Restaurar / Eliminar definitivamente)
+             tienen que estar también acá, no solo en la tabla. -->
+        <template v-if="viewingInvoice && currentTab === 'trash'">
+          <v-btn
+            color="success"
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            style="min-height: 44px;"
+            @click="restaurarDesdeDetalle"
+          >
+            Restaurar
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="tonal"
+            prepend-icon="mdi-delete-forever"
+            style="min-height: 44px;"
+            @click="moverAPapeleraDesdeDetalle"
+          >
+            Eliminar definitivamente
+          </v-btn>
+        </template>
+        <template v-else-if="viewingInvoice">
+          <v-btn
+            v-if="viewingInvoice.financial?.paymentMethod === 'CASHEA'"
+            variant="tonal"
+            style="background-color: #fdfa3d; color: #000; min-height: 44px;"
+            @click="cuotasCasheaDesdeDetalle"
+          >
+            <img src="/Cashea-black-icon.svg" alt="Cashea" width="14" height="14" class="mr-1" />
+            Cuotas Cashea
+          </v-btn>
+          <v-btn
+            color="warning"
+            variant="tonal"
+            prepend-icon="mdi-pencil"
+            style="min-height: 44px;"
+            @click="editarDesdeDetalle"
+          >
+            Editar
+          </v-btn>
+          <!-- Menú de Descargas Unificado (Modal) -->
+          <v-menu>
+            <template v-slot:activator="{ props }">
+              <v-btn
+                color="success"
+                variant="tonal"
+                prepend-icon="mdi-download"
+                style="min-height: 44px;"
+                v-bind="props"
+              >
+                Descargas
+              </v-btn>
+            </template>
+            <v-list density="compact">
+              <v-list-item @click="downloadReceiptPdf(viewingInvoice)" prepend-icon="mdi-file-pdf-box">
+                <v-list-item-title>Ver / Descargar Resumen en PDF</v-list-item-title>
+              </v-list-item>
+              <v-list-item v-if="hasAttachment(viewingInvoice)" @click="downloadAttachment(viewingInvoice)" prepend-icon="mdi-paperclip">
+                <v-list-item-title>Ver / Descargar Foto Adjunta</v-list-item-title>
+              </v-list-item>
+              <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.islr > 0) || (viewingInvoice.financial && viewingInvoice.financial.islrRetention > 0)" @click="downloadISLR(viewingInvoice)" prepend-icon="mdi-file-percent">
+                <v-list-item-title>Descargar Comprobante ISLR (PDF)</v-list-item-title>
+              </v-list-item>
+              <v-list-item v-if="(viewingInvoice.retenciones && viewingInvoice.retenciones.iva > 0) || (viewingInvoice.financial && viewingInvoice.financial.ivaRetention > 0)" @click="downloadIVA(viewingInvoice)" prepend-icon="mdi-file-certificate">
+                <v-list-item-title>Descargar Comprobante IVA (PDF)</v-list-item-title>
+              </v-list-item>
+              <v-list-item v-if="canDownloadMunicipal(viewingInvoice)" @click="downloadMunicipal(viewingInvoice)" prepend-icon="mdi-file-document-outline">
+                <v-list-item-title>Descargar Comprobante Municipal (PDF)</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+          <v-btn
+            color="error"
+            variant="text"
+            prepend-icon="mdi-delete"
+            style="min-height: 44px;"
+            @click="moverAPapeleraDesdeDetalle"
+          >
+            Mover a papelera
+          </v-btn>
+        </template>
         <v-spacer></v-spacer>
-        <v-btn color="primary" variant="elevated" @click="viewDialog = false" class="px-6">
+        <v-btn color="primary" variant="elevated" @click="viewDialog = false" class="px-6" style="min-height: 44px;">
           Cerrar
         </v-btn>
       </template>
@@ -1003,6 +1065,7 @@
     <!-- Diálogo de filtros de fecha para exportación (UX Mejorado) -->
     <DialogoAdaptable
       v-model="exportDateDialog"
+      @cerrar="cancelExportDateDialog"
       titulo="Exportar registros"
       icono="mdi-file-export-outline"
       max-width="520"
@@ -1195,6 +1258,7 @@
     <!-- ── Diálogo confirmación retención municipal ─────────── -->
     <DialogoAdaptable
       v-model="municipalConfirmDialog"
+      @cerrar="resolverMunicipalConfirm(false)"
       titulo="Tu proveedor está en otro municipio"
       icono="mdi-map-marker-alert-outline"
       max-width="420"
@@ -1460,8 +1524,16 @@ export default {
       return 'VENTA';
     },
 
+    // M1 (ola F2b): si hay búsqueda/filtros activos (no el simple recorte por
+    // pestaña), la lista vacía no significa "aún no registras nada" — significa
+    // que ESOS filtros no encontraron nada. Mensaje distinto + "Limpiar filtros"
+    // en vez de "Nuevo Registro" (que sería confuso: sí hay registros).
+    estadoVacioPorFiltro() {
+      return this.activeFiltersCount > 0;
+    },
     // Copy del estado vacío según la pestaña activa (en lenguaje llano, enseña qué tocar)
     estadoVacioIcono() {
+      if (this.estadoVacioPorFiltro) return 'mdi-filter-remove-outline';
       const iconos = {
         ventas: 'mdi-cash-plus',
         compras: 'mdi-cart',
@@ -1472,6 +1544,7 @@ export default {
       return iconos[this.currentTab] || 'mdi-receipt-text-outline';
     },
     estadoVacioTitulo() {
+      if (this.estadoVacioPorFiltro) return 'No hay resultados con estos filtros';
       const titulos = {
         ventas: 'Aún no registras ventas',
         compras: 'Aún no registras compras',
@@ -1482,6 +1555,7 @@ export default {
       return titulos[this.currentTab] || 'Aún no registras movimientos';
     },
     estadoVacioMensaje() {
+      if (this.estadoVacioPorFiltro) return 'Prueba con otra búsqueda o quita algún filtro.';
       const mensajes = {
         ventas: 'Toca «Nuevo Registro» y tómale foto a tu factura de venta.',
         compras: 'Toca «Nuevo Registro» y tómale foto a tu factura de compra.',
@@ -1914,6 +1988,35 @@ export default {
       this.deleteDialog = true;
     },
 
+    // C1 (ola F2b): acciones del diálogo de detalle (el único punto de
+    // entrada en móvil, donde la tabla se reemplaza por FilaMovimiento).
+    // Cierran el diálogo de detalle primero para no apilarlo con el
+    // siguiente (editar, confirmar borrado...).
+    editarDesdeDetalle() {
+      if (!this.viewingInvoice) return;
+      this.viewDialog = false;
+      this.editInvoice(this.viewingInvoice);
+    },
+    // Sirve tanto para "Mover a papelera" (tabs normales) como para
+    // "Eliminar definitivamente" (tab Papelera): deleteInvoice() abre el
+    // mismo diálogo de confirmación, que ya distingue el texto y la acción
+    // según currentTab (ver confirmDelete).
+    moverAPapeleraDesdeDetalle() {
+      if (!this.viewingInvoice) return;
+      this.viewDialog = false;
+      this.deleteInvoice(this.viewingInvoice);
+    },
+    async restaurarDesdeDetalle() {
+      if (!this.viewingInvoice) return;
+      this.viewDialog = false;
+      await this.restoreInvoice(this.viewingInvoice);
+    },
+    cuotasCasheaDesdeDetalle() {
+      if (!this.viewingInvoice) return;
+      this.viewDialog = false;
+      this.openCasheaDialog(this.viewingInvoice);
+    },
+
     /** Abre el modal rápido de cuotas Cashea */
     openCasheaDialog(invoice) {
       // Clonar para evitar mutaciones directas antes de guardar
@@ -2106,6 +2209,27 @@ export default {
         return this.convertedAmounts[invoice.id] != null ? this.convertedAmounts[invoice.id] : 0;
       }
       return invoice.financial?.totalSales || 0;
+    },
+
+    // I1: versión "cruda" (monto + moneda, no un string ya formateado) de
+    // getFormattedDisplayAmount, para la lista móvil (FilaMovimiento, que
+    // formatea internamente con formatMoney). Antes la lista móvil usaba
+    // getDisplayAmount() + currencyDisplay siempre, así que una factura en
+    // USD se pintaba como si fuera VES (o se convertía como si ya fuera VES
+    // en vista USD). Con esto respeta la moneda real de CADA factura, igual
+    // que la tabla de escritorio.
+    getDisplayAmountYMoneda(invoice) {
+      if (this.currencyDisplay === 'USD') {
+        if (invoice.financial?.currency === 'USD') {
+          return { monto: invoice.financial.totalSales || 0, moneda: 'USD' };
+        }
+        const converted = this.convertedAmounts[invoice.id] !== undefined ? this.convertedAmounts[invoice.id] : 0;
+        return { monto: converted, moneda: 'USD' };
+      }
+      return {
+        monto: invoice.financial?.totalSales || 0,
+        moneda: invoice.financial?.currency || 'VES'
+      };
     },
     
     async convertAmountToUSD(amountInVES) {

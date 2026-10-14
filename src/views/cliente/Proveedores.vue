@@ -191,15 +191,19 @@
     </div>
 
     <!-- Estado Vacío (Empty State) -->
+    <!-- M1 (ola F2b): un chip de filtro activo (JURIDICA/NATURAL/CON_IVA/...)
+         sin texto de búsqueda también cuenta como "hay un filtro aplicado",
+         no solo searchQuery — antes mostraba "Todavía no tienes proveedores"
+         aunque sí los tuviera, solo que el filtro los dejó todos afuera. -->
     <EstadoVacio
       v-else-if="filteredProveedores.length === 0"
-      icono="mdi-domain-off"
-      :titulo="searchQuery ? 'No hay resultados para tu búsqueda' : 'Todavía no tienes proveedores'"
-      :mensaje="searchQuery
-        ? 'Intenta con otro término de búsqueda o limpia los filtros activos.'
+      :icono="(searchQuery || activeFilter !== 'ALL') ? 'mdi-filter-remove-outline' : 'mdi-domain-off'"
+      :titulo="(searchQuery || activeFilter !== 'ALL') ? 'No hay resultados con estos filtros' : 'Todavía no tienes proveedores'"
+      :mensaje="(searchQuery || activeFilter !== 'ALL')
+        ? 'Prueba con otra búsqueda o quita algún filtro.'
         : 'Registra tus proveedores con sus parámetros fiscales para automatizar compras y comprobantes de retención.'"
-      :texto-accion="searchQuery ? 'Limpiar filtros' : 'Registrar primer proveedor'"
-      @accion="searchQuery ? limpiarFiltros() : openCreateModal()"
+      :texto-accion="(searchQuery || activeFilter !== 'ALL') ? 'Limpiar filtros' : 'Registrar primer proveedor'"
+      @accion="(searchQuery || activeFilter !== 'ALL') ? limpiarFiltros() : openCreateModal()"
     />
 
     <!-- A. VISTA MÓVIL: FEED DE TARJETAS TÁCTILES FIRST MOBILE -->

@@ -11,6 +11,7 @@
 
 import { supabase } from '@/lib/supabaseClient'
 import { getCurrentOrganizationId, getCurrentClientId } from '@/utils/tenantHelpers'
+import { normalizarRif } from '@/utils/rif.js'
 
 // Caché en memoria
 let cachedConceptosIslr = null
@@ -579,6 +580,36 @@ class ProveedorService {
       console.error('❌ [ProveedorService] Error en getProveedorById:', error)
       return null
     }
+  }
+
+  /**
+   * Busca un proveedor existente (activo) cuyo RIF normalizado coincida,
+   * para comprobar duplicados ANTES de crear uno nuevo (I4, ola F2b). A
+   * diferencia de `getProveedores`, que devuelve `[]` ante cualquier error
+   * (pensado para no romper una lista), esta función SÍ lanza si la
+   * consulta falla: quien llama (p. ej. el proveedor pendiente del OCR) no
+   * debe decidir "no hay duplicados" solo porque la red falló.
+   * @param {string} rifNormalizado - ya normalizado con src/utils/rif.js.
+   * @returns {Promise<Object|null>} el proveedor existente, o null si no hay match.
+   */
+  async buscarPorRifNormalizado(rifNormalizado) {
+    if (!rifNormalizado) return null
+
+    const { orgId, clientId } = await this._getEffectiveContext()
+    if (!orgId) throw new Error('No hay una organización activa en la sesión.')
+
+    let query = supabase
+      .from('proveedores')
+      .select('id, rif, nombre')
+      .eq('organization_id', orgId)
+      .is('deleted_at', null)
+
+    if (clientId) query = query.eq('client_id', clientId)
+
+    const { data, error } = await query
+    if (error) throw error
+
+    return (data || []).find(p => normalizarRif(p.rif) === rifNormalizado) || null
   }
 
   /**

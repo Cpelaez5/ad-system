@@ -18,34 +18,43 @@ import { normalizarRif } from './rif'
 // Reglas por palabras clave. Los patrones corren sobre texto sin tildes y en
 // minúsculas (ver `normalizarTexto`). El orden importa: la primera regla que
 // matchea gana.
+// Nota (I9): los patrones corren SOLO sobre el nombre del proveedor y la
+// descripción de los ítems (ver `sugerirCategoria`), nunca sobre notas
+// libres del OCR ("Teléfono:", "Tlf:", "Email:" suelen venir ahí y daban
+// falsos positivos). Todos con límite de palabra (`\b`) para no matchear
+// una palabra que solo contiene el patrón como subcadena (p. ej. una
+// "ferretería eléctrica" no es un pago de electricidad).
 const REGLAS_PALABRAS_CLAVE = [
   {
     categoria: 'Electricidad',
-    patrones: [/corpelec/, /electricidad/, /\belectrica\b/, /luz electrica/]
+    patrones: [/\bcorpelec\b/, /\belectricidad\b/, /\bluz electrica\b/]
   },
   {
     categoria: 'Internet y telefonía',
-    patrones: [/\binter\b/, /internet/, /telefon/, /movistar/, /digitel/, /\bcantv\b/]
+    patrones: [/\binter\b/, /\binternet\b/, /\btelefon/, /\bmovistar\b/, /\bdigitel\b/, /\bcantv\b/]
   },
   {
     categoria: 'Papelería e imprenta',
-    patrones: [/papeler/, /imprenta/, /impresion/, /fotocopia/]
+    patrones: [/\bpapeler/, /\bimprenta\b/, /\bimpresion/, /\bfotocopia/]
   },
   {
     categoria: 'Comida',
-    patrones: [/restaurant/, /\bcomida\b/, /almuerzo/, /panaderia/, /charcuteria/]
+    patrones: [/\brestaurant/, /\bcomida\b/, /\balmuerzo\b/, /\bpanaderia/, /\bcharcuteria/]
   },
   {
     categoria: 'Combustible',
-    patrones: [/combustible/, /gasolina/, /estacion de servicio/, /\bpdv\b/]
+    // "pdv" (sin "sa") significa casi siempre "punto de venta" (pago con
+    // tarjeta) en Venezuela, no "Petróleos de Venezuela": se quita para no
+    // marcar como Combustible cualquier compra pagada con tarjeta.
+    patrones: [/\bcombustible\b/, /\bgasolina\b/, /\bestacion de servicio\b/, /\bpdvsa\b/]
   },
   {
     categoria: 'Alquiler',
-    patrones: [/alquiler/, /arrendamiento/, /canon de arrendamiento/]
+    patrones: [/\balquiler\b/, /\barrendamiento\b/, /\bcanon de arrendamiento\b/]
   },
   {
     categoria: 'Compras en línea',
-    patrones: [/amazon/, /mercado ?libre/, /\bebay\b/, /aliexpress/, /compra en linea/, /compras en linea/]
+    patrones: [/\bamazon\b/, /\bmercado ?libre\b/, /\bebay\b/, /\baliexpress\b/, /\bcompras? en linea\b/]
   }
 ]
 
@@ -60,6 +69,7 @@ function normalizarTexto(texto) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
+    .trim()
 }
 
 /**
@@ -98,8 +108,12 @@ export function sugerirCategoria({ proveedor = null, items = [], textoOcr = '', 
   }
 
   // (b) reglas por palabras clave ──────────────────────────────────────────
+  // I9: solo nombre del proveedor + descripción de ítems. Las notas libres
+  // del OCR (`textoOcr`) quedan afuera a propósito: ahí es donde aparecen
+  // etiquetas como "Teléfono:", "Tlf:" o "Email:" que daban falsos positivos
+  // (p. ej. "Teléfono: 0212…" sugería "Internet y telefonía").
   const descripcionesItems = Array.isArray(items) ? items.map(i => i?.description || '') : []
-  const bolsaTexto = normalizarTexto([nombreProveedor, textoOcr, ...descripcionesItems].join(' '))
+  const bolsaTexto = normalizarTexto([nombreProveedor, ...descripcionesItems].join(' '))
 
   for (const regla of REGLAS_PALABRAS_CLAVE) {
     if (regla.patrones.some(patron => patron.test(bolsaTexto))) {
@@ -121,6 +135,24 @@ export function sugerirCategoria({ proveedor = null, items = [], textoOcr = '', 
   }
 
   return { categoria: null, confianza: 0, motivo: null }
+}
+
+/**
+ * Busca, entre categorías reales (`{ id, name }`), una cuyo nombre coincida
+ * EXACTO (normalizado: sin tildes, minúsculas) con el nombre sugerido. Nunca
+ * hace coincidencia parcial (I9: antes también aceptaba que un nombre fuera
+ * subcadena del otro, lo que podía elegir una categoría de nombre corto o
+ * genérico del cliente) y nunca inventa una categoría nueva: si no existe,
+ * devuelve `null` para que la persona la elija o la cree a mano.
+ * @param {string} nombreSugerido
+ * @param {Array<{ id: string, name: string }>} categorias - categorías reales del cliente.
+ * @returns {{ id: string, name: string }|null}
+ */
+export function resolverCategoriaPorNombre(nombreSugerido, categorias) {
+  const objetivo = normalizarTexto(nombreSugerido)
+  if (!objetivo) return null
+  const lista = Array.isArray(categorias) ? categorias : []
+  return lista.find(c => normalizarTexto(c.name) === objetivo) || null
 }
 
 export default sugerirCategoria

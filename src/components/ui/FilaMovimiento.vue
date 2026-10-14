@@ -3,7 +3,7 @@
     class="fila-movimiento ad-move-press"
     role="button"
     tabindex="0"
-    :aria-label="`${quien}, ${montoFormateado}, ${estado || ''}`"
+    :aria-label="`${quien || 'Sin nombre'}, ${montoFormateado}, ${estado || ''}`"
     @click="$emit('abrir', $event)"
     @keydown.enter="$emit('abrir', $event)"
     @keydown.space.prevent="$emit('abrir', $event)"
@@ -13,7 +13,9 @@
         <v-icon :icon="icono" :color="colorIcono" size="22" aria-hidden="true" />
       </template>
 
-      <v-card-title class="fila-movimiento__quien">{{ quien }}</v-card-title>
+      <!-- M7 (ola F2b): `quien` es obligatorio, pero si al emisor/cliente le
+           falta companyName llega undefined (warning de Vue + título vacío). -->
+      <v-card-title class="fila-movimiento__quien">{{ quien || 'Sin nombre' }}</v-card-title>
       <v-card-subtitle v-if="subtitulo || fechaFormateada" class="fila-movimiento__detalle">
         <span v-if="subtitulo">{{ subtitulo }}</span>
         <span v-if="subtitulo && fechaFormateada"> · </span>
@@ -23,9 +25,15 @@
       <template #append>
         <div class="fila-movimiento__derecha">
           <div class="fila-movimiento__monto">{{ montoFormateado }}</div>
+          <div v-if="equivalente" class="fila-movimiento__equivalente">≈ {{ equivalente }}</div>
           <v-chip v-if="estado" :color="colorEstado" variant="tonal" size="small" class="mt-1">
             {{ estado }}
           </v-chip>
+        </div>
+        <!-- C1 (ola F2b): acciones además de "ver detalle" (tocar la fila).
+             @click.stop para que tocar un botón de acá NO dispare "abrir". -->
+        <div v-if="$slots.acciones" class="fila-movimiento__acciones" @click.stop @keydown.enter.stop @keydown.space.stop>
+          <slot name="acciones" />
         </div>
       </template>
     </v-card-item>
@@ -89,6 +97,13 @@ export default {
       type: String,
       default: 'grey',
     },
+    /** Monto ya formateado en la OTRA moneda, para mostrar como referencia
+     * bajo el monto principal (p. ej. "≈ Bs 3.600,00" bajo "$100,00"). I1:
+     * igual que la tabla de escritorio, que siempre muestra el equivalente. */
+    equivalente: {
+      type: String,
+      default: '',
+    },
   },
 
   emits: ['abrir'],
@@ -147,6 +162,19 @@ export default {
   font-size: 0.95rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.fila-movimiento__equivalente {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.fila-movimiento__acciones {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {

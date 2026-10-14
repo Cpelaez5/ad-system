@@ -76,4 +76,35 @@ describe('sugerirCategoria', () => {
     expect(() => sugerirCategoria({})).not.toThrow()
     expect(() => sugerirCategoria(undefined)).not.toThrow()
   })
+
+  // I9: falsos positivos del vocabulario venezolano ──────────────────────
+  it('no sugiere Combustible por "Pago PDV" en las notas (PDV = punto de venta)', () => {
+    const r = sugerirCategoria({
+      proveedor: { nombre: 'Distribuidora XYZ' },
+      textoOcr: 'Pago PDV Banesco'
+    })
+    expect(r.categoria).not.toBe('Combustible')
+  })
+
+  it('no sugiere nada a partir de una etiqueta "Teléfono:" en las notas', () => {
+    const r = sugerirCategoria({
+      proveedor: { nombre: 'Distribuidora XYZ' },
+      textoOcr: 'Teléfono: 0212-1234567'
+    })
+    expect(r.categoria).toBeNull()
+  })
+
+  it('no confunde una "ferretería eléctrica" con el servicio de Electricidad', () => {
+    const r = sugerirCategoria({
+      proveedor: { nombre: 'Ferretería Eléctrica Los Andes' }
+    })
+    expect(r.categoria).not.toBe('Electricidad')
+  })
+
+  it('sí sugiere Combustible con "PDVSA" (Petróleos de Venezuela)', () => {
+    const r = sugerirCategoria({
+      proveedor: { nombre: 'PDVSA Estación El Llanito' }
+    })
+    expect(r.categoria).toBe('Combustible')
+  })
 })

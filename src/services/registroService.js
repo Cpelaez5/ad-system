@@ -16,9 +16,10 @@ import invoiceService from '@/services/invoiceService.js'
 import retentionRpcService from '@/services/retentionRpcService.js'
 import emailNotificationService from '@/services/email-notification-service.js'
 import proveedorService from '@/services/proveedorService.js'
+import inventoryService from '@/services/inventoryService.js'
 import { supabase } from '@/lib/supabaseClient'
 import { logger } from '@/utils/logger'
-import { normalizarRif } from '@/utils/rif.js'
+import { normalizarRif, tipoPersonaPorLetra } from '@/utils/rif.js'
 
 /**
  * Si el OCR no encontró el proveedor (emisor) en el directorio del cliente,
@@ -31,38 +32,64 @@ import { normalizarRif } from '@/utils/rif.js'
  * `guardarRegistro`, que solo se llama al guardar de verdad.
  *
  * @param {{ nombre?: string, rif?: string, direccion?: string, telefono?: string, email?: string }} pendiente
- * @returns {Promise<{ success: boolean, id?: string, rif?: string, message?: string }>}
+ * @returns {Promise<{ success: boolean, id?: string, rif?: string, creado?: boolean, message?: string }>}
+ *   `creado: true` solo cuando esta llamada insertó una fila nueva (no un
+ *   match existente) — lo usa `guardarRegistro` para decidir si debe
+ *   compensar (borrar) el proveedor si la factura falla justo después (I4).
  */
 async function resolverProveedorPendiente(pendiente) {
+  const rifNormalizado = normalizarRif(pendiente?.rif)
+  if (!rifNormalizado) {
+    return { success: false, message: 'El proveedor leído del documento no tiene un RIF reconocible; selecciónalo o créalo manualmente.' }
+  }
+
+  // I4: puede que ya exista (otra pestaña, el botón "Nuevo", u otro registro
+  // guardado mientras tanto) — nunca duplicar por RIF. A diferencia de
+  // `proveedorService.getProveedores` (que devuelve [] ante cualquier
+  // error), `buscarPorRifNormalizado` SÍ lanza si la consulta falla: si no
+  // podemos comprobar duplicados, NO seguimos a crear uno (podría ser el
+  // mismo proveedor que ya existe) y avisamos en vez de arriesgarnos.
+  let existente
   try {
-    const rifNormalizado = normalizarRif(pendiente?.rif)
-    if (!rifNormalizado) {
-      return { success: false, message: 'El proveedor leído del documento no tiene un RIF reconocible; selecciónalo o créalo manualmente.' }
-    }
+    existente = await proveedorService.buscarPorRifNormalizado(rifNormalizado)
+  } catch (err) {
+    logger.warn('[registroService]', 'No se pudo comprobar si el proveedor ya existía antes de crearlo', err?.message)
+    return { success: false, message: 'No pudimos comprobar si este proveedor ya existe (revisa tu conexión). No se creó ni se guardó nada; intenta de nuevo.' }
+  }
 
-    // Puede que ya exista (otra pestaña, el botón "Nuevo", u otro registro
-    // guardado mientras tanto): nunca duplicar por RIF.
-    const existentes = await proveedorService.getProveedores({ onlyActive: true })
-    const match = (existentes || []).find(p => normalizarRif(p.rif) === rifNormalizado)
-    if (match) {
-      return { success: true, id: match.id, rif: match.rif }
-    }
+  if (existente) {
+    return { success: true, id: existente.id, rif: existente.rif, creado: false }
+  }
 
-    const esNatural = /^[VE]-/.test(rifNormalizado)
+  try {
     const creado = await proveedorService.createProveedor({
       nombre: pendiente.nombre || '',
       rif: rifNormalizado,
       direccion: pendiente.direccion || null,
       telefono: pendiente.telefono || null,
       email: pendiente.email || null,
-      tipo_persona: esNatural ? 'NATURAL' : 'JURIDICA'
+      tipo_persona: tipoPersonaPorLetra(rifNormalizado)
     })
 
-    if (!creado.success) {
-      return { success: false, message: creado.error || 'No se pudo registrar el proveedor nuevo.' }
+    if (creado.success) {
+      return { success: true, id: creado.data.id, rif: creado.data.rif, creado: true }
     }
 
-    return { success: true, id: creado.data.id, rif: creado.data.rif }
+    // Contexto del orquestador: la BD tiene un índice único real sobre
+    // (client_id, RIF normalizado) para RIF con formato SENIAT válido
+    // (`proveedores_client_rif_unico`). Si el insert choca con él (23505),
+    // no es un error — alguien más (otra pestaña, una carrera) lo creó
+    // justo antes: lo buscamos de nuevo y lo usamos, en vez de fallar.
+    if (/ya existe un proveedor/i.test(creado.error || '')) {
+      try {
+        const encontradoTrasChoque = await proveedorService.buscarPorRifNormalizado(rifNormalizado)
+        if (encontradoTrasChoque) {
+          return { success: true, id: encontradoTrasChoque.id, rif: encontradoTrasChoque.rif, creado: false }
+        }
+      } catch { /* si ni esto funciona, caemos al mensaje de error de abajo */ }
+    }
+
+    return { success: false, message: creado.error || 'No se pudo registrar el proveedor nuevo.' }
   } catch (err) {
     logger.warn('[registroService]', 'No se pudo crear el proveedor pendiente del OCR', err.message)
     return { success: false, message: 'No se pudo registrar el proveedor nuevo. Intenta seleccionarlo manualmente.' }
@@ -132,6 +159,10 @@ function construirPayloadRpc(formData) {
  *   con un mensaje en lenguaje llano.
  */
 export async function guardarRegistro(formData) {
+  // I4: si esta llamada crea un proveedor nuevo y la factura falla justo
+  // después, hay que compensar (borrarlo) — todavía no tiene historial, así
+  // que no tiene sentido dejarlo huérfano en el directorio.
+  let proveedorRecienCreado = null
   try {
     const isUpdate = Boolean(formData?.id)
     let savedResult
@@ -145,7 +176,33 @@ export async function guardarRegistro(formData) {
       }
       formData.issuer.id = resuelto.id
       if (resuelto.rif) formData.issuer.rif = resuelto.rif
-      delete formData.issuer._proveedorPendiente
+      if (resuelto.creado) proveedorRecienCreado = { id: resuelto.id, rif: resuelto.rif }
+    }
+    // I3: `_proveedorPendiente` NUNCA se guarda dentro de la factura, se haya
+    // resuelto arriba o venga de una edición/flujo anterior con una marca
+    // vieja (si no se resolvió arriba, ya habríamos retornado antes).
+    if (formData.issuer) delete formData.issuer._proveedorPendiente
+
+    // I7: productos de inventario marcados como pendientes por el OCR (ver
+    // SimpleInvoiceForm, PASO 5) — igual que el proveedor pendiente, nunca
+    // se crean hasta este punto y nunca se guardan dentro de la factura. Si
+    // la creación de un producto falla, se avisa en consola y el ítem queda
+    // como texto libre (sin product_id), pero no bloquea todo el registro.
+    if (!isUpdate && Array.isArray(formData.items)) {
+      for (const item of formData.items) {
+        if (!item || !item._productoPendiente) continue
+        try {
+          const nuevoProducto = await inventoryService.createProduct(item._productoPendiente)
+          const newId = nuevoProducto?.data?.[0]?.id || nuevoProducto?.id
+          if (newId) {
+            item.product_id = newId
+            item.code = item._productoPendiente.code || item.code
+          }
+        } catch (err) {
+          logger.warn('[registroService]', 'No se pudo crear un producto pendiente del OCR', err?.message)
+        }
+        delete item._productoPendiente
+      }
     }
 
     if (isUpdate) {
@@ -169,6 +226,10 @@ export async function guardarRegistro(formData) {
     }
 
     if (!savedResult || !savedResult.success) {
+      if (proveedorRecienCreado) {
+        proveedorService.deleteProveedor(proveedorRecienCreado.id, proveedorRecienCreado.rif)
+          .catch(err => logger.warn('[registroService]', 'No se pudo compensar (borrar) el proveedor recién creado tras un guardado fallido', err?.message))
+      }
       return {
         success: false,
         message: savedResult?.message || 'Error desconocido al guardar factura en base de datos'
@@ -191,6 +252,10 @@ export async function guardarRegistro(formData) {
     }
   } catch (err) {
     console.error('❌ [registroService] Error al guardar registro:', err)
+    if (proveedorRecienCreado) {
+      proveedorService.deleteProveedor(proveedorRecienCreado.id, proveedorRecienCreado.rif)
+        .catch(compErr => logger.warn('[registroService]', 'No se pudo compensar (borrar) el proveedor recién creado tras una excepción al guardar', compErr?.message))
+    }
     return {
       success: false,
       message: err?.message || 'Ocurrió un error al guardar. Por favor intenta de nuevo.'

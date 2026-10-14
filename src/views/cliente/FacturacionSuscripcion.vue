@@ -82,11 +82,13 @@
               :titulo="item.invoice_number"
               :subtitulo="formatDate(item.period_start) + ' — ' + formatDate(item.period_end)"
               :valor="'$' + formatMoney(item.amount)"
-              :estado="statusLabel(item.status)"
-              :color-estado="statusColor(item.status)"
+              :estado="estadoEfectivoFactura(item).label"
+              :color-estado="estadoEfectivoFactura(item).color"
             >
               <template #acciones>
-                <v-btn v-if="item.status === 'pending' || invoiceReportStatus(item.id) === 'rejected'"
+                <!-- M3: si ya hay un reporte en revisión, no se ofrece "Reportar" de
+                     nuevo (antes se podía enviar un segundo reporte parcial). -->
+                <v-btn v-if="invoiceReportStatus(item.id) !== 'pending_review' && (item.status === 'pending' || invoiceReportStatus(item.id) === 'rejected')"
                   size="small" color="primary" variant="tonal" class="text-none"
                   @click="openPaymentDialog(item)">
                   {{ invoiceReportStatus(item.id) === 'rejected' ? 'Reintentar' : 'Reportar' }}
@@ -219,6 +221,7 @@
     <!-- ==================== DIALOG: REPORTAR / EDITAR PAGO ==================== -->
     <DialogoAdaptable
       v-model="showPaymentDialog"
+      @cerrar="closePaymentDialog"
       :titulo="isEditingReport ? 'Editar reporte de pago' : 'Reportar pago'"
       :icono="isEditingReport ? 'mdi-pencil' : 'mdi-cash-register'"
       max-width="650"
@@ -663,6 +666,8 @@ import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue';
 import EstadoVacio from '@/components/ui/EstadoVacio.vue';
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
 import FilaLista from '@/components/ui/FilaLista.vue';
+import { formatMoney as formatMoneySimbolo } from '@/utils/formatMoney.js';
+import { formatFechaLocal } from '@/utils/fechas.js';
 
 export default {
   name: 'FacturacionSuscripcion',
@@ -945,10 +950,20 @@ export default {
       return report?.status || null;
     },
 
-    formatMoney(val) { return parseFloat(val || 0).toFixed(2); },
+    // M3: usa el formateador compartido (separador de miles, "." cada 3
+    // dígitos) en vez de un toFixed(2) a mano. Sin símbolo porque las
+    // plantillas de este archivo ya anteponen "$"/"Bs." ellas mismas.
+    formatMoney(val) {
+      return formatMoneySimbolo(val, 'USD').replace(/^\$\s*/, '');
+    },
+    // M3: `new Date('YYYY-MM-DD')` interpreta la fecha como medianoche UTC,
+    // que en Caracas (UTC-4) es el día anterior a las 8pm — period_start,
+    // period_end y due_date vienen como fecha sin hora y mostraban el día
+    // equivocado. formatFechaLocal (src/utils/fechas.js) la trata como
+    // medianoche LOCAL.
     formatDate(dateStr) {
       if (!dateStr) return '—';
-      return new Date(dateStr).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });
+      return formatFechaLocal(dateStr, { day: '2-digit', month: 'short', year: 'numeric' });
     },
     formatDateTime(dateStr) {
       if (!dateStr) return '—';

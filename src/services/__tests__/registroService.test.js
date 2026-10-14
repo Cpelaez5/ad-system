@@ -37,8 +37,15 @@ vi.mock('@/services/email-notification-service.js', () => ({
 
 vi.mock('@/services/proveedorService.js', () => ({
   default: {
-    getProveedores: vi.fn(),
-    createProveedor: vi.fn()
+    buscarPorRifNormalizado: vi.fn(),
+    createProveedor: vi.fn(),
+    deleteProveedor: vi.fn()
+  }
+}))
+
+vi.mock('@/services/inventoryService.js', () => ({
+  default: {
+    createProduct: vi.fn()
   }
 }))
 
@@ -181,6 +188,11 @@ describe('registroService.guardarRegistro', () => {
   })
 
   describe('proveedor pendiente del OCR (Tarea C)', () => {
+    // RIF inventado con dígito verificador calculado de verdad (algoritmo
+    // SENIAT, ver src/utils/rif.js): J + 12345678 → DV 4. Ninguno corresponde
+    // a un contribuyente real.
+    const RIF_VALIDO = 'J-12345678-4'
+
     it('crea el proveedor nuevo y lo enlaza antes de guardar la compra (vía RPC de retenciones)', async () => {
       const formData = {
         flow: 'COMPRA',
@@ -188,22 +200,22 @@ describe('registroService.guardarRegistro', () => {
         client: { id: 'client-abc' },
         issuer: {
           companyName: 'Corpelec',
-          _proveedorPendiente: { nombre: 'Corpelec', rif: 'j123456789', direccion: 'Av. Principal' }
+          _proveedorPendiente: { nombre: 'Corpelec', rif: 'j123456784', direccion: 'Av. Principal' }
         },
         financial: { ivaRetention: 0, islrRetention: 0, municipalRetention: 0 }
       }
 
-      proveedorService.getProveedores.mockResolvedValue([])
+      proveedorService.buscarPorRifNormalizado.mockResolvedValue(null)
       proveedorService.createProveedor.mockResolvedValue({
         success: true,
-        data: { id: 'prov-nuevo-1', rif: 'J-12345678-9' }
+        data: { id: 'prov-nuevo-1', rif: RIF_VALIDO }
       })
       retentionRpcService.registrarCompra.mockResolvedValue({ invoice_id: 'inv-1' })
 
       const result = await guardarRegistro(formData)
 
       expect(proveedorService.createProveedor).toHaveBeenCalledWith(
-        expect.objectContaining({ nombre: 'Corpelec', rif: 'J-12345678-9', tipo_persona: 'JURIDICA' })
+        expect.objectContaining({ nombre: 'Corpelec', rif: RIF_VALIDO, tipo_persona: 'JURIDICA' })
       )
       expect(formData.issuer.id).toBe('prov-nuevo-1')
       expect(formData.issuer._proveedorPendiente).toBeUndefined()
@@ -218,11 +230,11 @@ describe('registroService.guardarRegistro', () => {
       const formData = {
         flow: 'COMPRA',
         expense_type: 'COMPRA',
-        issuer: { _proveedorPendiente: { nombre: 'Corpelec', rif: 'J-12345678-9' } },
+        issuer: { _proveedorPendiente: { nombre: 'Corpelec', rif: RIF_VALIDO } },
         financial: {}
       }
 
-      proveedorService.getProveedores.mockResolvedValue([{ id: 'prov-existente', rif: 'J-12345678-9' }])
+      proveedorService.buscarPorRifNormalizado.mockResolvedValue({ id: 'prov-existente', rif: RIF_VALIDO })
       retentionRpcService.registrarCompra.mockResolvedValue({ invoice_id: 'inv-2' })
 
       const result = await guardarRegistro(formData)
@@ -239,17 +251,17 @@ describe('registroService.guardarRegistro', () => {
       const formData = {
         flow: 'COMPRA',
         expense_type: 'GASTO',
-        issuer: { _proveedorPendiente: { nombre: 'Corpelec', rif: 'J-12345678-9' } },
+        issuer: { _proveedorPendiente: { nombre: 'Corpelec', rif: RIF_VALIDO } },
         financial: {}
       }
 
-      proveedorService.getProveedores.mockResolvedValue([])
-      proveedorService.createProveedor.mockResolvedValue({ success: false, error: 'Ya existe un proveedor con ese RIF.' })
+      proveedorService.buscarPorRifNormalizado.mockResolvedValue(null)
+      proveedorService.createProveedor.mockResolvedValue({ success: false, error: 'No se pudo registrar el proveedor nuevo.' })
 
       const result = await guardarRegistro(formData)
 
       expect(result.success).toBe(false)
-      expect(result.message).toBe('Ya existe un proveedor con ese RIF.')
+      expect(result.message).toBe('No se pudo registrar el proveedor nuevo.')
       expect(invoiceService.createInvoice).not.toHaveBeenCalled()
     })
 
@@ -257,15 +269,84 @@ describe('registroService.guardarRegistro', () => {
       const formData = {
         flow: 'COMPRA',
         expense_type: 'GASTO',
-        issuer: { id: 'prov-ya-enlazado', _proveedorPendiente: { nombre: 'Corpelec', rif: 'J-12345678-9' } },
+        issuer: { id: 'prov-ya-enlazado', _proveedorPendiente: { nombre: 'Corpelec', rif: RIF_VALIDO } },
         financial: {}
       }
       retentionRpcService.registrarCompra.mockResolvedValue({ invoice_id: 'inv-3' })
 
       await guardarRegistro(formData)
 
-      expect(proveedorService.getProveedores).not.toHaveBeenCalled()
+      expect(proveedorService.buscarPorRifNormalizado).not.toHaveBeenCalled()
       expect(proveedorService.createProveedor).not.toHaveBeenCalled()
+    })
+
+    // I4: si la búsqueda de duplicados falla (red, orgId sin resolver), NO se
+    // crea el proveedor ni se guarda la factura.
+    it('I4: si la búsqueda de duplicados falla, no crea el proveedor ni guarda la factura', async () => {
+      const formData = {
+        flow: 'COMPRA',
+        expense_type: 'GASTO',
+        issuer: { _proveedorPendiente: { nombre: 'Corpelec', rif: RIF_VALIDO } },
+        financial: {}
+      }
+
+      proveedorService.buscarPorRifNormalizado.mockRejectedValue(new Error('network error'))
+
+      const result = await guardarRegistro(formData)
+
+      expect(result.success).toBe(false)
+      expect(proveedorService.createProveedor).not.toHaveBeenCalled()
+      expect(invoiceService.createInvoice).not.toHaveBeenCalled()
+      expect(retentionRpcService.registrarCompra).not.toHaveBeenCalled()
+    })
+
+    // I4: un choque 23505 con el índice único real (proveedores_client_rif_unico)
+    // se trata como "ya existe": se busca de nuevo y se usa, no se falla.
+    it('I4: si el insert choca con el RIF único (23505), reutiliza el proveedor encontrado tras el choque', async () => {
+      const formData = {
+        flow: 'COMPRA',
+        expense_type: 'GASTO',
+        issuer: { _proveedorPendiente: { nombre: 'Corpelec', rif: RIF_VALIDO } },
+        financial: {}
+      }
+
+      proveedorService.buscarPorRifNormalizado
+        .mockResolvedValueOnce(null) // primera comprobación: no existe
+        .mockResolvedValueOnce({ id: 'prov-ganador-de-la-carrera', rif: RIF_VALIDO }) // tras el choque: sí existe
+      proveedorService.createProveedor.mockResolvedValue({
+        success: false,
+        error: `Ya existe un proveedor registrado con el RIF ${RIF_VALIDO}.`
+      })
+      retentionRpcService.registrarCompra.mockResolvedValue({ invoice_id: 'inv-4' })
+
+      const result = await guardarRegistro(formData)
+
+      expect(formData.issuer.id).toBe('prov-ganador-de-la-carrera')
+      expect(result.success).toBe(true)
+    })
+
+    // I4: si la factura falla justo después de crear el proveedor en este
+    // mismo intento, se compensa (se borra) el proveedor recién creado.
+    it('I4: compensa (borra) el proveedor recién creado si la factura falla justo después', async () => {
+      const formData = {
+        flow: 'COMPRA',
+        expense_type: 'GASTO',
+        issuer: { _proveedorPendiente: { nombre: 'Corpelec', rif: RIF_VALIDO } },
+        financial: {}
+      }
+
+      proveedorService.buscarPorRifNormalizado.mockResolvedValue(null)
+      proveedorService.createProveedor.mockResolvedValue({
+        success: true,
+        data: { id: 'prov-compensar', rif: RIF_VALIDO }
+      })
+      retentionRpcService.registrarCompra.mockRejectedValue(new Error('El RPC rechazó el registro'))
+      proveedorService.deleteProveedor.mockResolvedValue({ success: true })
+
+      const result = await guardarRegistro(formData)
+
+      expect(result.success).toBe(false)
+      expect(proveedorService.deleteProveedor).toHaveBeenCalledWith('prov-compensar', RIF_VALIDO)
     })
   })
 })

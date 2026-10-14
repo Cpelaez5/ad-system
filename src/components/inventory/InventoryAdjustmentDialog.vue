@@ -2,6 +2,7 @@
   <DialogoAdaptable
     :model-value="modelValue"
     @update:model-value="$emit('update:modelValue', $event)"
+    @cerrar="reset"
     titulo="Asistente de inventario IA"
     icono="mdi-robot"
     max-width="900"
@@ -170,7 +171,7 @@
           variant="elevated"
           @click="confirmAdjustment"
           :loading="processing"
-          :disabled="unmatchedItemsCount > 0 || items.length === 0"
+          :disabled="processing || unmatchedItemsCount > 0 || items.length === 0"
       >
           Confirmar Consumo
       </v-btn>
@@ -310,6 +311,10 @@ const onProductMatch = (item) => {
 }
 
 const confirmAdjustment = async () => {
+    // I5: evita que "Confirmar Consumo" se ejecute dos veces (doble toque
+    // antes de que :disabled="processing" se re-renderice) y descuente el
+    // stock por duplicado.
+    if (processing.value) return
     processing.value = true
     try {
         // Procesar todos los movimientos

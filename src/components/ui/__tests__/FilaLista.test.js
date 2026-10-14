@@ -67,4 +67,17 @@ describe('FilaLista.vue', () => {
     await wrapper.find('.fila-lista__acciones button').trigger('click')
     expect(wrapper.emitted('click')).toBeUndefined()
   })
+
+  // M7 (ola F2b): antes solo "click" tenía .stop; Enter/Espacio sobre un
+  // botón de acciones subía hasta la fila y disparaba su "click" también.
+  it('un Enter o Espacio en las acciones tampoco dispara el "click" de la fila', async () => {
+    const wrapper = mount(FilaLista, {
+      props: { titulo: 'Producto', clicable: true },
+      slots: { acciones: '<button>Editar</button>' },
+      global: globalConfig,
+    })
+    await wrapper.find('.fila-lista__acciones button').trigger('keydown.enter')
+    await wrapper.find('.fila-lista__acciones button').trigger('keydown.space')
+    expect(wrapper.emitted('click')).toBeUndefined()
+  })
 })

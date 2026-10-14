@@ -78,6 +78,31 @@
     </section>
 
     <section class="mb-10">
+      <h2 class="mb-4">FilaLista</h2>
+      <div class="d-flex flex-column">
+        <FilaLista
+          icono="mdi-package-variant-closed"
+          titulo="Harina de trigo 1kg"
+          subtitulo="COD-001 · 12 Und"
+          valor="$ 2,50"
+          estado="Stock bajo"
+          color-estado="warning"
+        >
+          <template #acciones>
+            <v-btn icon="mdi-pencil" size="small" variant="text" />
+          </template>
+        </FilaLista>
+        <FilaLista
+          titulo="Plan Profesional — oct 2026"
+          subtitulo="01/10/2026 — 31/10/2026"
+          valor="$ 25,00"
+          estado="Pagada"
+          color-estado="success"
+        />
+      </div>
+    </section>
+
+    <section class="mb-10">
       <h2 class="mb-4">AvisoAmable</h2>
       <div class="d-flex flex-column ga-3">
         <AvisoAmable tipo="info" mensaje="Dólar BCV hoy: Bs 36,50" />
@@ -222,6 +247,7 @@ import GraficoBarras from '@/components/ui/GraficoBarras.vue'
 import ChipTasa from '@/components/ui/ChipTasa.vue'
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
 import FilaMovimiento from '@/components/ui/FilaMovimiento.vue'
+import FilaLista from '@/components/ui/FilaLista.vue'
 
 /**
  * CatalogoUI — vitrina de los componentes de src/components/ui/ para
@@ -248,6 +274,7 @@ export default {
     ChipTasa,
     EncabezadoPagina,
     FilaMovimiento,
+    FilaLista,
   },
 
   data() {
