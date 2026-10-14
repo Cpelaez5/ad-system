@@ -81,6 +81,12 @@
           >
             Mejorar foto con IA
           </v-btn>
+          <div v-if="ofertaFotoCatalogo && !form.foto_path" class="pf-catalogo-foto" data-testid="catalogo-oferta-foto">
+            <img :src="ofertaFotoCatalogo.url" alt="Foto del catálogo de AD System" class="pf-catalogo-foto__img" loading="lazy">
+            <v-btn variant="tonal" color="primary" class="text-none" :loading="copiandoFoto" prepend-icon="mdi-image-plus-outline" @click="usarFotoCatalogo">
+              Usar foto del catálogo
+            </v-btn>
+          </div>
           <p v-if="errorFoto" class="pf-foto__error" role="alert">{{ errorFoto }}</p>
         </div>
         <input ref="camaraInput" type="file" accept="image/*" capture="environment" class="d-none" @change="alElegirFoto">
@@ -120,6 +126,32 @@
         :rules="[v => !!(v && v.trim()) || 'Escribe el nombre']"
         class="mb-1"
       />
+
+      <div v-if="catalogoMarca" class="pf-catalogo-marca" data-testid="catalogo-marca-producto">
+        <v-icon size="16" class="mr-1" icon="mdi-check-decagram-outline" />
+        <span>{{ catalogoMarca }}</span>
+        <v-btn variant="text" size="small" color="primary" class="text-none ml-1 px-2" data-testid="catalogo-no-es-este" @click="deshacerCatalogo">No es este</v-btn>
+      </div>
+
+      <section v-if="sugerencias.length" class="pf-sugerencias" aria-label="Sugerencias del catálogo" data-testid="catalogo-sugerencias">
+        <p class="pf-sugerencias__titulo">¿Es alguno de estos?</p>
+        <button
+          v-for="s in sugerencias"
+          :key="s.id || s.codigo_barras || s.nombre"
+          type="button"
+          class="pf-sugerencia"
+          @click="elegirSugerencia(s)"
+        >
+          <span class="pf-sugerencia__foto">
+            <img v-if="urlMiniatura(s)" :src="urlMiniatura(s)" alt="" loading="lazy">
+            <v-icon v-else icon="mdi-package-variant" size="22" aria-hidden="true" />
+          </span>
+          <span class="pf-sugerencia__texto">
+            <strong>{{ s.nombre }}</strong>
+            <small v-if="s.marca">{{ s.marca }}</small>
+          </span>
+        </button>
+      </section>
 
       <v-row dense>
         <v-col cols="12" :sm="mostrarStockInicial ? 6 : 12">
@@ -213,7 +245,13 @@
                 <v-text-field v-model="form.code" label="Código interno / SKU" variant="outlined" hint="Si lo dejas vacío, lo creamos nosotros" persistent-hint />
               </v-col>
               <v-col v-if="!esServicio" cols="12" sm="6">
-                <v-text-field v-model="form.codigo_barras" label="Código de barras" variant="outlined" inputmode="numeric" />
+                <v-text-field v-model="form.codigo_barras" label="Código de barras" variant="outlined" inputmode="numeric" data-testid="campo-codigo-barras">
+                  <template v-if="puedeEscanear" #append-inner>
+                    <v-btn variant="tonal" color="secondary" size="small" class="text-none" prepend-icon="mdi-barcode-scan" data-testid="boton-escanear" @click="escanerAbierto = true">
+                      Escanear
+                    </v-btn>
+                  </template>
+                </v-text-field>
               </v-col>
               <v-col v-if="!esServicio" cols="12" sm="6">
                 <v-select v-model="form.unit" label="Unidad" :items="['UND', 'KG', 'LTS', 'MTS', 'CAJA', 'BULTO']" variant="outlined" />
@@ -259,6 +297,7 @@
         </v-btn>
       </template>
     </template>
+    <EscanerCodigoBarras v-if="puedeEscanear" v-model="escanerAbierto" @detectado="alEscanear" />
   </DialogoAdaptable>
 </template>
 
@@ -272,14 +311,19 @@
  *   al guardar ofrece "Tomar otra foto" para cargar el catálogo en ráfaga.
  * - Servicios: sin stock, sin costo y sin movimientos de inventario.
  */
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import FotoProducto from '@/components/inventory/FotoProducto.vue'
+import EscanerCodigoBarras from '@/components/inventory/EscanerCodigoBarras.vue'
 import inventoryService from '@/services/inventoryService'
 import { subirFoto, urlFoto, mejorarFoto, borrarFotos, unidadDelFormulario } from '@/services/productoFotoService'
 import { guardarRubro } from '@/services/rubroService'
 import { RUBROS, camposDe, tipoPorDefecto } from '@/constants/rubros'
 import { fotosASuprimir } from '@/utils/fotosProducto'
+import { buscarProducto, urlFotoCatalogo, copiarFotoCatalogoAlNegocio } from '@/services/catalogoService'
+import { codigoBarrasValido, limpiarCodigoBarras } from '@/utils/codigoBarras'
+import { camposDesdeCatalogo, marcaCatalogo } from '@/utils/catalogoProducto'
+import { soportaEscaner } from '@/utils/escanerCodigoBarras'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -315,6 +359,19 @@ const guardandoRubro = ref(false)
 let subidasSesion = []
 let fotosIniciales = []
 
+// Estado del catálogo global (declarado antes de `iniciar`, que se ejecuta de inmediato)
+const catalogoMarca = ref('')
+const sugerencias = ref([])
+const ofertaFotoCatalogo = ref(null)
+const copiandoFoto = ref(false)
+const escanerAbierto = ref(false)
+const puedeEscanear = computed(() => !props.producto && soportaEscaner())
+let deshacerCatalogoDatos = null
+let temporizadorCodigo = null
+let temporizadorNombre = null
+let codigoConsultado = ''
+let nombreConsultado = ''
+
 const nuevoForm = () => ({
   code: '', name: '', description: '', unit: 'UND', currency: 'VES',
   cost_price: 0, sale_price: null, min_stock: 5, initial_stock: null,
@@ -344,6 +401,7 @@ const aviso = computed(() => {
 })
 
 function iniciar() {
+  reiniciarCatalogo()
   subidasSesion = []
   fotosIniciales = []
   guardadoOk.value = false
@@ -399,6 +457,108 @@ watch(() => form.foto_path, async path => {
   fotoUrl.value = null
   if (path) fotoUrl.value = await urlFoto(path)
 }, { immediate: true })
+
+// ─── Catálogo global de AD System (solo al CREAR) ───────────────────────────
+
+function reiniciarCatalogo() {
+  clearTimeout(temporizadorCodigo)
+  clearTimeout(temporizadorNombre)
+  catalogoMarca.value = ''
+  sugerencias.value = []
+  ofertaFotoCatalogo.value = null
+  deshacerCatalogoDatos = null
+  codigoConsultado = ''
+  nombreConsultado = ''
+}
+
+function urlMiniatura(item) {
+  return urlFotoCatalogo(item?.foto_path)
+}
+
+/** Llena solo los campos vacíos y guarda lo anterior para "No es este". */
+function aplicarCatalogo(item) {
+  const actual = { name: form.name, marca: form.marca, categoria: form.categoria, unit: form.unit, atributos: form.atributos }
+  const { cambios, llenados } = camposDesdeCatalogo(actual, item)
+  const previo = {}
+  for (const k of Object.keys(cambios)) previo[k] = k === 'atributos' ? { ...form.atributos } : form[k]
+  if (item.codigo_barras && !String(form.codigo_barras || '').trim()) {
+    cambios.codigo_barras = item.codigo_barras
+    previo.codigo_barras = form.codigo_barras
+    codigoConsultado = item.codigo_barras
+  }
+  if (cambios.name) nombreConsultado = cambios.name
+  Object.assign(form, cambios)
+  const fotoUrl = !form.foto_path && item.foto_path ? urlFotoCatalogo(item.foto_path) : null
+  ofertaFotoCatalogo.value = fotoUrl ? { path: item.foto_path, url: fotoUrl } : null
+  if (!llenados.length && !ofertaFotoCatalogo.value) return false
+  deshacerCatalogoDatos = previo
+  catalogoMarca.value = marcaCatalogo(item)
+  sugerencias.value = []
+  return true
+}
+
+function deshacerCatalogo() {
+  if (deshacerCatalogoDatos) Object.assign(form, deshacerCatalogoDatos)
+  deshacerCatalogoDatos = null
+  catalogoMarca.value = ''
+  ofertaFotoCatalogo.value = null
+}
+
+async function consultarPorCodigo(codigo) {
+  codigoConsultado = codigo
+  const [item] = await buscarProducto(codigo, 1)
+  if (!item || limpiarCodigoBarras(form.codigo_barras) !== codigo) return
+  aplicarCatalogo(item)
+}
+
+async function consultarPorNombre(texto) {
+  nombreConsultado = texto
+  const items = await buscarProducto(texto, 3)
+  if (form.name?.trim() !== texto) return
+  sugerencias.value = items.slice(0, 3)
+}
+
+function elegirSugerencia(item) {
+  sugerencias.value = []
+  aplicarCatalogo(item)
+}
+
+async function usarFotoCatalogo() {
+  const oferta = ofertaFotoCatalogo.value
+  if (!oferta) return
+  errorFoto.value = ''
+  copiandoFoto.value = true
+  const path = await copiarFotoCatalogoAlNegocio(oferta.path)
+  copiandoFoto.value = false
+  if (!path) { errorFoto.value = 'No pudimos copiar la foto. Puedes tomar una tú.'; return }
+  subidasSesion.push(path)
+  form.foto_path = path
+  form.foto_original_path = path
+  ofertaFotoCatalogo.value = null
+}
+
+function alEscanear(codigo) {
+  form.codigo_barras = codigo
+}
+
+watch(() => form.codigo_barras, valor => {
+  clearTimeout(temporizadorCodigo)
+  if (props.producto || !props.modelValue) return
+  const codigo = limpiarCodigoBarras(valor)
+  if (!codigoBarrasValido(codigo) || codigo === codigoConsultado) return
+  temporizadorCodigo = setTimeout(() => consultarPorCodigo(codigo), 400)
+}, { immediate: true })
+
+watch(() => form.name, valor => {
+  clearTimeout(temporizadorNombre)
+  const texto = String(valor || '').trim()
+  if (props.producto || !props.modelValue || esServicio.value) { sugerencias.value = []; return }
+  if (texto.length < 3) { sugerencias.value = []; return }
+  if (codigoBarrasValido(form.codigo_barras) || texto === nombreConsultado) return
+  temporizadorNombre = setTimeout(() => consultarPorNombre(texto), 400)
+}, { immediate: true })
+
+onBeforeUnmount(() => { clearTimeout(temporizadorCodigo); clearTimeout(temporizadorNombre) })
 
 function limpiarFotos(guardado) {
   const borrar = fotosASuprimir({
@@ -635,6 +795,90 @@ function otraFoto() {
 .pf-comparar__opcion figcaption {
   font-weight: 600;
   text-align: center;
+}
+
+.pf-catalogo-marca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+}
+
+.pf-catalogo-foto {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.pf-catalogo-foto__img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+}
+
+.pf-sugerencias {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border-radius: 16px;
+}
+
+.pf-sugerencias__titulo {
+  margin: 0 0 8px;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.pf-sugerencia {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pf-sugerencia:hover,
+.pf-sugerencia:focus-visible {
+  background: rgba(var(--v-theme-primary), 0.08);
+  outline: none;
+}
+
+.pf-sugerencia__foto {
+  flex: 0 0 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+.pf-sugerencia__foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pf-sugerencia__texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 1rem;
+}
+
+.pf-sugerencia__texto small {
+  color: rgba(var(--v-theme-on-surface), 0.65);
 }
 
 .pf-tipo { margin-bottom: 16px; }
