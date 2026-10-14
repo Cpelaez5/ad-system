@@ -18,10 +18,10 @@
     <template v-else>
       <EncabezadoPagina
         titulo="Mi mercancía"
-        subtitulo="Tus productos, su stock y el historial de movimientos"
+        subtitulo="Toma una foto de tu producto y nosotros llenamos los datos"
       >
-        <v-btn color="primary" size="large" prepend-icon="mdi-plus" class="text-none" @click="openProductDialog()">
-          Nuevo producto
+        <v-btn color="primary" size="large" prepend-icon="mdi-camera-outline" class="text-none" @click="tomarFoto">
+          Tomar foto
         </v-btn>
         <v-menu location="bottom end">
           <template #activator="{ props: menuProps }">
@@ -36,6 +36,13 @@
           </v-list>
         </v-menu>
       </EncabezadoPagina>
+
+      <div class="mi-mercancia__rapidas">
+        <v-btn variant="tonal" color="secondary" prepend-icon="mdi-image-outline" class="text-none" @click="subirFotoGaleria">Subir foto</v-btn>
+        <v-btn variant="tonal" color="secondary" prepend-icon="mdi-bookshelf" class="text-none" @click="fotoEstante">Foto del estante</v-btn>
+        <v-btn variant="text" color="secondary" prepend-icon="mdi-pencil-outline" class="text-none" @click="openProductDialog()">Escribirlo yo</v-btn>
+        <v-btn variant="text" color="secondary" prepend-icon="mdi-briefcase-plus-outline" class="text-none" @click="openProductDialog(null, 'servicio')">Nuevo servicio</v-btn>
+      </div>
 
       <!-- AVANCE DE STOCK + SIGUIENTE PASO -->
       <div class="mi-mercancia__panel">
@@ -168,8 +175,23 @@
               @update:model-value="loadProducts"
             ></v-checkbox>
             <v-btn icon="mdi-refresh" variant="text" aria-label="Actualizar" @click="loadProducts"></v-btn>
+            <v-btn-toggle
+              :model-value="vista"
+              mandatory
+              color="primary"
+              variant="outlined"
+              divided
+              density="comfortable"
+              class="mi-mercancia__vista"
+              aria-label="Cómo ver tu mercancía"
+              @update:model-value="setVista"
+            >
+              <v-btn value="lista" icon="mdi-view-list-outline" aria-label="Ver en lista" />
+              <v-btn value="cuadricula" icon="mdi-view-grid-outline" aria-label="Ver en cuadrícula" />
+            </v-btn-toggle>
           </div>
 
+          <FiltroChips v-model="tipoFilter" :opciones="opcionesFiltroTipo" etiqueta="Filtrar por tipo" class="mb-2" />
           <FiltroChips v-model="stockFilter" :opciones="opcionesFiltroStock" etiqueta="Filtrar por stock" class="mb-4" />
 
           <div v-if="loadingProducts">
@@ -180,15 +202,15 @@
             v-else-if="filteredProducts.length === 0"
             :icono="inventarioEstadoVacioPorFiltro ? 'mdi-filter-remove-outline' : 'mdi-package-variant-closed'"
             :titulo="inventarioEstadoVacioPorFiltro ? 'No hay resultados con estos filtros' : 'Todavía no tienes productos'"
-            :mensaje="inventarioEstadoVacioPorFiltro ? 'Prueba con otra búsqueda o quita algún filtro.' : 'Registra tu primer producto para llevar el control de stock, costos y precios de venta.'"
-            :texto-accion="inventarioEstadoVacioPorFiltro ? 'Limpiar filtros' : 'Nuevo producto'"
-            :texto-accion-secundaria="inventarioEstadoVacioPorFiltro ? '' : 'Subir lista de Excel'"
-            icono-accion-secundaria="mdi-file-excel-outline"
-            @accion="inventarioEstadoVacioPorFiltro ? limpiarFiltrosInventario() : openProductDialog()"
-            @accion-secundaria="avisarSubidaExcelFutura"
+            :mensaje="inventarioEstadoVacioPorFiltro ? 'Prueba con otra búsqueda o quita algún filtro.' : 'Toma una foto de tu primer producto: nosotros llenamos los datos y tú solo pones el precio.'"
+            :texto-accion="inventarioEstadoVacioPorFiltro ? 'Limpiar filtros' : 'Tomar foto'"
+            :texto-accion-secundaria="inventarioEstadoVacioPorFiltro ? '' : 'Escribirlo yo'"
+            icono-accion-secundaria="mdi-pencil-outline"
+            @accion="inventarioEstadoVacioPorFiltro ? limpiarFiltrosInventario() : tomarFoto()"
+            @accion-secundaria="openProductDialog()"
           />
 
-          <SeccionLista v-else :meta="`${filteredProducts.length} producto${filteredProducts.length === 1 ? '' : 's'}`">
+          <SeccionLista v-else-if="vista === 'lista'" :meta="`${filteredProducts.length} ${filteredProducts.length === 1 ? 'elemento' : 'elementos'}`">
             <div
               v-for="item in filteredProducts"
               :key="item.id"
@@ -196,8 +218,11 @@
               :class="{ 'fila-producto--resaltada': resaltadoProducto === item.id }"
               :data-producto-id="item.id"
             >
-              <span class="fila-producto__icono" :class="`fila-producto__icono--${getStockColor(item)}`" aria-hidden="true">
-                <v-icon icon="mdi-package-variant-closed" size="20" />
+              <span v-if="fotoUrls[item.foto_path]" class="fila-producto__foto">
+                <FotoProducto :src="fotoUrls[item.foto_path]" :tipo="item.tipo" :alt="item.name" />
+              </span>
+              <span v-else class="fila-producto__icono" :class="item.tipo === 'servicio' ? 'fila-producto__icono--rank' : `fila-producto__icono--${getStockColor(item)}`" aria-hidden="true">
+                <v-icon :icon="item.tipo === 'servicio' ? 'mdi-briefcase-outline' : 'mdi-package-variant-closed'" size="20" />
               </span>
 
               <div class="fila-producto__texto">
@@ -205,7 +230,11 @@
                   {{ item.name }}
                   <v-chip v-if="item.deleted_at" size="x-small" color="error" variant="tonal" class="ml-2">Eliminado</v-chip>
                 </div>
-                <div class="fila-producto__estado">
+                <div v-if="item.tipo === 'servicio'" class="fila-producto__estado">
+                  <v-chip size="x-small" color="secondary" variant="tonal" class="mr-1">Servicio</v-chip>
+                  {{ item.atributos?.se_cobra_por ? 'Se cobra por ' + item.atributos.se_cobra_por.toLowerCase() : '' }}
+                </div>
+                <div v-else class="fila-producto__estado">
                   {{ item.code ? item.code + ' · ' : '' }}{{ item.stock }} {{ item.unit || 'Und' }}
                   <span v-if="!item.deleted_at && item.stock <= 0" class="text-error font-weight-medium">· Agotado</span>
                   <span v-else-if="!item.deleted_at && item.stock <= item.min_stock" class="text-warning-oscuro font-weight-medium">· Stock bajo</span>
@@ -229,7 +258,7 @@
                       <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" aria-label="Más opciones" />
                     </template>
                     <v-list density="comfortable">
-                      <v-list-item prepend-icon="mdi-history" title="Ver Kardex" @click="viewMovements(item)" />
+                      <v-list-item v-if="item.tipo !== 'servicio'" prepend-icon="mdi-history" title="Ver Kardex" @click="viewMovements(item)" />
                       <v-list-item prepend-icon="mdi-delete-outline" base-color="error" title="Eliminar" @click="openDeleteDialog(item)" />
                     </v-list>
                   </v-menu>
@@ -238,11 +267,53 @@
                   <v-btn variant="tonal" color="success" prepend-icon="mdi-restore" class="text-none fila-producto__accion" @click="openRestoreDialog(item)">
                     Restaurar
                   </v-btn>
-                  <v-btn icon="mdi-history" variant="text" aria-label="Ver Kardex" @click="viewMovements(item)"></v-btn>
+                  <v-btn v-if="item.tipo !== 'servicio'" icon="mdi-history" variant="text" aria-label="Ver Kardex" @click="viewMovements(item)"></v-btn>
                 </template>
               </div>
             </div>
           </SeccionLista>
+
+          <!-- Cuadrícula -->
+          <div v-else>
+            <p class="mi-mercancia__meta">{{ filteredProducts.length }} {{ filteredProducts.length === 1 ? 'elemento' : 'elementos' }}</p>
+            <ul class="mi-mercancia__cuadricula">
+              <li
+                v-for="item in filteredProducts"
+                :key="item.id"
+                class="tarjeta-producto"
+                :class="{ 'tarjeta-producto--eliminada': item.deleted_at, 'fila-producto--resaltada': resaltadoProducto === item.id }"
+                :data-producto-id="item.id"
+              >
+                <button type="button" class="tarjeta-producto__boton" :aria-label="(item.deleted_at ? 'Restaurar ' : 'Editar ') + item.name" @click="abrirDetalle(item)">
+                  <span class="tarjeta-producto__foto">
+                    <FotoProducto :src="fotoUrls[item.foto_path]" :tipo="item.tipo" :alt="item.name" tamano-icono="40" />
+                    <span class="tarjeta-producto__tipo" aria-hidden="true">
+                      <v-icon :icon="item.tipo === 'servicio' ? 'mdi-briefcase-outline' : 'mdi-package-variant-closed'" size="16" />
+                    </span>
+                  </span>
+                  <span class="tarjeta-producto__nombre">{{ item.name }}</span>
+                  <span class="tarjeta-producto__precio">{{ formatCurrency(item.sale_price, item.currency) }}</span>
+                  <span class="tarjeta-producto__estado">
+                    <v-chip v-if="item.deleted_at" size="small" color="error" variant="tonal">Eliminado</v-chip>
+                    <v-chip v-else-if="item.tipo === 'servicio'" size="small" color="secondary" variant="tonal">Servicio</v-chip>
+                    <v-chip v-else-if="Number(item.stock) <= 0" size="small" color="error" variant="tonal">Agotado</v-chip>
+                    <v-chip v-else-if="Number(item.stock) <= Number(item.min_stock || 0)" size="small" color="warning" variant="tonal">Quedan {{ item.stock }}</v-chip>
+                    <v-chip v-else size="small" color="success" variant="tonal">{{ item.stock }} {{ (item.unit || 'und').toLowerCase() }}</v-chip>
+                  </span>
+                </button>
+                <v-menu v-if="!item.deleted_at" location="bottom end">
+                  <template #activator="{ props: menuProps }">
+                    <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="flat" size="small" class="tarjeta-producto__menu" :aria-label="`Más opciones de ${item.name}`" />
+                  </template>
+                  <v-list density="comfortable">
+                    <v-list-item prepend-icon="mdi-pencil-outline" title="Editar" @click="openProductDialog(item)" />
+                    <v-list-item v-if="item.tipo !== 'servicio'" prepend-icon="mdi-history" title="Ver Kardex" @click="viewMovements(item)" />
+                    <v-list-item prepend-icon="mdi-delete-outline" base-color="error" title="Eliminar" @click="openDeleteDialog(item)" />
+                  </v-list>
+                </v-menu>
+              </li>
+            </ul>
+          </div>
         </v-window-item>
 
         <!-- MOVEMENTS TAB -->
@@ -285,126 +356,26 @@
       </v-window>
     </template>
 
-    <!-- Dialogo Producto -->
-    <DialogoAdaptable
+    <!-- Entradas de foto (cámara y galería) -->
+    <input ref="camaraInput" type="file" accept="image/*" capture="environment" class="d-none" @change="alElegirFotoNueva">
+    <input ref="galeriaInput" type="file" accept="image/*" class="d-none" @change="alElegirFotoNueva">
+    <input ref="estanteInput" type="file" accept="image/*" capture="environment" class="d-none" @change="alElegirFotoEstante">
+
+    <CrearConFotoDialog v-model="crearConFotoDialog" :archivo="archivoFoto" :rubro="rubro" @listo="alFotoLista" />
+
+    <ProductoFormDialog
       v-model="productDialog"
-      :titulo="editingProduct ? 'Editar producto' : 'Nuevo producto'"
-      icono="mdi-package-variant"
-      max-width="600"
-      :cargando="savingProduct"
-    >
-      <v-form ref="productForm" v-model="productValid" @submit.prevent="saveProduct">
-        <v-row dense>
-          <v-col cols="12" sm="6">
-            <v-text-field
-              v-model="productForm.code"
-              label="Código / SKU"
-              variant="outlined"
-              hint="Código de barras o interno"
-              persistent-hint
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-select
-              v-model="productForm.unit"
-              label="Unidad"
-              :items="['UND', 'KG', 'LTS', 'MTS', 'CAJA', 'BULTO']"
-              variant="outlined"
-              required
-            ></v-select>
-          </v-col>
-          <v-col cols="12">
-            <v-text-field
-              v-model="productForm.name"
-              label="Nombre del producto"
-              variant="outlined"
-              :rules="[v => !!v || 'Requerido']"
-              required
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12">
-            <v-textarea
-              v-model="productForm.description"
-              label="Descripción"
-              variant="outlined"
-              rows="2"
-            ></v-textarea>
-          </v-col>
-          <v-col cols="12" sm="4">
-            <v-select
-              v-model="productForm.currency"
-              :items="[
-                { title: 'Bolívares (Bs)', value: 'VES' },
-                { title: 'Dólares (USD)', value: 'USD' },
-                { title: 'Euros (EUR)', value: 'EUR' }
-              ]"
-              item-title="title"
-              item-value="value"
-              label="Moneda del precio"
-              variant="outlined"
-              prepend-inner-icon="mdi-currency-usd"
-            ></v-select>
-          </v-col>
-          <v-col cols="12" sm="4">
-            <v-text-field
-              v-model.number="productForm.cost_price"
-              :label="`Costo unitario (${productForm.currency || 'VES'})`"
-              type="number"
-              step="0.01"
-              variant="outlined"
-              :prefix="productForm.currency === 'USD' ? '$' : productForm.currency === 'EUR' ? '€' : 'Bs'"
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12" sm="4">
-            <v-text-field
-              v-model.number="productForm.sale_price"
-              :label="`Precio venta (${productForm.currency || 'VES'})`"
-              type="number"
-              step="0.01"
-              variant="outlined"
-              :prefix="productForm.currency === 'USD' ? '$' : productForm.currency === 'EUR' ? '€' : 'Bs'"
-            ></v-text-field>
-          </v-col>
+      :producto="editingProduct"
+      :prefill="prefillProducto"
+      :rubro="rubro"
+      :tipo-inicial="tipoInicial"
+      @guardado="alGuardarProducto"
+      @otra-foto="tomarFoto"
+      @rubro-guardado="v => rubro = v"
+      @error="msg => $root?.showSnackbar?.(msg, 'error')"
+    />
 
-          <v-col cols="12" v-if="!editingProduct">
-            <v-divider class="my-2"></v-divider>
-            <div class="text-subtitle-2 mb-2">Inventario inicial</div>
-            <v-row dense>
-              <v-col cols="6">
-                <v-text-field
-                  v-model.number="productForm.initial_stock"
-                  label="Stock inicial"
-                  type="number"
-                  variant="outlined"
-                ></v-text-field>
-              </v-col>
-              <v-col cols="6">
-                <v-text-field
-                  v-model.number="productForm.min_stock"
-                  label="Stock mínimo (alerta)"
-                  type="number"
-                  variant="outlined"
-                ></v-text-field>
-              </v-col>
-            </v-row>
-          </v-col>
-
-          <v-col cols="12" v-else>
-            <v-text-field
-              v-model.number="productForm.min_stock"
-              label="Stock mínimo (alerta)"
-              type="number"
-              variant="outlined"
-            ></v-text-field>
-          </v-col>
-        </v-row>
-      </v-form>
-
-      <template #acciones>
-        <v-btn variant="text" :disabled="savingProduct" @click="productDialog = false">Cancelar</v-btn>
-        <v-btn color="primary" variant="flat" :loading="savingProduct" @click="saveProduct">Guardar</v-btn>
-      </template>
-    </DialogoAdaptable>
+    <EstanteDialog v-model="estanteDialog" :archivo="archivoEstante" :productos="products" @cambios="alCambiosEstante" />
 
     <!-- Dialogo Kardex (Movimientos Producto) -->
     <DialogoAdaptable
@@ -542,6 +513,12 @@ import BarraSegmentos from '@/components/ui/BarraSegmentos.vue'
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
 import FiltroChips from '@/components/ui/FiltroChips.vue'
 import SeccionLista from '@/components/ui/SeccionLista.vue'
+import FotoProducto from '@/components/inventory/FotoProducto.vue'
+import ProductoFormDialog from '@/components/inventory/ProductoFormDialog.vue'
+import CrearConFotoDialog from '@/components/inventory/CrearConFotoDialog.vue'
+import EstanteDialog from '@/components/inventory/EstanteDialog.vue'
+import { firmarVarias } from '@/services/productoFotoService'
+import { obtenerRubro } from '@/services/rubroService'
 import { formatMoney } from '@/utils/formatMoney.js'
 import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, format, subMonths } from 'date-fns'
 
@@ -555,7 +532,11 @@ export default {
     BarraSegmentos,
     PanelSiguientePaso,
     FiltroChips,
-    SeccionLista
+    SeccionLista,
+    FotoProducto,
+    ProductoFormDialog,
+    CrearConFotoDialog,
+    EstanteDialog
   },
   data() {
     return {
@@ -607,19 +588,20 @@ export default {
       productSearch: '',
       productDialog: false,
       editingProduct: null,
-      productValid: false,
-      productForm: {
-        code: '',
-        name: '',
-        description: '',
-        unit: 'UND',
-        cost_price: 0,
-        sale_price: 0,
-        min_stock: 5,
-        initial_stock: 0
-      },
+      prefillProducto: null,
+      tipoInicial: null,
 
-      savingProduct: false,
+      // Vista y filtros
+      vista: 'lista',
+      tipoFilter: 'ALL',
+      fotoUrls: {},
+      rubro: null,
+
+      // Foto y listo / Foto del estante
+      archivoFoto: null,
+      crearConFotoDialog: false,
+      archivoEstante: null,
+      estanteDialog: false,
 
       // Soft delete UI
       showDeletedProducts: false,
@@ -652,11 +634,11 @@ export default {
     // activa, para que el panel de arriba siempre refleje la mercancía real.
     segmentosStock() {
       return this.products
-        .filter(p => !p.deleted_at)
+        .filter(p => !p.deleted_at && p.tipo !== 'servicio')
         .map(p => ({ id: p.id, tono: this.getStockColor(p), etiqueta: p.name }))
     },
     resumenStock() {
-      const activos = this.products.filter(p => !p.deleted_at)
+      const activos = this.products.filter(p => !p.deleted_at && p.tipo !== 'servicio')
       const agotados = activos.filter(p => Number(p.stock) <= 0).length
       const bajos = activos.filter(p => Number(p.stock) > 0 && Number(p.stock) <= Number(p.min_stock || 0)).length
       return { total: activos.length, agotados, bajos, bien: activos.length - agotados - bajos }
@@ -666,8 +648,20 @@ export default {
       if (total === 0) return 'Todavía no tienes productos registrados.'
       return `Tienes ${total} producto${total === 1 ? '' : 's'}; tu inventario vale ${formatMoney(this.convertedTotalValueCost, this.currencyDisplay)} en costo.`
     },
+    sinPrecio() {
+      return this.products.filter(p => !p.deleted_at && !(Number(p.sale_price) > 0)).length
+    },
     pasoStock() {
       const { agotados, bajos } = this.resumenStock
+      if (this.sinPrecio > 0) {
+        const n = this.sinPrecio
+        return {
+          titulo: `${n} producto${n === 1 ? '' : 's'} sin precio`,
+          detalle: 'Ponles precio para poder venderlos.',
+          boton: 'Ponerles precio',
+          filtro: 'SIN_PRECIO'
+        }
+      }
       if (agotados > 0) {
         return {
           titulo: `${agotados} producto${agotados === 1 ? '' : 's'} agotado${agotados === 1 ? '' : 's'}`,
@@ -692,7 +686,17 @@ export default {
         { valor: 'ALL', texto: 'Todos', cantidad: total },
         { valor: 'AGOTADOS', texto: 'Agotados', cantidad: agotados, deshabilitado: agotados === 0 },
         { valor: 'BAJOS', texto: 'Por agotarse', cantidad: bajos, deshabilitado: bajos === 0 },
-        { valor: 'BIEN', texto: 'Con buen stock', cantidad: bien, deshabilitado: bien === 0 }
+        { valor: 'BIEN', texto: 'Con buen stock', cantidad: bien, deshabilitado: bien === 0 },
+        { valor: 'SIN_PRECIO', texto: 'Sin precio', cantidad: this.sinPrecio, deshabilitado: this.sinPrecio === 0 }
+      ]
+    },
+    opcionesFiltroTipo() {
+      const activos = this.products.filter(p => !p.deleted_at)
+      const servicios = activos.filter(p => p.tipo === 'servicio').length
+      return [
+        { valor: 'ALL', texto: 'Todo', cantidad: activos.length },
+        { valor: 'PRODUCTO', texto: 'Productos', cantidad: activos.length - servicios },
+        { valor: 'SERVICIO', texto: 'Servicios', cantidad: servicios }
       ]
     },
     filteredProducts() {
@@ -712,12 +716,19 @@ export default {
         toDate.setHours(23, 59, 59, 999)
         result = result.filter(p => new Date(p.created_at) <= toDate)
       }
+      if (this.tipoFilter === 'PRODUCTO') {
+        result = result.filter(p => p.tipo !== 'servicio')
+      } else if (this.tipoFilter === 'SERVICIO') {
+        result = result.filter(p => p.tipo === 'servicio')
+      }
       if (this.stockFilter === 'AGOTADOS') {
-        result = result.filter(p => !p.deleted_at && Number(p.stock) <= 0)
+        result = result.filter(p => !p.deleted_at && p.tipo !== 'servicio' && Number(p.stock) <= 0)
       } else if (this.stockFilter === 'BAJOS') {
-        result = result.filter(p => !p.deleted_at && Number(p.stock) > 0 && Number(p.stock) <= Number(p.min_stock || 0))
+        result = result.filter(p => !p.deleted_at && p.tipo !== 'servicio' && Number(p.stock) > 0 && Number(p.stock) <= Number(p.min_stock || 0))
       } else if (this.stockFilter === 'BIEN') {
-        result = result.filter(p => !p.deleted_at && Number(p.stock) > Number(p.min_stock || 0))
+        result = result.filter(p => !p.deleted_at && p.tipo !== 'servicio' && Number(p.stock) > Number(p.min_stock || 0))
+      } else if (this.stockFilter === 'SIN_PRECIO') {
+        result = result.filter(p => !p.deleted_at && !(Number(p.sale_price) > 0))
       }
       return result
     },
@@ -762,7 +773,12 @@ export default {
     }
   },
   async mounted() {
-    await Promise.all([this.loadDashboard(), this.loadProducts()])
+    try { this.vista = localStorage.getItem('ad_mercancia_vista') || '' } catch { this.vista = '' }
+    const [, , rubro] = await Promise.all([this.loadDashboard(), this.loadProducts(), obtenerRubro()])
+    this.rubro = rubro
+    if (this.vista !== 'lista' && this.vista !== 'cuadricula') {
+      this.vista = this.products.some(p => p.foto_path) ? 'cuadricula' : 'lista'
+    }
     await this.fetchExchangeRate()
     this.initialLoading = false
   },
@@ -872,6 +888,7 @@ export default {
     // explícita, no un filtro accidental) y recarga.
     limpiarFiltrosInventario() {
       this.productSearch = ''
+      this.tipoFilter = 'ALL'
       this.dateFromFilter = null
       this.dateToFilter = null
       this.stockFilter = 'ALL'
@@ -886,6 +903,7 @@ export default {
       this.loadingProducts = true
       try {
         this.products = await inventoryService.getProducts({ includeDeleted: this.showDeletedProducts, limit: 500 })
+        this.cargarFotos()
       } catch (e) {
         console.error(e)
       } finally {
@@ -909,79 +927,62 @@ export default {
       setTimeout(() => { if (this.resaltadoProducto === seg.id) this.resaltadoProducto = null }, 1600)
     },
 
-    // CRUD Producto
-    openProductDialog(product = null) {
-      this.editingProduct = product
-      if (product) {
-        this.productForm = { ...product }
-      } else {
-        this.productForm = {
-          code: '',
-          name: '',
-          description: '',
-          unit: 'UND',
-          currency: 'VES',
-          cost_price: 0,
-          sale_price: 0,
-          min_stock: 5,
-          initial_stock: 0
-        }
-      }
+    // ─── Vista, fotos y "Foto y listo" ───
+    setVista(v) {
+      if (v !== 'lista' && v !== 'cuadricula') return
+      this.vista = v
+      try { localStorage.setItem('ad_mercancia_vista', v) } catch { /* sin almacenamiento: no pasa nada */ }
+    },
+    async cargarFotos() {
+      const rutas = this.products.map(p => p.foto_path).filter(Boolean)
+      if (!rutas.length) { this.fotoUrls = {}; return }
+      this.fotoUrls = await firmarVarias(rutas)
+    },
+    tomarFoto() { this.$refs.camaraInput?.click() },
+    subirFotoGaleria() { this.$refs.galeriaInput?.click() },
+    fotoEstante() { this.$refs.estanteInput?.click() },
+    alElegirFotoNueva(e) {
+      const archivo = e.target.files?.[0]
+      e.target.value = ''
+      if (!archivo) return
+      this.archivoFoto = archivo
+      this.crearConFotoDialog = true
+    },
+    alElegirFotoEstante(e) {
+      const archivo = e.target.files?.[0]
+      e.target.value = ''
+      if (!archivo) return
+      this.archivoEstante = archivo
+      this.estanteDialog = true
+    },
+    alFotoLista(resultado) {
+      this.editingProduct = null
+      this.tipoInicial = null
+      this.prefillProducto = resultado
       this.productDialog = true
     },
+    async alGuardarProducto(info) {
+      this.$root?.showSnackbar?.(info.nuevo ? '¡Listo! Producto creado.' : '¡Listo! Producto actualizado.', 'success')
+      await Promise.all([this.loadProducts(), this.loadDashboard()])
+    },
+    async alCambiosEstante({ creados, ajustados }) {
+      const partes = []
+      if (creados) partes.push(`${creados} producto${creados === 1 ? '' : 's'} nuevo${creados === 1 ? '' : 's'}`)
+      if (ajustados) partes.push(`existencias de ${ajustados} producto${ajustados === 1 ? '' : 's'} ajustadas`)
+      this.$root?.showSnackbar?.(`¡Listo! ${partes.join(' y ')}.`, 'success')
+      await Promise.all([this.loadProducts(), this.loadDashboard()])
+    },
+    abrirDetalle(item) {
+      if (item.deleted_at) this.openRestoreDialog(item)
+      else this.openProductDialog(item)
+    },
 
-    async saveProduct() {
-      if (!this.$refs.productForm.validate()) return
-
-      this.savingProduct = true
-      try {
-        const payload = { ...this.productForm }
-        const initialStock = payload.initial_stock
-        delete payload.initial_stock
-
-        let productId
-
-        if (this.editingProduct) {
-          await inventoryService.updateProduct(this.editingProduct.id, payload)
-          productId = this.editingProduct.id
-        } else {
-          if (!payload.code || payload.code.trim() === '') {
-            try {
-              payload.code = await inventoryService.getNextProductSku()
-            } catch {
-              payload.code = `PROD-${Date.now().toString().slice(-5)}`
-            }
-          }
-
-          const { data: newProds, error } = await inventoryService.createProduct({
-            ...payload,
-            stock: 0
-          })
-
-          if (error) throw error
-          const newProd = newProds[0]
-          productId = newProd.id
-
-          if (initialStock > 0) {
-            await inventoryService.registerMovement({
-              product_id: productId,
-              movement_type: 'INITIAL',
-              quantity: initialStock,
-              cost_price: payload.cost_price,
-              description: 'Inventario Inicial'
-            })
-          }
-        }
-
-        this.productDialog = false
-        this.$root?.showSnackbar?.(this.editingProduct ? '¡Listo! Producto actualizado.' : '¡Listo! Producto creado.', 'success')
-        await Promise.all([this.loadProducts(), this.loadDashboard()])
-      } catch (e) {
-        console.error('Error saving product', e)
-        this.$root?.showSnackbar?.('No pudimos guardar el producto. Intenta de nuevo.', 'error')
-      } finally {
-        this.savingProduct = false
-      }
+    // CRUD Producto
+    openProductDialog(product = null, tipo = null) {
+      this.editingProduct = product
+      this.prefillProducto = null
+      this.tipoInicial = tipo
+      this.productDialog = true
     },
 
     openDeleteDialog(item) {
@@ -1236,7 +1237,129 @@ export default {
   max-width: 420px;
 }
 
+/* ── Acciones rápidas bajo el encabezado ── */
+.mi-mercancia__rapidas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.mi-mercancia__vista { flex: 0 0 auto; }
+
+.mi-mercancia__meta {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-surface), 0.65);
+}
+
+/* ── Cuadrícula de tarjetas ── */
+.mi-mercancia__cuadricula {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 600px) {
+  .mi-mercancia__cuadricula { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+}
+
+@media (min-width: 960px) {
+  .mi-mercancia__cuadricula { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1280px) {
+  .mi-mercancia__cuadricula { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+.tarjeta-producto {
+  position: relative;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color var(--ad-move-fast, 150ms) ease;
+}
+
+.tarjeta-producto:hover { border-color: rgba(var(--v-theme-on-surface), 0.3); }
+.tarjeta-producto--eliminada { opacity: 0.6; }
+
+.tarjeta-producto__boton {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 8px 12px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.tarjeta-producto__boton:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary));
+  outline-offset: -3px;
+  border-radius: 16px;
+}
+
+.tarjeta-producto__foto { position: relative; display: block; }
+
+.tarjeta-producto__tipo {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(var(--v-theme-surface), 0.92);
+  color: rgb(var(--v-theme-secondary));
+}
+
+.tarjeta-producto__nombre {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.6em;
+  padding: 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tarjeta-producto__precio {
+  padding: 0 4px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.tarjeta-producto__estado { padding: 0 4px; }
+
+.tarjeta-producto__menu {
+  position: absolute !important;
+  top: 12px;
+  right: 12px;
+  background: rgba(var(--v-theme-surface), 0.92) !important;
+}
+
 /* ── Fila de producto (Productos y Tablero) ── */
+.fila-producto__foto {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: block;
+}
+
 .fila-producto {
   display: flex;
   align-items: center;

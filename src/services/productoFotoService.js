@@ -71,17 +71,11 @@ export function carpetaNegocio() {
   return `${org}/${cliente}`
 }
 
-/** Reduce y sube una foto. Devuelve { path, error }. */
-export async function subirFoto(archivo) {
+/** Sube un Blob JPEG ya reducido a la carpeta del negocio. Devuelve { path, error }. */
+export async function subirBlob(blob) {
   try {
     const carpeta = carpetaNegocio()
     if (!carpeta) return { path: null, error: 'No pudimos identificar tu negocio. Vuelve a iniciar sesión.' }
-    let blob
-    try {
-      blob = await reducirImagen(archivo)
-    } catch {
-      return { path: null, error: 'No pudimos leer esa foto. Prueba con otra.' }
-    }
     const path = `${carpeta}/${nombreArchivo()}`
     const { error } = await supabase.storage
       .from(BUCKET_PRODUCTOS)
@@ -91,6 +85,65 @@ export async function subirFoto(archivo) {
   } catch {
     return { path: null, error: 'No pudimos subir la foto. Revisa tu conexión e intenta de nuevo.' }
   }
+}
+
+/** Reduce y sube una foto. Devuelve { path, blob, error } (blob = la foto reducida). */
+export async function subirFoto(archivo) {
+  if (!carpetaNegocio()) return { path: null, blob: null, error: 'No pudimos identificar tu negocio. Vuelve a iniciar sesión.' }
+  let blob
+  try {
+    blob = await reducirImagen(archivo)
+  } catch {
+    return { path: null, blob: null, error: 'No pudimos leer esa foto. Prueba con otra.' }
+  }
+  const r = await subirBlob(blob)
+  return { ...r, blob }
+}
+
+/**
+ * Recorta un rectángulo {x,y,w,h} (en píxeles de la imagen) y lo devuelve como
+ * { blob, dataUrl } de lado mayor <= max. Para "Foto del estante".
+ */
+export async function recortarImagen(archivo, rect, { max = 800, calidad = CALIDAD_JPEG } = {}) {
+  const img = await cargarImagen(archivo)
+  const escala = Math.min(1, max / Math.max(rect.w, rect.h))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(rect.w * escala))
+  canvas.height = Math.max(1, Math.round(rect.h * escala))
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h, 0, 0, canvas.width, canvas.height)
+  const blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error('no_se_pudo_recortar'))), 'image/jpeg', calidad)
+  })
+  return { blob, dataUrl: canvas.toDataURL('image/jpeg', 0.8) }
+}
+
+/** Mide una imagen (File/Blob). */
+export async function medirImagen(archivo) {
+  const img = await cargarImagen(archivo)
+  return { ancho: img.naturalWidth || img.width, alto: img.naturalHeight || img.height }
+}
+
+/**
+ * Firma muchas rutas de una vez (cuadrícula). Devuelve { ruta: url }.
+ * Nunca lanza; si falla devuelve lo que alcanzó a firmar.
+ */
+export async function firmarVarias(paths = [], segundos = 3600) {
+  const unicas = [...new Set(paths.filter(Boolean))]
+  const mapa = {}
+  for (let i = 0; i < unicas.length; i += 100) {
+    const lote = unicas.slice(i, i + 100)
+    try {
+      const { data, error } = await supabase.storage.from(BUCKET_PRODUCTOS).createSignedUrls(lote, segundos)
+      if (error) continue
+      for (const f of data || []) {
+        if (f?.signedUrl && f.path) mapa[f.path] = f.signedUrl
+      }
+    } catch { /* se queda sin foto, nunca rompe */ }
+  }
+  return mapa
 }
 
 /** URL firmada para mostrar una foto guardada (o null). */
@@ -146,6 +199,19 @@ export async function mejorarFoto(fotoPath) {
   return { path: data.foto_path, error: null }
 }
 
+/**
+ * Foto del estante: la IA devuelve todos los productos que ve.
+ * @returns {Promise<{productos: Array, error: string|null}>}
+ */
+export async function identificarEstante(fotoPath) {
+  const { data, error } = await invocar(
+    { accion: 'estante', foto_path: fotoPath },
+    'No pudimos leer el estante. Intenta con una foto más cerca o por partes.'
+  )
+  if (error) return { productos: [], error }
+  return { productos: Array.isArray(data?.productos) ? data.productos : [], error: null }
+}
+
 /** Pasa la unidad de la IA (LT, MT, PAQ) a las unidades del formulario. */
 export function unidadDelFormulario(unidad) {
   const mapa = { UND: 'UND', KG: 'KG', LT: 'LTS', LTS: 'LTS', MT: 'MTS', MTS: 'MTS', CAJA: 'CAJA', PAQ: 'BULTO', BULTO: 'BULTO' }
@@ -153,6 +219,7 @@ export function unidadDelFormulario(unidad) {
 }
 
 export default {
-  reducirImagen, subirFoto, urlFoto, borrarFotos, identificarProducto, mejorarFoto,
+  reducirImagen, subirFoto, subirBlob, recortarImagen, medirImagen, firmarVarias, urlFoto, borrarFotos,
+  identificarProducto, identificarEstante, mejorarFoto,
   calcularTamano, carpetaNegocio, unidadDelFormulario
 }

@@ -203,6 +203,45 @@ describe('InventoryService', () => {
     })
   })
 
+  describe('servicios y campos nuevos', () => {
+    it('un servicio no genera movimientos ni toca el stock', async () => {
+      const servicio = buildProduct({ tipo: 'servicio', stock: 0 })
+      vi.spyOn(inventoryService, 'getProductById').mockResolvedValue(servicio)
+      const upd = vi.spyOn(inventoryService, 'updateProduct').mockResolvedValue({ success: true })
+      supabase.from.mockClear()
+      const r = await inventoryService.registerMovement({ product_id: servicio.id, movement_type: 'INITIAL', quantity: 5 })
+      expect(r).toMatchObject({ success: true, skipped: true })
+      expect(supabase.from).not.toHaveBeenCalled()
+      expect(upd).not.toHaveBeenCalled()
+    })
+
+    it('createProduct envía tipo, categoría, marca, código de barras, atributos y fotos', async () => {
+      insertWithTenant.mockResolvedValue({ data: [{ id: 'n' }], error: null })
+      await inventoryService.createProduct({
+        name: 'Camisa', tipo: 'producto', categoria: ' Ropa ', marca: '', codigo_barras: '759',
+        atributos: { talla: 'M', color: '', vencimiento: null }, foto_path: 'o/c/a.jpg', foto_original_path: 'o/c/a.jpg'
+      })
+      const enviado = insertWithTenant.mock.calls.at(-1)[1]
+      expect(enviado).toMatchObject({
+        tipo: 'producto', categoria: 'Ropa', marca: null, codigo_barras: '759',
+        atributos: { talla: 'M' }, foto_path: 'o/c/a.jpg', foto_original_path: 'o/c/a.jpg'
+      })
+    })
+
+    it('un servicio se guarda sin stock', async () => {
+      insertWithTenant.mockResolvedValue({ data: [{ id: 'n' }], error: null })
+      await inventoryService.createProduct({ name: 'Corte', tipo: 'servicio', stock: 9, min_stock: 5, atributos: { se_cobra_por: 'Hora' } })
+      expect(insertWithTenant.mock.calls.at(-1)[1]).toMatchObject({ tipo: 'servicio', stock: 0, min_stock: 0, atributos: { se_cobra_por: 'Hora' } })
+    })
+
+    it('updateProduct envía los campos nuevos', async () => {
+      vi.restoreAllMocks()
+      updateWithTenant.mockResolvedValue({ error: null })
+      await inventoryService.updateProduct('p1', { marca: 'PAN', atributos: { presentacion: '1 kg' } })
+      expect(updateWithTenant).toHaveBeenLastCalledWith('inventory_products', 'p1', { marca: 'PAN', atributos: { presentacion: '1 kg' } })
+    })
+  })
+
   // ═════════════════════════════════════════════════════════════
   // Suite 4: Soft Delete y Restauración
   // ═════════════════════════════════════════════════════════════

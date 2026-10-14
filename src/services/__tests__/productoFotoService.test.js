@@ -7,10 +7,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const upload = vi.fn()
 const remove = vi.fn()
 const invoke = vi.fn()
+const createSignedUrls = vi.fn()
 
 vi.mock('@/lib/supabaseClient', () => ({
   supabase: {
-    storage: { from: vi.fn(() => ({ upload, remove })) },
+    storage: { from: vi.fn(() => ({ upload, remove, createSignedUrls })) },
     functions: { invoke: (...a) => invoke(...a) }
   }
 }))
@@ -27,7 +28,7 @@ import { getCurrentClientId } from '@/utils/tenantHelpers'
 import { obtenerUrlFirmada } from '@/services/storageUrlService'
 import svc, {
   calcularTamano, carpetaNegocio, nombreArchivo, subirFoto, urlFoto, borrarFotos,
-  identificarProducto, mejorarFoto, unidadDelFormulario
+  identificarProducto, identificarEstante, mejorarFoto, unidadDelFormulario, firmarVarias, subirBlob
 } from '@/services/productoFotoService'
 
 beforeEach(() => {
@@ -72,9 +73,17 @@ describe('subirFoto', () => {
   })
 
   it('avisa si la foto no se puede leer (no es imagen)', async () => {
-    const r = await subirFoto(new Blob(['no soy imagen']))
-    expect(r.path).toBeNull()
-    expect(r.error).toMatch(/leer esa foto/)
+    const origImage = globalThis.Image
+    globalThis.URL.createObjectURL = vi.fn(() => 'blob:x')
+    globalThis.URL.revokeObjectURL = vi.fn()
+    globalThis.Image = class { set src(_) { setTimeout(() => this.onerror()) } }
+    try {
+      const r = await subirFoto(new Blob(['no soy imagen']))
+      expect(r.path).toBeNull()
+      expect(r.error).toMatch(/leer esa foto/)
+    } finally {
+      globalThis.Image = origImage
+    }
   })
 
   it('reduce, sube a la carpeta del negocio y devuelve la ruta', async () => {
@@ -173,5 +182,43 @@ describe('unidadDelFormulario', () => {
     expect(unidadDelFormulario('kg')).toBe('KG')
     expect(unidadDelFormulario('raro')).toBe('UND')
     expect(unidadDelFormulario(null)).toBe('UND')
+  })
+})
+
+describe('subirBlob', () => {
+  it('sube a la carpeta del negocio', async () => {
+    upload.mockResolvedValue({ error: null })
+    const r = await subirBlob(new Blob(['x']))
+    expect(r.error).toBeNull()
+    expect(r.path).toMatch(/^org-1\/cli-1\/.+\.jpg$/)
+  })
+  it('error de red: mensaje amable', async () => {
+    upload.mockResolvedValue({ error: { message: 'boom' } })
+    expect((await subirBlob(new Blob(['x']))).error).toMatch(/conexión/)
+  })
+})
+
+describe('foto del estante y firmado en lote', () => {
+  it('identificarEstante pide la acción estante', async () => {
+    invoke.mockResolvedValue({ data: { productos: [{ nombre: 'A' }] }, error: null })
+    const r = await identificarEstante('p')
+    expect(invoke).toHaveBeenCalledWith('producto-ia', { body: { accion: 'estante', foto_path: 'p' } })
+    expect(r.productos).toHaveLength(1)
+  })
+  it('identificarEstante falla con mensaje amable', async () => {
+    invoke.mockResolvedValue({ data: null, error: new Error('x') })
+    const r = await identificarEstante('p')
+    expect(r.productos).toEqual([])
+    expect(r.error).toMatch(/por partes/)
+  })
+  it('firmarVarias devuelve un mapa ruta a url y no repite rutas', async () => {
+    createSignedUrls.mockResolvedValue({ data: [{ path: 'a', signedUrl: 'u-a' }, { path: 'b', signedUrl: 'u-b' }], error: null })
+    const m = await firmarVarias(['a', 'b', 'a', null])
+    expect(createSignedUrls).toHaveBeenCalledWith(['a', 'b'], 3600)
+    expect(m).toEqual({ a: 'u-a', b: 'u-b' })
+  })
+  it('firmarVarias no lanza si falla', async () => {
+    createSignedUrls.mockRejectedValue(new Error('red'))
+    expect(await firmarVarias(['a'])).toEqual({})
   })
 })
