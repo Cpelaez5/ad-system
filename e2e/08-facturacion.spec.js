@@ -19,7 +19,7 @@ test.describe('Cliente — Facturación (Mis movimientos)', () => {
     if (isMobile) {
       await expect(page.locator('.ad-move-entrada').first()).toBeVisible()
     } else {
-      await expect(page.getByText('Tus movimientos', { exact: true })).toBeVisible()
+      await expect(page.getByText(/^Tus movimientos \(\d+\)$/)).toBeVisible()
     }
 
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])

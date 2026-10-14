@@ -54,8 +54,23 @@
               Quitar
             </v-btn>
           </div>
+          <!-- Nano Banana es OPCIONAL: el cliente decide si la usa y puede cambiar de opinión -->
+          <v-btn-toggle
+            v-if="form.foto_path && mejoradaPath && !comparacion"
+            :model-value="usandoMejorada ? 'mejorada' : 'original'"
+            mandatory
+            density="comfortable"
+            color="primary"
+            variant="outlined"
+            class="pf-foto__version"
+            aria-label="Qué foto usar"
+            @update:model-value="usarVersion"
+          >
+            <v-btn value="original" class="text-none">Original</v-btn>
+            <v-btn value="mejorada" class="text-none" prepend-icon="mdi-auto-fix">Mejorada</v-btn>
+          </v-btn-toggle>
           <v-btn
-            v-if="form.foto_path"
+            v-if="form.foto_path && !mejoradaPath"
             variant="outlined"
             color="primary"
             class="text-none pf-foto__mejorar"
@@ -74,7 +89,8 @@
 
       <!-- Original vs. mejorada -->
       <section v-if="comparacion" class="pf-comparar" aria-label="Elige tu foto">
-        <p class="pf-comparar__titulo">Elige la foto que prefieres</p>
+        <p class="pf-comparar__titulo">¿Cuál foto quieres usar?</p>
+        <p class="pf-comparar__ayuda">Tú decides. Puedes cambiarla cuando quieras.</p>
         <div class="pf-comparar__par">
           <figure class="pf-comparar__opcion">
             <FotoProducto :src="comparacion.urlOriginal" :tipo="form.tipo" alt="Foto original" />
@@ -84,7 +100,7 @@
           <figure class="pf-comparar__opcion">
             <FotoProducto :src="comparacion.urlMejorada" :tipo="form.tipo" alt="Foto mejorada con IA" />
             <figcaption>Mejorada con IA</figcaption>
-            <v-btn variant="flat" color="primary" block class="text-none" @click="elegirFoto('mejorada')">Usar la mejorada</v-btn>
+            <v-btn variant="tonal" color="secondary" block class="text-none" @click="elegirFoto('mejorada')">Usar la mejorada</v-btn>
           </figure>
         </div>
       </section>
@@ -289,6 +305,9 @@ const mejorando = ref(false)
 const errorFoto = ref('')
 const fotoUrl = ref(null)
 const comparacion = ref(null)
+// Versión "de estudio" generada con Nano Banana, guardada aparte para poder alternar.
+const mejoradaPath = ref(null)
+const usandoMejorada = computed(() => !!mejoradaPath.value && form.foto_path === mejoradaPath.value)
 const rubroLocal = ref(null)
 const rubroElegido = ref(null)
 const guardandoRubro = ref(false)
@@ -330,6 +349,7 @@ function iniciar() {
   guardadoOk.value = false
   errorFoto.value = ''
   comparacion.value = null
+  mejoradaPath.value = null
   rubroElegido.value = null
   rubroLocal.value = null
   Object.assign(form, nuevoForm())
@@ -343,6 +363,7 @@ function iniciar() {
       atributos: { ...(p.atributos || {}) }, foto_path: p.foto_path || null, foto_original_path: p.foto_original_path || null,
     })
     fotosIniciales = [p.foto_path, p.foto_original_path]
+    if (p.foto_path && p.foto_original_path && p.foto_path !== p.foto_original_path) mejoradaPath.value = p.foto_path
   } else {
     form.tipo = props.tipoInicial || tipoPorDefecto(props.rubro)
     const pre = props.prefill
@@ -408,12 +429,14 @@ async function alElegirFoto(e) {
   subidasSesion.push(path)
   form.foto_path = path
   form.foto_original_path = path
+  mejoradaPath.value = null
 }
 
 function quitarFoto() {
   form.foto_path = null
   form.foto_original_path = null
   comparacion.value = null
+  mejoradaPath.value = null
 }
 
 async function mejorar() {
@@ -435,8 +458,14 @@ async function mejorar() {
 function elegirFoto(cual) {
   if (!comparacion.value) return
   form.foto_original_path = comparacion.value.original
+  mejoradaPath.value = comparacion.value.mejorada
   form.foto_path = cual === 'mejorada' ? comparacion.value.mejorada : comparacion.value.original
   comparacion.value = null
+}
+
+function usarVersion(cual) {
+  if (!mejoradaPath.value) return
+  form.foto_path = cual === 'mejorada' ? mejoradaPath.value : (form.foto_original_path || form.foto_path)
 }
 
 async function guardarRubroElegido() {
@@ -551,6 +580,16 @@ function otraFoto() {
   flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 8px;
+}
+
+.pf-foto__version {
+  margin-top: 4px;
+}
+
+.pf-comparar__ayuda {
+  margin: -4px 0 12px;
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-surface), 0.68);
 }
 
 .pf-foto__mejorar {
