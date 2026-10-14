@@ -17,6 +17,7 @@ import retentionRpcService from '@/services/retentionRpcService.js'
 import emailNotificationService from '@/services/email-notification-service.js'
 import proveedorService from '@/services/proveedorService.js'
 import inventoryService from '@/services/inventoryService.js'
+import clientesNegocioService from '@/services/clientesNegocioService.js'
 import { supabase } from '@/lib/supabaseClient'
 import { logger } from '@/utils/logger'
 import { normalizarRif, tipoPersonaPorLetra } from '@/utils/rif.js'
@@ -166,6 +167,14 @@ export async function guardarRegistro(formData) {
   try {
     const isUpdate = Boolean(formData?.id)
     let savedResult
+
+    // Mis clientes: la venta se enlaza con su cliente (o crea el nuevo, solo
+    // ahora que se guarda de verdad). "Consumidor final" deja el id en null.
+    if (formData?.flow === 'VENTA') {
+      const cliente = await clientesNegocioService.asegurarClienteDeVenta(formData)
+      if (!cliente.success) return { success: false, message: cliente.message }
+      formData.cliente_negocio_id = cliente.id
+    }
 
     // Proveedor nuevo sugerido por el OCR, nunca creado hasta este punto
     // (ver Tarea C — OCR, punto 1: "nada se crea si el usuario cancela").

@@ -191,14 +191,19 @@
               v-model="proveedor"
               @add-new="showProveedorModal = true"
             />
-            <v-text-field
+            <ClienteNegocioAutocomplete
               v-if="formData.flow !== 'COMPRA'"
-              v-model="counterpartName"
-              placeholder="Ej: Distribuidora López"
-              variant="outlined"
-              density="comfortable"
-              hide-details="auto"
-              :rules="[v => !!v || 'Este campo es obligatorio']"
+              v-bind="propsClienteNegocio"
+              v-model:rif="counterpartRif"
+              v-model:telefono="clientePhone"
+              v-on="eventosClienteNegocio"
+            />
+            <AvisoAmable
+              v-if="formData.flow !== 'COMPRA' && clienteEspecial"
+              tipo="info"
+              mensaje="Este cliente te retiene IVA; pídele el comprobante."
+              class="mt-2"
+              data-testid="aviso-cliente-especial"
             />
           </v-col>
 
@@ -678,27 +683,21 @@
 
           <!-- VENTA: Campos de Cliente -->
           <template v-else>
-            <v-col cols="12" sm="7">
-              <v-text-field
-                v-model="counterpartName"
-                label="Nombre o empresa del cliente"
-                placeholder="Ej: Distribuidora López"
-                variant="outlined"
-                density="comfortable"
-                :rules="[v => !!v || 'Este campo es obligatorio']"
-                hide-details="auto"
+            <v-col cols="12">
+              <ClienteNegocioAutocomplete
+                v-bind="propsClienteNegocio"
+                label="¿A quién le vendiste?"
+                v-model:rif="counterpartRif"
+                v-model:telefono="clientePhone"
+                v-on="eventosClienteNegocio"
                 class="mb-2"
               />
-            </v-col>
-            <v-col cols="12" sm="5">
-              <v-text-field
-                v-model="counterpartRif"
-                label="RIF (opcional)"
-                placeholder="J-12345678-9"
-                variant="outlined"
-                density="comfortable"
-                hide-details
+              <AvisoAmable
+                v-if="clienteEspecial"
+                tipo="info"
+                mensaje="Este cliente te retiene IVA; pídele el comprobante."
                 class="mb-2"
+                data-testid="aviso-cliente-especial"
               />
             </v-col>
           </template>
@@ -1453,6 +1452,7 @@ import FileUploadZone from '@/components/common/FileUploadZone.vue';
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
 import ProductAutocomplete from '@/components/common/ProductAutocomplete.vue';
 import ExpenseCategorySelector from '@/components/common/ExpenseCategorySelector.vue';
+import ClienteNegocioAutocomplete from '@/components/forms/ClienteNegocioAutocomplete.vue'
 import ProveedorAutocomplete from '@/components/forms/ProveedorAutocomplete.vue';
 import ProveedorModalForm from '@/components/forms/ProveedorModalForm.vue';
 import RetentionSummaryCard from '@/components/forms/RetentionSummaryCard.vue';
@@ -1503,7 +1503,7 @@ export default {
   name: 'SimpleInvoiceForm',
   components: { EnvolturaDetallesContables,
     AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete,
-    ExpenseCategorySelector, ProveedorAutocomplete, ProveedorModalForm,
+    ExpenseCategorySelector, ProveedorAutocomplete, ClienteNegocioAutocomplete, ProveedorModalForm,
     RetentionSummaryCard, RetentionAdjustSheet, NumericInput,
     BotonAccion, PasoGuiado, TarjetaAccion, AyudaTermino, AvisoAmable
   },
@@ -1516,7 +1516,10 @@ export default {
     // hoy (lo usa Facturacion.vue). true: presenta un asistente de 2 pasos
     // (¿Tienes la factura? → Confirma 4 datos) con el resto del formulario
     // disponible, sin cambios de lógica, dentro de "Ver detalles contables".
-    simple:  { type: Boolean, default: false }
+    simple:  { type: Boolean, default: false },
+    // Mis clientes: cliente (fila de clientes_negocio) con el que se abre una venta nueva
+    // ("Registrar venta a este cliente"). Solo aplica al crear, no al editar.
+    clienteInicial: { type: Object, default: null }
   },
 
   emits: ['submit', 'cancel', 'saved'],
@@ -1556,6 +1559,9 @@ export default {
 
       // Usuario actual
       currentUser: null,
+
+      // Mis clientes: el cliente elegido retiene IVA (aviso amable)
+      clienteEspecial: false,
 
       // Retenciones
       proveedor: null,
@@ -1674,6 +1680,7 @@ export default {
         dueDate:         '',
         status:          'BORRADOR',
 
+        cliente_negocio_id: null,
         issuer: { companyName:'', rif:'', taxpayerType:'PERSONA JURÍDICA', phone:'', email:'', website:'', address:'' },
         client: { companyName:'', rif:'', taxpayerType:'PERSONA JURÍDICA', phone:'', email:'', website:'', address:'' },
 
@@ -1749,6 +1756,29 @@ export default {
         if (this.formData.flow === 'VENTA') this.formData.client.rif = v;
         else this.formData.issuer.rif = v;
       }
+    },
+
+    // Mis clientes (VENTA): teléfono del cliente y conexión con el autocompletado
+    clientePhone: {
+      get() { return this.formData.client.phone; },
+      set(v) { this.formData.client.phone = v; }
+    },
+    propsClienteNegocio() {
+      return {
+        clienteId: this.formData.cliente_negocio_id || null,
+        nombre: this.formData.client.companyName || '',
+        rif: this.formData.client.rif || '',
+        telefono: this.formData.client.phone || ''
+      };
+    },
+    eventosClienteNegocio() {
+      return {
+        seleccionar: this.elegirClienteNegocio,
+        nuevo: ({ nombre }) => this.usarClienteNuevo(nombre),
+        'consumidor-final': () => this.usarClienteNuevo('Consumidor final'),
+        limpiar: () => this.usarClienteNuevo(''),
+        'cliente-cargado': (c) => { this.clienteEspecial = !!c.es_contribuyente_especial; }
+      };
     },
 
     // Mis datos (el usuario autenticado)
@@ -2086,6 +2116,9 @@ export default {
       this.formData.expense_type = 'GASTO';
     }
     await this.loadCurrentUser();
+    if (this.clienteInicial && !this.isEditing && this.formData.flow === 'VENTA') {
+      this.elegirClienteNegocio(this.clienteInicial);
+    }
     this.fetchExchangeRate(this.formData.issueDate);
     // Modo simple: guarda una foto del formulario ya pre-llenado (mis datos,
     // flow, expense_type) para que "Registrar otro" (simpleResetForm) vuelva
@@ -2101,6 +2134,37 @@ export default {
 
   // ─── METHODS ─────────────────────────────────────────────────────────────────
   methods: {
+
+    // ── Mis clientes (VENTA) ─────────────────────────────────────────────────
+    // Un cliente guardado llena client_info como siempre (compatibilidad con
+    // PDF y libros) y enlaza la venta por cliente_negocio_id.
+    elegirClienteNegocio(c) {
+      this.formData.cliente_negocio_id = c.id;
+      this.formData.client = {
+        ...this.formData.client,
+        companyName: c.nombre || '',
+        rif: c.rif || '',
+        phone: c.telefono || '',
+        email: c.correo || '',
+        address: c.direccion || '',
+        taxpayerType: c.tipo_persona === 'natural' ? 'PERSONA NATURAL' : 'PERSONA JURÍDICA'
+      };
+      this.clienteEspecial = !!c.es_contribuyente_especial;
+    },
+    // Cliente nuevo, "Consumidor final" o vacío: no hay vínculo; el cliente
+    // nuevo se crea al guardar la venta (registroService), nunca al escribirlo.
+    usarClienteNuevo(nombre) {
+      this.formData.cliente_negocio_id = null;
+      this.formData.client = {
+        ...this.formData.client,
+        companyName: nombre,
+        rif: '',
+        phone: '',
+        email: '',
+        address: ''
+      };
+      this.clienteEspecial = false;
+    },
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     newItem() {
