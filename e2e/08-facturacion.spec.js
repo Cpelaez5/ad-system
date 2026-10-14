@@ -12,14 +12,14 @@ test.describe('Cliente — Facturación (Mis movimientos)', () => {
     await page.goto('/cliente/facturacion')
     await expect(page).toHaveURL(/\/cliente\/facturacion/)
     // El título "Mis movimientos" es el mismo en escritorio y móvil, pero
-    // "Lista de Facturas" solo existe en la v-data-table de escritorio: en
+    // "Tus movimientos" (título de la tabla) solo existe en la v-data-table de escritorio: en
     // xs la lista usa FilaMovimiento (ver Facturacion.vue) y ese texto no
     // se renderiza nunca.
     await expect(page.getByText('Mis movimientos')).toBeVisible()
     if (isMobile) {
       await expect(page.locator('.ad-move-entrada').first()).toBeVisible()
     } else {
-      await expect(page.getByText('Lista de Facturas')).toBeVisible()
+      await expect(page.getByText('Tus movimientos', { exact: true })).toBeVisible()
     }
 
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
@@ -27,7 +27,7 @@ test.describe('Cliente — Facturación (Mis movimientos)', () => {
 
   test('formulario normal de compras tiene "Fecha fiscal"; cancelar sin guardar', async ({ page, consoleErrors }) => {
     await page.goto('/cliente/facturacion?tab=compras')
-    await page.getByRole('button', { name: 'Nuevo Registro' }).click()
+    await page.getByRole('button', { name: 'Nuevo registro' }).click()
 
     await expect(page.getByText(/Fecha fiscal/).first()).toBeVisible()
 
@@ -52,7 +52,7 @@ test.describe('Cliente — Facturación (Mis movimientos)', () => {
     test.skip(!isMobile, 'Solo aplica al proyecto mobile; en desktop el diálogo no colapsa al forzar el viewport')
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/cliente/facturacion')
-    await page.getByRole('button', { name: 'Nuevo Registro' }).click()
+    await page.getByRole('button', { name: 'Nuevo registro' }).click()
 
     const cancelar = page.getByRole('button', { name: 'Cancelar' })
     await expect(cancelar).toBeVisible()
