@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   MONEDAS, CODIGOS_MONEDA, CODIGOS_CON_TASA, MONEDAS_VISTA, MONEDAS_OTRAS,
   esMonedaValida, simboloDe, nombreDe, normalizarTasas, tasasDeFactura,
-  convertir, montoFacturaEn, sumarFacturasEn, textoSinTasa, monedaDeFactura
+  convertir, montoFacturaEn, sumarFacturasEn, textoSinTasa, monedaDeFactura, parsearTasa
 } from '../monedas.js'
 
 const factura = (financial) => ({ financial })
@@ -165,6 +165,21 @@ describe('montoFacturaEn', () => {
   it('una tasa propia inválida cae a la vigente', () => {
     const inv = factura({ totalSales: 400, currency: 'VES', exchangeRate: 'x' })
     expect(montoFacturaEn(inv, 'USD', { USD: 40 }).aproximado).toBe(true)
+  })
+})
+
+describe('parsearTasa', () => {
+  it('lee coma o punto decimal y miles', () => {
+    expect(parsearTasa('877,9')).toBe(877.9)
+    expect(parsearTasa('877.9')).toBe(877.9)
+    expect(parsearTasa('1.234,56')).toBe(1234.56)
+    expect(parsearTasa(' Bs 40 ')).toBe(40)
+    expect(parsearTasa(40)).toBe(40)
+  })
+  it('devuelve null si no es un número mayor que cero', () => {
+    for (const malo of ['', '   ', 'abc', '0', '-5', '1,2,3', null, undefined, 0, NaN]) {
+      expect(parsearTasa(malo)).toBeNull()
+    }
   })
 })
 

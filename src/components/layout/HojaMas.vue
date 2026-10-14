@@ -13,7 +13,16 @@
 
       <!-- Tasas del día: solo valores (formatTasa), sin etiquetas largas
            (feedback #2 del shell: en móvil las tasas tapaban el título). -->
-      <v-list-subheader>Tasas del día</v-list-subheader>
+      <v-list-subheader>
+        {{ tasaInfo?.modo === 'manual' ? 'Tus tasas (manual)' : 'Tasas del día' }}
+      </v-list-subheader>
+      <v-list-item
+        v-if="avisoTasa"
+        prepend-icon="mdi-alert-outline"
+        :title="avisoTasa"
+        class="hoja-mas__aviso-tasa"
+        data-testid="hoja-aviso-tasa"
+      />
       <v-list-item v-if="showUsdRate" title="Dólar">
         <template #prepend>
           <v-icon size="20">mdi-currency-usd</v-icon>
@@ -55,6 +64,13 @@
         </template>
       </v-list-item>
 
+      <v-list-item
+        prepend-icon="mdi-swap-horizontal"
+        title="Cambiar mi tasa"
+        data-testid="hoja-cambiar-tasa"
+        @click="$emit('navegar', '/cliente/mi-area#tasa')"
+      />
+
       <v-divider class="my-2" />
 
       <!-- Ayuda: abre el chat de soporte (en móvil la burbuja flotante se
@@ -77,6 +93,7 @@
 
 <script>
 import { formatTasa } from '@/utils/formatMoney.js'
+import { formatFechaCorta } from '@/utils/fechas.js'
 import { getMenuClienteMas } from './menuPorRol.js'
 
 /**
@@ -101,6 +118,8 @@ export default {
   props: {
     isServicesCompany: { type: Boolean, default: false },
     bcvRate: { type: Object, default: null },
+    /** { modo, desactualizada, fallo, fecha } de la tasa vigente (ver AppShell). */
+    tasaInfo: { type: Object, default: null },
     showUsdRate: { type: Boolean, default: true },
     showEurRate: { type: Boolean, default: true },
     showCnyRate: { type: Boolean, default: false },
@@ -113,6 +132,15 @@ export default {
   computed: {
     itemsMenu() {
       return getMenuClienteMas({ isServicesCompany: this.isServicesCompany })
+    },
+    avisoTasa() {
+      const t = this.tasaInfo
+      if (!t) return ''
+      if (t.fallo) return 'No pudimos actualizar la tasa del BCV'
+      if (t.desactualizada) {
+        return t.fecha ? `Tu tasa es del ${formatFechaCorta(t.fecha)}. Actualízala si cambió` : 'Tu tasa está desactualizada'
+      }
+      return ''
     },
   },
 

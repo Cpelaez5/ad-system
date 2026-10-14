@@ -59,6 +59,26 @@ describe('ChipTasa', () => {
     expect(error.text()).toContain('—')
   })
 
+  it('con tasa manual muestra la marca "Manual" y lo dice en el aria-label', () => {
+    const w = mount(ChipTasa, { props: { currency: 'USD', rateValue: 877.9, manual: true }, global: globalConfig })
+    expect(w.text()).toContain('Manual')
+    expect(w.find('.chip-tasa').attributes('aria-label')).toContain('Tu tasa del dólar')
+    expect(w.find('.chip-tasa').attributes('aria-label')).toContain('Mi negocio')
+  })
+
+  it('sin marca "Manual" cuando es automática', () => {
+    const w = mount(ChipTasa, { props: { currency: 'USD', rateValue: 36.5 }, global: globalConfig })
+    expect(w.text()).not.toContain('Manual')
+  })
+
+  it('en aviso (desactualizada o con fallo) usa el color ámbar y repite la nota', () => {
+    const w = mount(ChipTasa, { props: { currency: 'USD', rateValue: 36.5, aviso: true, nota: 'Es del 10/10/2026' }, global: globalConfig })
+    expect(w.find('.chip-tasa').attributes('color')).toBe('warning')
+    const normal = mount(ChipTasa, { props: { currency: 'USD', rateValue: 36.5 }, global: globalConfig })
+    expect(normal.find('.chip-tasa').attributes('color')).toBe('secondary')
+    expect(w.find('.chip-tasa').attributes('aria-label')).toContain('Es del 10/10/2026')
+  })
+
   it('emite "click" al pulsar el chip (refresca la tasa)', async () => {
     const wrapper = mount(ChipTasa, { props: { currency: 'USD', rateValue: 36.5 }, global: globalConfig })
     await wrapper.find('.chip-tasa').trigger('click')

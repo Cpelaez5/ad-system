@@ -22,6 +22,7 @@
     :bcv-rate="bcvRate"
     :bcv-loading="bcvLoading"
     :bcv-error="bcvError"
+    :tasa-info="tasaInfo"
     :show-usd-rate="showUsdRate"
     :show-eur-rate="showEurRate"
     :show-cny-rate="showCnyRate"
@@ -36,8 +37,17 @@
 
   <!-- Barra inferior del cliente en móvil (<600px); no renderiza nada en
        otros roles o tamaños, ver ClienteBottomNav.vue -->
+  <!-- Aviso no bloqueante: la tasa automática no respondió (solo clientes) -->
+  <v-snackbar v-model="avisoTasaFallo" location="top" :timeout="10000" color="warning" data-testid="aviso-tasa-fallo">
+    No pudimos actualizar la tasa del BCV
+    <template #actions>
+      <v-btn variant="text" class="text-none" @click="escribirTasa">Escribirla yo</v-btn>
+    </template>
+  </v-snackbar>
+
   <ClienteBottomNav
     :bcv-rate="bcvRate"
+    :tasa-info="tasaInfo"
     :show-usd-rate="showUsdRate"
     :show-eur-rate="showEurRate"
     :show-cny-rate="showCnyRate"
@@ -48,6 +58,7 @@
 
 <script>
 import bcvService from '@/services/bcvService.js';
+import { tasasVigentes, EVENTO_TASA_CAMBIO } from '@/services/tasaService.js';
 import { supabase } from '@/lib/supabaseClient';
 import userSettingsService from '@/services/user-settings-service.js';
 import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
@@ -90,6 +101,10 @@ export default {
       bcvRate: null,
       bcvLoading: false,
       bcvError: false,
+      // { modo, desactualizada, fallo, fecha } de la tasa vigente (automática o definida por el cliente)
+      tasaInfo: null,
+      avisoTasaFallo: false,
+      avisoTasaMostrado: false,
       userPlan: null,
       showUsdRate: true,
       showEurRate: true,
@@ -157,6 +172,7 @@ export default {
     this.loadRatePreferences();
 
     window.addEventListener('ad-settings-changed', this.onSettingsChanged);
+    window.addEventListener(EVENTO_TASA_CAMBIO, this.onTasaCambio);
 
     this.onUserUpdated = (event) => {
       this.currentUser = event?.detail || this.getCurrentUserFromStorage();
@@ -170,6 +186,7 @@ export default {
       clearInterval(this.bcvInterval);
     }
     window.removeEventListener('ad-settings-changed', this.onSettingsChanged);
+    window.removeEventListener(EVENTO_TASA_CAMBIO, this.onTasaCambio);
     if (this.onUserUpdated) {
       window.removeEventListener('ad-user-updated', this.onUserUpdated);
       window.removeEventListener('storage', this.onUserUpdated);
@@ -251,12 +268,32 @@ export default {
       try {
         this.bcvLoading = true;
         this.bcvError = false;
-        const response = await bcvService.getCurrentRate();
-        if (response.success) {
-          this.bcvRate = response.data;
+        // Tasa VIGENTE del negocio: automática (BCV) o la que definió el cliente.
+        const vigentes = await tasasVigentes();
+        const t = vigentes.tasas || {};
+        if (t.USD) {
+          this.bcvRate = {
+            dollar: t.USD,
+            euro: t.EUR || null,
+            yuan: t.CNY || null,
+            lira: t.TRY || null,
+            rublo: t.RUB || null,
+            date: vigentes.fecha,
+            source: vigentes.fuente,
+          };
         } else {
           this.bcvError = true;
           this.bcvRate = null;
+        }
+        this.tasaInfo = {
+          modo: vigentes.modo,
+          desactualizada: vigentes.desactualizada,
+          fallo: vigentes.fallo,
+          fecha: vigentes.fecha,
+        };
+        if (vigentes.fallo && vigentes.modo === 'automatica' && this.isCliente && !this.avisoTasaMostrado) {
+          this.avisoTasaMostrado = true;
+          this.avisoTasaFallo = true;
         }
       } catch (error) {
         console.error('Error al cargar tasa del BCV:', error);
@@ -270,6 +307,15 @@ export default {
     async refreshBCVRate() {
       bcvService.clearCache();
       await this.loadBCVRate();
+    },
+
+    escribirTasa() {
+      this.avisoTasaFallo = false;
+      this.$router?.push('/cliente/mi-area#tasa');
+    },
+
+    onTasaCambio() {
+      this.loadBCVRate();
     },
 
     async logout() {

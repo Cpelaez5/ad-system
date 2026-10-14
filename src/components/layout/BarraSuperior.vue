@@ -21,39 +21,54 @@
         :rate-value="bcvRate?.dollar"
         :loading="bcvLoading"
         :error="bcvError"
-        @click="$emit('refresh-bcv')"
+        :manual="chipManual"
+        :aviso="chipAviso"
+        :nota="chipNota"
+        @click="alTocarTasa"
       />
       <ChipTasa
         v-if="showEurRate && !bcvLoading && bcvRate?.euro"
         currency="EUR"
         :rate-value="bcvRate?.euro"
         :error="bcvError"
+        :manual="chipManual"
+        :aviso="chipAviso"
+        :nota="chipNota"
         class="d-none d-md-inline-flex"
-        @click="$emit('refresh-bcv')"
+        @click="alTocarTasa"
       />
       <ChipTasa
         v-if="showCnyRate && !bcvLoading && bcvRate?.yuan"
         currency="CNY"
         :rate-value="bcvRate?.yuan"
         :error="bcvError"
+        :manual="chipManual"
+        :aviso="chipAviso"
+        :nota="chipNota"
         class="d-none d-lg-inline-flex"
-        @click="$emit('refresh-bcv')"
+        @click="alTocarTasa"
       />
       <ChipTasa
         v-if="showTryRate && !bcvLoading && bcvRate?.lira"
         currency="TRY"
         :rate-value="bcvRate?.lira"
         :error="bcvError"
+        :manual="chipManual"
+        :aviso="chipAviso"
+        :nota="chipNota"
         class="d-none d-lg-inline-flex"
-        @click="$emit('refresh-bcv')"
+        @click="alTocarTasa"
       />
       <ChipTasa
         v-if="showRubRate && !bcvLoading && bcvRate?.rublo"
         currency="RUB"
         :rate-value="bcvRate?.rublo"
         :error="bcvError"
+        :manual="chipManual"
+        :aviso="chipAviso"
+        :nota="chipNota"
         class="d-none d-lg-inline-flex"
-        @click="$emit('refresh-bcv')"
+        @click="alTocarTasa"
       />
     </div>
 
@@ -68,6 +83,7 @@
 <script>
 import ChipTasa from '@/components/ui/ChipTasa.vue'
 import MenuUsuario from './MenuUsuario.vue'
+import { formatFechaCorta } from '@/utils/fechas.js'
 
 /**
  * BarraSuperior — app bar del shell. En móvil (<600px) muestra solo el
@@ -95,9 +111,42 @@ export default {
     currentUser: { type: Object, default: () => ({}) },
     userPlan: { type: String, default: null },
     isClientProfileIncomplete: { type: Boolean, default: false },
+    /** { modo, desactualizada, fallo, fecha } de la tasa vigente (ver tasaService.tasasVigentes). */
+    tasaInfo: { type: Object, default: null },
   },
 
   emits: ['toggle-drawer', 'refresh-bcv'],
+
+  computed: {
+    esCliente() {
+      return this.currentUser?.role === 'cliente'
+    },
+    chipManual() {
+      return this.tasaInfo?.modo === 'manual'
+    },
+    chipAviso() {
+      return !!(this.tasaInfo && (this.tasaInfo.desactualizada || this.tasaInfo.fallo))
+    },
+    chipNota() {
+      const t = this.tasaInfo
+      if (!t) return ''
+      if (t.fallo) return 'No pudimos actualizar la tasa del BCV: es la última que conocemos'
+      if (t.desactualizada && t.fecha) return `Es del ${formatFechaCorta(t.fecha)}. Actualízala si cambió`
+      if (t.desactualizada) return 'Está desactualizada'
+      return ''
+    },
+  },
+
+  methods: {
+    /** El cliente va a Mi negocio → Tasa de cambio; el resto de roles refresca la tasa. */
+    alTocarTasa() {
+      if (this.esCliente && this.$router) {
+        this.$router.push('/cliente/mi-area#tasa')
+        return
+      }
+      this.$emit('refresh-bcv')
+    },
+  },
 }
 </script>
 

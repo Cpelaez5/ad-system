@@ -454,6 +454,8 @@
         </v-row>
       </section>
 
+      <TasaDeCambio v-if="currentUser?.role === 'cliente'" />
+
       <ConexionesApi v-if="currentUser?.role === 'cliente'" />
     </template>
 
@@ -544,6 +546,7 @@ import venezuelaLocationsService from '@/services/venezuelaLocationsService';
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue';
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
 import ConexionesApi from '@/components/cliente/ConexionesApi.vue';
+import TasaDeCambio from '@/components/cliente/TasaDeCambio.vue';
 import ListaPasos from '@/components/ui/ListaPasos.vue';
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
 import AvisoAmable from '@/components/ui/AvisoAmable.vue';
@@ -555,6 +558,7 @@ export default {
   name: 'ClienteMiArea',
   components: {
     ConexionesApi,
+    TasaDeCambio,
     EncabezadoPagina,
     DialogoAdaptable,
     ListaPasos,

@@ -171,6 +171,19 @@ export function sumarFacturasEn(facturas, monedaDestino, tasasVigentes, obtener)
   return { total, aproximadas, sinTasa }
 }
 
+/**
+ * Lee una tasa escrita a mano: "877,9", "877.9", "1.234,56" → número.
+ * Devuelve null si no es un número mayor que cero.
+ */
+export function parsearTasa(texto) {
+  if (typeof texto === 'number') return texto > 0 && Number.isFinite(texto) ? texto : null
+  let t = String(texto ?? '').trim().replace(/\s/g, '').replace(/^(Bs\.?|VES)/i, '')
+  if (!t) return null
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.')
+  if (!/^\d+(\.\d+)?$/.test(t)) return null
+  return positivo(t)
+}
+
 /** "1 factura sin tasa" / "3 facturas sin tasa" (o '' si no hay). */
 export function textoSinTasa(cantidad) {
   const n = Number(cantidad) || 0

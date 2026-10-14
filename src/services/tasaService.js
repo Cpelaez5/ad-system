@@ -161,9 +161,31 @@ export async function tasasVigentes({ clientId, ahora = new Date() } = {}) {
   return { tasas: {}, modo: 'automatica', fecha: null, fuente: 'NINGUNA', desactualizada: true, fallo: true }
 }
 
+/**
+ * Monedas distintas de VES que el negocio ya usó en sus facturas (para ofrecerle
+ * su tasa en "Tasa de cambio"). Nunca lanza: ante cualquier problema devuelve [].
+ */
+export async function monedasUsadas({ clientId } = {}) {
+  try {
+    const id = clientId || getCurrentClientId()
+    if (!id) return []
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('moneda:financial->>currency')
+      .eq('client_id', id)
+      .is('deleted_at', null)
+      .limit(1000)
+    if (error || !Array.isArray(data)) return []
+    const usadas = new Set(data.map((f) => f?.moneda).filter((m) => CODIGOS_CON_TASA.includes(m)))
+    return CODIGOS_CON_TASA.filter((c) => usadas.has(c))
+  } catch {
+    return []
+  }
+}
+
 /** Solo para tests: olvida la última tasa conocida. */
 export function _reiniciar() {
   ultimaAutomatica = null
 }
 
-export default { preferencia, guardarPreferencia, tasasVigentes, diasDeAntiguedad }
+export default { preferencia, guardarPreferencia, tasasVigentes, monedasUsadas, diasDeAntiguedad }

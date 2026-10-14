@@ -75,6 +75,7 @@
       <HojaMas
         :is-services-company="isServicesCompany"
         :bcv-rate="bcvRate"
+        :tasa-info="tasaInfo"
         :show-usd-rate="showUsdRate"
         :show-eur-rate="showEurRate"
         :show-cny-rate="showCnyRate"
@@ -106,6 +107,8 @@ export default {
   props: {
     /** Tasa BCV actual (ver bcvService.getCurrentRate()), cargada por AppShell. */
     bcvRate: { type: Object, default: null },
+    /** { modo, desactualizada, fallo, fecha } de la tasa vigente (ver AppShell). */
+    tasaInfo: { type: Object, default: null },
     showUsdRate: { type: Boolean, default: true },
     showEurRate: { type: Boolean, default: true },
     showCnyRate: { type: Boolean, default: false },

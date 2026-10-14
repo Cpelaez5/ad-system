@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import BarraSuperior from '@/components/layout/BarraSuperior.vue'
 
@@ -37,6 +37,53 @@ describe('BarraSuperior', () => {
     await wrapper.setProps({ tituloPagina: 'Mis movimientos' })
     expect(wrapper.text()).toContain('Mis movimientos')
     expect(wrapper.text()).not.toContain('Inicio')
+  })
+
+  it('el cliente va a Mi negocio → Tasa de cambio al tocar un chip de tasa', async () => {
+    const push = vi.fn()
+    const wrapper = mount(BarraSuperior, {
+      props: { bcvRate: { dollar: 36.5 }, currentUser: { role: 'cliente' } },
+      global: { ...globalConfig, mocks: { $router: { push } } },
+    })
+    wrapper.vm.alTocarTasa()
+    expect(push).toHaveBeenCalledWith('/cliente/mi-area#tasa')
+    expect(wrapper.emitted('refresh-bcv')).toBeFalsy()
+  })
+
+  it('otros roles refrescan la tasa al tocar un chip', () => {
+    const push = vi.fn()
+    const wrapper = mount(BarraSuperior, {
+      props: { currentUser: { role: 'contador' } },
+      global: { ...globalConfig, mocks: { $router: { push } } },
+    })
+    wrapper.vm.alTocarTasa()
+    expect(push).not.toHaveBeenCalled()
+    expect(wrapper.emitted('refresh-bcv')).toBeTruthy()
+  })
+
+  it('marca Manual y ámbar según la tasa vigente, con la nota correspondiente', () => {
+    const manual = mount(BarraSuperior, {
+      props: { tasaInfo: { modo: 'manual', desactualizada: true, fallo: false, fecha: '2026-10-10' } },
+      global: globalConfig,
+    })
+    expect(manual.vm.chipManual).toBe(true)
+    expect(manual.vm.chipAviso).toBe(true)
+    expect(manual.vm.chipNota).toContain('10/10/2026')
+
+    const fallo = mount(BarraSuperior, {
+      props: { tasaInfo: { modo: 'automatica', desactualizada: false, fallo: true, fecha: '2026-10-14' } },
+      global: globalConfig,
+    })
+    expect(fallo.vm.chipManual).toBe(false)
+    expect(fallo.vm.chipAviso).toBe(true)
+    expect(fallo.vm.chipNota).toContain('No pudimos actualizar la tasa del BCV')
+
+    const normal = mount(BarraSuperior, {
+      props: { tasaInfo: { modo: 'automatica', desactualizada: false, fallo: false, fecha: '2026-10-14' } },
+      global: globalConfig,
+    })
+    expect(normal.vm.chipAviso).toBe(false)
+    expect(normal.vm.chipNota).toBe('')
   })
 
   it('muestra el botón de menú (hamburguesa) solo si mostrarMenu=true', () => {
