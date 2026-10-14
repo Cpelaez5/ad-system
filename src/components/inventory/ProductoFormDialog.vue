@@ -18,7 +18,7 @@
       <!-- Aviso amable de la IA -->
       <v-alert
         v-if="aviso"
-        :type="aviso.tipo"
+        :color="aviso.tipo === 'warning' ? 'warning' : 'secondary'"
         variant="tonal"
         density="comfortable"
         class="mb-4"
@@ -135,7 +135,7 @@
       </v-row>
 
       <!-- Invitación a elegir el rubro -->
-      <v-alert v-if="!rubroActual && !esServicio" type="info" variant="tonal" density="comfortable" class="mt-4 pf-rubro" icon="mdi-store-cog-outline">
+      <v-alert v-if="!rubroActual && !esServicio" color="secondary" variant="tonal" density="comfortable" class="mt-4 pf-rubro" icon="mdi-store-cog-outline">
         <p class="mb-2"><strong>¿A qué se dedica tu negocio?</strong> Así te pedimos solo los datos que importan para tus productos.</p>
         <div class="pf-rubro__fila">
           <v-select
