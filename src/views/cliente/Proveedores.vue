@@ -46,7 +46,7 @@
         <PanelSiguientePaso
           :listo="proveedoresIncompletos.length === 0"
           titulo="Completa el RIF"
-          :detalle="`${proveedoresIncompletos.length} proveedor${proveedoresIncompletos.length === 1 ? '' : 'es'} ${proveedoresIncompletos.length === 1 ? 'no tiene' : 'no tienen'} un RIF válido. Compétalo para poder aplicarle las retenciones correctas.`"
+          :detalle="`${proveedoresIncompletos.length} proveedor${proveedoresIncompletos.length === 1 ? '' : 'es'} ${proveedoresIncompletos.length === 1 ? 'no tiene' : 'no tienen'} un RIF válido. Complétalo para poder aplicarle las retenciones correctas.`"
           texto-boton="Completar ahora"
           icono-boton="mdi-card-account-details-outline"
           titulo-listo="¡Tu directorio está completo!"
