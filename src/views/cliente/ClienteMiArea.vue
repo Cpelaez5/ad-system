@@ -343,11 +343,11 @@
                 @change="handleFileUpload($event, 'seal')"
               />
 
-              <div class="d-flex ga-2 w-100 mt-auto pt-2" @click.stop>
-                <v-btn variant="tonal" color="secondary" size="small" block prepend-icon="mdi-upload" class="text-none" :loading="uploadingSeal" @click="$refs.sealFileInput.click()">
+              <div class="d-flex align-center ga-2 w-100 mt-auto pt-2" @click.stop>
+                <v-btn variant="tonal" color="secondary" size="small" prepend-icon="mdi-upload" class="text-none flex-grow-1 sello-firma__cambiar" :loading="uploadingSeal" @click="$refs.sealFileInput.click()">
                   {{ sealConfig.sealUrl ? 'Cambiar sello' : 'Cargar sello' }}
                 </v-btn>
-                <v-btn v-if="sealConfig.sealUrl" variant="text" color="error" icon="mdi-delete-outline" size="small" aria-label="Eliminar sello" @click="deleteSealAsset('seal')" />
+                <v-btn v-if="sealConfig.sealUrl" variant="text" color="error" icon="mdi-delete-outline" size="small" class="flex-shrink-0" aria-label="Eliminar sello" @click="deleteSealAsset('seal')" />
               </div>
             </div>
           </v-col>
@@ -391,11 +391,11 @@
                 @change="handleFileUpload($event, 'signature')"
               />
 
-              <div class="d-flex ga-2 w-100 mt-auto pt-2" @click.stop>
-                <v-btn variant="tonal" color="secondary" size="small" block prepend-icon="mdi-upload" class="text-none" :loading="uploadingSignature" @click="$refs.signatureFileInput.click()">
+              <div class="d-flex align-center ga-2 w-100 mt-auto pt-2" @click.stop>
+                <v-btn variant="tonal" color="secondary" size="small" prepend-icon="mdi-upload" class="text-none flex-grow-1 sello-firma__cambiar" :loading="uploadingSignature" @click="$refs.signatureFileInput.click()">
                   {{ sealConfig.signatureUrl ? 'Cambiar firma' : 'Cargar firma' }}
                 </v-btn>
-                <v-btn v-if="sealConfig.signatureUrl" variant="text" color="error" icon="mdi-delete-outline" size="small" aria-label="Eliminar firma" @click="deleteSealAsset('signature')" />
+                <v-btn v-if="sealConfig.signatureUrl" variant="text" color="error" icon="mdi-delete-outline" size="small" class="flex-shrink-0" aria-label="Eliminar firma" @click="deleteSealAsset('signature')" />
               </div>
             </div>
           </v-col>
@@ -1194,5 +1194,10 @@ export default {
 .pregunta-fiscal__toggle :deep(.v-btn.v-btn--active) {
   border-color: rgb(var(--v-theme-primary)) !important;
   font-weight: 700;
+}
+
+/* Sello y firma: el botón ancho cede espacio a la papelera para que no se salga de la tarjeta */
+.sello-firma__cambiar {
+  min-width: 0;
 }
 </style>
