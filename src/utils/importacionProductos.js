@@ -6,6 +6,7 @@
  *        -> construirFila (valida) -> planificar (nuevo / actualizar / error).
  */
 import { camposDe, CAMPOS_SERVICIO, tipoPorDefecto } from '@/constants/rubros.js'
+import { codigoBarrasValido, limpiarCodigoBarras } from '@/utils/codigoBarras.js'
 
 export const MAX_FILAS = 2000
 export const MAX_BYTES = 5 * 1024 * 1024
@@ -458,6 +459,40 @@ export function planificar(filas, ctx, existentes = []) {
   })
 
   return { filas: resultado, resumen: resumir(resultado) }
+}
+
+/**
+ * Catálogo global: a las filas NUEVAS con código de barras válido les completa
+ * solo lo que el archivo dejó vacío (marca, categoría, presentación, unidad).
+ * Las filas que actualizan un producto existente no se tocan (no se pisa lo
+ * que el negocio ya tiene). Las fotos del catálogo NO se copian aquí: serían
+ * cientos de subidas (mejora pendiente: copiarlas en segundo plano).
+ * @param {object[]} filas  resultado de planificar().filas
+ * @param {Map<string,object>} catalogoPorCodigo  codigo_barras -> fila del catálogo
+ * @returns {object[]} filas nuevas (copias); las completadas llevan `completadoCatalogo: true`
+ */
+export function completarConCatalogo(filas, catalogoPorCodigo) {
+  if (!catalogoPorCodigo || !catalogoPorCodigo.size) return filas
+  return filas.map((f) => {
+    if (f.estado !== 'nuevo' || f.datos.tipo === 'servicio') return f
+    const codigo = limpiarCodigoBarras(f.datos.codigo_barras)
+    if (!codigoBarrasValido(codigo)) return f
+    const item = catalogoPorCodigo.get(codigo)
+    if (!item) return f
+    const datos = { ...f.datos }
+    let completado = false
+    if (!datos.marca && item.marca) { datos.marca = item.marca; completado = true }
+    if (!datos.categoria && item.categoria) { datos.categoria = item.categoria; completado = true }
+    if (!datos.unit && item.unidad) {
+      const u = parseUnidad(item.unidad)
+      if (u) { datos.unit = u; completado = true }
+    }
+    if (item.presentacion && !datos.atributos?.presentacion) {
+      datos.atributos = { ...(datos.atributos || {}), presentacion: item.presentacion }
+      completado = true
+    }
+    return completado ? { ...f, datos, completadoCatalogo: true } : f
+  })
 }
 
 export function resumir(filas) {

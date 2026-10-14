@@ -6,6 +6,8 @@
 import { supabase } from '@/lib/supabaseClient'
 import { getCurrentOrganizationId, getCurrentClientId } from '@/utils/tenantHelpers'
 import inventoryService from '@/services/inventoryService'
+import { buscarProductosPorCodigos } from '@/services/catalogoService'
+import { codigoBarrasValido, limpiarCodigoBarras } from '@/utils/codigoBarras.js'
 import { MAX_BYTES, MAX_FILAS, enLotes, puedeDeshacer } from '@/utils/importacionProductos.js'
 
 const TAMANO_LOTE = 50
@@ -66,6 +68,19 @@ export async function cargarExistentes() {
     if (!data || data.length < 1000) break
   }
   return todos
+}
+
+/**
+ * Catálogo global para la vista previa: un solo select con todos los códigos de
+ * barras válidos del archivo. Nunca lanza; devuelve un Map codigo -> producto.
+ * @param {{crudo:object}[]} filasCrudas
+ */
+export async function cargarCatalogo(filasCrudas = []) {
+  const codigos = filasCrudas
+    .map((f) => limpiarCodigoBarras(f.crudo?.codigo_barras))
+    .filter(codigoBarrasValido)
+  const items = await buscarProductosPorCodigos(codigos)
+  return new Map(items.map((i) => [i.codigo_barras, i]))
 }
 
 /**
@@ -245,4 +260,4 @@ export async function deshacerImportacion(importacion, ahora = new Date()) {
   return { quitados: quitar.length, conservados: conVentas.size }
 }
 
-export default { leerArchivo, obtenerRubro, cargarExistentes, importarPlan, ajustarExistencias, listarImportaciones, deshacerImportacion }
+export default { leerArchivo, obtenerRubro, cargarExistentes, cargarCatalogo, importarPlan, ajustarExistencias, listarImportaciones, deshacerImportacion }
