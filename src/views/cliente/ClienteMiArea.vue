@@ -203,7 +203,6 @@
             v-model="form.activity_type"
             color="primary"
             variant="outlined"
-            divided
             mandatory
             class="pregunta-fiscal__toggle pregunta-fiscal__toggle--ancho"
           >
@@ -219,7 +218,6 @@
             v-model="form.taxpayer_type"
             color="primary"
             variant="outlined"
-            divided
             mandatory
             class="pregunta-fiscal__toggle"
           >
@@ -235,7 +233,7 @@
             ¿Eres contribuyente especial?
             <AyudaTermino clave="contribuyente_especial" />
           </div>
-          <v-btn-toggle v-model="form.es_contribuyente_especial" color="primary" variant="outlined" divided mandatory class="pregunta-fiscal__toggle">
+          <v-btn-toggle v-model="form.es_contribuyente_especial" color="primary" variant="outlined" mandatory class="pregunta-fiscal__toggle">
             <v-btn :value="true" class="text-none">Sí</v-btn>
             <v-btn :value="false" class="text-none">No</v-btn>
           </v-btn-toggle>
@@ -246,7 +244,7 @@
             ¿Eres agente de retención municipal?
             <AyudaTermino clave="retencion_municipal" />
           </div>
-          <v-btn-toggle v-model="form.es_agente_retencion_municipal" color="primary" variant="outlined" divided mandatory class="pregunta-fiscal__toggle">
+          <v-btn-toggle v-model="form.es_agente_retencion_municipal" color="primary" variant="outlined" mandatory class="pregunta-fiscal__toggle">
             <v-btn :value="true" class="text-none">Sí</v-btn>
             <v-btn :value="false" class="text-none">No</v-btn>
           </v-btn-toggle>
@@ -257,7 +255,7 @@
             ¿Retienes el ISLR a tus proveedores?
             <AyudaTermino clave="retencion_islr" />
           </div>
-          <v-btn-toggle v-model="form.retains_islr" color="primary" variant="outlined" divided mandatory class="pregunta-fiscal__toggle">
+          <v-btn-toggle v-model="form.retains_islr" color="primary" variant="outlined" mandatory class="pregunta-fiscal__toggle">
             <v-btn :value="true" class="text-none">Sí</v-btn>
             <v-btn :value="false" class="text-none">No</v-btn>
           </v-btn-toggle>
@@ -1142,5 +1140,30 @@ export default {
   border-radius: 16px;
   border: 1px solid rgba(var(--v-theme-success), 0.3);
   background: linear-gradient(0deg, rgba(var(--v-theme-success), 0.06), rgba(var(--v-theme-success), 0.06)), rgb(var(--v-theme-surface));
+}
+
+/* Opciones del perfil fiscal: botones separados (antes iban pegados), cada uno con su
+   borde y esquina redondeada, y el elegido en granate. Altura cómoda para tocar. */
+.pregunta-fiscal__toggle {
+  gap: 8px;
+  border: 0 !important;
+  overflow: visible !important;
+  height: auto !important;
+  background: transparent !important;
+  flex-wrap: wrap;
+}
+
+.pregunta-fiscal__toggle :deep(.v-btn) {
+  min-height: 44px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.2) !important;
+  border-radius: 12px !important;
+  padding: 0 18px !important;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pregunta-fiscal__toggle :deep(.v-btn.v-btn--active) {
+  border-color: rgb(var(--v-theme-primary)) !important;
+  font-weight: 700;
 }
 </style>

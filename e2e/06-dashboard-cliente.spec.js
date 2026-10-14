@@ -26,7 +26,7 @@ test.describe('Cliente — ¿Cómo voy?', () => {
     await expect(page.getByText('Vendí', { exact: true })).toBeVisible()
     await expect(page.getByText('Gasté', { exact: true })).toBeVisible()
     await expect(page.getByText('Lo que vas a declarar', { exact: true })).toBeVisible()
-    await expect(page.getByText('Últimos 6 meses')).toBeVisible()
+    await expect(page.getByText('¿Cómo va mi negocio mes a mes?')).toBeVisible()
 
     // Cambiar a "Mes pasado": cambia el contenido (en este entorno, el
     // cliente de prueba no tiene movimientos el mes pasado → estado vacío)
