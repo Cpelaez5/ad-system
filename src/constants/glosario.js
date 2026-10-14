@@ -152,6 +152,11 @@ const GLOSARIO = {
     termino: 'Expediente Fiscal',
     simple: 'Mis papeles del negocio',
     explicacion: 'Es la carpeta donde guardas todos los papeles importantes de tu negocio. Ahí va tu permiso de alcaldía y tus declaraciones.'
+  },
+  licencia_actividad_economica: {
+    termino: 'Licencia de Actividad Económica',
+    simple: 'Permiso de la alcaldía',
+    explicacion: 'Es el permiso que te da la alcaldía de tu municipio para operar tu negocio. También se le dice Patente de Industria y Comercio.'
   }
 };
 

@@ -46,7 +46,9 @@ test.describe('Cliente — Mi negocio (Proveedores, Inventario, Mi área)', () =
   test('Mi área carga sin errores de consola', async ({ page, consoleErrors }) => {
     await page.goto('/cliente/mi-area')
     await expect(page).toHaveURL(/\/cliente\/mi-area/)
-    await expect(page.getByText('Mi perfil').first()).toBeVisible()
+    // Ola "patrón cliente" (2026-10-13): el título de la pantalla pasó a
+    // "Mi negocio", igual que en el menú (ver docs/mvp/diseno/patron-cliente.md).
+    await expect(page.getByRole('heading', { name: 'Mi negocio' }).first()).toBeVisible()
 
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })

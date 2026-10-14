@@ -663,13 +663,26 @@ const userService = {
             address: profileData.client.address,
             activity_type: profileData.client.activity_type,
             licencia_actividad_economica: profileData.client.licencia_actividad_economica,
+            // I6 (ola patrón Mi negocio): "estado" se perdía porque nunca se
+            // mapeaba aquí — ClienteMiArea.vue sí lo enviaba, pero este método
+            // lo descartaba en silencio y solo guardaba el municipio.
+            estado: profileData.client.estado,
             municipio_id: profileData.client.municipio_id || profileData.client.municipio,
             // Billing data
             billing_name: profileData.client.billing_name,
             billing_tax_id: profileData.client.billing_tax_id,
             billing_address: profileData.client.billing_address,
-            is_special_taxpayer: profileData.client.is_special_taxpayer,
-            retains_islr: profileData.client.retains_islr
+            // Perfil fiscal guiado (ola patrón Mi negocio). `es_contribuyente_especial`
+            // es la columna que de verdad lee la lógica de retención en
+            // SimpleInvoiceForm.vue; `is_special_taxpayer` es un duplicado
+            // legado que antes era la única columna que este método
+            // actualizaba (y que nadie más lee hoy) — se mantiene en
+            // sincronía por compatibilidad, sin romper nada existente.
+            es_contribuyente_especial: profileData.client.es_contribuyente_especial,
+            is_special_taxpayer: profileData.client.is_special_taxpayer ?? profileData.client.es_contribuyente_especial,
+            es_agente_retencion_municipal: profileData.client.es_agente_retencion_municipal,
+            retains_islr: profileData.client.retains_islr,
+            taxpayer_type: profileData.client.taxpayer_type
           };
 
           Object.keys(clientUpdates).forEach(key => clientUpdates[key] === undefined && delete clientUpdates[key]);
