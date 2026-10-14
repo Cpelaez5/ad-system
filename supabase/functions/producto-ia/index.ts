@@ -3,6 +3,8 @@
 //   POST { accion: 'identificar', foto_path, campos? } → datos sugeridos del producto
 //        campos: [{ clave, etiqueta }] propios del rubro (talla, vencimiento…); la IA los llena si se ven
 //   POST { accion: 'mejorar',     foto_path }  → foto "de estudio" (Nano Banana)
+//   POST { accion: 'estante',     foto_path }  → todos los productos visibles en un estante, con
+//        cantidad visible y su caja en la foto (box_2d: [ymin, xmin, ymax, xmax] en 0–1000) para recortarlos
 //
 // `foto_path` es una ruta del bucket PRIVADO `productos`:
 //   {organization_id}/{client_id}/{archivo}
@@ -62,6 +64,41 @@ const SCHEMA_PRODUCTO = {
   required: ['nombre', 'unidad', 'confianza'],
 };
 
+const PROMPT_ESTANTE = `Eres un asistente de inventario para pequeños comercios en Venezuela.
+La foto muestra un estante, anaquel, nevera o mostrador con varios productos.
+Devuelve CADA producto distinto que se vea (agrupa las unidades iguales en una sola entrada):
+- "nombre": cómo lo pediría un cliente (ej. "Harina PAN 1 kg").
+- "marca", "categoria", "presentacion": si se ven; si no, null.
+- "unidad": una de UND, KG, LT, MT, PAQ, CAJA.
+- "cantidad_visible": cuántas unidades de ese producto se ven completas o casi completas (cuenta con cuidado; si hay filas detrás que no se ven, cuenta solo las visibles).
+- "box_2d": la caja que encierra UNA unidad representativa y bien visible de ese producto, como [ymin, xmin, ymax, xmax] normalizado de 0 a 1000.
+- "confianza": "alta", "media" o "baja".
+Máximo 40 productos. No inventes productos que no se vean ni precios.`;
+
+const SCHEMA_ESTANTE = {
+  type: 'OBJECT',
+  properties: {
+    productos: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          nombre: { type: 'STRING' },
+          marca: { type: 'STRING', nullable: true },
+          categoria: { type: 'STRING', nullable: true },
+          presentacion: { type: 'STRING', nullable: true },
+          unidad: { type: 'STRING', enum: ['UND', 'KG', 'LT', 'MT', 'PAQ', 'CAJA'] },
+          cantidad_visible: { type: 'INTEGER' },
+          box_2d: { type: 'ARRAY', items: { type: 'INTEGER' } },
+          confianza: { type: 'STRING', enum: ['alta', 'media', 'baja'] },
+        },
+        required: ['nombre', 'unidad', 'cantidad_visible', 'confianza'],
+      },
+    },
+  },
+  required: ['productos'],
+};
+
 const PROMPT_MEJORAR = `Convierte esta foto en una foto de producto profesional para catálogo:
 el MISMO producto, idéntico (forma, colores, etiqueta, texto y logotipos sin cambios),
 centrado, sobre fondo blanco limpio, con luz de estudio suave y una sombra sutil debajo.
@@ -119,7 +156,7 @@ Deno.serve(async (req) => {
         .slice(0, 12)
         .map((c: any) => ({ clave: c.clave, etiqueta: String(c.etiqueta ?? c.clave).slice(0, 60) }))
     : [];
-  if (!['identificar', 'mejorar'].includes(accion)) return error(400, 'ACCION', 'Acción no válida.');
+  if (!['identificar', 'mejorar', 'estante'].includes(accion)) return error(400, 'ACCION', 'Acción no válida.');
   if (typeof foto_path !== 'string' || foto_path.includes('..')) return error(400, 'RUTA', 'Ruta de foto no válida.');
 
   // 3. La foto debe ser de SU empresa: {org}/{client}/...
@@ -172,6 +209,28 @@ Además, en "atributos" llena SOLO lo que se vea en la foto (si no se ve, null):
       log.tokens_completion = datos?.usageMetadata?.candidatesTokenCount;
       await supabase.from('ai_usage_logs').insert(log).then(() => {}, () => {});
       return respuesta(200, { producto });
+    }
+
+    if (accion === 'estante') {
+      log.model = ia.model;
+      const datos = await llamarGemini(ia.encrypted_api_key, ia.model, {
+        contents: [{ parts: [{ text: PROMPT_ESTANTE }, imagen] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA_ESTANTE, temperature: 0.2 },
+      });
+      const texto = datos?.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
+      let resultado: any;
+      try { resultado = JSON.parse(texto); } catch { throw { code: 'RESPUESTA_IA', message: 'No pudimos leer la respuesta de la IA.' }; }
+      // Sanear: cantidades ≥ 0 y cajas válidas dentro de 0–1000 (si no, sin caja).
+      const productos = (resultado?.productos ?? []).slice(0, 40).map((p: any) => {
+        const b = Array.isArray(p.box_2d) && p.box_2d.length === 4 ? p.box_2d.map((n: any) => Math.max(0, Math.min(1000, Number(n) || 0))) : null;
+        const caja = b && b[2] > b[0] && b[3] > b[1] ? b : null;
+        return { ...p, cantidad_visible: Math.max(0, Math.round(Number(p.cantidad_visible) || 0)), box_2d: caja };
+      });
+      log.status = 'success';
+      log.tokens_prompt = datos?.usageMetadata?.promptTokenCount;
+      log.tokens_completion = datos?.usageMetadata?.candidatesTokenCount;
+      await supabase.from('ai_usage_logs').insert(log).then(() => {}, () => {});
+      return respuesta(200, { productos });
     }
 
     // accion === 'mejorar' (Nano Banana)
