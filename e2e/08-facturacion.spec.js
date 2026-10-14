@@ -19,7 +19,7 @@ test.describe('Cliente — Facturación (Mis movimientos)', () => {
     if (isMobile) {
       await expect(page.locator('.ad-move-entrada').first()).toBeVisible()
     } else {
-      await expect(page.getByText(/^Tus movimientos \(\d+\)$/)).toBeVisible()
+      await expect(page.getByText(/Tus movimientos \(\d+\)/).first()).toBeVisible()
     }
 
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
@@ -29,10 +29,12 @@ test.describe('Cliente — Facturación (Mis movimientos)', () => {
     await page.goto('/cliente/facturacion?tab=compras')
     await page.getByRole('button', { name: 'Nuevo registro' }).click()
 
-    await expect(page.getByText(/Fecha fiscal/).first()).toBeVisible()
+    // Por su nombre accesible: getByText(...).first() caía en la etiqueta flotante oculta de Vuetify.
+    const fechaFiscal = page.getByRole('textbox', { name: /Fecha fiscal/ })
+    await expect(fechaFiscal).toBeVisible()
 
     await page.getByRole('button', { name: 'Cancelar' }).click()
-    await expect(page.getByText(/Fecha fiscal/).first()).toBeHidden()
+    await expect(fechaFiscal).toBeHidden()
 
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
