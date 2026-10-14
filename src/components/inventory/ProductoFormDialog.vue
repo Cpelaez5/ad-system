@@ -260,9 +260,10 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import FotoProducto from '@/components/inventory/FotoProducto.vue'
 import inventoryService from '@/services/inventoryService'
-import { subirFoto, urlFoto, mejorarFoto, unidadDelFormulario } from '@/services/productoFotoService'
+import { subirFoto, urlFoto, mejorarFoto, borrarFotos, unidadDelFormulario } from '@/services/productoFotoService'
 import { guardarRubro } from '@/services/rubroService'
 import { RUBROS, camposDe, tipoPorDefecto } from '@/constants/rubros'
+import { fotosASuprimir } from '@/utils/fotosProducto'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -291,6 +292,9 @@ const comparacion = ref(null)
 const rubroLocal = ref(null)
 const rubroElegido = ref(null)
 const guardandoRubro = ref(false)
+// Fotos subidas en esta sesión y fotos que tenía el producto al abrir (para no dejar huérfanas).
+let subidasSesion = []
+let fotosIniciales = []
 
 const nuevoForm = () => ({
   code: '', name: '', description: '', unit: 'UND', currency: 'VES',
@@ -321,6 +325,8 @@ const aviso = computed(() => {
 })
 
 function iniciar() {
+  subidasSesion = []
+  fotosIniciales = []
   guardadoOk.value = false
   errorFoto.value = ''
   comparacion.value = null
@@ -336,12 +342,14 @@ function iniciar() {
       categoria: p.categoria || '', marca: p.marca || '', codigo_barras: p.codigo_barras || '',
       atributos: { ...(p.atributos || {}) }, foto_path: p.foto_path || null, foto_original_path: p.foto_original_path || null,
     })
+    fotosIniciales = [p.foto_path, p.foto_original_path]
   } else {
     form.tipo = props.tipoInicial || tipoPorDefecto(props.rubro)
     const pre = props.prefill
     if (pre) {
       form.foto_path = pre.foto_path || null
       form.foto_original_path = pre.foto_path || null
+      subidasSesion.push(pre.foto_path)
       const ia = pre.producto
       if (ia) {
         form.tipo = 'producto'
@@ -371,8 +379,19 @@ watch(() => form.foto_path, async path => {
   if (path) fotoUrl.value = await urlFoto(path)
 }, { immediate: true })
 
+function limpiarFotos(guardado) {
+  const borrar = fotosASuprimir({
+    iniciales: fotosIniciales,
+    subidas: subidasSesion,
+    conservar: guardado ? [form.foto_path, form.foto_original_path] : fotosIniciales,
+    guardado,
+  })
+  if (borrar.length) borrarFotos(borrar)
+}
+
 function cerrar(valor) {
   if (valor === false && (guardando.value || subiendoFoto.value)) return
+  if (valor === false && !guardadoOk.value && props.modelValue) limpiarFotos(false)
   emit('update:modelValue', valor)
 }
 
@@ -386,6 +405,7 @@ async function alElegirFoto(e) {
   const { path, error } = await subirFoto(archivo)
   subiendoFoto.value = false
   if (error) { errorFoto.value = error; return }
+  subidasSesion.push(path)
   form.foto_path = path
   form.foto_original_path = path
 }
@@ -406,6 +426,7 @@ async function mejorar() {
     errorFoto.value = error
     return
   }
+  subidasSesion.push(path)
   const [urlOriginal, urlMejorada] = await Promise.all([urlFoto(original), urlFoto(path)])
   mejorando.value = false
   comparacion.value = { original, mejorada: path, urlOriginal, urlMejorada }
@@ -479,6 +500,7 @@ async function guardar() {
       }
     }
     nombreGuardado.value = payload.name
+    limpiarFotos(true)
     emit('guardado', { nuevo: !props.producto, nombre: payload.name, servicio: esServicio.value })
     if (modoFoto.value) {
       guardadoOk.value = true

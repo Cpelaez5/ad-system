@@ -831,7 +831,7 @@
                   @update:model-value="updateItemTotal(index)"
                 />
                 <div
-                  v-if="item.product && showProductSearch"
+                  v-if="item.product && showProductSearch && item.product.tipo !== 'servicio'"
                   class="text-caption mt-0 pl-1"
                   :class="isStockError(item) ? 'text-error font-weight-bold' : 'text-grey'"
                 >
@@ -1445,6 +1445,7 @@ import invoiceService from '@/services/invoiceService.js';
 import userService from '@/services/userService.js';
 import { procesarComprobanteOCR } from '@/services/gemini/geminiOcrService.js';
 import inventoryService from '@/services/inventoryService.js';
+import { excedeStock } from '@/utils/stockVenta';
 import bcvService from '@/services/bcvService.js';
 import proveedorService from '@/services/proveedorService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
@@ -2058,7 +2059,7 @@ export default {
               // Reconstruir el objeto product para que el combobox lo muestre correctamente
               // en modo edición. Solo necesitamos los campos mínimos que usa ProductAutocomplete.
               product: it.product_id
-                ? { id: it.product_id, name: it.description, code: it.code, unit: it.unit, stock: it.product?.stock ?? 0 }
+                ? { id: it.product_id, name: it.description, code: it.code, unit: it.unit, stock: it.product?.stock ?? 0, tipo: it.product?.tipo }
                 : (typeof it.product === 'string' ? it.product : null)
             }))
           };
@@ -2223,7 +2224,7 @@ export default {
     },
 
     isStockError(item) {
-      return this.formData.flow === 'VENTA' && item.product && item.quantity > item.product.stock;
+      return excedeStock(item, this.formData.flow);
     },
 
     // ── Modo simple (Fase 2) ───────────────────────────────────────────────────
@@ -2302,7 +2303,7 @@ export default {
     simpleCampoDeDetalleConError() {
       if (this.isDuplicate) return 'invoiceNumber';
       if (this.formData.flow === 'VENTA') {
-        const overflow = this.formData.items.find(i => i.product && i.quantity > i.product.stock);
+        const overflow = this.formData.items.find(i => excedeStock(i, 'VENTA'));
         if (overflow) return 'items';
       }
       if (this.formData.flow === 'COMPRA') {
@@ -3447,7 +3448,7 @@ export default {
       }
       // 5. Stock suficiente (solo en VENTA)
       if (this.formData.flow === 'VENTA') {
-        const overflow = this.formData.items.find(i => i.product && i.quantity > i.product.stock);
+        const overflow = this.formData.items.find(i => excedeStock(i, 'VENTA'));
         if (overflow) {
           this.showSnackbar(`Sin stock suficiente para: ${overflow.product.name} (quedan ${overflow.product.stock})`, 'error');
           return false;

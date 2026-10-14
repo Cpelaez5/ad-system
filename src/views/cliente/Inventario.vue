@@ -20,7 +20,7 @@
         titulo="Mi mercancía"
         subtitulo="Toma una foto de tu producto y nosotros llenamos los datos"
       >
-        <v-btn color="primary" size="large" prepend-icon="mdi-camera-outline" class="text-none" @click="tomarFoto">
+        <v-btn color="primary" size="large" prepend-icon="mdi-camera-outline" class="text-none mi-mercancia__tomar" @click="tomarFoto">
           Tomar foto
         </v-btn>
         <v-menu location="bottom end">
@@ -33,15 +33,22 @@
             <v-list-item prepend-icon="mdi-cash-multiple" title="Exportar inventario valorizado" @click="downloadValuation" />
             <v-list-item prepend-icon="mdi-history" title="Exportar Kardex global" @click="downloadKardex" />
             <v-list-item prepend-icon="mdi-table-arrow-right" title="Exportar resumen horizontal" @click="openExportDialog" />
+            <v-divider />
+            <v-list-item
+              :prepend-icon="showDeletedProducts ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+              :title="showDeletedProducts ? 'Ocultar eliminados' : 'Ver también los eliminados'"
+              @click="alternarEliminados"
+            />
+            <v-list-item prepend-icon="mdi-refresh" title="Actualizar" @click="loadProducts" />
           </v-list>
         </v-menu>
       </EncabezadoPagina>
 
       <div class="mi-mercancia__rapidas">
-        <v-btn variant="tonal" color="secondary" prepend-icon="mdi-image-outline" class="text-none" @click="subirFotoGaleria">Subir foto</v-btn>
-        <v-btn variant="tonal" color="secondary" prepend-icon="mdi-bookshelf" class="text-none" @click="fotoEstante">Foto del estante</v-btn>
-        <v-btn variant="text" color="secondary" prepend-icon="mdi-pencil-outline" class="text-none" @click="openProductDialog()">Escribirlo yo</v-btn>
-        <v-btn variant="text" color="secondary" prepend-icon="mdi-briefcase-plus-outline" class="text-none" @click="openProductDialog(null, 'servicio')">Nuevo servicio</v-btn>
+        <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-bookshelf" class="text-none" @click="fotoEstante">Foto del estante</v-btn>
+        <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-image-outline" class="text-none" @click="subirFotoGaleria">Subir foto</v-btn>
+        <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-pencil-outline" class="text-none" @click="openProductDialog()">Escribirlo yo</v-btn>
+        <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-briefcase-plus-outline" class="text-none" @click="openProductDialog(null, 'servicio')">Nuevo servicio</v-btn>
       </div>
 
       <!-- AVANCE DE STOCK + SIGUIENTE PASO -->
@@ -72,53 +79,6 @@
           @accion="ejecutarPasoStock"
         />
       </div>
-
-      <!-- Filtros Colapsables de Fecha -->
-      <v-expansion-panels class="mb-6" variant="accordion">
-        <v-expansion-panel>
-          <v-expansion-panel-title>
-            <div class="d-flex align-center">
-              <v-icon start>mdi-filter-variant</v-icon>
-              <span class="font-weight-medium">Filtros de fecha</span>
-              <v-chip
-                v-if="dateFromFilter || dateToFilter"
-                size="small"
-                color="secondary"
-                variant="tonal"
-                class="ml-3"
-              >
-                Filtro activo
-              </v-chip>
-            </div>
-          </v-expansion-panel-title>
-          <v-expansion-panel-text>
-            <v-row class="mt-2">
-              <v-col cols="12" md="4">
-                <v-select
-                  v-model="quickDateFilter"
-                  :items="quickDateOptions"
-                  item-title="title"
-                  item-value="value"
-                  prepend-inner-icon="mdi-clock-fast"
-                  label="Intervalos de tiempo"
-                  variant="outlined"
-                  hide-details
-                  @update:model-value="applyQuickDate"
-                ></v-select>
-              </v-col>
-              <v-col cols="12" md="4">
-                <v-text-field v-model="dateFromFilter" label="Desde" type="date" variant="outlined" hide-details></v-text-field>
-              </v-col>
-              <v-col cols="12" md="4">
-                <v-text-field v-model="dateToFilter" label="Hasta" type="date" variant="outlined" hide-details></v-text-field>
-              </v-col>
-              <v-col cols="12" class="d-flex justify-end mt-2 pt-0">
-                <v-btn variant="text" color="secondary" class="text-none" @click="resetDateFilters">Limpiar</v-btn>
-              </v-col>
-            </v-row>
-          </v-expansion-panel-text>
-        </v-expansion-panel>
-      </v-expansion-panels>
 
       <!-- Tabs de Navegación -->
       <v-tabs v-model="activeTab" color="primary" class="mb-6 bg-white rounded-lg elevation-1">
@@ -167,14 +127,6 @@
               clearable
               class="mi-mercancia__buscador"
             ></v-text-field>
-            <v-checkbox
-              v-model="showDeletedProducts"
-              label="Incluir eliminados"
-              density="comfortable"
-              hide-details
-              @update:model-value="loadProducts"
-            ></v-checkbox>
-            <v-btn icon="mdi-refresh" variant="text" aria-label="Actualizar" @click="loadProducts"></v-btn>
             <v-btn-toggle
               :model-value="vista"
               mandatory
@@ -191,8 +143,7 @@
             </v-btn-toggle>
           </div>
 
-          <FiltroChips v-model="tipoFilter" :opciones="opcionesFiltroTipo" etiqueta="Filtrar por tipo" class="mb-2" />
-          <FiltroChips v-model="stockFilter" :opciones="opcionesFiltroStock" etiqueta="Filtrar por stock" class="mb-4" />
+          <FiltroChips v-model="filtroUnico" :opciones="opcionesFiltro" etiqueta="Filtrar mi mercancía" class="mb-3" />
 
           <div v-if="loadingProducts">
             <v-skeleton-loader type="list-item-avatar-two-line@5" class="rounded-xl" />
@@ -318,6 +269,52 @@
 
         <!-- MOVEMENTS TAB -->
         <v-window-item value="movements">
+        <!-- Filtros de fecha: solo aplican a Movimientos -->
+      <v-expansion-panels class="mb-4" variant="accordion">
+        <v-expansion-panel>
+          <v-expansion-panel-title>
+            <div class="d-flex align-center">
+              <v-icon start>mdi-filter-variant</v-icon>
+              <span class="font-weight-medium">Filtros de fecha</span>
+              <v-chip
+                v-if="dateFromFilter || dateToFilter"
+                size="small"
+                color="secondary"
+                variant="tonal"
+                class="ml-3"
+              >
+                Filtro activo
+              </v-chip>
+            </div>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <v-row class="mt-2">
+              <v-col cols="12" md="4">
+                <v-select
+                  v-model="quickDateFilter"
+                  :items="quickDateOptions"
+                  item-title="title"
+                  item-value="value"
+                  prepend-inner-icon="mdi-clock-fast"
+                  label="Intervalos de tiempo"
+                  variant="outlined"
+                  hide-details
+                  @update:model-value="applyQuickDate"
+                ></v-select>
+              </v-col>
+              <v-col cols="12" md="4">
+                <v-text-field v-model="dateFromFilter" label="Desde" type="date" variant="outlined" hide-details></v-text-field>
+              </v-col>
+              <v-col cols="12" md="4">
+                <v-text-field v-model="dateToFilter" label="Hasta" type="date" variant="outlined" hide-details></v-text-field>
+              </v-col>
+              <v-col cols="12" class="d-flex justify-end mt-2 pt-0">
+                <v-btn variant="text" color="secondary" class="text-none" @click="resetDateFilters">Limpiar</v-btn>
+              </v-col>
+            </v-row>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
           <v-card class="rounded-xl" elevation="1">
             <v-card-title>Historial de movimientos</v-card-title>
             <v-data-table
@@ -540,7 +537,7 @@ export default {
   },
   data() {
     return {
-      activeTab: 'dashboard',
+      activeTab: 'products',
 
       // Date Filters
       dateFromFilter: null,
@@ -690,6 +687,23 @@ export default {
         { valor: 'SIN_PRECIO', texto: 'Sin precio', cantidad: this.sinPrecio, deshabilitado: this.sinPrecio === 0 }
       ]
     },
+    filtroUnico: {
+      get() { return this.stockFilter !== 'ALL' ? this.stockFilter : this.tipoFilter },
+      set(v) {
+        if (v === 'ALL' || v === 'PRODUCTO' || v === 'SERVICIO') { this.tipoFilter = v; this.stockFilter = 'ALL' } else { this.stockFilter = v; this.tipoFilter = 'ALL' }
+      }
+    },
+    // Una sola fila: Todo · Productos · Servicios │ estados (solo los que tienen algo)
+    opcionesFiltro() {
+      const base = this.opcionesFiltroTipo
+      const { agotados, bajos } = this.resumenStock
+      const estados = [
+        { valor: 'AGOTADOS', texto: 'Agotados', cantidad: agotados },
+        { valor: 'BAJOS', texto: 'Por agotarse', cantidad: bajos },
+        { valor: 'SIN_PRECIO', texto: 'Sin precio', cantidad: this.sinPrecio }
+      ].filter(e => e.cantidad > 0 || this.stockFilter === e.valor)
+      return [...base, ...estados]
+    },
     opcionesFiltroTipo() {
       const activos = this.products.filter(p => !p.deleted_at)
       const servicios = activos.filter(p => p.tipo === 'servicio').length
@@ -707,14 +721,6 @@ export default {
           (p.name && p.name.toLowerCase().includes(q)) ||
           (p.code && p.code.toLowerCase().includes(q))
         )
-      }
-      if (this.dateFromFilter) {
-        result = result.filter(p => new Date(p.created_at) >= new Date(this.dateFromFilter))
-      }
-      if (this.dateToFilter) {
-        const toDate = new Date(this.dateToFilter)
-        toDate.setHours(23, 59, 59, 999)
-        result = result.filter(p => new Date(p.created_at) <= toDate)
       }
       if (this.tipoFilter === 'PRODUCTO') {
         result = result.filter(p => p.tipo !== 'servicio')
@@ -977,6 +983,11 @@ export default {
       else this.openProductDialog(item)
     },
 
+    alternarEliminados() {
+      this.showDeletedProducts = !this.showDeletedProducts
+      this.loadProducts()
+    },
+
     // CRUD Producto
     openProductDialog(product = null, tipo = null) {
       this.editingProduct = product
@@ -1232,9 +1243,12 @@ export default {
   margin-bottom: 16px;
 }
 
+.mi-mercancia__toolbar { flex-wrap: nowrap; gap: 8px; margin-bottom: 12px; }
+
 .mi-mercancia__buscador {
-  flex: 1 1 280px;
-  max-width: 420px;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 520px;
 }
 
 /* ── Acciones rápidas bajo el encabezado ── */
@@ -1243,6 +1257,24 @@ export default {
   flex-wrap: wrap;
   gap: 8px;
   margin: 4px 0 8px;
+}
+
+@media (max-width: 599px) {
+  /* Teléfono: "Tomar foto" grande arriba; las demás, en una fila con scroll */
+  .mi-mercancia__rapidas {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -16px 8px;
+    padding: 0 16px 4px;
+    scrollbar-width: none;
+  }
+  .mi-mercancia__rapidas::-webkit-scrollbar { display: none; }
+  .mi-mercancia__rapidas :deep(.v-btn) { flex: 0 0 auto; }
+  .mi-mercancia__tomar { flex: 1 1 auto; min-height: 56px; font-size: 1.0625rem; }
+  .mi-mercancia__panel { gap: 10px; margin: 4px 0 12px; }
+  .mi-mercancia__avance { padding: 12px 16px; gap: 8px; }
+  .mi-mercancia__frase { font-size: 0.9375rem; }
+  .mi-mercancia__leyenda { gap: 10px; font-size: 0.75rem; flex-wrap: nowrap; white-space: nowrap; }
 }
 
 .mi-mercancia__vista { flex: 0 0 auto; }

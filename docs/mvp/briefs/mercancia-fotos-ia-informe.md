@@ -25,3 +25,10 @@ Tests: `productoFotoService.test.js`, `inventoryService.test.js` (ampliado), `te
 - Subir lista de Excel sigue sin existir (se quitó el botón secundario del estado vacío a favor de "Escribirlo yo").
 - Al reemplazar una foto no se borra la anterior del bucket (huérfanas).
 - Servicios en ventas/facturas: no se revisó el buscador de productos de facturación.
+
+## Ronda de ajustes
+- Mi mercancía compacta: filtros de fecha movidos a Movimientos; "Ver los eliminados" y "Actualizar" en el menú ⋮ (el Excel queda libre); una sola fila de chips con scroll (Todo, Productos, Servicios + estados con cantidad > 0); switch junto al buscador; en teléfono resumen compacto y fila de botones tonales con scroll bajo "Tomar foto". La pestaña inicial es Productos. Capturas `mercancia-movil.png` y `mercancia-escritorio.png` regeneradas.
+- Foto del estante: los botones del pie que aplican a 0 productos se ocultan.
+- Servicios en ventas: el buscador (`ProductAutocomplete`) siempre muestra los servicios y el formulario de factura (`SimpleInvoiceForm`) no los bloquea por stock (`src/utils/stockVenta.js`, con test). `registerMovement` ya ignora servicios, así que no hay movimiento ni descuento (cubre también la edición y anulación de facturas).
+- Fotos: al guardar o cancelar se borran del bucket las reemplazadas o descartadas, salvo `foto_original_path` y la nueva (`src/utils/fotosProducto.js`, con test).
+- Detector de impeccable sobre los archivos tocados: sin hallazgos.

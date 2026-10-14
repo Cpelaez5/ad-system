@@ -140,10 +140,10 @@
       </template>
       <template v-else>
         <div class="es-acciones">
-          <v-btn color="primary" variant="flat" size="large" class="text-none" prepend-icon="mdi-plus" :disabled="!resumen.nuevos || trabajando" :loading="trabajando && haciendo === 'crear'" @click="crearNuevos">
+          <v-btn v-if="resumen.nuevos" color="primary" variant="flat" size="large" class="text-none" prepend-icon="mdi-plus" :disabled="trabajando" :loading="trabajando && haciendo === 'crear'" @click="crearNuevos">
             Crear {{ resumen.nuevos }} producto{{ resumen.nuevos === 1 ? '' : 's' }} nuevo{{ resumen.nuevos === 1 ? '' : 's' }}
           </v-btn>
-          <v-btn color="secondary" variant="tonal" size="large" class="text-none" prepend-icon="mdi-counter" :disabled="!resumen.ajustes || trabajando" @click="paso = 'confirmar'">
+          <v-btn v-if="resumen.ajustes" color="secondary" variant="tonal" size="large" class="text-none" prepend-icon="mdi-counter" :disabled="trabajando" @click="paso = 'confirmar'">
             Ajustar existencias de {{ resumen.ajustes }} producto{{ resumen.ajustes === 1 ? '' : 's' }}
           </v-btn>
           <v-btn variant="text" class="text-none" :disabled="trabajando" @click="cerrar(false)">Cancelar</v-btn>
