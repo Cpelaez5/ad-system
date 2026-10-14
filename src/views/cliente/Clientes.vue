@@ -111,8 +111,11 @@
             </div>
 
             <div class="fila-cliente__derecha">
-              <div class="fila-cliente__valor">{{ dinero(c.totales.comprado90) }}</div>
-              <div class="fila-cliente__valor-secundario">comprado en 90 días</div>
+              <template v-if="c.totales.comprado90 > 0">
+                <div class="fila-cliente__valor">{{ dinero(c.totales.comprado90) }}</div>
+                <div class="fila-cliente__valor-secundario">comprado en 90 días</div>
+              </template>
+              <div v-else class="fila-cliente__valor-secundario">Sin compras en 90 días</div>
             </div>
 
             <div class="fila-cliente__acciones" @click.stop>
@@ -577,7 +580,7 @@ export default {
   color: rgb(var(--v-theme-on-surface));
 }
 .clientes__frase strong { font-weight: 700; }
-.clientes__buscador { max-width: 420px; }
+.clientes__buscador { max-width: 420px; flex: 0 0 auto; }
 
 /* ── Fila de cliente ── */
 .fila-cliente {
@@ -670,6 +673,7 @@ export default {
 .fila-venta__titulo { font-weight: 600; }
 .fila-venta__sub { font-size: 0.875rem; color: rgba(var(--v-theme-on-surface), 0.65); }
 .fila-venta__monto { font-weight: 700; white-space: nowrap; }
+.fila-venta .v-chip { flex-shrink: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .fila-cliente { transition: none; }
