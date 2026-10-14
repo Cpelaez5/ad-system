@@ -158,6 +158,22 @@
               />
             </v-col>
 
+            <v-col cols="12" md="6">
+              <v-select
+                v-model="form.rubro"
+                :items="rubros"
+                item-title="titulo"
+                item-value="valor"
+                label="Rubro de tu negocio"
+                variant="outlined"
+                color="primary"
+                prepend-inner-icon="mdi-store-cog-outline"
+                hint="Así te pedimos solo los datos que importan en Mi mercancía"
+                persistent-hint
+                clearable
+              />
+            </v-col>
+
             <v-col cols="12">
               <v-textarea
                 v-model="form.address"
@@ -532,6 +548,8 @@ import ListaPasos from '@/components/ui/ListaPasos.vue';
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
 import AvisoAmable from '@/components/ui/AvisoAmable.vue';
 import AyudaTermino from '@/components/ui/AyudaTermino.vue';
+import { RUBROS } from '@/constants/rubros';
+import { obtenerRubro, guardarRubro } from '@/services/rubroService';
 
 export default {
   name: 'ClienteMiArea',
@@ -559,6 +577,8 @@ export default {
       arrastrandoSello: false,
       arrastrandoFirma: false,
       companyFormValid: true,
+      rubros: RUBROS,
+      rubroGuardado: null,
       personalFormValid: true,
       avisoFiscalPendiente: null,
       sealConfig: {
@@ -569,7 +589,7 @@ export default {
       form: {
         firstName: '', lastName: '', email: '', username: '',
         companyName: '', rif: '', phone: '', address: '',
-        licencia_actividad_economica: '', estado: '', municipio: '',
+        licencia_actividad_economica: '', estado: '', municipio: '', rubro: null,
         activity_type: 'goods',
         taxpayer_type: 'JURIDICA',
         es_contribuyente_especial: false,
@@ -720,6 +740,7 @@ export default {
           this.form.es_contribuyente_especial = !!(client.es_contribuyente_especial ?? client.is_special_taxpayer);
           this.form.es_agente_retencion_municipal = !!client.es_agente_retencion_municipal;
           this.form.retains_islr = !!client.retains_islr;
+          obtenerRubro().then(r => { this.form.rubro = r; this.rubroGuardado = r; });
 
           const rawMunicipio = client.municipio || client.municipio_id || '';
           this.form.municipio = rawMunicipio;
@@ -835,6 +856,10 @@ export default {
 
         const result = await userService.updateUserProfile(this.currentUser.id, updates);
         if (result.success) {
+          if ((this.form.rubro || null) !== (this.rubroGuardado || null) && this.form.rubro) {
+            const r = await guardarRubro(this.form.rubro);
+            if (r.ok) this.rubroGuardado = this.form.rubro;
+          }
           this.snackbar = { show: true, text: 'Datos de empresa actualizados', color: 'success' };
           await this.loadUser(true);
         } else throw result.error;

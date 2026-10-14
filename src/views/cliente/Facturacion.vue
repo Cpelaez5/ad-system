@@ -18,7 +18,7 @@
 
       <!-- Skeleton KPIs -->
       <v-row class="mb-6">
-        <v-col v-for="n in 4" :key="'kpi-sk-' + n" cols="12" sm="6" md="3">
+        <v-col v-for="n in 2" :key="'kpi-sk-' + n" cols="12" md="6">
           <v-skeleton-loader type="card" height="130" class="rounded-xl" />
         </v-col>
       </v-row>
@@ -38,316 +38,181 @@
     <!-- CONTENIDO PRINCIPAL                             -->
     <!-- ═══════════════════════════════════════════════ -->
     <template v-else>
-      <!-- Header Section -->
+      <!-- Encabezado: acción principal "Nuevo registro"; exportar en el menú ⋮ -->
       <EncabezadoPagina
         titulo="Mis movimientos"
         subtitulo="Tus facturas de venta, compra y gastos en un solo lugar."
-        class="mb-6 animate-section"
-        style="animation-delay: 0.1s"
+        class="mb-6"
       >
-          <v-btn
-            color="primary"
-            size="large"
-            prepend-icon="mdi-plus"
-            @click="openNewInvoiceDialog"
-            :block="$vuetify.display.smAndDown"
-          >
-            Nuevo Registro
-          </v-btn>
-          <v-menu>
-            <template v-slot:activator="{ props }">
-              <v-btn
-                color="success"
-                variant="outlined"
-                size="large"
-                prepend-icon="mdi-download"
-                v-bind="props"
-                :disabled="filteredInvoices.length === 0"
-                :block="$vuetify.display.smAndDown"
-              >
-                Exportar
-                <v-icon>mdi-chevron-down</v-icon>
-              </v-btn>
-            </template>
-            <v-list>
-              <!-- Libros Fiscales (SENIAT) -->
-              <v-list-subheader class="text-primary font-weight-bold">
-                <v-icon start size="small">mdi-gavel</v-icon>
-                Libros Fiscales (SENIAT)
-              </v-list-subheader>
-              
-              <v-list-item @click="exportFiscal('COMPRA')">
-                <template v-slot:prepend>
-                  <v-icon color="blue">mdi-book-open-variant</v-icon>
-                </template>
-                <v-list-item-title>Libro de Compras</v-list-item-title>
-                <v-list-item-subtitle>Solo facturas fiscales (compras y gastos)</v-list-item-subtitle>
-              </v-list-item>
-              
-              <v-list-item @click="exportFiscal('VENTA')">
-                <template v-slot:prepend>
-                  <v-icon color="green">mdi-book-open-variant</v-icon>
-                </template>
-                <v-list-item-title>Libro de Ventas</v-list-item-title>
-                <v-list-item-subtitle>Solo facturas fiscales de ventas</v-list-item-subtitle>
-              </v-list-item>
-              
-              <v-divider class="my-2"></v-divider>
-              
-              <!-- Reportes Generales -->
-              <v-list-subheader class="text-grey-darken-1 font-weight-bold">
-                <v-icon start size="small">mdi-file-chart</v-icon>
-                Reportes Generales
-              </v-list-subheader>
-              
-              <v-list-item @click="exportGeneral('COMPRA')">
-                <template v-slot:prepend>
-                  <v-icon color="orange">mdi-file-excel</v-icon>
-                </template>
-                <v-list-item-title>Compras General</v-list-item-title>
-                <v-list-item-subtitle>Facturas + Recibos de compras y gastos</v-list-item-subtitle>
-              </v-list-item>
-              
-              <v-list-item @click="exportGeneral('VENTA')">
-                <template v-slot:prepend>
-                  <v-icon color="teal">mdi-file-excel</v-icon>
-                </template>
-                <v-list-item-title>Ventas General</v-list-item-title>
-                <v-list-item-subtitle>Facturas + Recibos de ventas</v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-menu>
+        <v-btn
+          color="primary"
+          size="large"
+          prepend-icon="mdi-plus"
+          class="text-none"
+          @click="openNewInvoiceDialog"
+        >
+          Nuevo registro
+        </v-btn>
+        <v-menu location="bottom end">
+          <template #activator="{ props: menuProps }">
+            <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="large" aria-label="Más opciones" />
+          </template>
+          <v-list density="comfortable" min-width="300">
+            <v-list-subheader>Libros fiscales (SENIAT)</v-list-subheader>
+            <v-list-item
+              prepend-icon="mdi-book-open-variant"
+              title="Libro de Compras"
+              subtitle="Solo facturas fiscales (compras y gastos)"
+              :disabled="invoices.length === 0"
+              @click="exportFiscal('COMPRA')"
+            />
+            <v-list-item
+              prepend-icon="mdi-book-open-variant"
+              title="Libro de Ventas"
+              subtitle="Solo facturas fiscales de ventas"
+              :disabled="invoices.length === 0"
+              @click="exportFiscal('VENTA')"
+            />
+            <v-divider class="my-2" />
+            <v-list-subheader>Reportes generales en Excel</v-list-subheader>
+            <v-list-item
+              prepend-icon="mdi-file-excel-outline"
+              title="Compras general"
+              subtitle="Facturas y recibos de compras y gastos"
+              :disabled="invoices.length === 0"
+              @click="exportGeneral('COMPRA')"
+            />
+            <v-list-item
+              prepend-icon="mdi-file-excel-outline"
+              title="Ventas general"
+              subtitle="Facturas y recibos de ventas"
+              :disabled="invoices.length === 0"
+              @click="exportGeneral('VENTA')"
+            />
+          </v-list>
+        </v-menu>
       </EncabezadoPagina>
 
-      <!-- Estadísticas rápidas -->
-      <v-row class="mb-6 animate-section" style="animation-delay: 0.2s">
-        <!-- Tarjeta de Totales -->
-        <v-col cols="12" md="2">
-          <StatsCard
-            title="Total documentos"
-            :value="stats.total"
-            bg-color="#02254d"
-            text-color="white"
-          />
-        </v-col>
-
-        <!-- Tarjeta Agrupada de Estatus -->
-        <v-col cols="12" md="4">
-          <v-card
-            class="pa-4 stats-card d-flex flex-column justify-center"
-            height="120"
-            style="border-radius: 20px !important; box-shadow: none !important; border: 1px solid #e0e0e0;"
-          >
-            <div class="text-body-2 mb-2 text-grey-darken-1 font-weight-medium">
-              Estatus de Documentos
+      <!-- Resumen del mes + siguiente paso -->
+      <div class="movimientos__panel">
+        <section class="movimientos__resumen" aria-label="Resumen del mes">
+          <p class="movimientos__frase">{{ fraseMes }}</p>
+          <dl class="movimientos__cifras">
+            <div class="movimientos__cifra">
+              <dt>Vendí</dt>
+              <dd>{{ money(resumenMes.vendi) }}</dd>
             </div>
-            <div class="d-flex justify-space-around align-center">
-              <div class="text-center px-2">
-                <div class="text-h5 font-weight-bold" style="color: #961112;">
-                  {{ stats.byStatus?.EMITIDA || 0 }}
-                </div>
-                <div class="text-caption text-grey-darken-1 font-weight-medium">Emitidas</div>
-              </div>
-              <v-divider vertical class="my-2"></v-divider>
-              <div class="text-center px-2">
-                <div class="text-h5 font-weight-bold" style="color: #5c6bc0;">
-                  {{ stats.byStatus?.CRÉDITO || 0 }}
-                </div>
-                <div class="text-caption text-grey-darken-1 font-weight-medium">Crédito</div>
-              </div>
-              <v-divider vertical class="my-2"></v-divider>
-              <div class="text-center px-2">
-                <div class="text-h5 font-weight-bold" style="color: #f2b648;">
-                  {{ stats.byStatus?.PAGADA || 0 }}
-                </div>
-                <div class="text-caption text-grey-darken-1 font-weight-medium">Pagadas</div>
-              </div>
+            <div class="movimientos__cifra">
+              <dt>Gasté</dt>
+              <dd>{{ money(resumenMes.gaste) }}</dd>
             </div>
-          </v-card>
-        </v-col>
+            <div class="movimientos__cifra">
+              <dt>Retenciones</dt>
+              <dd>{{ money(resumenMes.retenciones) }}</dd>
+            </div>
+          </dl>
+        </section>
 
-        <!-- Cashea -->
-        <v-col cols="12" md="3">
-          <CurrencyStatsCard
-            title="Cashea por Cobrar"
-            :value="convertedStatsCashea"
-            bg-color="#000000"
-            text-color="#fdfa3d"
-            :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
-            @toggle-currency="toggleCurrency"
-          />
-        </v-col>
+        <PanelSiguientePaso
+          :listo="pasoSiguiente.tipo === 'listo'"
+          :titulo="pasoSiguiente.titulo"
+          :detalle="pasoSiguiente.detalle"
+          :texto-boton="pasoSiguiente.boton"
+          :icono-boton="pasoSiguiente.icono"
+          titulo-listo="¡Tus movimientos están al día!"
+          detalle-listo="No tienes borradores, cobros pendientes ni retenciones por revisar."
+          @accion="irAlSiguientePaso"
+        />
+      </div>
 
-        <!-- Rentabilidad -->
-        <v-col cols="12" md="3">
-          <CurrencyStatsCard
-            :title="currentTab === 'all' ? 'Rentabilidad' : 'Monto Total'"
-            :value="convertedStatsTotal"
-            bg-color="#f0d29b"
-            text-color="#010101"
-            :currency-symbol="currencyDisplay === 'VES' ? 'Bs. ' : '$'"
-            @toggle-currency="toggleCurrency"
-          />
-        </v-col>
-      </v-row>
+      <!-- Tipo de movimiento, con su cantidad -->
+      <FiltroChips
+        v-model="currentTab"
+        :opciones="opcionesTab"
+        etiqueta="Tipo de movimiento"
+        class="mb-4"
+      />
 
-      <!-- Tabs de navegación por tipo de factura -->
-      <v-card class="mb-4 animate-section" style="animation-delay: 0.3s" elevation="2">
-        <v-tabs
-          v-model="currentTab"
-          bg-color="white"
-          color="primary"
-          grow
-          height="64"
-        >
-          <v-tab value="all" class="text-none font-weight-medium">
-            <v-icon start size="24">mdi-view-list</v-icon>
-            Todas
-            <v-chip size="small" class="ml-2" color="primary" variant="tonal">
-              {{ invoices.length }}
-            </v-chip>
-          </v-tab>
-          
-          <v-tab value="ventas" class="text-none font-weight-medium">
-            <v-icon start size="24" color="success">mdi-cash-plus</v-icon>
-            Ventas
-            <v-chip size="small" class="ml-2" color="success" variant="tonal">
-              {{ ventasCount }}
-            </v-chip>
-          </v-tab>
-          
-          <v-tab value="compras" class="text-none font-weight-medium">
-            <v-icon start size="24" color="orange">mdi-cart</v-icon>
-
-          Compras
-          <v-chip size="small" class="ml-2" color="orange" variant="tonal">
-            {{ comprasCount }}
-          </v-chip>
-        </v-tab>
-        
-        <v-tab value="gastos" class="text-none font-weight-medium">
-          <v-icon start size="24" color="error">mdi-cash-minus</v-icon>
-          Gastos
-          <v-chip size="small" class="ml-2" color="error" variant="tonal">
-            {{ gastosCount }}
-          </v-chip>
-        </v-tab>
-
-        <v-tab value="retenciones" class="text-none font-weight-medium">
-          <v-icon start size="24" color="purple">mdi-file-document-outline</v-icon>
-          Mis Retenciones
-          <v-chip size="small" class="ml-2" color="purple" variant="tonal">
-            {{ retencionesCount }}
-          </v-chip>
-        </v-tab>
-
-        <v-tab value="trash" class="text-none font-weight-medium">
-          <v-icon start size="24" color="grey">mdi-delete</v-icon>
-          Papelera
-          <v-chip size="small" class="ml-2" color="grey" variant="tonal">
-            {{ trashCount }}
-          </v-chip>
-        </v-tab>
-      </v-tabs>
-    </v-card>
-
-    <!-- Filtros colapsables con búsqueda -->
-    <v-expansion-panels class="mb-4 animate-section" style="animation-delay: 0.4s" variant="accordion">
-      <v-expansion-panel>
-        <v-expansion-panel-title>
-          <div class="d-flex align-center">
-            <v-icon start>mdi-filter-variant</v-icon>
-            <span class="font-weight-medium">Filtros</span>
-            <v-chip 
-              v-if="activeFiltersCount > 0" 
-              size="small" 
-              color="primary" 
-              variant="tonal"
-              class="ml-3"
-            >
-              {{ activeFiltersCount }} activo{{ activeFiltersCount > 1 ? 's' : '' }}
-            </v-chip>
-          </div>
-        </v-expansion-panel-title>
-        <v-expansion-panel-text>
-          <v-row class="mt-2">
-            <!-- Búsqueda -->
-            <v-col cols="12" md="4">
-              <v-text-field
-                v-model="searchQuery"
-                prepend-inner-icon="mdi-magnify"
-                label="Buscar por número o cliente/proveedor"
-                variant="outlined"
-                clearable
-                hide-details
-                @input="applyFilters"
-              ></v-text-field>
-            </v-col>
-
-            <!-- Estado (con opción 'Todos' por defecto) -->
-            <v-col cols="12" md="2">
-              <v-select
-                v-model="statusFilter"
-                :items="statusFilterOptions"
-                item-title="text"
-                item-value="value"
-                prepend-inner-icon="mdi-tag-outline"
-                label="Estado"
-                variant="outlined"
-                hide-details
-                @update:model-value="applyFilters"
-              ></v-select>
-            </v-col>
-
-            <!-- Moneda -->
-            <v-col cols="12" md="2">
-              <v-select
-                v-model="currencyFilter"
-                :items="currencyFilterOptions"
-                item-title="text"
-                item-value="value"
-                prepend-inner-icon="mdi-currency-usd"
-                label="Moneda"
-                variant="outlined"
-                hide-details
-                @update:model-value="applyFilters"
-              ></v-select>
-            </v-col>
-
-            <!-- Fecha Inicio (CustomDatePicker) -->
-            <v-col cols="12" md="2">
-              <CustomDatePicker
-                v-model="dateFromFilter"
-                label="Fecha Inicio"
-                placeholder="Seleccionar"
-                @update:model-value="applyFilters"
-              />
-            </v-col>
-
-            <!-- Fecha Fin (CustomDatePicker) -->
-            <v-col cols="12" md="2">
-              <CustomDatePicker
-                v-model="dateToFilter"
-                label="Fecha Fin"
-                placeholder="Seleccionar"
-                @update:model-value="applyFilters"
-              />
-            </v-col>
-
-            <!-- Botón Limpiar -->
-            <v-col cols="12" md="1" class="d-flex align-center">
-              <v-btn
+      <!-- Filtros plegables (búsqueda, estado, moneda, fechas) -->
+      <v-expansion-panels class="mb-4" variant="accordion">
+        <v-expansion-panel>
+          <v-expansion-panel-title>
+            <div class="d-flex align-center">
+              <v-icon start>mdi-filter-variant</v-icon>
+              <span class="font-weight-medium">Buscar y filtrar</span>
+              <v-chip
+                v-if="activeFiltersCount > 0"
+                size="small"
                 color="secondary"
-                variant="outlined"
-                icon="mdi-filter-off"
-                @click="clearFilters"
-                title="Limpiar Filtros"
-              ></v-btn>
-            </v-col>
-          </v-row>
-        </v-expansion-panel-text>
-      </v-expansion-panel>
-    </v-expansion-panels>
+                variant="tonal"
+                class="ml-3"
+              >
+                {{ activeFiltersCount }} activo{{ activeFiltersCount > 1 ? 's' : '' }}
+              </v-chip>
+            </div>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <v-row class="mt-2">
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="searchQuery"
+                  prepend-inner-icon="mdi-magnify"
+                  label="Buscar por número o cliente/proveedor"
+                  variant="outlined"
+                  clearable
+                  hide-details
+                  @input="applyFilters"
+                  @update:model-value="applyFilters"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" md="3">
+                <CustomDatePicker
+                  v-model="dateFromFilter"
+                  label="Fecha inicio"
+                  placeholder="Seleccionar"
+                  @update:model-value="applyFilters"
+                />
+              </v-col>
+              <v-col cols="12" md="3">
+                <CustomDatePicker
+                  v-model="dateToFilter"
+                  label="Fecha fin"
+                  placeholder="Seleccionar"
+                  @update:model-value="applyFilters"
+                />
+              </v-col>
+              <v-col cols="12">
+                <div class="text-body-2 text-medium-emphasis mb-1">Estado</div>
+                <FiltroChips
+                  v-model="statusFilter"
+                  :opciones="opcionesEstado"
+                  etiqueta="Filtrar por estado"
+                />
+              </v-col>
+              <v-col cols="12">
+                <div class="text-body-2 text-medium-emphasis mb-1">Moneda</div>
+                <FiltroChips
+                  v-model="currencyFilter"
+                  :opciones="opcionesMoneda"
+                  etiqueta="Filtrar por moneda"
+                />
+              </v-col>
+              <v-col cols="12" class="d-flex">
+                <v-btn
+                  variant="text"
+                  color="secondary"
+                  prepend-icon="mdi-filter-off"
+                  class="text-none"
+                  :disabled="activeFiltersCount === 0"
+                  @click="clearFilters"
+                >
+                  Limpiar filtros
+                </v-btn>
+              </v-col>
+            </v-row>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
 
     <!-- Error al cargar: mensaje llano + Reintentar, en vez de una lista vacía silenciosa -->
     <AvisoAmable
@@ -372,7 +237,7 @@
         :icono="estadoVacioIcono"
         :titulo="estadoVacioTitulo"
         :mensaje="estadoVacioMensaje"
-        :texto-accion="estadoVacioPorFiltro ? 'Limpiar filtros' : ((currentTab === 'trash' || currentTab === 'retenciones') ? '' : 'Nuevo Registro')"
+        :texto-accion="estadoVacioPorFiltro ? 'Limpiar filtros' : ((currentTab === 'trash' || currentTab === 'retenciones') ? '' : 'Nuevo registro')"
         @accion="estadoVacioPorFiltro ? clearFilters() : openNewInvoiceDialog()"
       />
 
@@ -380,7 +245,7 @@
         <!-- Lista en móvil: la tabla de varias columnas es ilegible en xs -->
         <div v-if="$vuetify.display.xs" class="d-flex flex-column ga-2">
           <FilaMovimiento
-            v-for="(item, i) in filteredInvoices"
+            v-for="(item, i) in invoicesMovil"
             :key="item.id"
             class="ad-move-entrada"
             :style="{ animationDelay: `calc(var(--ad-move-escalon-lista) * ${Math.min(i, 12)})` }"
@@ -396,13 +261,24 @@
             :color-icono="item.flow === 'VENTA' ? 'success' : 'error'"
             @abrir="viewInvoice(item)"
           />
+          <!-- Por tandas: 51 filas de golpe abruman y hacen eterno el scroll -->
+          <v-btn
+            v-if="filteredInvoices.length > limiteMovil"
+            variant="tonal"
+            size="large"
+            block
+            class="text-none mt-2"
+            prepend-icon="mdi-chevron-down"
+            @click="limiteMovil += tandaMovil"
+          >
+            Ver más ({{ filteredInvoices.length - limiteMovil }} restantes)
+          </v-btn>
         </div>
 
         <!-- Tabla de facturas (escritorio) -->
-        <v-card v-else class="animate-section" style="animation-delay: 0.5s">
+        <v-card v-else variant="outlined" class="movimientos__tabla">
       <v-card-title>
-        <v-icon left>mdi-receipt-text-outline</v-icon>
-        {{ currentTab === 'retenciones' ? 'Registro de Retenciones Fiscales' : 'Lista de Facturas' }} ({{ filteredInvoices.length }})
+        {{ currentTab === 'retenciones' ? 'Retenciones fiscales' : 'Tus movimientos' }} ({{ filteredInvoices.length }})
       </v-card-title>
 
       <v-data-table
@@ -416,13 +292,11 @@
         <!-- Columna de número de factura -->
         <template v-slot:item.invoiceNumber="{ item }">
           <div class="d-flex align-center flex-wrap ga-1">
-            <v-chip color="primary" variant="tonal" size="small">
-              {{ item.invoiceNumber }}
-            </v-chip>
-            <v-chip v-if="(item.retenciones && item.retenciones.iva > 0) || (item.financial && item.financial.ivaRetention > 0)" color="indigo" variant="flat" size="x-small" class="font-weight-bold">
+            <span class="font-weight-medium">{{ item.invoiceNumber }}</span>
+            <v-chip v-if="(item.retenciones && item.retenciones.iva > 0) || (item.financial && item.financial.ivaRetention > 0)" color="secondary" variant="outlined" size="x-small" class="font-weight-bold">
               IVA
             </v-chip>
-            <v-chip v-if="(item.retenciones && item.retenciones.islr > 0) || (item.financial && item.financial.islrRetention > 0)" color="purple" variant="flat" size="x-small" class="font-weight-bold">
+            <v-chip v-if="(item.retenciones && item.retenciones.islr > 0) || (item.financial && item.financial.islrRetention > 0)" color="secondary" variant="outlined" size="x-small" class="font-weight-bold">
               ISLR
             </v-chip>
           </div>
@@ -443,7 +317,7 @@
 
         <!-- Columna de fecha -->
         <template v-slot:item.issueDate="{ item }">
-          {{ formatDate(item.issueDate) }}
+          {{ formatFechaCorta(item.issueDate) }}
         </template>
 
         <!-- Columna de método de pago -->
@@ -475,7 +349,7 @@
         <!-- Columna de Retención IVA (en tab Retenciones) -->
         <template v-slot:item.retencionesIva="{ item }">
           <div v-if="(item.retenciones && item.retenciones.iva > 0) || (item.financial && item.financial.ivaRetention > 0)">
-            <v-chip color="indigo" size="small" variant="tonal" class="font-weight-bold">
+            <v-chip color="secondary" size="small" variant="tonal" class="font-weight-bold">
               -{{ formatCurrency(item.retenciones?.iva || item.financial?.ivaRetention, item.financial?.currency) }}
             </v-chip>
           </div>
@@ -485,7 +359,7 @@
         <!-- Columna de Retención ISLR (en tab Retenciones) -->
         <template v-slot:item.retencionesIslr="{ item }">
           <div v-if="(item.retenciones && item.retenciones.islr > 0) || (item.financial && item.financial.islrRetention > 0)">
-            <v-chip color="purple" size="small" variant="tonal" class="font-weight-bold">
+            <v-chip color="secondary" size="small" variant="tonal" class="font-weight-bold">
               -{{ formatCurrency(item.retenciones?.islr || item.financial?.islrRetention, item.financial?.currency) }}
             </v-chip>
           </div>
@@ -555,7 +429,7 @@
             <v-btn
               icon="mdi-eye"
               size="small"
-              color="info"
+              color="secondary"
               variant="text"
               @click="viewInvoice(item)"
               title="Ver detalles"
@@ -563,7 +437,7 @@
             <v-btn
               icon="mdi-pencil"
               size="small"
-              color="warning"
+              color="secondary"
               variant="text"
               @click="editInvoice(item)"
               title="Editar"
@@ -574,7 +448,7 @@
                 <v-btn
                   icon="mdi-download"
                   size="small"
-                  color="success"
+                  color="secondary"
                   variant="text"
                   v-bind="props"
                   title="Opciones de descarga"
@@ -1290,8 +1164,6 @@
 
 
 <script>
-import StatsCard from '@/components/common/StatsCard.vue'
-import CurrencyStatsCard from '@/components/common/CurrencyStatsCard.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue'
 import invoiceService from '@/services/invoiceService.js';
@@ -1316,6 +1188,14 @@ import AvisoAmable from '@/components/ui/AvisoAmable.vue'
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import FilaMovimiento from '@/components/ui/FilaMovimiento.vue'
 
+/** Filas que muestra la lista móvil por tanda ("Ver más" agrega otra). */
+const TANDA_MOVIL = 20
+import FiltroChips from '@/components/ui/FiltroChips.vue'
+import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
+import { formatMoney } from '@/utils/formatMoney.js'
+import { formatFechaCorta } from '@/utils/fechas.js'
+import { resumenDelMes, siguientePasoMovimientos } from '@/utils/resumenMovimientos.js'
+
 export default {
   name: 'FacturacionCliente',
   components: {
@@ -1324,14 +1204,14 @@ export default {
     SimpleInvoiceForm,
     CasheaInstallmentsModal,
     AnimatedNumber,
-    StatsCard,
-    CurrencyStatsCard,
     CustomDatePicker,
     EncabezadoPagina,
     EstadoVacio,
     AvisoAmable,
     DialogoAdaptable,
-    FilaMovimiento
+    FilaMovimiento,
+    FiltroChips,
+    PanelSiguientePaso
   },
   data() {
     return {
@@ -1363,6 +1243,8 @@ export default {
       cachedRate: null,
       
       // Tab actual
+      limiteMovil: TANDA_MOVIL,
+      tandaMovil: TANDA_MOVIL,
       currentTab: 'all', // 'all', 'ventas', 'compras', 'gastos'
       
       // Ordenamiento por defecto
@@ -1461,6 +1343,65 @@ export default {
     };
   },
   computed: {
+    invoicesMovil() {
+      return this.filteredInvoices.slice(0, this.limiteMovil)
+    },
+    opcionesTab() {
+      return [
+        { valor: 'all', texto: 'Todas', cantidad: this.invoices.length },
+        { valor: 'ventas', texto: 'Ventas', cantidad: this.ventasCount },
+        { valor: 'compras', texto: 'Compras', cantidad: this.comprasCount },
+        { valor: 'gastos', texto: 'Gastos', cantidad: this.gastosCount },
+        { valor: 'retenciones', texto: 'Mis retenciones', cantidad: this.retencionesCount },
+        { valor: 'trash', texto: 'Papelera', cantidad: this.trashCount },
+      ];
+    },
+    opcionesEstado() {
+      return this.statusFilterOptions.map((o) => ({ valor: o.value, texto: o.text }));
+    },
+    opcionesMoneda() {
+      return this.currencyFilterOptions.map((o) => ({ valor: o.value, texto: o.text }));
+    },
+    resumenMes() {
+      return resumenDelMes(this.invoices, this.cachedRate);
+    },
+    fraseMes() {
+      const r = this.resumenMes;
+      if (!r.vendi && !r.gaste) return 'Este mes todavía no tienes ventas ni gastos registrados.';
+      return `Este mes vendiste ${formatMoney(r.vendi, 'USD')} y gastaste ${formatMoney(r.gaste, 'USD')}.`;
+    },
+    pasoSiguiente() {
+      const p = siguientePasoMovimientos(this.invoices, this.cachedRate);
+      const plural = (n, uno, varios) => (n === 1 ? uno : varios);
+      if (p.tipo === 'borradores') {
+        return {
+          tipo: p.tipo,
+          titulo: `Tienes ${p.cantidad} ${plural(p.cantidad, 'factura en borrador', 'facturas en borrador')}`,
+          detalle: 'Los borradores todavía no cuentan en tus cifras. Revísalos y termínalos.',
+          boton: plural(p.cantidad, 'Revisarla', 'Revisarlas'),
+          icono: 'mdi-file-edit-outline',
+        };
+      }
+      if (p.tipo === 'cobrar') {
+        return {
+          tipo: p.tipo,
+          titulo: `Te deben ${formatMoney(p.monto, 'USD')} de ventas por cobrar`,
+          detalle: `${p.cantidad} ${plural(p.cantidad, 'venta a crédito o vencida', 'ventas a crédito o vencidas')} sin cobrar.`,
+          boton: 'Ver ventas',
+          icono: 'mdi-cash-clock',
+        };
+      }
+      if (p.tipo === 'retenciones') {
+        return {
+          tipo: p.tipo,
+          titulo: `${p.cantidad} ${plural(p.cantidad, 'comprobante de retención', 'comprobantes de retención')} por descargar`,
+          detalle: 'Descárgalos y entrégaselos a tus proveedores.',
+          boton: 'Ver retenciones',
+          icono: 'mdi-file-download-outline',
+        };
+      }
+      return { tipo: 'listo', titulo: '', detalle: '', boton: '', icono: '' };
+    },
     dynamicHeaders() {
       if (this.currentTab === 'retenciones') {
         return [
@@ -1527,7 +1468,7 @@ export default {
     // M1 (ola F2b): si hay búsqueda/filtros activos (no el simple recorte por
     // pestaña), la lista vacía no significa "aún no registras nada" — significa
     // que ESOS filtros no encontraron nada. Mensaje distinto + "Limpiar filtros"
-    // en vez de "Nuevo Registro" (que sería confuso: sí hay registros).
+    // en vez de "Nuevo registro" (que sería confuso: sí hay registros).
     estadoVacioPorFiltro() {
       return this.activeFiltersCount > 0;
     },
@@ -1557,13 +1498,13 @@ export default {
     estadoVacioMensaje() {
       if (this.estadoVacioPorFiltro) return 'Prueba con otra búsqueda o quita algún filtro.';
       const mensajes = {
-        ventas: 'Toca «Nuevo Registro» y tómale foto a tu factura de venta.',
-        compras: 'Toca «Nuevo Registro» y tómale foto a tu factura de compra.',
-        gastos: 'Toca «Nuevo Registro» y registra lo que gastaste, con o sin factura.',
+        ventas: 'Toca «Nuevo registro» y tómale foto a tu factura de venta.',
+        compras: 'Toca «Nuevo registro» y tómale foto a tu factura de compra.',
+        gastos: 'Toca «Nuevo registro» y registra lo que gastaste, con o sin factura.',
         retenciones: 'Aquí verás las facturas de compra con retención de IVA, ISLR o municipal.',
         trash: 'Las facturas que elimines aparecerán aquí antes de borrarse para siempre.',
       };
-      return mensajes[this.currentTab] || 'Toca «Nuevo Registro» para empezar.';
+      return mensajes[this.currentTab] || 'Toca «Nuevo registro» para empezar.';
     },
 
 
@@ -1593,6 +1534,9 @@ export default {
     }
   },
   watch: {
+    filteredInvoices() {
+      this.limiteMovil = TANDA_MOVIL
+    },
     currentTab() {
       this.applyFilters();
       if (this.$route.query.tab !== this.currentTab) {
@@ -1685,6 +1629,24 @@ export default {
     }
   },
   methods: {
+    formatFechaCorta,
+    money(monto) {
+      return formatMoney(monto, 'USD');
+    },
+    irAlSiguientePaso() {
+      const tipo = this.pasoSiguiente.tipo;
+      if (tipo === 'borradores') {
+        this.currentTab = 'all';
+        this.statusFilter = 'BORRADOR';
+      } else if (tipo === 'cobrar') {
+        this.currentTab = 'ventas';
+        this.statusFilter = 'all';
+      } else if (tipo === 'retenciones') {
+        this.currentTab = 'retenciones';
+        this.statusFilter = 'all';
+      }
+      this.applyFilters();
+    },
     async loadProveedores() {
       try {
         const list = await proveedorService.getProveedores({ onlyActive: true });
@@ -2141,8 +2103,8 @@ export default {
     getStatusColor(status) {
       const colors = {
         'BORRADOR': 'grey',
-        'EMITIDA': 'primary',
-        'ENVIADA': 'info',
+        'EMITIDA': 'secondary',
+        'ENVIADA': 'secondary',
         'PAGADA': 'success',
         'VENCIDA': 'error',
         'ANULADA': 'grey-darken-3',
@@ -2172,12 +2134,12 @@ export default {
 
     getPaymentMethodColor(method) {
       const colors = {
-        'EFECTIVO': 'green',
-        'PAGO_MOVIL': 'blue',
-        'TRANSFERENCIA': 'indigo',
-        'ZELLE': 'deep-purple',
-        'PUNTO_VENTA': 'orange',
-        'CASHEA': 'red-darken-2',
+        'EFECTIVO': 'secondary',
+        'PAGO_MOVIL': 'secondary',
+        'TRANSFERENCIA': 'secondary',
+        'ZELLE': 'secondary',
+        'PUNTO_VENTA': 'secondary',
+        'CASHEA': 'secondary',
         'OTRO': 'grey'
       };
       return colors[method] || 'grey';
@@ -2760,6 +2722,63 @@ export default {
 </script>
 
 <style scoped>
+.movimientos__panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin: 8px 0 24px;
+}
+
+@media (min-width: 960px) {
+  .movimientos__panel { grid-template-columns: 7fr 5fr; }
+}
+
+.movimientos__resumen {
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 20px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  justify-content: center;
+}
+
+@media (max-width: 599px) {
+  .movimientos__resumen { padding: 18px; }
+}
+
+.movimientos__frase {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.movimientos__cifras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 0;
+}
+
+.movimientos__cifra dt {
+  font-size: 1rem;
+  color: rgba(var(--v-theme-on-surface), 0.75);
+}
+
+.movimientos__cifra dd {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.movimientos__tabla {
+  border-radius: 20px;
+  border-color: rgba(var(--v-theme-on-surface), 0.1);
+}
+
 .total-amount-display {
   font-weight: 600;
   transition: all 0.3s ease;
@@ -2828,7 +2847,7 @@ export default {
 }
 
 .detalle-factura__encabezado {
-  background: linear-gradient(135deg, #2A2A2E 0%, #3F3F46 100%);
+  background: rgb(var(--v-theme-secondary));
 }
 
 .detalle-factura__numero {

@@ -24,13 +24,22 @@
         v-bind="props"
         :title="item.raw.name"
         :subtitle="item.raw.code"
-        :disabled="flow === 'VENTA' && item.raw.stock <= 0"
+        :disabled="!vendible(item.raw, flow)"
       >
         <template v-slot:append>
            <div class="d-flex flex-column align-end">
              <!-- Chip de stock con semáforo visual -->
              <v-chip
-               v-if="item.raw.stock > 0"
+               v-if="item.raw.tipo === 'servicio'"
+               size="x-small"
+               color="secondary"
+               variant="tonal"
+               class="mb-1"
+             >
+               Servicio
+             </v-chip>
+             <v-chip
+               v-else-if="item.raw.stock > 0"
                size="x-small"
                :color="item.raw.stock <= item.raw.min_stock ? 'warning' : 'success'"
                variant="flat"
@@ -67,6 +76,7 @@
 
 <script>
 import inventoryService from '@/services/inventoryService'
+import { vendible } from '@/utils/stockVenta'
 
 export default {
   name: 'ProductAutocomplete',
@@ -125,6 +135,7 @@ export default {
       }
   },
   methods: {
+    vendible,
     async querySelections(v) {
       this.loading = true
       try {

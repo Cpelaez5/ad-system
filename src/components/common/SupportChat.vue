@@ -135,7 +135,7 @@
           <!-- Mensaje de límite alcanzado -->
           <div v-if="limitReached" class="message message--system">
             <div class="message__bubble message__bubble--limit">
-              <v-icon size="16" color="#E0B04F" class="mr-1">mdi-clock-outline</v-icon>
+              <v-icon size="16" color="#8E1818" class="mr-1">mdi-clock-outline</v-icon>
               <p class="message__text">{{ dailyLimitInfo.message }}</p>
             </div>
           </div>
@@ -164,7 +164,7 @@
             >
               <v-icon
                 size="22"
-                :color="inputMessage.trim() && !isTyping ? '#E0B04F' : '#aaa'"
+                :color="inputMessage.trim() && !isTyping ? '#8E1818' : '#aaa'"
               >
                 mdi-send
               </v-icon>
@@ -536,7 +536,7 @@ export default {
 
 .support-chat-wrapper {
   --chat-primary: #2A2A2E;
-  --chat-accent: #E0B04F;
+  --chat-accent: #8E1818;
   --chat-bg: #f8f9fa;
   --chat-user-bg: #2A2A2E;
   --chat-assistant-bg: #ffffff;
@@ -554,14 +554,14 @@ export default {
   bottom: 24px;
   right: 24px;
   z-index: 1500;
-  background: linear-gradient(135deg, #2A2A2E 0%, #2a4a7f 100%) !important;
-  box-shadow: 0 6px 24px rgba(31, 53, 92, 0.45) !important;
+  background: linear-gradient(135deg, #2A2A2E 0%, #3F3F46 100%) !important;
+  box-shadow: 0 6px 24px rgba(42, 42, 46, 0.45) !important;
   transition: transform 0.3s ease, box-shadow 0.3s ease !important;
 }
 
 .chat-fab:hover {
   transform: scale(1.08) !important;
-  box-shadow: 0 8px 32px rgba(31, 53, 92, 0.55) !important;
+  box-shadow: 0 8px 32px rgba(42, 42, 46, 0.55) !important;
 }
 
 .fab-badge {
@@ -653,7 +653,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  background: linear-gradient(135deg, #2A2A2E 0%, #2a4a7f 100%);
+  background: linear-gradient(135deg, #2A2A2E 0%, #3F3F46 100%);
   color: white;
   flex-shrink: 0;
 }
@@ -667,7 +667,7 @@ export default {
 .chat-header__avatar {
   width: 36px;
   height: 36px;
-  background: rgba(224, 176, 79, 0.25);
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -807,7 +807,7 @@ export default {
   width: 28px;
   height: 28px;
   min-width: 28px;
-  background: rgba(31, 53, 92, 0.08);
+  background: rgba(42, 42, 46, 0.08);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -836,8 +836,8 @@ export default {
 
 /* Mensaje de bienvenida */
 .message--welcome .message__bubble {
-  background: linear-gradient(135deg, #f0f4ff 0%, #e8edf8 100%);
-  border: 1px solid rgba(31, 53, 92, 0.1);
+  background: linear-gradient(135deg, #f7f7f8 0%, #efeff1 100%);
+  border: 1px solid rgba(42, 42, 46, 0.1);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -885,7 +885,7 @@ export default {
 
 .quick-action-btn {
   background: white;
-  border: 1px solid rgba(31, 53, 92, 0.15);
+  border: 1px solid rgba(42, 42, 46, 0.15);
   border-radius: 20px;
   padding: 7px 14px;
   font-size: 12px;
@@ -903,7 +903,7 @@ export default {
   color: white;
   border-color: #2A2A2E;
   transform: translateY(-1px);
-  box-shadow: 0 3px 10px rgba(31, 53, 92, 0.2);
+  box-shadow: 0 3px 10px rgba(42, 42, 46, 0.2);
 }
 
 .quick-action-btn:active {
@@ -931,7 +931,7 @@ export default {
 }
 
 .chat-input__container:focus-within {
-  box-shadow: 0 0 0 2px rgba(31, 53, 92, 0.15);
+  box-shadow: 0 0 0 2px rgba(42, 42, 46, 0.15);
 }
 
 .chat-input__field {
@@ -966,7 +966,7 @@ export default {
 }
 
 .limit-hint {
-  color: #E0B04F;
+  color: #8E1818;
   font-weight: 500;
 }
 
