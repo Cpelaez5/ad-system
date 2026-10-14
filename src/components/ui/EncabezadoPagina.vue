@@ -63,6 +63,7 @@ export default {
 .encabezado-pagina__acciones {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 

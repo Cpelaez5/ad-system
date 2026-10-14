@@ -245,7 +245,7 @@
         <!-- Lista en móvil: la tabla de varias columnas es ilegible en xs -->
         <div v-if="$vuetify.display.xs" class="d-flex flex-column ga-2">
           <FilaMovimiento
-            v-for="(item, i) in filteredInvoices"
+            v-for="(item, i) in invoicesMovil"
             :key="item.id"
             class="ad-move-entrada"
             :style="{ animationDelay: `calc(var(--ad-move-escalon-lista) * ${Math.min(i, 12)})` }"
@@ -261,6 +261,18 @@
             :color-icono="item.flow === 'VENTA' ? 'success' : 'error'"
             @abrir="viewInvoice(item)"
           />
+          <!-- Por tandas: 51 filas de golpe abruman y hacen eterno el scroll -->
+          <v-btn
+            v-if="filteredInvoices.length > limiteMovil"
+            variant="tonal"
+            size="large"
+            block
+            class="text-none mt-2"
+            prepend-icon="mdi-chevron-down"
+            @click="limiteMovil += tandaMovil"
+          >
+            Ver más ({{ filteredInvoices.length - limiteMovil }} restantes)
+          </v-btn>
         </div>
 
         <!-- Tabla de facturas (escritorio) -->
@@ -1175,6 +1187,9 @@ import EstadoVacio from '@/components/ui/EstadoVacio.vue'
 import AvisoAmable from '@/components/ui/AvisoAmable.vue'
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import FilaMovimiento from '@/components/ui/FilaMovimiento.vue'
+
+/** Filas que muestra la lista móvil por tanda ("Ver más" agrega otra). */
+const TANDA_MOVIL = 20
 import FiltroChips from '@/components/ui/FiltroChips.vue'
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
 import { formatMoney } from '@/utils/formatMoney.js'
@@ -1228,6 +1243,8 @@ export default {
       cachedRate: null,
       
       // Tab actual
+      limiteMovil: TANDA_MOVIL,
+      tandaMovil: TANDA_MOVIL,
       currentTab: 'all', // 'all', 'ventas', 'compras', 'gastos'
       
       // Ordenamiento por defecto
@@ -1326,6 +1343,9 @@ export default {
     };
   },
   computed: {
+    invoicesMovil() {
+      return this.filteredInvoices.slice(0, this.limiteMovil)
+    },
     opcionesTab() {
       return [
         { valor: 'all', texto: 'Todas', cantidad: this.invoices.length },
@@ -1514,6 +1534,9 @@ export default {
     }
   },
   watch: {
+    filteredInvoices() {
+      this.limiteMovil = TANDA_MOVIL
+    },
     currentTab() {
       this.applyFilters();
       if (this.$route.query.tab !== this.currentTab) {
