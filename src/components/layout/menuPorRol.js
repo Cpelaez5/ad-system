@@ -90,6 +90,7 @@ export function getMenuCliente({ isServicesCompany = false } = {}) {
 
   items.push(
     { key: 'cliente-proveedores', titulo: 'Mis proveedores', icono: 'mdi-truck-delivery-outline', to: { name: 'ClienteProveedores' } },
+    { key: 'cliente-clientes', titulo: 'Mis clientes', icono: 'mdi-account-group-outline', to: { name: 'ClienteClientes' } },
     { key: 'cliente-mi-area', titulo: 'Mi negocio', icono: 'mdi-domain', to: { name: 'ClienteMiArea' } },
     { key: 'cliente-planes', titulo: 'Mi plan', icono: 'mdi-crown-outline', to: { name: 'ClientePlanes' } }
   )

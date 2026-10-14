@@ -43,6 +43,10 @@ vi.mock('@/services/proveedorService.js', () => ({
   }
 }))
 
+vi.mock('@/services/clientesNegocioService.js', () => ({
+  default: { asegurarClienteDeVenta: vi.fn() }
+}))
+
 vi.mock('@/services/inventoryService.js', () => ({
   default: {
     createProduct: vi.fn()
@@ -59,6 +63,7 @@ import invoiceService from '@/services/invoiceService.js'
 import retentionRpcService from '@/services/retentionRpcService.js'
 import emailNotificationService from '@/services/email-notification-service.js'
 import proveedorService from '@/services/proveedorService.js'
+import clientesNegocioService from '@/services/clientesNegocioService.js'
 import { guardarRegistro } from '@/services/registroService.js'
 
 describe('registroService.guardarRegistro', () => {
@@ -66,6 +71,36 @@ describe('registroService.guardarRegistro', () => {
     vi.clearAllMocks()
     // Por defecto, el email "sale bien" y no debe bloquear nada.
     emailNotificationService.notifyInvoiceCreated.mockResolvedValue({ success: true })
+    clientesNegocioService.asegurarClienteDeVenta.mockResolvedValue({ success: true, id: null })
+  })
+
+  describe('Mis clientes (ventas)', () => {
+    it('una VENTA nueva pone cliente_negocio_id antes de guardar', async () => {
+      clientesNegocioService.asegurarClienteDeVenta.mockResolvedValue({ success: true, id: 'cn-1', creado: true })
+      invoiceService.createInvoice.mockResolvedValue({ success: true, data: { id: 'i1' } })
+      await guardarRegistro({ flow: 'VENTA', client: { companyName: 'Ana' }, financial: {} })
+      expect(invoiceService.createInvoice).toHaveBeenCalledWith(expect.objectContaining({ cliente_negocio_id: 'cn-1' }))
+    })
+
+    it('editar una VENTA también resuelve el cliente', async () => {
+      clientesNegocioService.asegurarClienteDeVenta.mockResolvedValue({ success: true, id: 'cn-2' })
+      invoiceService.updateInvoice.mockResolvedValue({ success: true, data: { id: 'i1' } })
+      await guardarRegistro({ id: 'i1', flow: 'VENTA', financial: {} })
+      expect(invoiceService.updateInvoice).toHaveBeenCalledWith('i1', expect.objectContaining({ cliente_negocio_id: 'cn-2' }))
+    })
+
+    it('si no se puede resolver el cliente, no guarda la venta', async () => {
+      clientesNegocioService.asegurarClienteDeVenta.mockResolvedValue({ success: false, id: null, message: 'Sin conexión' })
+      const r = await guardarRegistro({ flow: 'VENTA', client: { companyName: 'Ana' }, financial: {} })
+      expect(r).toEqual({ success: false, message: 'Sin conexión' })
+      expect(invoiceService.createInvoice).not.toHaveBeenCalled()
+    })
+
+    it('las COMPRAS no tocan clientes', async () => {
+      invoiceService.createInvoice.mockResolvedValue({ success: true, data: { id: 'i1' } })
+      await guardarRegistro({ flow: 'COMPRA', expense_type: 'OTRO', financial: {} })
+      expect(clientesNegocioService.asegurarClienteDeVenta).not.toHaveBeenCalled()
+    })
   })
 
   it('actualiza un registro existente (formData.id presente) usando invoiceService.updateInvoice', async () => {

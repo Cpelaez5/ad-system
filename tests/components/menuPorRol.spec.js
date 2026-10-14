@@ -12,6 +12,7 @@ describe('menuPorRol', () => {
       'cliente-fiscal-360',
       'cliente-inventario',
       'cliente-proveedores',
+      'cliente-clientes',
       'cliente-mi-area',
       'cliente-planes',
     ])
@@ -27,6 +28,7 @@ describe('menuPorRol', () => {
       'cliente-dashboard',
       'cliente-fiscal-360',
       'cliente-proveedores',
+      'cliente-clientes',
       'cliente-mi-area',
       'cliente-planes',
     ])

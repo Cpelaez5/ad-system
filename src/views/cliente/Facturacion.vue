@@ -523,6 +523,7 @@
         ref="simpleForm"
         :invoice="editingInvoice"
         :flow="defaultFlow"
+        :cliente-inicial="clienteInicial"
         @submit="handleInvoiceSubmit"
         @cancel="closeInvoiceDialog"
       />
@@ -1173,6 +1174,7 @@ import bcvService from '@/services/bcvService.js';
 import exportService from '@/services/exportService.js';
 import ClientInvoiceForm from '@/components/forms/client/ClientInvoiceForm.vue';
 import SimpleInvoiceForm  from '@/components/forms/client/SimpleInvoiceForm.vue';
+import clientesNegocioService from '@/services/clientesNegocioService.js';
 import CasheaInstallmentsModal from '@/components/forms/client/CasheaInstallmentsModal.vue';
 import userService from '@/services/userService.js';
 import { generateReceiptPdf } from '@/services/receipt-pdf-service.js';
@@ -1246,6 +1248,7 @@ export default {
       limiteMovil: TANDA_MOVIL,
       tandaMovil: TANDA_MOVIL,
       currentTab: 'all', // 'all', 'ventas', 'compras', 'gastos'
+      clienteInicial: null, // Mis clientes: "Registrar venta a este cliente" (?cliente=<id>)
       
       // Ordenamiento por defecto
       sortBy: [{ key: 'invoiceNumber', order: 'asc' }],
@@ -1631,6 +1634,7 @@ export default {
       const { ver, ...resto } = this.$route.query;
       this.$router.replace({ query: resto });
     }
+    await this.abrirVentaParaCliente();
     if (typeof window !== 'undefined') {
       window.addEventListener('ad-proveedor-changed', this.loadProveedores);
     }
@@ -1934,6 +1938,19 @@ export default {
       this.applyFilters();
     },
     
+    // Mis clientes → "Registrar venta a este cliente": /cliente/facturacion?cliente=<id>
+    // abre el formulario de venta con ese cliente ya elegido (no guarda nada).
+    async abrirVentaParaCliente() {
+      const { cliente, ...resto } = this.$route.query;
+      if (!cliente) return;
+      this.$router.replace({ query: resto });
+      const fila = await clientesNegocioService.obtenerBasico(String(cliente));
+      if (!fila) return;
+      this.currentTab = 'ventas';
+      this.clienteInicial = fila;
+      this.openNewInvoiceDialog();
+    },
+
     openNewInvoiceDialog() {
       this.editingInvoice = null;
       this.invoiceDialog = true;
@@ -2076,6 +2093,7 @@ export default {
     closeInvoiceDialog() {
       this.invoiceDialog = false;
       this.editingInvoice = null;
+      this.clienteInicial = null;
     },
     
     async handleInvoiceSubmit(result) {
