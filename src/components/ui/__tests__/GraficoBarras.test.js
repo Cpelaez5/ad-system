@@ -42,4 +42,28 @@ describe('GraficoBarras.vue', () => {
     expect(opciones.scales.x.grid.display).toBe(false)
     expect(opciones.scales.y.grid.color).toBe('rgba(0,0,0,0.06)')
   })
+
+  it('con una sola serie, oculta la leyenda (es ruido con un solo nombre)', () => {
+    const wrapper = mount(GraficoBarras, { props: { labels, series: [series[0]] }, global: globalConfig })
+    expect(wrapper.vm.opcionesGrafico.plugins.legend.display).toBe(false)
+  })
+
+  it('una serie con tipo "linea" se dibuja como línea sobre las barras (gráfico mixto)', () => {
+    const conNeto = [...series, { nombre: 'Me queda', datos: [50, 120, 90], color: '#2A2A2E', tipo: 'linea' }]
+    const wrapper = mount(GraficoBarras, { props: { labels, series: conNeto }, global: globalConfig })
+    const linea = wrapper.vm.datosGrafico.datasets[2]
+    expect(linea).toMatchObject({ type: 'line', label: 'Me queda', data: [50, 120, 90], borderColor: '#2A2A2E', fill: false })
+    // las barras no llevan `type` (chart.js usa el tipo base del chart).
+    expect(wrapper.vm.datosGrafico.datasets[0].type).toBeUndefined()
+  })
+
+  it('horizontal: invierte los ejes (categorías en Y, valores en X) y el tooltip lee parsed.x', () => {
+    const wrapper = mount(GraficoBarras, { props: { labels, series, horizontal: true } , global: globalConfig })
+    const opciones = wrapper.vm.opcionesGrafico
+    expect(opciones.indexAxis).toBe('y')
+    expect(opciones.scales.y.grid.display).toBe(false) // eje de categorías, ahora en Y
+    expect(opciones.scales.x.ticks.callback).toBeTypeOf('function') // eje de valores, ahora en X
+    const texto = opciones.plugins.tooltip.callbacks.label({ dataset: { label: 'Vendí' }, parsed: { x: 300 } })
+    expect(texto).toContain('$ 300,00')
+  })
 })

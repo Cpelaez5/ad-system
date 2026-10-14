@@ -11,6 +11,10 @@ const globalConfig = {
       props: ['icon', 'title', 'text', 'actionText', 'color'],
       emits: ['click:action'],
     },
+    'v-btn': {
+      template: '<button class="secundaria" @click="$emit(\'click\')"><slot /></button>',
+      emits: ['click'],
+    },
   },
 }
 
@@ -39,5 +43,26 @@ describe('EstadoVacio.vue', () => {
     expect(boton.text()).toBe('Agregar proveedor')
     await boton.trigger('click')
     expect(conAccion.emitted('accion')).toBeTruthy()
+  })
+
+  it('muestra una segunda salida de bajo énfasis solo si se pasa, y emite "accionSecundaria"', async () => {
+    const sinSecundaria = mount(EstadoVacio, {
+      props: { titulo: 'Todavía no tienes productos', textoAccion: 'Agregar producto' },
+      global: globalConfig,
+    })
+    expect(sinSecundaria.find('.secundaria').exists()).toBe(false)
+
+    const conSecundaria = mount(EstadoVacio, {
+      props: {
+        titulo: 'Todavía no tienes productos',
+        textoAccion: 'Agregar producto',
+        textoAccionSecundaria: 'Subir lista de Excel',
+      },
+      global: globalConfig,
+    })
+    const boton = conSecundaria.find('.secundaria')
+    expect(boton.text()).toBe('Subir lista de Excel')
+    await boton.trigger('click')
+    expect(conSecundaria.emitted('accionSecundaria')).toBeTruthy()
   })
 })

@@ -1,46 +1,32 @@
 <template>
   <v-container fluid class="billing-page pa-4 pa-md-6">
     <EncabezadoPagina
-      titulo="Facturación"
-      subtitulo="Historial de pagos de tu suscripción al sistema"
+      titulo="Pagos de mi plan"
+      subtitulo="Tus facturas y los pagos que has reportado"
     />
 
-    <!-- Stats Cards -->
-    <v-row class="mb-6">
-      <v-col cols="12" sm="6" md="3">
-        <v-card rounded="xl" class="pa-4 stat-card" style="background: #02254d; color: white;">
-          <div class="text-caption text-uppercase opacity-80 mb-1">Total Facturado</div>
-          <div class="text-h5 font-weight-bold">${{ formatMoney(balance.totalFacturado) }}</div>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <v-card rounded="xl" class="pa-4 stat-card" style="background: #4CAF50; color: white;">
-          <div class="text-caption text-uppercase opacity-80 mb-1">Pagado</div>
-          <div class="text-h5 font-weight-bold">${{ formatMoney(balance.totalPagado) }}</div>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <v-card rounded="xl" class="pa-4 stat-card" style="background: #A81C22; color: white;">
-          <div class="text-caption text-uppercase opacity-80 mb-1">Pendiente</div>
-          <div class="text-h5 font-weight-bold">${{ formatMoney(balance.totalPendiente) }}</div>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <v-card rounded="xl" class="pa-4 stat-card" style="background: #E0B04F; color: #2A2A2E;">
-          <div class="text-caption text-uppercase opacity-80 mb-1">Próx. Vencimiento</div>
-          <div class="text-h6 font-weight-bold">
-            {{ balance.proximoVencimiento ? formatDate(balance.proximoVencimiento) : 'Sin pendientes' }}
-          </div>
-        </v-card>
-      </v-col>
-      <!-- Saldo a favor (Nuevo) -->
-      <v-col cols="12" sm="6" md="3" v-if="balance.saldoAFavor > 0">
-        <v-card rounded="xl" class="pa-4 stat-card" style="background: #4CAF50; color: white;">
-          <div class="text-caption text-uppercase opacity-80 mb-1">Saldo a favor</div>
-          <div class="text-h6 font-weight-bold">+${{ formatMoney(balance.saldoAFavor) }}</div>
-        </v-card>
-      </v-col>
-    </v-row>
+    <!-- Resumen en llano + 3 cifras en línea (sin tarjetas de colores). -->
+    <p class="text-h6 font-weight-regular mb-3 billing-page__frase">{{ fraseBalance }}</p>
+    <div class="billing-page__cifras mb-6">
+      <div class="billing-page__cifra">
+        <div class="text-body-2 text-medium-emphasis">Has pagado</div>
+        <div class="text-h5 font-weight-bold text-success">${{ formatMoney(balance.totalPagado) }}</div>
+      </div>
+      <div class="billing-page__cifra">
+        <div class="text-body-2 text-medium-emphasis">Te falta pagar</div>
+        <div class="text-h5 font-weight-bold">${{ formatMoney(balance.totalPendiente) }}</div>
+      </div>
+      <div class="billing-page__cifra">
+        <div class="text-body-2 text-medium-emphasis">Próximo vencimiento</div>
+        <div class="text-h6 font-weight-bold">
+          {{ balance.proximoVencimiento ? formatDate(balance.proximoVencimiento) : 'Sin pendientes' }}
+        </div>
+      </div>
+      <div v-if="balance.saldoAFavor > 0" class="billing-page__cifra">
+        <div class="text-body-2 text-medium-emphasis">Saldo a favor</div>
+        <div class="text-h6 font-weight-bold text-success">+${{ formatMoney(balance.saldoAFavor) }}</div>
+      </div>
+    </div>
 
     <!-- Tabs: Facturas / Mis Reportes -->
     <v-card rounded="xl">
@@ -748,6 +734,13 @@ export default {
     };
   },
   computed: {
+    /** Frase de resumen de los pagos del plan, en llano. */
+    fraseBalance() {
+      const pend = Number(this.balance?.totalPendiente) || 0;
+      if (pend > 0) return `Tienes $${this.formatMoney(pend)} por pagar. Reporta tu pago desde la lista de facturas.`;
+      if ((Number(this.balance?.totalFacturado) || 0) === 0) return 'Aún no tienes facturas de tu plan.';
+      return 'Estás al día con los pagos de tu plan.';
+    },
     paymentFormValid() {
       // Validaciones básicas
       const isBalance = this.paymentFormData.payment_method_id === 'balance_method';
@@ -1320,8 +1313,8 @@ export default {
 
 <style scoped>
 .billing-page { max-width: 1200px; margin: 0 auto; }
-.stat-card { transition: transform 0.2s ease; }
-.stat-card:hover { transform: translateY(-3px); }
+.billing-page__frase { max-width: 62ch; text-wrap: balance; }
+.billing-page__cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px 24px; }
 .billing-table :deep(th) { font-weight: 700 !important; color: rgb(var(--v-theme-secondary)) !important; font-size: 0.8rem !important; text-transform: uppercase; }
 
 /* Zona de upload de comprobante */

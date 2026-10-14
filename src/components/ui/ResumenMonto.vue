@@ -1,7 +1,10 @@
 <template>
   <v-card variant="flat" color="surface" class="resumen-monto">
     <v-card-item>
-      <p class="resumen-monto__etiqueta text-medium-emphasis">{{ etiqueta }}</p>
+      <p class="resumen-monto__etiqueta text-medium-emphasis d-flex align-center ga-1">
+        {{ etiqueta }}
+        <slot name="etiqueta-extra" />
+      </p>
       <p class="resumen-monto__monto" :class="`text-${color}`">
         <AnimatedNumber v-if="animar" :value="monto" :duration="600" :formatter="formatearAnimado" />
         <template v-else>{{ montoFormateado }}</template>

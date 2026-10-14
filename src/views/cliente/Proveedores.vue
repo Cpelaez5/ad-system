@@ -1,529 +1,158 @@
 <template>
-  <v-container fluid class="pa-4 pa-md-6 bg-background min-vh-100">
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!-- 1. CABECERA & ACCIONES PRINCIPALES                     -->
-    <!-- ══════════════════════════════════════════════════════ -->
-    <EncabezadoPagina
-      titulo="Proveedores"
-      subtitulo="Directorio con los parámetros fiscales para compras y retenciones"
-    >
-      <v-btn
-        icon="mdi-refresh"
-        variant="tonal"
-        color="secondary"
-        density="comfortable"
-        :loading="loading"
-        @click="loadData"
-        title="Actualizar datos"
-      ></v-btn>
+  <div class="proveedores">
+    <!-- ═════════════ CARGANDO ═════════════ -->
+    <template v-if="loading">
+      <v-skeleton-loader type="heading, text" class="mb-6 bg-transparent" max-width="420" />
+      <v-skeleton-loader type="image" height="110" class="rounded-xl mb-4" />
+      <v-skeleton-loader type="list-item-avatar-two-line@6" class="rounded-xl" />
+    </template>
 
-      <v-btn
-        color="white"
-        variant="elevated"
-        prepend-icon="mdi-file-excel-outline"
-        class="text-secondary font-weight-bold elevation-1"
-        @click="exportToExcel"
-        :loading="exporting"
+    <!-- ═════════════ CONTENIDO ═════════════ -->
+    <template v-else>
+      <EncabezadoPagina
+        titulo="Mis proveedores"
+        subtitulo="Directorio con los parámetros fiscales para compras y retenciones"
       >
-        Exportar Excel
-      </v-btn>
+        <v-btn color="primary" size="large" prepend-icon="mdi-plus" class="text-none" @click="openCreateModal">
+          Nuevo proveedor
+        </v-btn>
+        <v-menu location="bottom end">
+          <template #activator="{ props: menuProps }">
+            <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="large" aria-label="Más opciones" />
+          </template>
+          <v-list density="comfortable" min-width="220">
+            <v-list-item prepend-icon="mdi-refresh" title="Actualizar" @click="loadData" />
+            <v-list-item prepend-icon="mdi-file-excel-outline" title="Exportar a Excel" :disabled="exporting" @click="exportToExcel" />
+          </v-list>
+        </v-menu>
+      </EncabezadoPagina>
 
-      <v-btn
-        color="primary"
-        variant="elevated"
-        prepend-icon="mdi-plus"
-        class="elevation-2 font-weight-bold"
-        @click="openCreateModal"
-      >
-        Nuevo Proveedor
-      </v-btn>
-    </EncabezadoPagina>
-
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!-- 2. TARJETAS DE KPIS Y MÉTRICAS FINANCIERAS (RESPONSIVE)-->
-    <!-- ══════════════════════════════════════════════════════ -->
-    <v-row class="mb-6">
-      <!-- KPI 1: Total Proveedores -->
-      <v-col cols="12" sm="6" md="3">
-        <v-card class="custom-kpi-card pa-4 rounded-xl elevation-1" style="background-color: #02254d; color: white;">
-          <div class="d-flex align-center justify-space-between mb-2">
-            <span class="text-caption font-weight-medium text-grey-lighten-2 text-uppercase letter-spacing-1">
-              Directorio Activo
-            </span>
-            <v-avatar size="32" color="rgba(255,255,255,0.15)">
-              <v-icon size="18" color="white">mdi-domain</v-icon>
-            </v-avatar>
-          </div>
-          <div class="kpi-value text-white mb-1">
-            <AnimatedNumber :value="kpis.total" :minimum-fraction-digits="0" :maximum-fraction-digits="0" />
-          </div>
-          <div class="text-caption text-grey-lighten-2">
-            Total Proveedores Registrados
-          </div>
-        </v-card>
-      </v-col>
-
-      <!-- KPI 2: Empresas / Naturales -->
-      <v-col cols="12" sm="6" md="3">
-        <v-card class="custom-kpi-card pa-4 rounded-xl elevation-1" style="background-color: #f2b648; color: #1a1a1a;">
-          <div class="d-flex align-center justify-space-between mb-2">
-            <span class="text-caption font-weight-bold text-uppercase letter-spacing-1 text-black">
-              Distribución Fiscal
-            </span>
-            <v-avatar size="32" color="rgba(0,0,0,0.1)">
-              <v-icon size="18" color="black">mdi-account-group-outline</v-icon>
-            </v-avatar>
-          </div>
-          <div class="kpi-value text-black mb-1">
-            <AnimatedNumber :value="kpis.juridicas" :minimum-fraction-digits="0" :maximum-fraction-digits="0" /> <span class="text-body-1 font-weight-medium text-grey-darken-3">Jurídicas</span> • <AnimatedNumber :value="kpis.naturales" :minimum-fraction-digits="0" :maximum-fraction-digits="0" /> <span class="text-body-1 font-weight-medium text-grey-darken-3">Nat.</span>
-          </div>
-          <div class="text-caption text-grey-darken-4 font-weight-medium">
-            Empresas vs Personas Naturales
-          </div>
-        </v-card>
-      </v-col>
-
-      <!-- KPI 3: Compras Acumuladas -->
-      <v-col cols="12" sm="6" md="3">
-        <v-card class="custom-kpi-card pa-4 rounded-xl elevation-1" style="background-color: #f0d29b; color: #1a1a1a;">
-          <div class="d-flex align-center justify-space-between mb-2">
-            <span class="text-caption font-weight-bold text-uppercase letter-spacing-1 text-black">
-              Compras Acumuladas
-            </span>
-            <v-avatar size="32" color="rgba(0,0,0,0.1)">
-              <v-icon size="18" color="black">mdi-cash-multiple</v-icon>
-            </v-avatar>
-          </div>
-          <div class="kpi-value text-black mb-1">
-            Bs. <AnimatedNumber :value="kpis.totalComprasPeriodo" :minimum-fraction-digits="2" :maximum-fraction-digits="2" />
-          </div>
-          <div class="text-caption text-grey-darken-4 font-weight-medium">
-            Volumen de Egresos Registrados
-          </div>
-        </v-card>
-      </v-col>
-
-      <!-- KPI 4: Retenciones Practicadas -->
-      <v-col cols="12" sm="6" md="3">
-        <v-card class="custom-kpi-card pa-4 rounded-xl elevation-1" style="background-color: #961112; color: white;">
-          <div class="d-flex align-center justify-space-between mb-2">
-            <span class="text-caption font-weight-medium text-grey-lighten-2 text-uppercase letter-spacing-1">
-              Impuesto Retenido
-            </span>
-            <v-avatar size="32" color="rgba(255,255,255,0.15)">
-              <v-icon size="18" color="white">mdi-shield-check</v-icon>
-            </v-avatar>
-          </div>
-          <div class="kpi-value text-white mb-1">
-            Bs. <AnimatedNumber :value="kpis.totalRetenidoPeriodo" :minimum-fraction-digits="2" :maximum-fraction-digits="2" />
-          </div>
-          <div class="text-caption text-grey-lighten-2">
-            IVA, ISLR y Municipalidad
-          </div>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!-- 3. BARRA DE HERRAMIENTAS, BÚSQUEDA Y FILTROS           -->
-    <!-- ══════════════════════════════════════════════════════ -->
-    <v-card class="rounded-xl pa-3 pa-md-4 mb-6 elevation-1 border-subtle">
-      <v-row dense align="center">
-        <!-- Buscador Reactivo -->
-        <v-col cols="12" lg="4" md="5">
+      <!-- RESUMEN + SIGUIENTE PASO -->
+      <div class="proveedores__panel">
+        <section class="proveedores__resumen" aria-label="Resumen de tus proveedores">
+          <p v-if="fraseResumen" class="proveedores__frase">{{ fraseResumen }}</p>
           <v-text-field
             v-model="searchQuery"
-            placeholder="Buscar por RIF, Razón Social o Municipio..."
+            placeholder="Buscar por nombre, RIF o municipio"
             prepend-inner-icon="mdi-magnify"
             variant="outlined"
             density="comfortable"
             hide-details
             clearable
-            class="search-input"
-          ></v-text-field>
-        </v-col>
+            class="proveedores__buscador"
+          />
+        </section>
 
-        <!-- Pills de Filtro con Flechas de Navegación (v-slide-group) -->
-        <v-col cols="12" lg="8" md="7">
-          <v-slide-group
-            v-model="activeFilter"
-            show-arrows
-            mandatory
-            class="filter-slide-group"
-          >
-            <v-slide-group-item
-              v-for="f in filterOptions"
-              :key="f.value"
-              :value="f.value"
-              v-slot="{ isSelected, toggle }"
-            >
-              <v-chip
-                :color="isSelected ? 'secondary' : 'default'"
-                :variant="isSelected ? 'flat' : 'outlined'"
-                size="small"
-                class="font-weight-medium ma-1 cursor-pointer flex-shrink-0"
-                @click="toggle"
-              >
-                <v-icon start size="14">{{ f.icon }}</v-icon>
-                {{ f.label }}
-                <span class="ml-1 opacity-70">({{ getFilterCount(f.value) }})</span>
-              </v-chip>
-            </v-slide-group-item>
-          </v-slide-group>
-        </v-col>
-      </v-row>
-    </v-card>
+        <PanelSiguientePaso
+          :listo="proveedoresIncompletos.length === 0"
+          titulo="Completa el RIF"
+          :detalle="`${proveedoresIncompletos.length} proveedor${proveedoresIncompletos.length === 1 ? '' : 'es'} ${proveedoresIncompletos.length === 1 ? 'no tiene' : 'no tienen'} un RIF válido. Complétalo para poder aplicarle las retenciones correctas.`"
+          texto-boton="Completar ahora"
+          icono-boton="mdi-card-account-details-outline"
+          titulo-listo="¡Tu directorio está completo!"
+          detalle-listo="Todos tus proveedores tienen su RIF registrado y listo para retenciones."
+          @accion="irAIncompletos"
+        />
+      </div>
 
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!-- 4. CONTENIDO PRINCIPAL: DUAL LAYOUT (MOBILE / DESKTOP)  -->
-    <!-- ══════════════════════════════════════════════════════ -->
+      <!-- FILTROS -->
+      <FiltroChips v-model="activeFilter" :opciones="opcionesFiltro" etiqueta="Filtrar proveedores" class="mb-4" />
 
-    <!-- Skeleton Loading -->
-    <div v-if="loading">
-      <v-row v-if="isMobile">
-        <v-col v-for="n in 3" :key="'sk-m-' + n" cols="12">
-          <v-skeleton-loader type="card" height="150" class="rounded-xl mb-3" />
-        </v-col>
-      </v-row>
-      <v-card v-else class="rounded-xl pa-4 elevation-1">
-        <v-skeleton-loader type="table-thead, table-tbody@5" />
-      </v-card>
-    </div>
+      <!-- ESTADO VACÍO -->
+      <EstadoVacio
+        v-if="filteredProveedores.length === 0"
+        :icono="(searchQuery || activeFilter !== 'ALL') ? 'mdi-filter-remove-outline' : 'mdi-domain-off'"
+        :titulo="(searchQuery || activeFilter !== 'ALL') ? 'No hay resultados con estos filtros' : 'Todavía no tienes proveedores'"
+        :mensaje="(searchQuery || activeFilter !== 'ALL')
+          ? 'Prueba con otra búsqueda o quita algún filtro.'
+          : 'Registra tus proveedores con sus parámetros fiscales para automatizar compras y comprobantes de retención.'"
+        :texto-accion="(searchQuery || activeFilter !== 'ALL') ? 'Limpiar filtros' : 'Registrar primer proveedor'"
+        @accion="(searchQuery || activeFilter !== 'ALL') ? limpiarFiltros() : openCreateModal()"
+      />
 
-    <!-- Estado Vacío (Empty State) -->
-    <!-- M1 (ola F2b): un chip de filtro activo (JURIDICA/NATURAL/CON_IVA/...)
-         sin texto de búsqueda también cuenta como "hay un filtro aplicado",
-         no solo searchQuery — antes mostraba "Todavía no tienes proveedores"
-         aunque sí los tuviera, solo que el filtro los dejó todos afuera. -->
-    <EstadoVacio
-      v-else-if="filteredProveedores.length === 0"
-      :icono="(searchQuery || activeFilter !== 'ALL') ? 'mdi-filter-remove-outline' : 'mdi-domain-off'"
-      :titulo="(searchQuery || activeFilter !== 'ALL') ? 'No hay resultados con estos filtros' : 'Todavía no tienes proveedores'"
-      :mensaje="(searchQuery || activeFilter !== 'ALL')
-        ? 'Prueba con otra búsqueda o quita algún filtro.'
-        : 'Registra tus proveedores con sus parámetros fiscales para automatizar compras y comprobantes de retención.'"
-      :texto-accion="(searchQuery || activeFilter !== 'ALL') ? 'Limpiar filtros' : 'Registrar primer proveedor'"
-      @accion="(searchQuery || activeFilter !== 'ALL') ? limpiarFiltros() : openCreateModal()"
-    />
-
-    <!-- A. VISTA MÓVIL: FEED DE TARJETAS TÁCTILES FIRST MOBILE -->
-    <div v-else-if="isMobile">
-      <v-row dense>
-        <v-col
-          v-for="prov in filteredProveedores"
-          :key="prov.id"
-          cols="12"
-          class="mb-3"
-        >
-          <v-card
-            class="rounded-xl pa-4 elevation-1 border-subtle mobile-provider-card"
+      <!-- LISTA -->
+      <template v-else>
+        <SeccionLista :meta="`${filteredProveedores.length} proveedor${filteredProveedores.length === 1 ? '' : 'es'}`">
+          <div
+            v-for="prov in paginatedProveedores"
+            :key="prov.id"
+            class="fila-proveedor"
+            role="button"
+            tabindex="0"
             @click="openDetailModal(prov)"
+            @keydown.enter.self="openDetailModal(prov)"
           >
-            <!-- Cabecera de la Tarjeta Móvil -->
-            <div class="d-flex align-start justify-space-between mb-2">
-              <div class="d-flex align-center flex-grow-1 overflow-hidden mr-2">
-                <v-avatar
-                  size="40"
-                  :color="prov.tipo_persona === 'JURIDICA' ? 'secondary' : 'accent'"
-                  class="mr-3 text-white font-weight-bold flex-shrink-0"
-                >
-                  <v-icon size="20" color="white">
-                    {{ prov.tipo_persona === 'JURIDICA' ? 'mdi-domain' : 'mdi-account' }}
-                  </v-icon>
-                </v-avatar>
+            <span
+              class="fila-proveedor__icono"
+              :class="prov.tipo_persona === 'JURIDICA' ? 'fila-proveedor__icono--empresa' : 'fila-proveedor__icono--persona'"
+              aria-hidden="true"
+            >
+              <v-icon :icon="prov.tipo_persona === 'JURIDICA' ? 'mdi-domain' : 'mdi-account'" size="22" />
+            </span>
 
-                <div class="overflow-hidden">
-                  <div class="text-subtitle-2 font-weight-bold text-truncate text-secondary">
-                    {{ prov.nombre }}
-                  </div>
-                  <div class="d-flex align-center">
-                    <span class="text-caption font-mono text-grey-darken-2 font-weight-bold">
-                      {{ prov.rif }}
-                    </span>
-                    <v-btn
-                      icon="mdi-content-copy"
-                      variant="text"
-                      density="compact"
-                      size="x-small"
-                      color="secondary"
-                      class="ml-1"
-                      @click.stop="copyRif(prov.rif)"
-                    ></v-btn>
-                  </div>
-                </div>
+            <div class="fila-proveedor__texto">
+              <div class="fila-proveedor__nombre">{{ prov.nombre }}</div>
+              <div class="fila-proveedor__rif">
+                <span class="font-mono">{{ prov.rif }}</span>
+                <v-btn
+                  icon="mdi-content-copy"
+                  variant="text"
+                  density="compact"
+                  size="x-small"
+                  aria-label="Copiar RIF"
+                  @click.stop="copyRif(prov.rif)"
+                />
+                <span v-if="esIncompleto(prov)" class="text-error font-weight-medium">· Falta un RIF válido</span>
               </div>
+              <div v-if="tieneChipsFiscales(prov)" class="fila-proveedor__chips">
+                <v-chip v-if="Number(prov.iva_retention_rate) > 0" size="small" variant="tonal" color="secondary">
+                  Ret. IVA {{ prov.iva_retention_rate }}%
+                </v-chip>
+                <v-chip v-if="prov.islr_codigo || prov.islr_concept_id" size="small" variant="tonal" color="secondary">
+                  ISLR {{ prov.islr_codigo || '—' }}
+                </v-chip>
+                <v-chip v-if="Number(prov.municipal_rate) > 0" size="small" variant="tonal" color="secondary">
+                  Municipal {{ prov.municipal_rate }}%
+                </v-chip>
+              </div>
+            </div>
 
-              <!-- Menú de Acciones Rápidas -->
+            <div class="fila-proveedor__derecha">
+              <div class="fila-proveedor__valor">{{ formatMoney(prov.total_compras || 0, 'VES') }}</div>
+              <div class="fila-proveedor__valor-secundario">{{ prov.total_facturas || 0 }} compra{{ (prov.total_facturas || 0) === 1 ? '' : 's' }}</div>
+            </div>
+
+            <div class="fila-proveedor__acciones" @click.stop>
+              <v-btn variant="tonal" color="secondary" prepend-icon="mdi-eye-outline" class="text-none fila-proveedor__accion" @click="openDetailModal(prov)">
+                Ver
+              </v-btn>
               <v-menu location="bottom end">
-                <template v-slot:activator="{ props }">
-                  <v-btn
-                    icon="mdi-dots-vertical"
-                    variant="text"
-                    density="comfortable"
-                    v-bind="props"
-                    @click.stop
-                  ></v-btn>
+                <template #activator="{ props: menuProps }">
+                  <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" aria-label="Más opciones" />
                 </template>
-                <v-list density="compact" class="rounded-lg elevation-3">
-                  <v-list-item prepend-icon="mdi-eye-outline" title="Ver Ficha 360" @click="openDetailModal(prov)" />
+                <v-list density="comfortable">
                   <v-list-item prepend-icon="mdi-pencil-outline" title="Editar" @click="openEditModal(prov)" />
-                  <v-divider></v-divider>
-                  <v-list-item prepend-icon="mdi-delete-outline" title="Eliminar / Archivar" class="text-primary" @click="confirmDelete(prov)" />
+                  <v-list-item prepend-icon="mdi-delete-outline" base-color="error" title="Eliminar" @click="confirmDelete(prov)" />
                 </v-list>
               </v-menu>
             </div>
+          </div>
+        </SeccionLista>
 
-            <!-- Chips de Configuración Fiscal -->
-            <div class="d-flex flex-wrap my-2" style="gap: 6px;">
-              <v-chip size="x-small" color="secondary" variant="flat">
-                Ret. IVA: {{ prov.iva_retention_rate || 0 }}%
-              </v-chip>
-
-              <v-chip
-                v-if="prov.islr_codigo || prov.islr_porcentaje"
-                size="x-small"
-                color="primary"
-                variant="flat"
-              >
-                ISLR: {{ prov.islr_codigo || 'Cód.' }} ({{ prov.islr_porcentaje || 0 }}%)
-              </v-chip>
-
-              <v-chip
-                v-if="prov.municipal_rate"
-                size="x-small"
-                color="accent"
-                variant="flat"
-                class="text-black font-weight-bold"
-              >
-                Mun: {{ prov.municipal_rate }}%
-              </v-chip>
-
-              <v-chip
-                v-if="prov.municipio_nombre"
-                size="x-small"
-                color="grey-lighten-2"
-                variant="flat"
-                class="text-grey-darken-3"
-              >
-                {{ prov.municipio_nombre }}
-              </v-chip>
-            </div>
-
-            <!-- Resumen Financiero y Contacto Rápido -->
-            <div class="d-flex align-center justify-space-between pt-2 border-t-subtle mt-2">
-              <div class="text-caption text-grey-darken-1">
-                Compras: <strong class="text-secondary">Bs. {{ formatMoney(prov.total_compras || 0) }}</strong>
-                <span class="text-grey ml-1">({{ prov.total_facturas || 0 }} fac.)</span>
-              </div>
-
-              <div class="d-flex align-center" style="gap: 4px;">
-                <v-btn
-                  v-if="prov.telefono"
-                  icon="mdi-phone"
-                  size="small"
-                  variant="tonal"
-                  color="secondary"
-                  :href="'tel:' + prov.telefono"
-                  @click.stop
-                ></v-btn>
-
-                <v-btn
-                  v-if="prov.email"
-                  icon="mdi-email-outline"
-                  size="small"
-                  variant="tonal"
-                  color="secondary"
-                  :href="'mailto:' + prov.email"
-                  @click.stop
-                ></v-btn>
-              </div>
-            </div>
-          </v-card>
-        </v-col>
-      </v-row>
-    </div>
-
-    <!-- B. VISTA DESKTOP: DATA TABLE MODERNA -->
-    <v-card v-else class="rounded-xl elevation-1 border-subtle overflow-hidden">
-      <v-table hover density="comfortable">
-        <thead>
-          <tr class="bg-grey-lighten-4">
-            <th class="text-left font-weight-bold text-secondary">Proveedor / RIF</th>
-            <th class="text-left font-weight-bold text-secondary">Tipo</th>
-            <th class="text-left font-weight-bold text-secondary">Configuración Fiscal</th>
-            <th class="text-left font-weight-bold text-secondary">Municipio / Licencia</th>
-            <th class="text-right font-weight-bold text-secondary">Compras Acumuladas</th>
-            <th class="text-right font-weight-bold text-secondary">Total Retenido</th>
-            <th class="text-center font-weight-bold text-secondary" style="width: 130px;">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="prov in paginatedProveedores"
-            :key="prov.id"
-            class="cursor-pointer provider-table-row"
-            @click="openDetailModal(prov)"
-          >
-            <!-- Columna Proveedor -->
-            <td class="py-3">
-              <div class="d-flex align-center">
-                <v-avatar
-                  size="36"
-                  :color="prov.tipo_persona === 'JURIDICA' ? 'secondary' : 'accent'"
-                  class="mr-3 text-white font-weight-bold flex-shrink-0"
-                >
-                  <v-icon size="18" color="white">
-                    {{ prov.tipo_persona === 'JURIDICA' ? 'mdi-domain' : 'mdi-account' }}
-                  </v-icon>
-                </v-avatar>
-                <div>
-                  <div class="font-weight-bold text-body-2 text-secondary">
-                    {{ prov.nombre }}
-                  </div>
-                  <div class="d-flex align-center">
-                    <span class="text-caption font-mono text-grey-darken-1">
-                      {{ prov.rif }}
-                    </span>
-                    <v-btn
-                      icon="mdi-content-copy"
-                      variant="text"
-                      density="compact"
-                      size="x-small"
-                      color="grey"
-                      class="ml-1"
-                      @click.stop="copyRif(prov.rif)"
-                    ></v-btn>
-                  </div>
-                </div>
-              </div>
-            </td>
-
-            <!-- Tipo de Persona -->
-            <td>
-              <v-chip
-                size="x-small"
-                :color="prov.tipo_persona === 'JURIDICA' ? 'blue-lighten-4' : 'amber-lighten-4'"
-                class="text-secondary font-weight-bold"
-              >
-                {{ prov.tipo_persona === 'JURIDICA' ? 'JURÍDICA' : 'NATURAL' }}
-              </v-chip>
-            </td>
-
-            <!-- Configuración Fiscal -->
-            <td>
-              <div class="d-flex flex-wrap" style="gap: 4px;">
-                <v-chip size="x-small" color="secondary" variant="flat">
-                  Ret. IVA: {{ prov.iva_retention_rate || 0 }}%
-                </v-chip>
-                <v-chip
-                  v-if="prov.islr_codigo || prov.islr_porcentaje"
-                  size="x-small"
-                  color="primary"
-                  variant="flat"
-                >
-                  ISLR: {{ prov.islr_codigo || 'Cód.' }} ({{ prov.islr_porcentaje || 0 }}%)
-                </v-chip>
-                <v-chip
-                  v-if="prov.municipal_rate"
-                  size="x-small"
-                  color="accent"
-                  variant="flat"
-                  class="text-black font-weight-bold"
-                >
-                  Mun: {{ prov.municipal_rate }}%
-                </v-chip>
-              </div>
-            </td>
-
-            <!-- Municipio y Licencia -->
-            <td>
-              <div class="text-body-2 font-weight-medium text-grey-darken-3">
-                {{ prov.municipio_nombre || 'No asignado' }}
-              </div>
-              <div v-if="prov.licencia_actividad_economica" class="text-caption text-grey">
-                Lic: {{ prov.licencia_actividad_economica }}
-              </div>
-            </td>
-
-            <!-- Compras Acumuladas -->
-            <td class="text-right">
-              <div class="font-weight-bold text-body-2 text-secondary">
-                Bs. {{ formatMoney(prov.total_compras || 0) }}
-              </div>
-              <div class="text-caption text-grey">
-                {{ prov.total_facturas || 0 }} facturas
-              </div>
-            </td>
-
-            <!-- Total Retenido -->
-            <td class="text-right font-weight-bold text-body-2 text-primary">
-              Bs. {{ formatMoney(prov.total_retenido || 0) }}
-            </td>
-
-            <!-- Acciones -->
-            <td class="text-center" @click.stop>
-              <div class="d-flex align-center justify-center" style="gap: 4px;">
-                <v-btn
-                  icon="mdi-eye-outline"
-                  variant="text"
-                  size="small"
-                  color="secondary"
-                  @click="openDetailModal(prov)"
-                ></v-btn>
-                <v-btn
-                  icon="mdi-pencil-outline"
-                  variant="text"
-                  size="small"
-                  color="secondary"
-                  @click="openEditModal(prov)"
-                ></v-btn>
-                <v-btn
-                  icon="mdi-delete-outline"
-                  variant="text"
-                  size="small"
-                  color="primary"
-                  @click="confirmDelete(prov)"
-                ></v-btn>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
-
-      <!-- Paginador Desktop -->
-      <v-divider></v-divider>
-      <div class="d-flex align-center justify-space-between pa-4">
-        <div class="text-caption text-grey">
-          Mostrando {{ (page - 1) * itemsPerPage + 1 }} a {{ Math.min(page * itemsPerPage, filteredProveedores.length) }} de {{ filteredProveedores.length }} proveedores
+        <div v-if="pageCount > 1" class="d-flex justify-center mt-4">
+          <v-pagination
+            v-model="page"
+            :length="pageCount"
+            density="comfortable"
+            size="small"
+            total-visible="5"
+            color="secondary"
+          />
         </div>
-        <v-pagination
-          v-if="pageCount > 1"
-          v-model="page"
-          :length="pageCount"
-          density="comfortable"
-          size="small"
-          total-visible="5"
-          color="secondary"
-        ></v-pagination>
-      </div>
-    </v-card>
+      </template>
+    </template>
 
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!-- 5. FLOATING ACTION BUTTON (MÓVIL)                      -->
-    <!-- ══════════════════════════════════════════════════════ -->
-    <v-btn
-      v-if="isMobile"
-      color="primary"
-      icon="mdi-plus"
-      size="large"
-      elevation="4"
-      class="mobile-fab"
-      @click="openCreateModal"
-    ></v-btn>
-
-    <!-- ══════════════════════════════════════════════════════ -->
-    <!-- 6. MODALES Y DIÁLOGOS (FORMULARIO, DETALLE, DELETE)    -->
-    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- ═════════════ MODALES ═════════════ -->
     <ProveedorModalForm
       v-model="formModalOpen"
       :proveedor="selectedProveedor"
@@ -536,7 +165,6 @@
       @edit="openEditModal"
     />
 
-    <!-- Diálogo de Confirmación de Borrado / Desactivación -->
     <DialogoAdaptable
       v-model="deleteDialogOpen"
       titulo="¿Eliminar proveedor?"
@@ -545,48 +173,45 @@
       persistent
       :cargando="deleting"
     >
-      <div class="text-body-2 text-grey-darken-2">
+      <p class="mb-2">
         ¿Estás seguro de que deseas eliminar a <strong>{{ providerToDelete?.nombre }}</strong> (RIF: {{ providerToDelete?.rif }})?
-        <p class="mt-2 text-caption text-grey">
-          Si este proveedor tiene compras o retenciones registradas, se archivará de forma segura para preservar la integridad de tus libros fiscales.
-        </p>
-      </div>
+      </p>
+      <p class="text-caption text-medium-emphasis mb-0">
+        Si este proveedor tiene compras o retenciones registradas, se archivará de forma segura para preservar la integridad de tus libros fiscales.
+      </p>
 
       <template #acciones>
-        <v-btn variant="text" color="grey-darken-1" :disabled="deleting" @click="deleteDialogOpen = false">
-          Cancelar
-        </v-btn>
-        <v-btn
-          color="primary"
-          variant="flat"
-          :loading="deleting"
-          @click="executeDelete"
-        >
-          Confirmar
-        </v-btn>
+        <v-btn variant="text" class="text-none" :disabled="deleting" @click="deleteDialogOpen = false">Cancelar</v-btn>
+        <v-btn color="error" variant="flat" class="text-none" :loading="deleting" @click="executeDelete">Confirmar</v-btn>
       </template>
     </DialogoAdaptable>
-  </v-container>
+  </div>
 </template>
 
 <script>
 import ProveedorModalForm from '@/components/forms/ProveedorModalForm.vue'
 import ProveedorDetailModal from '@/components/forms/ProveedorDetailModal.vue'
-import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
 import EstadoVacio from '@/components/ui/EstadoVacio.vue'
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
+import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
+import FiltroChips from '@/components/ui/FiltroChips.vue'
+import SeccionLista from '@/components/ui/SeccionLista.vue'
 import proveedorService from '@/services/proveedorService.js'
+import { normalizarRif } from '@/utils/rif.js'
+import { formatMoney } from '@/utils/formatMoney.js'
 
 export default {
   name: 'ProveedoresView',
   components: {
     ProveedorModalForm,
     ProveedorDetailModal,
-    AnimatedNumber,
     EncabezadoPagina,
     EstadoVacio,
-    DialogoAdaptable
+    DialogoAdaptable,
+    PanelSiguientePaso,
+    FiltroChips,
+    SeccionLista
   },
   data() {
     return {
@@ -598,59 +223,46 @@ export default {
       activeFilter: 'ALL',
       page: 1,
       itemsPerPage: 10,
-      
+
       // Modales
       formModalOpen: false,
       detailModalOpen: false,
       deleteDialogOpen: false,
       selectedProveedor: null,
-      providerToDelete: null,
-
-      // KPIs
-      kpis: {
-        total: 0,
-        juridicas: 0,
-        naturales: 0,
-        conRetencionIva: 0,
-        conRetencionIslr: 0,
-        totalComprasPeriodo: 0,
-        totalRetenidoPeriodo: 0
-      },
-
-      filterOptions: [
-        { label: 'Todos', value: 'ALL', icon: 'mdi-view-grid' },
-        { label: 'Empresas (Jurídicas)', value: 'JURIDICA', icon: 'mdi-domain' },
-        { label: 'Personas Naturales', value: 'NATURAL', icon: 'mdi-account' },
-        { label: 'Retención IVA', value: 'CON_IVA', icon: 'mdi-receipt' },
-        { label: 'Retención ISLR', value: 'CON_ISLR', icon: 'mdi-file-percent' },
-        { label: 'Con Municipio', value: 'CON_MUN', icon: 'mdi-city' }
-      ]
+      providerToDelete: null
     }
   },
   computed: {
-    isMobile() {
-      return this.$vuetify?.display?.smAndDown || false
+    // Un proveedor "incompleto" es aquel cuyo RIF no normaliza a un RIF
+    // válido del SENIAT (p. ej. el placeholder "PROV-172633444" que se
+    // autogenera al descubrir un proveedor desde una factura sin RIF
+    // legible). Sin un RIF válido no se le puede aplicar una retención.
+    proveedoresIncompletos() {
+      return this.proveedores.filter(p => this.esIncompleto(p))
+    },
+    fraseResumen() {
+      const total = this.proveedores.length
+      if (total === 0) return ''
+      const inc = this.proveedoresIncompletos.length
+      let frase = `Tienes ${total} proveedor${total === 1 ? '' : 'es'}`
+      if (inc > 0) frase += `; a ${inc} le${inc === 1 ? '' : 's'} falta el RIF`
+      return frase + '.'
+    },
+    opcionesFiltro() {
+      return [
+        { valor: 'ALL', texto: 'Todos', cantidad: this.proveedores.length },
+        { valor: 'JURIDICA', texto: 'Empresas', cantidad: this.contarFiltro('JURIDICA') },
+        { valor: 'NATURAL', texto: 'Personas', cantidad: this.contarFiltro('NATURAL') },
+        { valor: 'CON_RETENCION', texto: 'Con retención', cantidad: this.contarFiltro('CON_RETENCION') },
+        { valor: 'INCOMPLETOS', texto: 'Datos incompletos', cantidad: this.proveedoresIncompletos.length, deshabilitado: this.proveedoresIncompletos.length === 0 }
+      ]
     },
     filteredProveedores() {
-      let list = this.proveedores
+      let list = this.proveedores.filter(p => this.cumpleFiltro(p, this.activeFilter))
 
-      // Filtro por categoría segmentada
-      if (this.activeFilter === 'JURIDICA') {
-        list = list.filter(p => p.tipo_persona === 'JURIDICA')
-      } else if (this.activeFilter === 'NATURAL') {
-        list = list.filter(p => p.tipo_persona === 'NATURAL')
-      } else if (this.activeFilter === 'CON_IVA') {
-        list = list.filter(p => Number(p.iva_retention_rate || 0) > 0)
-      } else if (this.activeFilter === 'CON_ISLR') {
-        list = list.filter(p => Boolean(p.islr_concept_id))
-      } else if (this.activeFilter === 'CON_MUN') {
-        list = list.filter(p => Boolean(p.municipio_id || p.municipal_rate))
-      }
-
-      // Filtro de búsqueda
       if (this.searchQuery && this.searchQuery.trim()) {
         const s = this.searchQuery.toLowerCase().trim()
-        list = list.filter(p => 
+        list = list.filter(p =>
           (p.nombre && p.nombre.toLowerCase().includes(s)) ||
           (p.rif && p.rif.toLowerCase().includes(s)) ||
           (p.licencia_actividad_economica && p.licencia_actividad_economica.toLowerCase().includes(s)) ||
@@ -689,7 +301,6 @@ export default {
       try {
         const list = await proveedorService.getProveedores({ onlyActive: true })
         this.proveedores = list || []
-        this.kpis = proveedorService.getKPIs(this.proveedores)
       } catch (e) {
         console.error('Error cargando proveedores:', e)
         this.$root?.showSnackbar?.('Error al cargar la lista de proveedores', 'error')
@@ -700,18 +311,30 @@ export default {
     handleProviderChange() {
       this.loadData()
     },
-    getFilterCount(filterValue) {
-      if (filterValue === 'ALL') return this.proveedores.length
-      if (filterValue === 'JURIDICA') return this.proveedores.filter(p => p.tipo_persona === 'JURIDICA').length
-      if (filterValue === 'NATURAL') return this.proveedores.filter(p => p.tipo_persona === 'NATURAL').length
-      if (filterValue === 'CON_IVA') return this.proveedores.filter(p => Number(p.iva_retention_rate || 0) > 0).length
-      if (filterValue === 'CON_ISLR') return this.proveedores.filter(p => Boolean(p.islr_concept_id)).length
-      if (filterValue === 'CON_MUN') return this.proveedores.filter(p => Boolean(p.municipio_id || p.municipal_rate)).length
-      return 0
+    esIncompleto(p) {
+      return !normalizarRif(p.rif)
+    },
+    tieneChipsFiscales(p) {
+      return Number(p.iva_retention_rate) > 0 || Boolean(p.islr_codigo || p.islr_concept_id) || Number(p.municipal_rate) > 0
+    },
+    cumpleFiltro(p, filtro) {
+      if (filtro === 'JURIDICA') return p.tipo_persona === 'JURIDICA'
+      if (filtro === 'NATURAL') return p.tipo_persona === 'NATURAL'
+      if (filtro === 'CON_RETENCION') return this.tieneChipsFiscales(p)
+      if (filtro === 'INCOMPLETOS') return this.esIncompleto(p)
+      return true
+    },
+    contarFiltro(filtro) {
+      return this.proveedores.filter(p => this.cumpleFiltro(p, filtro)).length
     },
     limpiarFiltros() {
       this.searchQuery = ''
       this.activeFilter = 'ALL'
+    },
+    irAIncompletos() {
+      this.searchQuery = ''
+      this.activeFilter = 'INCOMPLETOS'
+      this.page = 1
     },
     openCreateModal() {
       this.selectedProveedor = null
@@ -766,7 +389,6 @@ export default {
         const workbook = new ExcelJS.Workbook()
         const worksheet = workbook.addWorksheet('Directorio de Proveedores')
 
-        // Configurar columnas
         worksheet.columns = [
           { header: 'Razón Social', key: 'nombre', width: 35 },
           { header: 'RIF', key: 'rif', width: 18 },
@@ -781,11 +403,9 @@ export default {
           { header: 'Total Retenido (Bs)', key: 'total_retenido', width: 22 }
         ]
 
-        // Estilo de encabezados
         worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
-        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F355C' } }
+        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2A2A2E' } }
 
-        // Agregar filas
         this.filteredProveedores.forEach(p => {
           worksheet.addRow({
             nombre: p.nombre,
@@ -819,82 +439,185 @@ export default {
         this.exporting = false
       }
     },
-    formatMoney(val) {
-      const num = Number(val || 0)
-      return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    formatMoney(val, moneda) {
+      return formatMoney(val, moneda)
     }
   }
 }
 </script>
 
 <style scoped>
-/* ─── KPI Cards Estilizadas y Responsivas ─────────────────── */
-.custom-kpi-card {
-  min-height: 125px;
+.proveedores {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 16px 96px;
+}
+
+@media (min-width: 960px) {
+  .proveedores { padding: 32px 32px 64px; }
+}
+
+/* ── Resumen + siguiente paso ── */
+.proveedores__panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin: 8px 0 24px;
+}
+
+@media (min-width: 960px) {
+  .proveedores__panel { grid-template-columns: 7fr 5fr; }
+}
+
+.proveedores__resumen {
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 20px;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  gap: 14px;
+  justify-content: center;
 }
 
-.custom-kpi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
+@media (max-width: 599px) {
+  .proveedores__resumen { padding: 18px; }
 }
 
-.kpi-value {
-  font-size: clamp(1.35rem, 1.8vw, 1.75rem);
+.proveedores__frase {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.proveedores__buscador {
+  max-width: 420px;
+  flex: 0 0 auto;
+}
+
+/* ── Fila de proveedor ── */
+.fila-proveedor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  min-height: 72px;
+  cursor: pointer;
+  transition: background-color var(--ad-move-rapido) var(--ad-move-curva-entrada);
+}
+
+.fila-proveedor:hover {
+  background: rgba(var(--v-theme-on-surface), 0.035);
+}
+
+.fila-proveedor:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: -2px;
+}
+
+.fila-proveedor__icono {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fila-proveedor__icono--empresa { background: rgba(var(--v-theme-secondary), 0.1); color: rgb(var(--v-theme-secondary)); }
+.fila-proveedor__icono--persona { background: rgba(var(--v-theme-primary), 0.1); color: rgb(var(--v-theme-primary)); }
+
+.fila-proveedor__texto {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fila-proveedor__nombre {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: rgb(var(--v-theme-on-surface));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fila-proveedor__rif {
+  margin-top: 2px;
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-surface), 0.65);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.fila-proveedor__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.fila-proveedor__derecha {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.fila-proveedor__valor {
+  font-size: 0.9375rem;
   font-weight: 700;
-  line-height: 1.2;
-  font-family: 'Montserrat', sans-serif;
-  letter-spacing: -0.02em;
+  white-space: nowrap;
+  color: rgb(var(--v-theme-on-surface));
 }
 
-.letter-spacing-1 {
-  letter-spacing: 0.06em !important;
+.fila-proveedor__valor-secundario {
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  white-space: nowrap;
 }
 
-.border-subtle {
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+.fila-proveedor__acciones {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.border-t-subtle {
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+.fila-proveedor__accion {
+  min-width: 96px;
 }
 
 .font-mono {
   font-family: monospace;
 }
 
-.mobile-provider-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+/* Teléfono: valor y acción bajan a su propia línea, a todo el ancho */
+@media (max-width: 599px) {
+  .fila-proveedor {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .fila-proveedor__texto {
+    flex: 1 1 calc(100% - 58px);
+  }
+  .fila-proveedor__derecha {
+    flex: 1 1 100%;
+    padding-left: 58px;
+    text-align: left;
+  }
+  .fila-proveedor__acciones {
+    flex: 1 1 100%;
+    padding-left: 58px;
+  }
+  .fila-proveedor__acciones .fila-proveedor__accion,
+  .fila-proveedor__acciones > .v-btn:first-child {
+    flex: 1 1 auto;
+  }
 }
 
-.mobile-provider-card:active {
-  transform: scale(0.98);
-}
-
-.provider-table-row:hover {
-  background-color: rgba(31, 53, 92, 0.03) !important;
-}
-
-.mobile-fab {
-  position: fixed !important;
-  bottom: 24px !important;
-  right: 24px !important;
-  z-index: 99 !important;
-}
-
-/* Estilos para el carrusel de filtros segmentados */
-.filter-slide-group :deep(.v-slide-group__prev),
-.filter-slide-group :deep(.v-slide-group__next) {
-  min-width: 32px !important;
-  flex: 0 0 32px !important;
-}
-
-.filter-slide-group :deep(.v-slide-group__prev .v-icon),
-.filter-slide-group :deep(.v-slide-group__next .v-icon) {
-  color: #2A2A2E !important;
-  font-size: 22px !important;
+@media (prefers-reduced-motion: reduce) {
+  .fila-proveedor { transition: none; }
 }
 </style>

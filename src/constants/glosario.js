@@ -131,7 +131,7 @@ const GLOSARIO = {
   licencia_actividad_economica: {
     termino: 'Licencia de Actividad Económica',
     simple: 'Permiso de la alcaldía',
-    explicacion: 'Es el permiso que te da la alcaldía para poder tener tu negocio abierto al público. Sin esto no puedes trabajar legalmente.'
+    explicacion: 'Es el permiso que te da la alcaldía para poder tener tu negocio abierto al público (también se le dice Patente de Industria y Comercio). Sin esto no puedes trabajar legalmente.'
   },
   declaracion_iva: {
     termino: 'Declaración de IVA',
@@ -152,6 +152,12 @@ const GLOSARIO = {
     termino: 'Expediente Fiscal',
     simple: 'Mis papeles del negocio',
     explicacion: 'Es la carpeta donde guardas todos los papeles importantes de tu negocio. Ahí va tu permiso de alcaldía y tus declaraciones.'
+  },
+  iva_a_pagar_estimado: {
+    termino: 'IVA a pagar (estimado)',
+    simple: 'Lo que probablemente debes declarar',
+    explicacion: 'Es un cálculo aproximado con lo que ya registraste: el IVA que cobraste vendiendo, menos el IVA que pagaste comprando, menos las retenciones que te hicieron tus clientes. Tu contador confirma el monto exacto al declarar.',
+    ejemplo: 'Si cobraste $16 de IVA vendiendo, pagaste $5 comprando y te retuvieron $2, el estimado es $16 − $5 − $2 = $9.'
   }
 };
 
