@@ -121,13 +121,37 @@
             :pasos="primerosPasos"
             @ir="irAPaso"
           />
-          <div v-else class="inicio-logro">
-            <v-icon icon="mdi-trophy-outline" size="32" color="success" />
-            <div>
+          <template v-else>
+            <div class="inicio-logro">
+              <v-icon icon="mdi-trophy-outline" size="28" color="success" />
               <div class="inicio-logro__titulo">¡Ya conoces AD System!</div>
-              <div class="inicio-logro__texto">Completaste los primeros pasos. Si tienes dudas, el botón de ayuda siempre está a mano.</div>
             </div>
-          </div>
+
+            <SeccionLista
+              v-if="sugerencias.length"
+              titulo="Sugerencias para ti"
+              icono="mdi-lightbulb-on-outline"
+              class="mt-5"
+            >
+              <TransitionGroup name="sugerencia" tag="div">
+                <div v-for="sug in sugerencias" :key="sug.clave" class="inicio-sugerencia">
+                  <span class="inicio-sugerencia__icono" aria-hidden="true"><v-icon :icon="sug.icono" size="20" /></span>
+                  <div class="inicio-sugerencia__texto">
+                    <div class="inicio-sugerencia__titulo">{{ sug.titulo }}</div>
+                    <div class="inicio-sugerencia__detalle">{{ sug.detalle }}</div>
+                    <div class="inicio-sugerencia__acciones">
+                      <v-btn variant="tonal" color="primary" size="small" class="text-none" @click="ejecutarSugerencia(sug)">
+                        {{ sug.textoBoton }}
+                      </v-btn>
+                      <v-btn variant="text" size="small" class="text-none text-medium-emphasis" @click="ocultarSugerencia(sug)">
+                        Ahora no
+                      </v-btn>
+                    </div>
+                  </div>
+                </div>
+              </TransitionGroup>
+            </SeccionLista>
+          </template>
         </aside>
       </div>
 
@@ -181,9 +205,13 @@ import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
 import ListaPasos from '@/components/ui/ListaPasos.vue'
 import SeccionLista from '@/components/ui/SeccionLista.vue'
 import sealService from '@/services/seal-service'
+import { sugerenciasInicio } from '@/utils/sugerenciasInicio'
 
 // Marca de "ya visitó ¿Cómo voy?" (la pone Dashboard.vue al abrirse).
 export const CLAVE_VISTO_COMO_VOY = 'ad_visto_como_voy'
+// Sugerencias ocultas con "Ahora no": { clave: 'YYYY-MM-DD' }; vuelven a los 7 días.
+const CLAVE_SUGERENCIAS_OCULTAS = 'ad_sugerencias_ocultas'
+const DIAS_OCULTA = 7
 
 /** Días enteros desde hoy hasta la fecha (local); negativo si ya pasó. */
 function diasHasta(fecha) {
@@ -235,6 +263,11 @@ export default {
       tieneRif: false,
       tieneSelloOFirma: false,
       vioComoVoy: false,
+
+      // Para "Sugerencias para ti"
+      todasVentas: [],
+      papelesSubidos: 0,
+      sugerenciasOcultas: {},
 
       dialogRegistroAbierto: false,
       flowRegistro: 'VENTA',
@@ -314,6 +347,25 @@ export default {
         { clave: 'sello', titulo: 'Agrega tu sello y firma', detalle: 'Salen solos en tus comprobantes de retención.', textoBoton: 'Agregar', icono: 'mdi-stamper', hecho: this.tieneSelloOFirma },
         { clave: 'comovoy', titulo: 'Mira «¿Cómo voy?»', detalle: 'Tus ventas y gastos del mes, sin jerga contable.', textoBoton: 'Ver', icono: 'mdi-chart-line', hecho: this.vioComoVoy },
       ]
+    },
+
+    sugerencias() {
+      const hoy = parseFechaLocal(hoyISO())
+      const descartadas = Object.entries(this.sugerenciasOcultas)
+        .filter(([, fecha]) => {
+          const desde = parseFechaLocal(fecha)
+          return desde && (hoy - desde) / 86400000 < DIAS_OCULTA
+        })
+        .map(([clave]) => clave)
+      return sugerenciasInicio({
+        ventasMes: this.ventasMes,
+        comprasMes: this.comprasMes,
+        todasVentas: this.todasVentas,
+        papelesSubidos: this.papelesSubidos,
+        diaDelMes: hoy.getDate(),
+        aUSD: (inv) => this.sumarMontosUSD([inv]),
+        descartadas,
+      })
     },
 
     primerosPasosCompletos() {
@@ -406,6 +458,9 @@ export default {
 
         this.pendientes = this.construirPendientes(docsFiscales, facturasSistema)
 
+        this.todasVentas = todasVentas
+        this.papelesSubidos = docsFiscales.length
+        try { this.sugerenciasOcultas = JSON.parse(localStorage.getItem(CLAVE_SUGERENCIAS_OCULTAS) || '{}') || {} } catch { this.sugerenciasOcultas = {} }
         this.hayVentas = todasVentas.length > 0
         this.hayCompras = todasCompras.length > 0
         this.tieneRif = docsFiscales.some((d) => d.doc_type === 'RIF' || (!d.doc_type && /\bRIF\b/i.test(d.name || '') && !/socios/i.test(d.name || '')))
@@ -571,6 +626,17 @@ export default {
       else if (paso.ruta) this.$router.push(paso.ruta)
     },
 
+    ejecutarSugerencia(sug) {
+      if (sug.accion?.evento === 'registrar-venta') return this.abrirRegistro('VENTA')
+      if (sug.accion?.evento === 'abrir-asistente') return window.dispatchEvent(new CustomEvent('ad-open-support-chat'))
+      if (sug.accion?.ruta) this.$router.push(sug.accion.ruta)
+    },
+
+    ocultarSugerencia(sug) {
+      this.sugerenciasOcultas = { ...this.sugerenciasOcultas, [sug.clave]: hoyISO() }
+      try { localStorage.setItem(CLAVE_SUGERENCIAS_OCULTAS, JSON.stringify(this.sugerenciasOcultas)) } catch { /* sin almacenamiento: solo por esta visita */ }
+    },
+
     irAPaso(paso) {
       const rutas = { perfil: '/cliente/mi-area', rif: '/cliente/fiscal-360', sello: '/cliente/mi-area', comovoy: '/cliente/dashboard' }
       if (paso.clave === 'gasto') return this.abrirRegistro('COMPRA')
@@ -697,12 +763,12 @@ export default {
   min-width: 0;
 }
 
-/* Logro al completar los primeros pasos */
+/* Logro al completar los primeros pasos (compacto: el espacio es para las sugerencias) */
 .inicio-logro {
   display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  padding: 20px 22px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 18px;
   border-radius: 20px;
   border: 1px solid rgba(var(--v-theme-success), 0.3);
   background: linear-gradient(0deg, rgba(var(--v-theme-success), 0.06), rgba(var(--v-theme-success), 0.06)), rgb(var(--v-theme-surface));
@@ -713,10 +779,60 @@ export default {
   font-size: 1.05rem;
 }
 
-.inicio-logro__texto {
-  margin-top: 4px;
-  font-size: 0.92rem;
+/* Sugerencias para ti */
+.inicio-sugerencia {
+  display: flex;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.inicio-sugerencia + .inicio-sugerencia {
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+
+.inicio-sugerencia__icono {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--v-theme-primary), 0.08);
+  color: rgb(var(--v-theme-primary));
+}
+
+.inicio-sugerencia__texto {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.inicio-sugerencia__titulo {
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.inicio-sugerencia__detalle {
+  margin-top: 3px;
+  font-size: 0.9rem;
+  line-height: 1.45;
   color: rgba(var(--v-theme-on-surface), 0.72);
+}
+
+.inicio-sugerencia__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* Al ocultar una sugerencia, se va con un fundido breve */
+.sugerencia-leave-active {
+  transition: opacity var(--ad-move-normal) var(--ad-move-curva-entrada), transform var(--ad-move-normal) var(--ad-move-curva-entrada);
+}
+.sugerencia-leave-to {
+  opacity: 0;
+  transform: translateX(12px);
 }
 
 /* Check animado al guardar: el ícono de éxito aparece con un pequeño "pop". */
@@ -736,6 +852,7 @@ export default {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sugerencia-leave-active { transition: none; }
   .inicio-acciones > * { animation: none; opacity: 1; }
   .aviso-exito-animado :deep(.v-alert__prepend .v-icon) { animation: none; }
 }
