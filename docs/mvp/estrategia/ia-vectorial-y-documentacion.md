@@ -28,3 +28,20 @@ Fecha: 2026-10-14. Pedidos del usuario:
 - Verificar que pgvector esté disponible en el proyecto (`list_extensions`).
 - Confirmar el nombre y las dimensiones del modelo de embeddings vigente en la documentación de Gemini, en ese momento.
 - Registrar el costo en `ai_usage_logs` (tokens de embeddings).
+
+## 4. Modelo propio "fiscal y de soporte" (pedido del usuario 2026-10-14, para el final)
+Pedido: entrenar un modelo de IA para el tema fiscal y de soporte, con los datos de los usuarios (excepto los privados), la documentación de la API y la del sistema.
+
+**Recomendación: en escalones, no entrenar primero.**
+1. **RAG (recuperación), escalones 2 y 3 de arriba.** La documentación del sistema, la de la API y las normas fiscales (IVA, ISLR, retenciones, calendario SENIAT, providencias) se indexan, y el modelo responde citándolas. Cuando cambia una norma o una pantalla, se actualiza **al instante**, sin reentrenar. Un modelo afinado, en cambio, "memoriza" reglas que el SENIAT cambia, y cada cambio exige reentrenarlo.
+2. **Conjunto de entrenamiento curado, mientras se usa el chat.** Se guardan las preguntas reales con su respuesta y su calificación (👍/👎 y la corrección del contador). Esa es la materia prima valiosa y lo que ningún competidor tiene.
+3. **Afinamiento (fine-tuning), cuando haya unos 1.000–5.000 pares buenos.** Sirve para el **tono y el formato**: lenguaje llano, pasos cortos, "tu siguiente paso". No sirve para los datos. Las opciones son el tuning supervisado de Gemini en Vertex AI o un modelo abierto (Gemma/Llama) afinado con LoRA, si se quiere independencia del proveedor. El conocimiento sigue llegando por RAG.
+
+**Datos de los usuarios: reglas obligatorias**
+- **Consentimiento explícito** en los Términos y en Mi negocio ("Ayuda a mejorar la IA de AD System"), desactivado por defecto o con opción clara de salir.
+- **Nunca se usan:** documentos (Mis papeles), cédulas, RIF, nombres de personas, cuentas bancarias, fotos, montos exactos ligados a una empresa, ni los chats marcados como privados.
+- **Sí se pueden usar, anonimizados y agregados:** preguntas y respuestas de soporte sin identificadores, patrones como "qué categorías usa una ferretería" o "qué dudas hay en la semana de declaración", y errores frecuentes de registro.
+- Un paso de **anonimización automática** antes de guardar cualquier ejemplo: detección de RIF, cédulas, correos, teléfonos y nombres.
+- Lo que sí puede usar el modelo en tiempo real son **los datos del propio cliente** que pregunta, por RAG con RLS, sin entrenar con ellos.
+
+**Métrica para decidir el afinamiento:** un conjunto de 200 preguntas fiscales y de soporte con su respuesta correcta, revisado por un contador. Solo se afina si mejora a RAG puro en ese examen.
