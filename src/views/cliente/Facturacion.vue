@@ -1619,6 +1619,18 @@ export default {
     await this.loadProveedores();
     await this.loadInvoices();
     this.initialLoading = false;
+    // ?ver=<id>: abre el detalle de esa factura (viene del chip del Kardex)
+    const verId = this.$route.query.ver;
+    if (verId) {
+      const encontrada = this.invoices.find(i => i.id === verId);
+      if (encontrada) {
+        await this.viewInvoice(encontrada);
+      } else {
+        this.showNotification('No encontramos esa factura (puede estar en la papelera).', 'warning');
+      }
+      const { ver, ...resto } = this.$route.query;
+      this.$router.replace({ query: resto });
+    }
     if (typeof window !== 'undefined') {
       window.addEventListener('ad-proveedor-changed', this.loadProveedores);
     }
@@ -2013,10 +2025,20 @@ export default {
 
       this.deleting = true;
       try {
+        let delResult;
         if (this.currentTab === 'trash') {
-            await invoiceService.hardDeleteInvoice(this.invoiceToDelete.id);
+            delResult = await invoiceService.hardDeleteInvoice(this.invoiceToDelete.id);
         } else {
-            await invoiceService.deleteInvoice(this.invoiceToDelete.id);
+            delResult = await invoiceService.deleteInvoice(this.invoiceToDelete.id);
+        }
+
+        // El servicio no lanza: avisa con success:false y un mensaje en lenguaje llano
+        // (p. ej. compras con comprobantes de retención no se borran del todo).
+        if (delResult && delResult.success === false) {
+          this.deleteDialog = false;
+          this.invoiceToDelete = null;
+          this.showNotification(delResult.message || 'No pudimos eliminar la factura.', 'warning', 9000);
+          return;
         }
 
         await this.loadInvoices(); // Recarga todo (invoices y trashInvoices)
@@ -2036,9 +2058,15 @@ export default {
 
     async restoreInvoice(invoice) {
         try {
-            await invoiceService.restoreInvoice(invoice.id);
+            const restoreResult = await invoiceService.restoreInvoice(invoice.id);
             await this.loadInvoices(); // Mueve de trash a active
-            this.showNotification('¡Listo! Restauramos la factura.', 'success');
+            if (restoreResult && restoreResult.success === false) {
+              this.showNotification(restoreResult.message || 'No pudimos restaurar la factura.', 'error');
+            } else if (restoreResult?.warning) {
+              this.showNotification(restoreResult.warning, 'warning', 9000);
+            } else {
+              this.showNotification('¡Listo! Restauramos la factura.', 'success');
+            }
         } catch (error) {
             console.error('❌ Error al restaurar factura:', error);
             this.showNotification('No pudimos restaurar la factura. Intenta de nuevo.', 'error');
@@ -2077,6 +2105,10 @@ export default {
 
         this.closeInvoiceDialog();
         await this.loadInvoices();
+        // La compra se guardó pero el inventario falló: avisar (no es un error de guardado)
+        if (saveResult.warning) {
+          this.showNotification(saveResult.warning, 'warning', 10000);
+        }
       } else {
         console.error('❌ [Facturacion] Error al guardar factura:', saveResult.message);
         // Notificar al SimpleInvoiceForm del error (no pierde los datos)

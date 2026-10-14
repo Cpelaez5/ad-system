@@ -11,6 +11,8 @@ import {
 import inventoryService from './inventoryService'
 import { extraerRutaStorage, obtenerUrlFirmada } from '@/services/storageUrlService.js'
 
+const MENSAJE_COMPRA_CON_RETENCIONES = 'Esta compra tiene comprobantes de retención; queda en la papelera como anulada, no se puede borrar del todo'
+
 class InvoiceService {
   constructor() {
     this.storageKey = 'sistema_contabilidad_invoices';
@@ -377,6 +379,10 @@ class InvoiceService {
         notes: invoiceData.notes || null,
         created_by: invoiceData.createdBy || userProfile?.id || null
       }
+      // Vínculo directo factura-proveedor (sin FK): solo en compras con proveedor elegido
+      if (effectiveFlow === 'COMPRA' && invoiceData.issuer?.id) {
+        invoiceRecord.proveedor_id = invoiceData.issuer.id
+      }
 
       console.log('📝 Datos a insertar:', invoiceRecord)
 
@@ -477,42 +483,9 @@ class InvoiceService {
       console.log('✅ Factura creada exitosamente en Supabase:', newInvoice.id)
       console.log('📄 Factura creada:', newInvoice)
 
-      // 2. Procesar Movimientos de Inventario (Salida/Entrada)
-      // No procesar inventario si la factura está en estado sin efecto (ANULADA o BORRADOR)
-      // Esto también actualiza los items con product_id si se crearon productos nuevos
-      const statusSinEfecto = ['ANULADA', 'BORRADOR']
-      const esInactiva = statusSinEfecto.includes((newInvoice.status || '').toUpperCase())
-      const inventoryResult = esInactiva
-        ? { success: true, createdProducts: [] }
-        : await this.processInventoryMovements(newInvoice, false)
-
-      // 3. Si se crearon productos nuevos, actualizar los items de la factura con los product_id
-      if (inventoryResult?.createdProducts && inventoryResult.createdProducts.length > 0) {
-        console.log('📦 [INVENTARIO] Actualizando items con nuevos product_id...')
-        const updatedItems = newInvoice.items.map(item => {
-          // Buscar si este item tuvo un producto creado
-          const createdProduct = inventoryResult.createdProducts.find(
-            cp => cp.description === item.description || cp.tempId === item._key
-          )
-          if (createdProduct && !item.product_id) {
-            return { ...item, product_id: createdProduct.productId }
-          }
-          return item
-        })
-
-        // Actualizar en la base de datos
-        const { error: updateError } = await supabase
-          .from('invoices')
-          .update({ items: updatedItems })
-          .eq('id', newInvoice.id)
-
-        if (updateError) {
-          console.warn('⚠️ No se pudieron actualizar los items con product_id:', updateError.message)
-        } else {
-          console.log('✅ Items actualizados con product_id correctamente')
-          newInvoice.items = updatedItems // Actualizar para la respuesta
-        }
-      }
+      // 2. Procesar Movimientos de Inventario (Salida/Entrada) y guardar los product_id
+      //    de los productos autocreados/reutilizados (helper compartido con la ruta RPC).
+      await this.aplicarInventarioDeFactura(newInvoice)
 
       // Transformar respuesta para el frontend
       const transformedInvoice = {
@@ -619,6 +592,9 @@ class InvoiceService {
         attachments: invoiceData.attachments || [],
         notes: invoiceData.notes || null
       }
+      if ((invoiceData.flow || 'VENTA') === 'COMPRA' && invoiceData.issuer?.id) {
+        updateData.proveedor_id = invoiceData.issuer.id
+      }
 
       // Remover campos undefined
       Object.keys(updateData).forEach(key => {
@@ -656,7 +632,7 @@ class InvoiceService {
       //    También manejamos transiciones de estado (ej: BORRADOR -> EMITIDA, EMITIDA -> ANULADA)
       const statusSinEfecto = ['ANULADA', 'BORRADOR']
       const esInactivaUpdate = statusSinEfecto.includes((updatedInvoice.status || '').toUpperCase())
-      const esInactivaOld = statusSinEfecto.includes((oldInvoiceSnapshot.status || '').toUpperCase())
+      const esInactivaOld = statusSinEfecto.includes((oldInvoiceSnapshot?.status || '').toUpperCase())
       
       let inventoryResult = { success: true, message: 'No se requiere actualización de inventario' }
       
@@ -667,7 +643,8 @@ class InvoiceService {
         inventoryResult = await this.processInventoryMovements(oldInvoiceSnapshot, true)
       } else if (!esInactivaUpdate && esInactivaOld) {
         // Transición: Sin Efecto -> Válida (ej: Borrador -> Emitida). Aplicar inventario.
-        inventoryResult = await this.processInventoryMovements(updatedInvoice, false)
+        //    Se guardan también los product_id de los productos autocreados (items de la respuesta).
+        inventoryResult = await this.aplicarInventarioDeFactura(updatedInvoice)
       } else {
         // Transición: Válida -> Válida (ej: Emitida -> Pagada o edición de items). Calcular delta.
         inventoryResult = await this.updateInventoryForInvoiceEdit(oldInvoiceSnapshot, updatedInvoice)
@@ -868,8 +845,9 @@ class InvoiceService {
         return { success: false, message: `Error al enviar a papelera: ${error.message}` }
       }
 
-      // Revertir inventario
-      if (deletedInvoice) {
+      // Revertir inventario SOLO si la factura tenía efecto (ni BORRADOR ni ANULADA).
+      // Las retenciones las anula sola la BD (trigger invoices_sincroniza_retenciones).
+      if (deletedInvoice && this.facturaTieneEfecto(deletedInvoice)) {
         await this.processInventoryMovements(deletedInvoice, true)
       }
 
@@ -902,8 +880,18 @@ class InvoiceService {
 
       if (error) throw error;
 
+      // Si la factura restaurada tiene efecto, vuelve a aplicar su movimiento de inventario
+      // (al mandarla a la papelera se revirtió). Las retenciones las reactiva la BD.
+      let aviso = null
+      if (data && this.facturaTieneEfecto(data)) {
+        const inv = await this.processInventoryMovements(data, false)
+        if (inv && inv.success === false) {
+          aviso = `La factura se restauró, pero no pudimos volver a aplicar el inventario: ${inv.error || 'error desconocido'}`
+        }
+      }
+
       console.log('✅ Factura restaurada:', data.id);
-      return { success: true, message: 'Factura restaurada exitosamente' };
+      return { success: true, message: aviso || 'Factura restaurada exitosamente', ...(aviso ? { warning: aviso } : {}) };
 
     } catch (error) {
       console.error('❌ Error restaurando factura:', error);
@@ -920,14 +908,26 @@ class InvoiceService {
       // 1. Obtener la factura para ver si tiene adjuntos
       const { data: invoiceToDelete, error: fetchError } = await supabase
         .from('invoices')
-        .select('attachments, deleted_at, items, flow, expense_type, expense_category_id, invoice_number')
+        .select('id, status, attachments, deleted_at, items, flow, expense_type, expense_category_id, invoice_number')
         .eq('id', id)
         .eq('organization_id', organizationId)
         .single();
 
       if (fetchError) {
         console.warn('⚠️ No se pudo obtener info de adjuntos antes de borrar. Se procederá a borrar el registro.', fetchError);
-      } else if (invoiceToDelete && invoiceToDelete.attachments && invoiceToDelete.attachments.length > 0) {
+      }
+
+      // Los comprobantes de retención son documentos fiscales: una compra que tuvo
+      // retenciones (aunque estén anuladas) no se puede borrar definitivamente.
+      const { count: retCount, error: retError } = await supabase
+        .from('retenciones')
+        .select('id', { count: 'exact', head: true })
+        .eq('invoice_id', id)
+      if (!retError && retCount > 0) {
+        return { success: false, message: MENSAJE_COMPRA_CON_RETENCIONES }
+      }
+
+      if (!fetchError && invoiceToDelete && invoiceToDelete.attachments && invoiceToDelete.attachments.length > 0) {
         console.log(`🗑️ Eliminando ${invoiceToDelete.attachments.length} archivos adjuntos...`);
 
         // Eliminar cada archivo del Storage
@@ -962,7 +962,7 @@ class InvoiceService {
       // Aunque si viene de papelera ya se revirtió.
       // HARD DELETE suele ser desde papelera (ya anulada).
       // Si el status NO es 'ANULADA' o deleted_at era null, revertimos.
-      if (invoiceToDelete && !invoiceToDelete.deleted_at) {
+      if (invoiceToDelete && !invoiceToDelete.deleted_at && this.facturaTieneEfecto(invoiceToDelete)) {
         await this.processInventoryMovements(invoiceToDelete, true)
       }
 
@@ -971,6 +971,9 @@ class InvoiceService {
 
     } catch (error) {
       console.error('❌ Error hard delete:', error);
+      if (error?.code === '23503' && /retenciones/i.test(`${error.message || ''} ${error.details || ''}`)) {
+        return { success: false, message: MENSAJE_COMPRA_CON_RETENCIONES }
+      }
       return { success: false, message: 'Error al eliminar permanentemente' };
     }
   }
@@ -1366,6 +1369,62 @@ class InvoiceService {
     }
   }
 
+  // ¿La factura tiene efecto en inventario/contabilidad? (ni BORRADOR ni ANULADA)
+  facturaTieneEfecto(invoice) {
+    const st = (invoice?.status || '').toUpperCase()
+    return !['BORRADOR', 'ANULADA'].includes(st)
+  }
+
+  /**
+   * Efecto neto (cantidad con signo) de los movimientos de una factura, por producto.
+   * Devuelve null si no se pudo consultar (en ese caso no se bloquea nada).
+   */
+  async movimientosNetosDeFactura(invoiceId) {
+    if (!invoiceId) return null
+    try {
+      const { data, error } = await supabase
+        .from('inventory_movements')
+        .select('product_id, movement_type, quantity')
+        .eq('reference_id', invoiceId)
+      if (error || !Array.isArray(data)) return null
+      const net = new Map()
+      for (const m of data) {
+        if (!['IN_PURCHASE', 'OUT_RETURN', 'OUT_SALE', 'IN_RETURN'].includes(m.movement_type)) continue
+        net.set(m.product_id, (net.get(m.product_id) || 0) + (parseFloat(m.quantity) || 0))
+      }
+      return net
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Aplica el inventario de una factura recién guardada (o que pasó a tener efecto) y
+   * guarda en invoices.items los product_id de los productos autocreados o reutilizados.
+   * Muta invoice.items con los product_id. Devuelve el resultado de processInventoryMovements.
+   */
+  async aplicarInventarioDeFactura(invoice) {
+    if (!this.facturaTieneEfecto(invoice)) return { success: true, createdProducts: [], movements: [] }
+    const inventoryResult = await this.processInventoryMovements(invoice, false)
+    const created = inventoryResult?.createdProducts || []
+    if (created.length > 0 && Array.isArray(invoice.items)) {
+      const updatedItems = invoice.items.map(item => {
+        const cp = created.find(c => c.description === (item.description || 'Producto sin nombre').trim() || (c.tempId && c.tempId === item._key))
+        return (cp && !item.product_id) ? { ...item, product_id: cp.productId } : item
+      })
+      const { error: updateError } = await supabase
+        .from('invoices')
+        .update({ items: updatedItems })
+        .eq('id', invoice.id)
+      if (updateError) {
+        console.warn('⚠️ No se pudieron actualizar los items con product_id:', updateError.message)
+      } else {
+        invoice.items = updatedItems
+      }
+    }
+    return inventoryResult
+  }
+
   // Procesar movimientos de inventario basados en la factura
   // isReversal: si es true, invertimos el movimiento (ej: anular factura)
   // options.skipAutoCreate: si es true, no crear productos nuevos (usar en updates, no en creates)
@@ -1421,6 +1480,21 @@ class InvoiceService {
 
       console.log(`📦 [INVENTARIO] Tipo de movimiento: ${movementType}`)
 
+      // Idempotencia: no duplicar movimientos. Si ya hay efecto neto de esta factura,
+      // no se vuelve a aplicar; si no hay efecto neto, no se revierte lo que nunca se aplicó.
+      if (invoice.id) {
+        const net = await this.movimientosNetosDeFactura(invoice.id)
+        if (net) {
+          const yaAplicada = Array.from(net.values()).some(v => Math.abs(v) > 1e-9)
+          if (!isReversal && yaAplicada) {
+            return { ...result, skipped: 'ya_aplicada' }
+          }
+          if (isReversal && !yaAplicada) {
+            return { ...result, skipped: 'sin_efecto_previo' }
+          }
+        }
+      }
+
       for (const item of invoice.items) {
         let productId = item.product_id
 
@@ -1433,7 +1507,8 @@ class InvoiceService {
             // ANTI-DUPLICADO: Buscar si ya existe un producto con ese nombre exacto
             // antes de crear uno nuevo. Esto evita que se creen duplicados al guardar
             // la misma factura varias veces o al editar.
-            const existingProducts = await inventoryService.getProducts({ search: itemName, limit: 5 })
+            // Acotado al cliente de la factura; getProducts escapa el término.
+            const existingProducts = await inventoryService.getProducts({ search: itemName, limit: 20, clientId: invoice.client_id || null })
             const exactMatch = existingProducts?.find(p =>
               p.name.toLowerCase().trim() === itemName.toLowerCase()
             )
@@ -1467,9 +1542,11 @@ class InvoiceService {
               const newProduct = await inventoryService.createProduct({
                 name: itemName,
                 code: autoCode,          // SKU auto-generado o del OCR
+                client_id: invoice.client_id || null,
+                tipo: 'producto',
                 stock: 0,                // El movimiento lo actualizará
                 cost_price: parseFloat(item.unitPrice) || 0,
-                sale_price: parseFloat(item.unitPrice) || 0,
+                sale_price: 0,           // Sin precio de venta: aparece en "productos sin precio"
                 unit: item.unit || 'UND',
                 min_stock: 0,
                 status: 'ACTIVE'
@@ -1497,11 +1574,15 @@ class InvoiceService {
                 })
               } else {
                 console.warn(`⚠️ [INVENTARIO] No se pudo auto-crear el producto "${itemName}":`, newProduct)
+                result.success = false
+                result.error = `no se pudo crear el producto "${itemName}"${newProduct?.message ? ` (${newProduct.message})` : ''}`
                 continue // Saltar este ítem si falla la creación
               }
             }
           } catch (createErr) {
             console.error(`❌ [INVENTARIO] Error auto-creando producto "${itemName}":`, createErr)
+            result.success = false
+            result.error = `no se pudo crear el producto "${itemName}": ${createErr?.message || 'error'}`
             continue
           }
         }
@@ -1517,7 +1598,7 @@ class InvoiceService {
 
           console.log(`📦 [INVENTARIO] Registrando movimiento: producto=${productId}, qty=${qty}, tipo=${movementType}`)
 
-          await inventoryService.registerMovement({
+          const movimiento = await inventoryService.registerMovement({
             product_id: productId,
             movement_type: movementType,
             quantity: qty,
@@ -1525,6 +1606,13 @@ class InvoiceService {
             reference_id: invoice.id,
             description: `${isReversal ? 'Anulación/Borrado' : ''} ${isPurchase ? 'Compra' : 'Venta'} Ref: ${invoice.invoice_number}`
           })
+
+          // registerMovement devuelve un Error (no lanza) cuando falla: no darlo por bueno.
+          if (movimiento instanceof Error || movimiento?.success === false) {
+            result.success = false
+            result.error = movimiento.message || 'no se pudo registrar el movimiento'
+            continue
+          }
 
           result.movements.push({
             productId,

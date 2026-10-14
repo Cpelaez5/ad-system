@@ -165,6 +165,19 @@ const DEFAULT_VENEZUELA_MUNICIPIOS = [
   { id: 'm-simon-bolivar', nombre: 'Simón Bolívar (Anzoátegui)' }
 ]
 
+/**
+ * ¿La factura es de este proveedor? Usa invoices.proveedor_id (o issuer.id de datos
+ * antiguos); solo si la factura no trae ninguno, respaldo por RIF normalizado.
+ * Nunca por nombre.
+ */
+export function facturaEsDeProveedor(factura, proveedor, limpiar = (x) => String(x || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()) {
+  const id = factura?.proveedor_id || factura?.issuer?.id || null
+  if (id) return id === proveedor.id
+  const iRif = limpiar(factura?.issuer?.rif)
+  const pRif = limpiar(proveedor.rif)
+  return Boolean(iRif && pRif && iRif === pRif)
+}
+
 class ProveedorService {
   /**
    * Resuelve el contexto de autenticación, organización y cliente activo con verificación en tiempo real.
@@ -305,7 +318,7 @@ class ProveedorService {
     try {
       let invQuery = supabase
         .from('invoices')
-        .select('id, client_id, issuer, financial, iva_retention, islr_retention, municipal_retention, issue_date')
+        .select('id, client_id, proveedor_id, status, issuer, financial, iva_retention, islr_retention, municipal_retention, issue_date')
         .eq('organization_id', orgId)
         .in('flow', ['COMPRA', 'GASTO'])
         .is('deleted_at', null)
@@ -340,110 +353,24 @@ class ProveedorService {
       }
 
       const cleanAlphanumeric = (str) => String(str || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
-      const cleanName = (str) => String(str || '').toLowerCase().trim()
 
-      const existingRifs = new Set(existingProveedores.map(p => cleanAlphanumeric(p.rif)).filter(Boolean))
-      const existingNames = new Set(existingProveedores.map(p => cleanName(p.nombre)).filter(Boolean))
-
-      const toAutoCreate = []
-
-      // 1. Auto-descubrimiento de proveedores en facturas no registrados aún (con client_id)
-      for (const inv of invoices) {
-        const issuer = inv.issuer || {}
-        const rawName = issuer.companyName || issuer.nombre || issuer.name
-        const rawRif = issuer.rif
-
-        if (!rawName || typeof rawName !== 'string' || !rawName.trim()) continue
-
-        const name = rawName.trim()
-        const rawRifClean = cleanAlphanumeric(rawRif)
-
-        const hasRifMatch = rawRifClean && existingRifs.has(rawRifClean)
-        const hasNameMatch = cleanName(name) && existingNames.has(cleanName(name))
-
-        if (!hasRifMatch && !hasNameMatch) {
-          const finalRif = rawRif?.trim() || `PROV-${Date.now().toString().slice(-6)}`
-          const isNatural = finalRif.toUpperCase().startsWith('V') || finalRif.toUpperCase().startsWith('E')
-
-          const newProvPayload = {
-            organization_id: orgId,
-            client_id: clientId || null,
-            nombre: name,
-            rif: finalRif,
-            tipo_persona: isNatural ? 'NATURAL' : 'JURIDICA',
-            telefono: issuer.phone || null,
-            email: issuer.email || null,
-            direccion: issuer.address || null,
-            iva_retention_rate: 75,
-            islr_concept_id: null,
-            municipal_rate: 0,
-            is_active: true
-          }
-
-          toAutoCreate.push(newProvPayload)
-
-          if (rawRifClean) existingRifs.add(rawRifClean)
-          existingNames.add(cleanName(name))
-        }
-      }
-
-      // Persistir proveedores auto-descubiertos
-      if (toAutoCreate.length > 0) {
-        try {
-          const { data: created } = await supabase
-            .from('proveedores')
-            .insert(toAutoCreate)
-            .select()
-
-          if (created && created.length > 0) {
-            created.forEach(item => {
-              existingProveedores.push({
-                ...item,
-                is_active: true,
-                islr_codigo: null,
-                islr_nombre: null,
-                islr_porcentaje: 0,
-                islr_sustraendo_ut: 0,
-                municipio_nombre: null,
-                total_facturas: 0,
-                total_compras: 0,
-                total_retenido: 0,
-                ultima_compra_fecha: null
-              })
-            })
-          }
-        } catch (insertErr) {
-          console.warn('⚠️ [ProveedorService] Error guardando proveedores descubiertos:', insertErr)
-        }
-      }
+      // Esta función SOLO lee: ya no crea proveedores a partir de las facturas
+      // (antes inventaba RIF `PROV-…`). Los proveedores se crean explícitamente.
+      // Las compras sin efecto (BORRADOR/ANULADA) no cuentan en los totales.
+      invoices = invoices.filter(i => !['BORRADOR', 'ANULADA'].includes(String(i.status || '').toUpperCase()))
 
       // 2. Calcular acumulados de compras y retenciones vinculando facturas y retenciones
       return existingProveedores.map(p => {
         const pRifClean = cleanAlphanumeric(p.rif)
-        const pNameClean = cleanName(p.nombre)
 
-        // Matching de facturas
-        const matchingInvoices = invoices.filter(inv => {
-          const issuer = inv.issuer || {}
-          const iRifClean = cleanAlphanumeric(issuer.rif)
-          const iNameClean = cleanName(issuer.companyName || issuer.nombre || issuer.name)
-          const iId = issuer.id || inv.proveedor_id
+        // Matching de facturas: por invoices.proveedor_id; solo si es null, respaldo por RIF normalizado.
+        const matchingInvoices = invoices.filter(inv => facturaEsDeProveedor(inv, p, cleanAlphanumeric))
 
-          return (iId && iId === p.id) ||
-                 (pRifClean && iRifClean && pRifClean === iRifClean) ||
-                 (pNameClean && iNameClean && pNameClean === iNameClean) ||
-                 (pNameClean && iNameClean && (pNameClean.includes(iNameClean) || iNameClean.includes(pNameClean)))
-        })
-
-        // Matching de retenciones
+        // Matching de retenciones: por proveedor_id; solo si es null, respaldo por RIF normalizado.
         const matchingRetenciones = retenciones.filter(ret => {
+          if (ret.proveedor_id) return ret.proveedor_id === p.id
           const rRifClean = cleanAlphanumeric(ret.proveedor_rif)
-          const rNameClean = cleanName(ret.proveedor_nombre)
-          const rId = ret.proveedor_id
-
-          return (rId && rId === p.id) ||
-                 (pRifClean && rRifClean && pRifClean === rRifClean) ||
-                 (pNameClean && rNameClean && pNameClean === rNameClean)
+          return Boolean(pRifClean && rRifClean && pRifClean === rRifClean)
         })
 
         // Totales de compras: suma de facturas o respaldo con base imponible de retenciones
@@ -511,7 +438,7 @@ class ProveedorService {
       // Historial de facturas asociadas (COMPRA)
       let invQuery = supabase
         .from('invoices')
-        .select('id, invoice_number, control_number, issue_date, status, issuer, financial, iva_retention, islr_retention, municipal_retention')
+        .select('id, invoice_number, control_number, issue_date, status, proveedor_id, issuer, financial, iva_retention, islr_retention, municipal_retention')
         .eq('organization_id', orgId)
         .eq('flow', 'COMPRA')
         .is('deleted_at', null)
@@ -529,7 +456,6 @@ class ProveedorService {
         .eq('proveedor_id', id)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
-        .limit(10)
 
       if (clientId) {
         retQuery = retQuery.eq('client_id', clientId)
@@ -543,13 +469,15 @@ class ProveedorService {
       const cleanAlphanumeric = (str) => String(str || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
       const pRifClean = cleanAlphanumeric(proveedor.rif)
 
-      const facturas = (allFacturas || []).filter(f => {
-        const issuer = f.issuer || {}
-        const iRifClean = cleanAlphanumeric(issuer.rif)
-        return (issuer.id && issuer.id === proveedor.id) || (pRifClean && iRifClean && pRifClean === iRifClean)
-      }).slice(0, 10)
+      // Todas las compras vigentes del proveedor (sin BORRADOR/ANULADA); por proveedor_id,
+      // con respaldo por RIF normalizado solo si la factura no tiene proveedor_id.
+      const todasLasCompras = (allFacturas || []).filter(f =>
+        !['BORRADOR', 'ANULADA'].includes(String(f.status || '').toUpperCase()) &&
+        facturaEsDeProveedor(f, proveedor, cleanAlphanumeric)
+      )
+      const facturas = todasLasCompras.slice(0, 10) // solo el listado se limita; los totales suman todo
 
-      const totalCompras = (facturas || []).reduce((acc, f) => acc + Number(f.financial?.totalSales || 0), 0)
+      const totalCompras = todasLasCompras.reduce((acc, f) => acc + Number(f.financial?.totalSales || 0), 0)
       const totalRetenido = (retenciones || []).reduce((acc, r) => acc + Number(r.monto_retenido || 0), 0)
 
       // Obtener conceptos ISLR y municipios para resolver nombres
@@ -566,12 +494,12 @@ class ProveedorService {
         concepto_islr: cIslr || null,
         municipio: cMun || null,
         facturasRecientes: facturas || [],
-        retencionesRecientes: retenciones || [],
+        retencionesRecientes: (retenciones || []).slice(0, 10),
         metricas: {
-          totalFacturas: facturas?.length || 0,
+          totalFacturas: todasLasCompras.length,
           totalCompras,
           totalRetenido,
-          ultimaCompra: facturas?.[0]?.issue_date || null
+          ultimaCompra: todasLasCompras[0]?.issue_date || null
         }
       }
 

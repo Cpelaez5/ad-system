@@ -343,6 +343,8 @@
                   color="primary"
                   variant="tonal"
                   prepend-icon="mdi-file-document-outline"
+                  :style="item.reference_id ? 'cursor: pointer' : null"
+                  @click="abrirFactura(item)"
                 >
                   {{ item.invoice_number }}
                 </v-chip>
@@ -409,6 +411,8 @@
             color="primary"
             variant="tonal"
             prepend-icon="mdi-file-document-outline"
+            :style="item.reference_id ? 'cursor: pointer' : null"
+            @click="abrirFactura(item)"
           >
             {{ item.invoice_number }}
           </v-chip>
@@ -801,6 +805,11 @@ export default {
     }
   },
   methods: {
+    // Kardex: el chip de la factura abre su detalle en Mis movimientos (?ver=<id>)
+    abrirFactura(item) {
+      if (!item?.reference_id) return
+      this.$router.push({ path: '/cliente/facturacion', query: { ver: item.reference_id } })
+    },
     applyQuickDate() {
       const today = new Date()
       switch (this.quickDateFilter) {

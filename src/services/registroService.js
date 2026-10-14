@@ -143,6 +143,61 @@ function construirPayloadRpc(formData) {
 }
 
 /**
+ * Tras guardar una compra por el RPC: llena invoices.proveedor_id y, si es compra de
+ * mercancía con efecto (ni BORRADOR ni ANULADA), suma al inventario con la factura
+ * guardada (leída por id para tener items/status/flow reales).
+ * Nunca lanza. Devuelve un aviso (string) si el inventario falló; null si todo bien.
+ * La compra ya está guardada en cualquier caso.
+ * @returns {Promise<string|null>}
+ */
+async function completarCompraGuardada(invoiceId, formData) {
+  if (!invoiceId) return null
+  const proveedorId = formData.issuer?.id || formData.proveedor_id || null
+  if (proveedorId) {
+    try {
+      const { error } = await supabase.from('invoices').update({ proveedor_id: proveedorId }).eq('id', invoiceId)
+      if (error) logger.warn('[registroService]', 'No se pudo vincular la factura con el proveedor', error.message)
+    } catch (err) {
+      logger.warn('[registroService]', 'No se pudo vincular la factura con el proveedor', err?.message)
+    }
+  }
+
+  const status = (formData.status || '').toUpperCase()
+  if (formData.expense_type !== 'COMPRA' || status === 'BORRADOR' || status === 'ANULADA') return null
+
+  try {
+    let factura = null
+    try {
+      const { data } = await supabase
+        .from('invoices')
+        .select('id, items, status, invoice_number, flow, expense_type, client_id')
+        .eq('id', invoiceId)
+        .single()
+      factura = data || null
+    } catch { /* si no se puede leer, se usan los datos del formulario */ }
+    if (!factura || !factura.id) {
+      factura = {
+        id: invoiceId,
+        items: formData.items || [],
+        status: formData.status,
+        invoice_number: formData.invoiceNumber,
+        flow: formData.flow,
+        expense_type: formData.expense_type,
+        client_id: formData.client?.id || formData.client_id || null
+      }
+    }
+    const res = await invoiceService.aplicarInventarioDeFactura(factura)
+    if (res && res.success === false) {
+      return `La compra se guardó, pero no pudimos sumar al inventario: ${res.error || res.message || 'error desconocido'}`
+    }
+    return null
+  } catch (err) {
+    logger.warn('[registroService]', 'No se pudo sumar la compra al inventario', err?.message)
+    return `La compra se guardó, pero no pudimos sumar al inventario: ${err?.message || 'error desconocido'}`
+  }
+}
+
+/**
  * Guarda un registro (factura/recibo) de venta, compra o gasto.
  *
  * Decide automáticamente:
@@ -166,6 +221,7 @@ export async function guardarRegistro(formData) {
   try {
     const isUpdate = Boolean(formData?.id)
     let savedResult
+    let avisoCompra = null
 
     // Proveedor nuevo sugerido por el OCR, nunca creado hasta este punto
     // (ver Tarea C — OCR, punto 1: "nada se crea si el usuario cancela").
@@ -219,6 +275,8 @@ export async function guardarRegistro(formData) {
           .eq('id', rpcData.invoice_id)
         if (errFecha) logger.warn('[registroService]', 'No se pudo fijar la fecha fiscal manual', errFecha.message)
       }
+      // Compras: vínculo directo factura-proveedor y entrada de mercancía al inventario.
+      avisoCompra = await completarCompraGuardada(rpcData?.invoice_id, formData)
       // Simular la respuesta de invoiceService para mantener compatibilidad
       savedResult = { success: true, data: { id: rpcData.invoice_id, ...formData } }
     } else {
@@ -246,7 +304,10 @@ export async function guardarRegistro(formData) {
     return {
       success: true,
       data: savedResult.data,
-      message: 'Registro guardado correctamente.',
+      // Si el inventario falló, la compra igual quedó guardada: el aviso va en
+      // `message` y en `warning` para que la UI lo muestre.
+      message: avisoCompra || 'Registro guardado correctamente.',
+      ...(avisoCompra ? { warning: avisoCompra } : {}),
       isUpdate,
       isCompra: formData.flow === 'COMPRA'
     }

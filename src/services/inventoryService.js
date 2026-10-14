@@ -37,6 +37,22 @@ function calculateSimilarity(str1, str2) {
 }
 
 /**
+ * Arma un patrón `%término%` seguro para usar dentro de .or() de PostgREST:
+ * escapa % y _ (comodines de ilike) y la barra invertida, y entrecomilla el valor
+ * para que comas, paréntesis y comillas del texto no rompan el filtro.
+ */
+export function patronBusquedaPostgrest(termino = '') {
+    // Nivel ilike: la barra invertida escapa el comodín
+    const literal = String(termino)
+        .replace(/\\/g, '\\\\')
+        .replace(/%/g, '\\%')
+        .replace(/_/g, '\\_')
+    // Nivel PostgREST (valor entre comillas dobles): escapar \ y "
+    const citado = literal.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    return `"%${citado}%"`
+}
+
+/**
  * Normaliza los campos de catálogo (productos y servicios) antes de guardar.
  * - tipo: 'producto' (por defecto) o 'servicio'.
  * - Los servicios no llevan stock ni movimientos: stock y mínimo quedan en 0.
@@ -102,7 +118,8 @@ class InventoryService {
             }
 
             if (search) {
-                query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%`)
+                const patron = patronBusquedaPostgrest(search)
+                query = query.or(`name.ilike.${patron},code.ilike.${patron}`)
             }
 
             if (limit) query = query.limit(limit)

@@ -107,7 +107,8 @@ describe('InventoryService', () => {
 
       await inventoryService.getProducts({ search: 'dell' })
 
-      expect(chain.or).toHaveBeenCalledWith('name.ilike.%dell%,code.ilike.%dell%')
+      // El término va entre comillas y escapado para PostgREST (comas, paréntesis, %)
+      expect(chain.or).toHaveBeenCalledWith('name.ilike."%dell%",code.ilike."%dell%"')
     })
   })
 
