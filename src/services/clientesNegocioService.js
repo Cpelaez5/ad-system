@@ -16,7 +16,7 @@
 import { supabase } from '@/lib/supabaseClient'
 import { getCurrentOrganizationId, getCurrentClientId } from '@/utils/tenantHelpers'
 import { normalizarRif, tipoPersonaPorLetra } from '@/utils/rif.js'
-import { aUSD } from '@/utils/resumenMovimientos.js'
+import { montoFacturaEn } from '@/utils/monedas.js'
 import { parseFechaLocal } from '@/utils/fechas.js'
 
 const COLUMNAS = 'id, client_id, organization_id, tipo_persona, nombre, rif, telefono, correo, direccion, es_contribuyente_especial, notas, deleted_at, created_at, updated_at'
@@ -31,7 +31,8 @@ export const TOTALES_VACIOS = Object.freeze({
   porCobrar: 0,
   facturasPorCobrar: 0,
   deudaDesde: null,
-  ultimaCompra: null
+  ultimaCompra: null,
+  sinTasa: 0 // ventas que no se pudieron convertir a USD por falta de tasa
 })
 
 const sinAcentos = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
@@ -47,18 +48,21 @@ function cuenta(inv) {
 /**
  * Totales por cliente a partir de sus ventas (filas de `invoices`).
  * @param {Array} ventas filas con cliente_negocio_id, issue_date, status, financial
- * @param {number} tasa BCV (Bs por USD); sin tasa, las ventas en Bs no suman
+ * @param {number|object} tasas vigentes (número = dólar, u objeto { USD, EUR, ... });
+ *   cada venta usa primero su propia tasa; sin ninguna, no suma y se cuenta en `sinTasa`
  * @param {Date} [ahora]
  * @returns {Object<string, typeof TOTALES_VACIOS>} por cliente_negocio_id
  */
-export function calcularTotales(ventas, tasa, ahora = new Date()) {
+export function calcularTotales(ventas, tasas, ahora = new Date()) {
   const porCliente = {}
   const limite90 = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() - DIAS_FRECUENTE)
   for (const inv of ventas || []) {
     const id = inv.cliente_negocio_id
     if (!id || !cuenta(inv)) continue
     const t = (porCliente[id] ||= { ...TOTALES_VACIOS })
-    const usd = aUSD(inv.financial?.totalSales, inv.financial?.currency || 'VES', tasa)
+    const conv = montoFacturaEn(inv, 'USD', tasas)
+    if (conv.sinTasa) t.sinTasa += 1
+    const usd = conv.monto
     const fecha = parseFechaLocal(inv.issue_date)
     if (fecha) {
       if (fecha.getFullYear() === ahora.getFullYear()) t.compradoAnio += usd
@@ -171,11 +175,11 @@ const servicio = {
    * @param {{ tasa?: number, ahora?: Date }} [opciones]
    * @returns {Promise<Array>} cada cliente trae `totales`
    */
-  async listar({ tasa = 0, ahora = new Date() } = {}) {
+  async listar({ tasa = 0, tasas = tasa, ahora = new Date() } = {}) {
     const ctx = await this._contexto()
     if (!ctx.orgId) return []
     const [clientes, ventas] = await Promise.all([this._clientes(ctx), this._ventas(ctx)])
-    const totales = calcularTotales(ventas, tasa, ahora)
+    const totales = calcularTotales(ventas, tasas, ahora)
     return clientes.map((c) => ({ ...c, totales: totales[c.id] || { ...TOTALES_VACIOS } }))
   },
 
@@ -183,7 +187,7 @@ const servicio = {
    * Un cliente con sus totales y su historial de ventas (más recientes primero).
    * @returns {Promise<{ cliente, totales, ventas }|null>}
    */
-  async obtener(id, { tasa = 0, ahora = new Date() } = {}) {
+  async obtener(id, { tasa = 0, tasas = tasa, ahora = new Date() } = {}) {
     const ctx = await this._contexto()
     if (!ctx.orgId || !id) return null
     let q = supabase.from('clientes_negocio').select(COLUMNAS).eq('id', id).eq('organization_id', ctx.orgId)
@@ -192,7 +196,7 @@ const servicio = {
     if (error) throw error
     if (!data) return null
     const filas = await this._ventas(ctx, id)
-    const totales = calcularTotales(filas, tasa, ahora)[id] || { ...TOTALES_VACIOS }
+    const totales = calcularTotales(filas, tasas, ahora)[id] || { ...TOTALES_VACIOS }
     const ventas = filas
       .map((v) => ({
         id: v.id,
@@ -201,7 +205,8 @@ const servicio = {
         estado: v.status,
         moneda: v.financial?.currency || 'VES',
         monto: Number(v.financial?.totalSales) || 0,
-        montoUSD: aUSD(v.financial?.totalSales, v.financial?.currency || 'VES', tasa)
+        montoUSD: montoFacturaEn(v, 'USD', tasas).monto,
+        sinTasa: montoFacturaEn(v, 'USD', tasas).sinTasa
       }))
       .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')))
     return { cliente: data, totales, ventas }

@@ -14,6 +14,7 @@
  */
 import { parseFechaLocal } from './fechas'
 import { formatMoney } from './formatMoney'
+import { montoFacturaEn } from './monedas'
 
 export const SIN_CATEGORIA = 'Sin categoría'
 export const SIN_NOMBRE_CLIENTE = 'Cliente sin nombre'
@@ -44,42 +45,16 @@ export function convertirAUsd(monto, moneda, tasaBcv = {}) {
   return valor
 }
 
-/** Tasa Bs/USD a usar para una factura: primero la que ella misma guardó al emitirse. */
-function tasaDolarFactura(factura, tasaBcv) {
-  return Number(factura?.financial?.exchangeRate) || Number(tasaBcv?.dollar) || 0
-}
-
-/** Tasa Bs/EUR a usar para una factura: primero la que ella misma guardó al emitirse. */
-function tasaEuroFactura(factura, tasaBcv) {
-  return Number(factura?.financial?.exchangeRateEur) || Number(tasaBcv?.euro) || 0
-}
-
 /**
- * true si la factura tiene una tasa utilizable para convertir SU moneda a
- * USD (ella misma primero, la BCV actual después) — mismo criterio para
- * cualquier monto de la factura (total, IVA, retención...), porque todos
- * viven en la misma moneda con la misma tasa guardada.
+ * Convierte `monto` (ya en la moneda de `factura`) a USD con `montoFacturaEn`
+ * (src/utils/monedas.js): tasa guardada en la factura primero, la vigente
+ * después (`tasaBcv`: forma de bcvService `{dollar, euro, ...}` o `{USD, EUR, ...}`).
+ * Mismo criterio para cualquier monto de la factura (total, IVA, retención...).
+ * @returns {{valor: number, excluida: boolean}}
  */
-function facturaConvertible(factura, tasaBcv) {
-  const moneda = factura?.financial?.currency || 'VES'
-  if (moneda === 'VES') return tasaDolarFactura(factura, tasaBcv) > 0
-  if (moneda === 'EUR') return tasaEuroFactura(factura, tasaBcv) > 0 && tasaDolarFactura(factura, tasaBcv) > 0
-  return true // USD o moneda desconocida: no hay regla de conversión, no se excluye.
-}
-
-/** Convierte `monto` (ya en la moneda de `factura`) a USD con su tasa. Asume `facturaConvertible(factura, tasaBcv)`. */
 function convertirMontoFactura(factura, tasaBcv, monto) {
-  const moneda = factura?.financial?.currency || 'VES'
-  if (moneda === 'VES') {
-    const tasa = tasaDolarFactura(factura, tasaBcv)
-    return tasa > 0 ? monto / tasa : monto
-  }
-  if (moneda === 'EUR') {
-    const tasaEur = tasaEuroFactura(factura, tasaBcv)
-    const tasaUsd = tasaDolarFactura(factura, tasaBcv)
-    return tasaEur > 0 && tasaUsd > 0 ? (monto * tasaEur) / tasaUsd : monto
-  }
-  return monto
+  const r = montoFacturaEn(factura, 'USD', tasaBcv, { monto })
+  return { valor: r.monto, excluida: r.sinTasa }
 }
 
 /**
@@ -96,9 +71,7 @@ function convertirMontoFactura(factura, tasaBcv, monto) {
  * @returns {{valor: number, excluida: boolean}}
  */
 export function obtenerMontoUsd(factura, tasaBcv) {
-  const monto = Number(factura?.financial?.totalSales) || 0
-  if (!facturaConvertible(factura, tasaBcv)) return { valor: 0, excluida: true }
-  return { valor: convertirMontoFactura(factura, tasaBcv, monto), excluida: false }
+  return convertirMontoFactura(factura, tasaBcv, Number(factura?.financial?.totalSales) || 0)
 }
 
 /**
@@ -109,9 +82,7 @@ export function obtenerMontoUsd(factura, tasaBcv) {
  * @returns {{valor: number, excluida: boolean}}
  */
 export function obtenerIvaFacturaUsd(factura, tasaBcv) {
-  const monto = Number(factura?.financial?.taxDebit) || 0
-  if (!facturaConvertible(factura, tasaBcv)) return { valor: 0, excluida: true }
-  return { valor: convertirMontoFactura(factura, tasaBcv, monto), excluida: false }
+  return convertirMontoFactura(factura, tasaBcv, Number(factura?.financial?.taxDebit) || 0)
 }
 
 /**
@@ -123,9 +94,7 @@ export function obtenerIvaFacturaUsd(factura, tasaBcv) {
  * @returns {{valor: number, excluida: boolean}}
  */
 export function obtenerRetencionIvaUsd(factura, tasaBcv) {
-  const monto = Number(factura?.retenciones?.iva) || 0
-  if (!facturaConvertible(factura, tasaBcv)) return { valor: 0, excluida: true }
-  return { valor: convertirMontoFactura(factura, tasaBcv, monto), excluida: false }
+  return convertirMontoFactura(factura, tasaBcv, Number(factura?.retenciones?.iva) || 0)
 }
 
 /** Suma un array de facturas con una función `obtenerValor(factura) -> {valor, excluida}`. */

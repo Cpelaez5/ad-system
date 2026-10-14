@@ -256,7 +256,7 @@ import AyudaTermino from '@/components/ui/AyudaTermino.vue'
 
 import userService from '@/services/userService'
 import invoiceService from '@/services/invoiceService'
-import bcvService from '@/services/bcvService'
+import { tasasVigentes } from '@/services/tasaService'
 import { formatMoney } from '@/utils/formatMoney'
 
 import {
@@ -421,7 +421,7 @@ export default {
 
     /** Tasa del dólar del día, 0 si no hay (oculta el equivalente en Bs en vez de mostrar basura). */
     factorBs() {
-      return this.tasaBCV?.dollar || 0
+      return this.tasaBCV?.USD || 0
     },
     bsVendi() {
       return this.factorBs > 0 ? this.totalVendi * this.factorBs : null
@@ -538,7 +538,7 @@ export default {
         const [ventasRes, comprasRes, bcvRes] = await Promise.allSettled([
           invoiceService.getInvoices({ flow: 'VENTA', clientId: this.clientId }),
           invoiceService.getInvoices({ flow: 'COMPRA', clientId: this.clientId }),
-          bcvService.getCurrentRate(),
+          tasasVigentes(),
         ])
 
         const ventasOk = ventasRes.status === 'fulfilled'
@@ -562,7 +562,7 @@ export default {
 
         this.ventasRaw = ventasRes.value || []
         this.comprasRaw = comprasRes.value || []
-        this.tasaBCV = bcvRes.status === 'fulfilled' && bcvRes.value?.success ? bcvRes.value.data : null
+        this.tasaBCV = bcvRes.status === 'fulfilled' ? (bcvRes.value?.tasas || null) : null
       } catch (error) {
         this.loadError = {
           code: 'ERROR_CARGA',
