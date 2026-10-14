@@ -2,28 +2,41 @@ import { describe, it, expect } from 'vitest'
 import {
   convertirAUsd,
   obtenerMontoUsd,
+  obtenerIvaFacturaUsd,
+  obtenerRetencionIvaUsd,
   sumarMontosUsd,
+  calcularIvaEstimado,
+  desglosarIvaEstimado,
   filtrarPorRango,
   obtenerRangoPeriodo,
   etiquetaPeriodoAnterior,
   agruparPorMes,
+  mejorMes,
+  agruparVentasPorDia,
+  diaConMasVentas,
+  proporcionMonedaUsd,
   topCategorias,
   topClientes,
+  topProveedores,
   calcularVariacion,
   textoComparacion,
+  fraseResultado,
   UMBRAL_SIN_CAMBIO,
   SIN_CATEGORIA,
   SIN_NOMBRE_CLIENTE,
+  SIN_NOMBRE_PROVEEDOR,
 } from '../resumenFinanciero'
 
 const TASA = { dollar: 40, euro: 44 }
 
-function factura({ monto, moneda = 'VES', fecha, categoria, cliente, exchangeRate, exchangeRateEur }) {
+function factura({ monto, moneda = 'VES', fecha, categoria, cliente, proveedor, exchangeRate, exchangeRateEur, taxDebit, retencionIva }) {
   return {
     issueDate: fecha,
-    financial: { totalSales: monto, currency: moneda, exchangeRate, exchangeRateEur },
+    financial: { totalSales: monto, currency: moneda, exchangeRate, exchangeRateEur, taxDebit },
+    retenciones: { iva: retencionIva || 0 },
     expenseCategory: categoria ? { name: categoria } : null,
     client: cliente ? { companyName: cliente } : {},
+    issuer: proveedor ? { companyName: proveedor } : {},
   }
 }
 
@@ -298,5 +311,181 @@ describe('textoComparacion', () => {
     expect(UMBRAL_SIN_CAMBIO).toBe(0.5)
     expect(textoComparacion(0.2, 'el mes pasado')).toBe('Igual que el mes pasado')
     expect(textoComparacion(-0.1, 'el mes pasado')).toBe('Igual que el mes pasado')
+  })
+})
+
+describe('obtenerIvaFacturaUsd / obtenerRetencionIvaUsd (mismo criterio de tasa que obtenerMontoUsd)', () => {
+  it('usa financial.taxDebit (no totalSales) para el IVA de la factura', () => {
+    const f = factura({ monto: 116, moneda: 'USD', taxDebit: 16 })
+    expect(obtenerIvaFacturaUsd(f, TASA)).toEqual({ valor: 16, excluida: false })
+  })
+
+  it('convierte el IVA con la tasa de la factura (VES), igual que el total', () => {
+    const f = factura({ monto: 4640, moneda: 'VES', exchangeRate: 20, taxDebit: 640 }) // 640/20 = 32
+    expect(obtenerIvaFacturaUsd(f, TASA)).toEqual({ valor: 32, excluida: false })
+  })
+
+  it('usa retenciones.iva (no financial) para la retención', () => {
+    const f = factura({ monto: 100, moneda: 'USD', retencionIva: 7.5 })
+    expect(obtenerRetencionIvaUsd(f, TASA)).toEqual({ valor: 7.5, excluida: false })
+  })
+
+  it('se excluye con el mismo criterio que obtenerMontoUsd (sin ninguna tasa disponible en VES)', () => {
+    const f = factura({ monto: 4000, moneda: 'VES', taxDebit: 640, retencionIva: 50 })
+    expect(obtenerIvaFacturaUsd(f, {})).toEqual({ valor: 0, excluida: true })
+    expect(obtenerRetencionIvaUsd(f, {})).toEqual({ valor: 0, excluida: true })
+  })
+})
+
+describe('calcularIvaEstimado (diferenciador D1: "Lo que vas a declarar")', () => {
+  it('débito de ventas − crédito de compras − retención de ventas', () => {
+    const ventas = [factura({ monto: 116, moneda: 'USD', taxDebit: 16, retencionIva: 2 })]
+    const compras = [factura({ monto: 58, moneda: 'USD', taxDebit: 8 })]
+    // 16 (débito) - 8 (crédito) - 2 (retención) = 6
+    expect(calcularIvaEstimado(ventas, compras, TASA)).toEqual({ valor: 6, excluidas: 0 })
+  })
+
+  it('puede salir negativo (crédito fiscal del período, no una deuda)', () => {
+    const ventas = [factura({ monto: 29, moneda: 'USD', taxDebit: 4 })]
+    const compras = [factura({ monto: 116, moneda: 'USD', taxDebit: 16 })]
+    expect(calcularIvaEstimado(ventas, compras, TASA).valor).toBe(-12)
+  })
+
+  it('no duplica las facturas excluidas: débito y retención salen de las mismas ventas', () => {
+    const ventas = [factura({ monto: 4000, moneda: 'VES', taxDebit: 640, retencionIva: 50 })] // sin tasa
+    const compras = [factura({ monto: 100, moneda: 'USD', taxDebit: 10 })]
+    const resultado = calcularIvaEstimado(ventas, compras, {})
+    expect(resultado.excluidas).toBe(1) // no 2
+    expect(resultado.valor).toBe(-10) // 0 (ventas excluidas) - 10 (crédito) - 0
+  })
+
+  it('array vacío da 0 sin excluidas', () => {
+    expect(calcularIvaEstimado([], [], TASA)).toEqual({ valor: 0, excluidas: 0 })
+  })
+})
+
+describe('fraseResultado', () => {
+  const hoy = new Date(2026, 9, 13) // 13 oct 2026
+
+  it('este_mes: en presente, con el nombre del mes actual', () => {
+    expect(fraseResultado('este_mes', 300, 100, hoy)).toBe(
+      'En octubre te quedan $ 200,00: vendiste $ 300,00 y gastaste $ 100,00.'
+    )
+  })
+
+  it('mes_pasado: en pasado, con el mes anterior', () => {
+    expect(fraseResultado('mes_pasado', 300, 100, hoy)).toBe(
+      'En septiembre te quedaron $ 200,00: vendiste $ 300,00 y gastaste $ 100,00.'
+    )
+  })
+
+  it('este_anio: en presente, con el año', () => {
+    expect(fraseResultado('este_anio', 300, 100, hoy)).toBe(
+      'En 2026 te quedan $ 200,00: vendiste $ 300,00 y gastaste $ 100,00.'
+    )
+  })
+
+  it('mes_pasado en enero usa diciembre del año anterior (no se rompe en el borde del año)', () => {
+    const eneroHoy = new Date(2026, 0, 10)
+    expect(fraseResultado('mes_pasado', 50, 10, eneroHoy)).toContain('En diciembre')
+  })
+})
+
+describe('topProveedores (issuer, no client — en una COMPRA el proveedor emite el documento)', () => {
+  it('agrupa por issuer.companyName y usa "Proveedor sin nombre" si falta', () => {
+    const compras = [
+      factura({ monto: 300, moneda: 'USD', proveedor: 'Distribuidora Ana' }),
+      factura({ monto: 100, moneda: 'USD', proveedor: 'Distribuidora Ana' }),
+      factura({ monto: 50, moneda: 'USD' }),
+    ]
+    const top = topProveedores(compras, TASA, 5)
+    expect(top[0]).toEqual({ nombre: 'Distribuidora Ana', monto: 400, porcentaje: expect.closeTo(88.89, 1) })
+    expect(top[1].nombre).toBe(SIN_NOMBRE_PROVEEDOR)
+  })
+})
+
+describe('desglosarIvaEstimado', () => {
+  it('devuelve débito, crédito, retención y neto por separado', () => {
+    const ventas = [factura({ monto: 116, moneda: 'USD', taxDebit: 16, retencionIva: 2 })]
+    const compras = [factura({ monto: 58, moneda: 'USD', taxDebit: 8 })]
+    expect(desglosarIvaEstimado(ventas, compras, TASA)).toEqual({
+      debito: 16, credito: 8, retencion: 2, neto: 6, excluidas: 0,
+    })
+  })
+})
+
+describe('mejorMes', () => {
+  it('devuelve el label y valor del máximo', () => {
+    expect(mejorMes(['Ene', 'Feb', 'Mar'], [10, 50, 30])).toEqual({ label: 'Feb', valor: 50 })
+  })
+
+  it('null si todo es 0 o los arrays están vacíos', () => {
+    expect(mejorMes(['Ene'], [0])).toBeNull()
+    expect(mejorMes([], [])).toBeNull()
+  })
+})
+
+describe('agruparVentasPorDia', () => {
+  it('período corto (≤31 días): agrupa por día de calendario', () => {
+    const inicio = new Date(2026, 9, 1)
+    const fin = new Date(2026, 9, 31, 23, 59, 59, 999)
+    const ventas = [factura({ monto: 100, moneda: 'USD', fecha: '2026-10-05' })]
+    const { labels, valores, porDiaSemana } = agruparVentasPorDia(ventas, { inicio, fin }, TASA)
+    expect(porDiaSemana).toBe(false)
+    expect(labels).toHaveLength(31)
+    expect(labels[4]).toBe('5') // 5 de octubre
+    expect(valores[4]).toBe(100)
+  })
+
+  it('período largo (>31 días, ej. "Este año"): agrupa por día de semana, lunes a domingo', () => {
+    const inicio = new Date(2026, 0, 1)
+    const fin = new Date(2026, 9, 13, 23, 59, 59, 999)
+    // 2026-10-05 es lunes.
+    const ventas = [factura({ monto: 100, moneda: 'USD', fecha: '2026-10-05' })]
+    const { labels, valores, porDiaSemana } = agruparVentasPorDia(ventas, { inicio, fin }, TASA)
+    expect(porDiaSemana).toBe(true)
+    expect(labels).toEqual(['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'])
+    expect(valores[0]).toBe(100) // lunes
+  })
+})
+
+describe('diaConMasVentas', () => {
+  it('encuentra el día de semana con más ventas, con el plural correcto', () => {
+    // 2026-10-02 es viernes.
+    const ventas = [
+      factura({ monto: 100, moneda: 'USD', fecha: '2026-10-02' }),
+      factura({ monto: 50, moneda: 'USD', fecha: '2026-10-09' }), // también viernes
+      factura({ monto: 10, moneda: 'USD', fecha: '2026-10-05' }), // lunes
+    ]
+    expect(diaConMasVentas(ventas, TASA)).toEqual({ dia: 'viernes', diaPlural: 'viernes', monto: 150 })
+  })
+
+  it('pluraliza con "s" los días que no terminan en s (sábado, domingo)', () => {
+    // 2026-10-03 es sábado.
+    const ventas = [factura({ monto: 20, moneda: 'USD', fecha: '2026-10-03' })]
+    expect(diaConMasVentas(ventas, TASA)?.diaPlural).toBe('sábados')
+  })
+
+  it('null sin ventas', () => {
+    expect(diaConMasVentas([], TASA)).toBeNull()
+  })
+})
+
+describe('proporcionMonedaUsd', () => {
+  it('agrupa por moneda, convertido a USD, ordenado descendente', () => {
+    const ventas = [
+      factura({ monto: 100, moneda: 'USD' }),
+      factura({ monto: 4000, moneda: 'VES' }), // 100 USD
+      factura({ monto: 50, moneda: 'USD' }),
+    ]
+    expect(proporcionMonedaUsd(ventas, TASA)).toEqual([
+      { moneda: 'USD', valor: 150 },
+      { moneda: 'VES', valor: 100 },
+    ])
+  })
+
+  it('omite monedas sin ventas y facturas sin tasa disponible', () => {
+    const ventas = [factura({ monto: 999999, moneda: 'VES' })] // sin tasa
+    expect(proporcionMonedaUsd(ventas, {})).toEqual([])
   })
 })

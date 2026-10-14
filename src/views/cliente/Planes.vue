@@ -1,21 +1,42 @@
 <template>
   <v-container fluid class="planes-page pa-4 pa-md-6">
-    <!-- Banner de suscripción actual -->
-    <AvisoAmable
-      v-if="currentSubscription && currentSubscription.plan"
-      :tipo="isActive ? 'info' : 'advertencia'"
-      :titulo="`Plan actual: ${currentSubscription.plan.name} (${isActive ? 'Activo' : 'Expirado'})`"
-      :mensaje="formattedExpirationDate
-        ? `Tu suscripción es válida hasta el ${formattedExpirationDate}.`
-        : 'Tu suscripción se encuentra activa.'"
-      :texto-accion="!isActive ? 'Renovar ahora' : ''"
-      class="mb-6"
-      @accion="scrollToPlans"
-    />
+    <!-- Tu plan actual: nombre, estado, días que quedan y UN siguiente paso. -->
+    <section v-if="currentSubscription && currentSubscription.plan" class="planes-page__actual mb-8" aria-label="Tu plan actual">
+      <div class="d-flex flex-wrap align-center ga-2 mb-1">
+        <h1 class="text-h5 font-weight-bold mb-0">Tu plan: {{ currentSubscription.plan.name }}</h1>
+        <v-chip size="small" variant="tonal" :color="estadoPlan.color" :prepend-icon="estadoPlan.icono" class="font-weight-bold">
+          {{ estadoPlan.texto }}
+        </v-chip>
+      </div>
+      <p class="text-body-1 text-medium-emphasis mb-3">{{ fraseVigencia }}</p>
+      <v-progress-linear
+        v-if="diasRestantes !== null"
+        :model-value="porcentajeRestante"
+        :color="diasRestantes <= 5 ? 'warning' : 'success'"
+        bg-color="grey-lighten-2"
+        height="10"
+        rounded
+        class="mb-4 planes-page__barra"
+        :aria-label="fraseVigencia"
+      />
+      <PanelSiguientePaso
+        :listo="pasoPlan.listo"
+        :titulo="pasoPlan.titulo"
+        :detalle="pasoPlan.detalle"
+        :texto-boton="pasoPlan.boton"
+        titulo-listo="Tu plan está al día"
+        :detalle-listo="pasoPlan.detalle"
+        @accion="ejecutarPasoPlan"
+      />
+    </section>
+    <header v-else class="mb-6">
+      <h1 class="text-h5 font-weight-bold mb-1">Mi plan</h1>
+      <p class="text-body-1 text-medium-emphasis mb-0">Todavía no tienes un plan. Elige el que mejor se ajuste a tu negocio.</p>
+    </header>
 
     <PricingSection
-      title="Planes de Suscripción"
-      subtitle="Escala tus operaciones con el plan ideal para tu negocio."
+      title="Compara los planes"
+      subtitle="Cambia de plan cuando quieras."
       :current-plan-id="currentSubscription?.plan_id"
       :processing-plan-id="processingPlan"
       :pending-plan-id="pendingPlanId"
@@ -40,14 +61,14 @@
 
 <script>
 import PricingSection from '@/components/common/PricingSection.vue';
-import AvisoAmable from '@/components/ui/AvisoAmable.vue';
+import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
 import plansService from '@/services/plansService';
 import userService from '@/services/userService';
 import { parseFechaLocal, formatFechaLocal } from '@/utils/fechas.js';
 
 export default {
   name: 'Planes',
-  components: { PricingSection, AvisoAmable },
+  components: { PricingSection, PanelSiguientePaso },
   data() {
     return {
       processingPlan: null,
@@ -74,6 +95,41 @@ export default {
       }
       return false;
     },
+    /** Días que quedan hasta el próximo cobro (null si no hay fecha). */
+    diasRestantes() {
+      const f = parseFechaLocal(this.currentSubscription?.next_billing_date);
+      if (!f) return null;
+      return Math.max(0, Math.ceil((f - new Date()) / 86400000));
+    },
+    porcentajeRestante() {
+      if (this.diasRestantes === null) return 0;
+      const total = this.currentSubscription?.billing_period === 'annual' ? 365 : 30;
+      return Math.min(100, Math.round((this.diasRestantes / total) * 100));
+    },
+    estadoPlan() {
+      if (this.pendingPlanId) return { texto: 'Pago en revisión', color: 'warning', icono: 'mdi-clock-outline' };
+      if (!this.isActive) return { texto: 'Vencido', color: 'error', icono: 'mdi-alert-circle-outline' };
+      return { texto: 'Activo', color: 'success', icono: 'mdi-check-circle' };
+    },
+    fraseVigencia() {
+      if (this.diasRestantes === null) return this.isActive ? 'Tu suscripción está activa.' : 'Tu suscripción venció.';
+      if (!this.isActive) return `Tu suscripción venció el ${this.formattedExpirationDate}.`;
+      if (this.diasRestantes === 0) return 'Tu suscripción vence hoy.';
+      return `Te quedan ${this.diasRestantes} ${this.diasRestantes === 1 ? 'día' : 'días'} (hasta el ${this.formattedExpirationDate}).`;
+    },
+    /** Un solo siguiente paso según el estado del plan y del pago. */
+    pasoPlan() {
+      if (this.pendingPlanId) {
+        return { listo: false, titulo: 'Tu pago está en revisión', detalle: 'Te avisaremos cuando lo aprobemos. Puedes ver el estado en tus pagos.', boton: 'Ver mis pagos' };
+      }
+      if (!this.isActive) {
+        return { listo: false, titulo: 'Renueva tu plan', detalle: 'Elige un plan abajo para seguir usando el sistema sin cortes.', boton: 'Elegir plan' };
+      }
+      if (this.diasRestantes !== null && this.diasRestantes <= 5) {
+        return { listo: false, titulo: 'Tu plan vence pronto', detalle: 'Revisa tus pagos y reporta el siguiente para no quedarte sin servicio.', boton: 'Ver mis pagos' };
+      }
+      return { listo: true, titulo: '', detalle: 'No tienes nada pendiente. Te avisaremos antes del próximo cobro.', boton: '' };
+    },
     formattedExpirationDate() {
       if (this.currentSubscription?.next_billing_date) {
         return formatFechaLocal(this.currentSubscription.next_billing_date, { year: 'numeric', month: 'long', day: 'numeric' }, 'es-ES');
@@ -82,6 +138,10 @@ export default {
     }
   },
   methods: {
+    ejecutarPasoPlan() {
+      if (!this.isActive && !this.pendingPlanId) return this.scrollToPlans();
+      this.$router.push({ name: 'ClienteFacturacionSuscripcion' });
+    },
     scrollToPlans() {
       window.scrollTo({ top: 300, behavior: 'smooth' });
     },

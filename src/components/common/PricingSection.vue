@@ -4,7 +4,7 @@
       <!-- Header compacto (Opcional, se puede ocultar con props) -->
       <div v-if="showHeader" class="d-flex flex-column flex-md-row align-center justify-space-between mb-8">
         <div class="mb-4 mb-md-0 text-md-left text-center">
-          <h2 class="text-h4 font-weight-bold text-secondary mb-2">
+          <h2 class="text-h5 font-weight-bold text-secondary mb-2">
             {{ title }}
           </h2>
           <p class="text-body-1 text-medium-emphasis mb-0">
@@ -27,7 +27,7 @@
             @click="billingPeriod = 'annual'"
           >
             Anual
-            <v-chip color="#E0B04F" size="x-small" class="ml-1 font-weight-bold" variant="flat" text-color="white">-17%</v-chip>
+            <v-chip color="success" size="x-small" class="ml-1 font-weight-bold" variant="tonal">-17%</v-chip>
           </button>
         </div>
       </div>
