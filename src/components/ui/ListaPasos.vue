@@ -163,6 +163,7 @@ const segmentos = computed(() => props.pasos.map((p) => ({ id: p.clave, tono: p.
 @media (max-width: 599px) {
   .lista-pasos { padding: 18px 18px 6px; }
   .lista-pasos__paso { flex-wrap: wrap; }
+  .lista-pasos__texto { flex: 1 1 calc(100% - 50px); }
   .lista-pasos__boton { flex: 1 1 100%; margin-left: 50px; }
 }
 </style>
