@@ -36,6 +36,41 @@ function calculateSimilarity(str1, str2) {
     return 1 - (distance / maxLength);
 }
 
+/**
+ * Normaliza los campos de catálogo (productos y servicios) antes de guardar.
+ * - tipo: 'producto' (por defecto) o 'servicio'.
+ * - Los servicios no llevan stock ni movimientos: stock y mínimo quedan en 0.
+ * - atributos: se descartan los vacíos para no guardar basura.
+ * Solo toca las claves que vienen en `data` (sirve también para actualizar).
+ */
+export function normalizarCamposCatalogo(data = {}) {
+    const out = { ...data }
+    if ('tipo' in out || 'atributos' in out) {
+        if (out.tipo !== undefined) out.tipo = out.tipo === 'servicio' ? 'servicio' : 'producto'
+    }
+    for (const k of ['categoria', 'marca', 'codigo_barras', 'foto_path', 'foto_original_path']) {
+        if (k in out) {
+            const v = typeof out[k] === 'string' ? out[k].trim() : out[k]
+            out[k] = v ? v : null
+        }
+    }
+    if ('atributos' in out) {
+        const limpio = {}
+        for (const [clave, valor] of Object.entries(out.atributos || {})) {
+            if (valor === null || valor === undefined) continue
+            if (typeof valor === 'string' && valor.trim() === '') continue
+            limpio[clave] = typeof valor === 'string' ? valor.trim() : valor
+        }
+        out.atributos = limpio
+    }
+    if (out.tipo === 'servicio') {
+        out.stock = 0
+        out.min_stock = 0
+        out.codigo_barras = null
+    }
+    return out
+}
+
 class InventoryService {
     constructor() {
         this.productsTable = 'inventory_products'
@@ -170,7 +205,7 @@ class InventoryService {
         try {
             // Asignar client_id si no viene (necesario para cumplir RLS de cliente)
             const payload = {
-                ...productData,
+                ...normalizarCamposCatalogo(productData),
                 client_id: productData.client_id || getCurrentClientId()
             }
 
@@ -183,7 +218,7 @@ class InventoryService {
 
     async updateProduct(id, productData) {
         try {
-            return await updateWithTenant(this.productsTable, id, productData)
+            return await updateWithTenant(this.productsTable, id, normalizarCamposCatalogo(productData))
         } catch (error) {
             return handleTenantError(error, 'updateProduct')
         }
@@ -326,6 +361,11 @@ class InventoryService {
             // Obtener el producto para saber su client_id
             const product = await this.getProductById(product_id)
             if (!product) throw new Error('Producto no encontrado')
+
+            // Los servicios no llevan stock: nunca generan movimientos.
+            if (product.tipo === 'servicio') {
+                return { success: true, skipped: true, newStock: 0 }
+            }
 
             const clientId = product.client_id
 
