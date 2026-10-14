@@ -1,5 +1,5 @@
 <template>
-  <div class="barra-papeles" :class="{ 'barra-papeles--animada': animar }">
+  <div class="barra-papeles">
     <div class="barra-papeles__titulo">
       <span class="barra-papeles__cifra">{{ resumen.alDia }}</span>
       <span class="barra-papeles__de">de {{ resumen.total }}</span>
@@ -7,27 +7,11 @@
     </div>
 
     <!-- Un segmento por papel: el negocio "se ve" completo o con huecos -->
-    <div class="barra-papeles__segmentos" role="list" :aria-label="`${resumen.alDia} de ${resumen.total} papeles al día`">
-      <v-tooltip
-        v-for="(papel, i) in visibles"
-        :key="papel.id"
-        location="top"
-        :text="`${papel.nombre}: ${papel.estado.semaforo.texto}`"
-      >
-        <template #activator="{ props: tooltipProps }">
-          <button
-            v-bind="tooltipProps"
-            type="button"
-            role="listitem"
-            class="barra-papeles__segmento"
-            :class="`barra-papeles__segmento--${tono(papel)}`"
-            :style="{ '--i': i }"
-            :aria-label="`${papel.nombre}: ${papel.estado.semaforo.texto}`"
-            @click="$emit('elegir', papel)"
-          />
-        </template>
-      </v-tooltip>
-    </div>
+    <BarraSegmentos
+      :segmentos="segmentos"
+      :etiqueta="`${resumen.alDia} de ${resumen.total} papeles al día`"
+      @elegir="(seg) => $emit('elegir', seg.papel)"
+    />
 
     <ul class="barra-papeles__leyenda">
       <li v-if="resumen.atender"><span class="punto punto--error" />{{ resumen.atender }} por atender</li>
@@ -42,15 +26,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
+import BarraSegmentos from '@/components/ui/BarraSegmentos.vue'
 import { resumenPapeles } from '@/utils/estadoPapel'
-import { prefiereMovimientoReducido } from '@/components/ui/movimiento.js'
 
 /**
  * BarraPapeles — avance del expediente como una fila de segmentos, uno por papel
  * (los "no aplica" no cuentan). Verde = al día, rojo/ámbar = por atender, gris
  * punteado = falta subirlo. Tocar un segmento lleva a ese papel (`elegir`).
- * Única animación de la vista: los segmentos se llenan en secuencia al cargar.
+ * Los segmentos (BarraSegmentos) se llenan en secuencia al cargar: única animación de la vista.
  */
 const props = defineProps({
   /** [{ id, nombre, estado: estadoPapel(...) }] */
@@ -78,10 +62,12 @@ const mensaje = computed(() => {
   return `Cada papel al día te protege de multas y te deja listo ante cualquier inspección. Vas ${porcentaje}%.`
 })
 
-const animar = ref(false)
-onMounted(() => {
-  animar.value = !prefiereMovimientoReducido()
-})
+const segmentos = computed(() => visibles.value.map((papel) => ({
+  id: papel.id,
+  tono: tono(papel),
+  etiqueta: `${papel.nombre}: ${papel.estado.semaforo.texto}`,
+  papel,
+})))
 </script>
 
 <style scoped>
@@ -111,51 +97,6 @@ onMounted(() => {
   font-size: 1.05rem;
   font-weight: 500;
   color: rgba(var(--v-theme-on-surface), 0.7);
-}
-
-.barra-papeles__segmentos {
-  display: flex;
-  gap: 4px;
-  height: 18px;
-}
-
-.barra-papeles__segmento {
-  flex: 1 1 0;
-  min-width: 6px;
-  border: 0;
-  border-radius: 4px;
-  padding: 0;
-  cursor: pointer;
-  transition: transform var(--ad-move-rapido) var(--ad-move-curva-entrada), filter var(--ad-move-rapido) ease;
-}
-
-.barra-papeles__segmento:hover,
-.barra-papeles__segmento:focus-visible {
-  transform: scaleY(1.35);
-  filter: brightness(0.92);
-}
-
-.barra-papeles__segmento:focus-visible {
-  outline: 2px solid rgb(var(--v-theme-primary));
-  outline-offset: 3px;
-}
-
-.barra-papeles__segmento--success { background: rgb(var(--v-theme-success)); }
-.barra-papeles__segmento--error { background: rgb(var(--v-theme-error)); }
-.barra-papeles__segmento--warning { background: #e0a100; }
-.barra-papeles__segmento--falta {
-  background: repeating-linear-gradient(135deg, #d4d6da 0 4px, #e9eaec 4px 8px);
-}
-
-/* Entrada: los segmentos se "llenan" uno tras otro (una sola vez) */
-.barra-papeles--animada .barra-papeles__segmento {
-  animation: llenar-segmento 420ms var(--ad-move-curva-entrada) both;
-  animation-delay: calc(var(--i) * 22ms);
-}
-
-@keyframes llenar-segmento {
-  from { opacity: 0; transform: scaleY(0.2); }
-  to { opacity: 1; transform: scaleY(1); }
 }
 
 .barra-papeles__leyenda {
@@ -195,7 +136,4 @@ onMounted(() => {
 .punto--warning { background: #e0a100; }
 .punto--falta { background: repeating-linear-gradient(135deg, #c4c7cc 0 3px, #e9eaec 3px 6px); }
 
-@media (prefers-reduced-motion: reduce) {
-  .barra-papeles__segmento { transition: none; animation: none !important; }
-}
 </style>

@@ -61,73 +61,51 @@
             <BarraPapeles :papeles="papeles" @elegir="irAPapel" />
           </section>
 
-          <section
-            class="mis-papeles__paso"
-            :class="paso ? `mis-papeles__paso--${paso.estado.clave}` : 'mis-papeles__paso--listo'"
-            aria-live="polite"
+          <PanelSiguientePaso
+            :listo="!paso"
+            :titulo="textoPaso.titulo"
+            :detalle="textoPaso.detalle"
+            :texto-boton="textoPaso.boton"
+            :icono-boton="paso ? paso.estado.accion.icono : ''"
+            titulo-listo="¡Tu negocio está al día!"
+            detalle-listo="Todos tus papeles están vigentes. Te avisaremos por correo antes de que algo venza."
+            @accion="ejecutarPaso(paso)"
           >
-            <template v-if="paso">
-              <div class="mis-papeles__paso-etiqueta">Tu siguiente paso</div>
-              <div class="mis-papeles__paso-titulo">{{ textoPaso.titulo }}</div>
-              <p class="mis-papeles__paso-detalle">{{ textoPaso.detalle }}</p>
-              <div class="mis-papeles__paso-acciones">
-                <v-btn color="primary" size="large" :prepend-icon="paso.estado.accion.icono" class="text-none" @click="ejecutarPaso(paso)">
-                  {{ textoPaso.boton }}
-                </v-btn>
-                <v-btn
-                  v-if="pendientesDespuesDelPaso > 0"
-                  variant="text"
-                  class="text-none"
-                  @click="filtro = 'pendientes'"
-                >
-                  Ver los {{ pendientesDespuesDelPaso }} que siguen
-                </v-btn>
-              </div>
+            <template #secundaria>
+              <v-btn v-if="pendientesDespuesDelPaso > 0" variant="text" class="text-none" @click="filtro = 'pendientes'">
+                Ver los {{ pendientesDespuesDelPaso }} que siguen
+              </v-btn>
             </template>
-            <template v-else>
-              <v-icon icon="mdi-check-decagram" size="40" color="success" class="mb-2" />
-              <div class="mis-papeles__paso-titulo">¡Tu negocio está al día!</div>
-              <p class="mis-papeles__paso-detalle">Todos tus papeles están vigentes. Te avisaremos por correo antes de que algo venza.</p>
-            </template>
-          </section>
+          </PanelSiguientePaso>
         </div>
 
         <!-- FILTROS -->
-        <v-chip-group v-model="filtro" mandatory selected-class="mis-papeles__filtro--activo" class="mis-papeles__filtros" aria-label="Filtrar papeles">
-          <v-chip value="todos" variant="outlined" size="large">Todos · {{ resumen.total + resumen.noaplica }}</v-chip>
-          <v-chip value="pendientes" variant="outlined" size="large" :disabled="!resumen.porResolver">
-            Por resolver · {{ resumen.porResolver }}
-          </v-chip>
-          <v-chip value="aldia" variant="outlined" size="large" :disabled="!resumen.aldia">Al día · {{ resumen.aldia }}</v-chip>
-        </v-chip-group>
+        <FiltroChips v-model="filtro" :opciones="opcionesFiltro" etiqueta="Filtrar papeles" class="mb-2" />
 
         <!-- LISTA POR CATEGORÍA -->
         <TransitionGroup tag="div" name="seccion" class="mis-papeles__secciones">
-          <section v-for="seccion in seccionesVisibles" :key="seccion.valor" class="mis-papeles__seccion">
-            <header class="mis-papeles__seccion-cabecera">
-              <h2 class="mis-papeles__seccion-titulo">
-                <v-icon :icon="getCategoryIcon(seccion.valor)" size="20" class="mr-2" />{{ seccion.titulo }}
-              </h2>
-              <span class="mis-papeles__seccion-avance" :class="{ 'text-success': seccion.alDia === seccion.total && seccion.total > 0 }">
-                {{ seccion.alDia }} de {{ seccion.total }} al día
-              </span>
-            </header>
-            <v-sheet class="mis-papeles__lista" rounded="xl" border>
-              <template v-for="(papel, i) in seccion.papeles" :key="papel.id">
-                <v-divider v-if="i > 0" />
-                <TarjetaDocumentoFiscal
-                  :doc="papel.doc"
-                  :pendiente="papel.pendiente"
-                  :frecuencia="papel.frecuencia"
-                  :class="{ 'fila-papel--resaltada': resaltado === papel.id }"
-                  @ver="openPreview"
-                  @editar="openDialog"
-                  @eliminar="confirmDelete"
-                  @subir="openDialogForPending"
-                />
-              </template>
-            </v-sheet>
-          </section>
+          <SeccionLista
+            v-for="seccion in seccionesVisibles"
+            :key="seccion.valor"
+            class="mis-papeles__seccion"
+            :titulo="seccion.titulo"
+            :icono="getCategoryIcon(seccion.valor)"
+            :meta="`${seccion.alDia} de ${seccion.total} al día`"
+            :meta-exito="seccion.alDia === seccion.total && seccion.total > 0"
+          >
+            <TarjetaDocumentoFiscal
+              v-for="papel in seccion.papeles"
+              :key="papel.id"
+              :doc="papel.doc"
+              :pendiente="papel.pendiente"
+              :frecuencia="papel.frecuencia"
+              :class="{ 'fila-papel--resaltada': resaltado === papel.id }"
+              @ver="openPreview"
+              @editar="openDialog"
+              @eliminar="confirmDelete"
+              @subir="openDialogForPending"
+            />
+          </SeccionLista>
         </TransitionGroup>
 
         <EstadoVacio
@@ -272,6 +250,9 @@ import FiscalDocDialog from '@/components/fiscal/FiscalDocDialog.vue'
 import FiscalPeriodTracker from '@/components/fiscal/FiscalPeriodTracker.vue'
 import TarjetaDocumentoFiscal from '@/components/fiscal/TarjetaDocumentoFiscal.vue'
 import BarraPapeles from '@/components/fiscal/BarraPapeles.vue'
+import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
+import FiltroChips from '@/components/ui/FiltroChips.vue'
+import SeccionLista from '@/components/ui/SeccionLista.vue'
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import { estadoPapel, siguientePaso, resumenPapeles, GRUPOS_POR_RESOLVER } from '@/utils/estadoPapel'
@@ -456,6 +437,12 @@ const seccionesVisibles = computed(() => categories
         }
     })
     .filter(sec => sec.papeles.length > 0))
+
+const opcionesFiltro = computed(() => [
+    { valor: 'todos', texto: 'Todos', cantidad: resumen.value.total + resumen.value.noaplica },
+    { valor: 'pendientes', texto: 'Por resolver', cantidad: resumen.value.porResolver, deshabilitado: !resumen.value.porResolver },
+    { valor: 'aldia', texto: 'Al día', cantidad: resumen.value.aldia, deshabilitado: !resumen.value.aldia },
+])
 
 const tiposRecurrentes = computed(() => categories.flatMap(cat =>
     getRecurringTypes(cat.value)
@@ -1341,86 +1328,34 @@ onMounted(async () => {
   .mis-papeles__panel { grid-template-columns: 7fr 5fr; }
 }
 
-.mis-papeles__avance,
-.mis-papeles__paso {
+.mis-papeles__avance {
   background: rgb(var(--v-theme-surface));
   border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
   border-radius: 20px;
   padding: 22px 24px;
 }
 
-.mis-papeles__paso {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  /* Un toque de marca: el paso pendiente lleva un fondo granate muy suave */
-  background: linear-gradient(0deg, rgba(var(--v-theme-primary), 0.045), rgba(var(--v-theme-primary), 0.045)), rgb(var(--v-theme-surface));
-  border-color: rgba(var(--v-theme-primary), 0.22);
-}
-
-.mis-papeles__paso--listo {
-  background: linear-gradient(0deg, rgba(var(--v-theme-success), 0.06), rgba(var(--v-theme-success), 0.06)), rgb(var(--v-theme-surface));
-  border-color: rgba(var(--v-theme-success), 0.3);
-}
-
-.mis-papeles__paso-etiqueta {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: rgb(var(--v-theme-primary));
-  margin-bottom: 6px;
-}
-
-.mis-papeles__paso-titulo {
-  font-size: 1.3rem;
-  font-weight: 700;
-  line-height: 1.3;
-  color: rgb(var(--v-theme-on-surface));
-  text-wrap: balance;
-}
-
-.mis-papeles__paso-detalle {
-  margin: 8px 0 16px;
-  font-size: 0.98rem;
-  line-height: 1.5;
-  color: rgba(var(--v-theme-on-surface), 0.75);
-  max-width: 52ch;
-}
-
-.mis-papeles__paso--listo .mis-papeles__paso-detalle { margin-bottom: 0; }
-
-.mis-papeles__paso-acciones {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
 @media (max-width: 599px) {
-  .mis-papeles__avance,
-  .mis-papeles__paso { padding: 18px; }
-  .mis-papeles__paso-acciones > .v-btn:first-child { flex: 1 1 100%; }
+  .mis-papeles__avance { padding: 18px; }
 }
 
 /* ── Filtros ── */
-.mis-papeles__filtros {
-  margin-bottom: 8px;
-}
 
-.mis-papeles__filtros :deep(.v-chip) {
-  font-weight: 600;
-}
 
-.mis-papeles__filtros :deep(.mis-papeles__filtro--activo) {
-  background: rgb(var(--v-theme-on-surface)) !important;
-  color: rgb(var(--v-theme-surface)) !important;
-  border-color: rgb(var(--v-theme-on-surface)) !important;
-}
 
 /* ── Secciones por categoría ── */
 .mis-papeles__seccion {
   margin-top: 28px;
 }
 
+
+
+
+.mis-papeles__lista {
+  overflow: hidden;
+}
+
+/* Cabecera de la sección de periódicas (lleva el selector de año) */
 .mis-papeles__seccion-cabecera {
   display: flex;
   align-items: flex-end;
@@ -1440,22 +1375,12 @@ onMounted(async () => {
   color: rgb(var(--v-theme-on-surface));
 }
 
-.mis-papeles__seccion-avance {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: rgba(var(--v-theme-on-surface), 0.65);
-  font-variant-numeric: tabular-nums;
-}
-
 .mis-papeles__seccion-ayuda {
   margin: 4px 0 0;
   font-size: 0.9rem;
   color: rgba(var(--v-theme-on-surface), 0.65);
 }
 
-.mis-papeles__lista {
-  overflow: hidden;
-}
 
 .mis-papeles__anio {
   max-width: 140px;

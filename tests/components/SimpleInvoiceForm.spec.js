@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('/ADSystem/logo.png', () => ({ default: 'mock-logo.png' }));
 vi.mock('/ADSystem/png/svg_logo_ADADAD_3000x3000.png', () => ({ default: 'mock-watermark.png' }));
 import SimpleInvoiceForm from '@/components/forms/client/SimpleInvoiceForm.vue';
+import { hoyISO } from '@/utils/fechas';
 
 // Mock de dependencias para permitir instanciar o probar la lógica del componente
 vi.mock('@/lib/supabaseClient', () => ({
@@ -37,7 +38,7 @@ vi.mock('@/services/municipalConceptsService.js', () => ({ municipalConceptsServ
 describe('SimpleInvoiceForm - Watcher de Invoice en Modo Edición', () => {
 
   it('asigna today como fallback estricto cuando una factura no tiene retentionDate (sin usar issueDate)', () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = hoyISO(); // fecha LOCAL, igual que el componente (con UTC fallaba de 8 pm a medianoche)
     
     // Factura histórica emitida hace 2 semanas sin retentionDate en financial
     const historicalInvoice = {
