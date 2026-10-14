@@ -3,10 +3,17 @@ import { describe, it, expect } from 'vitest'
 import TarjetaKPI from '../TarjetaKPI.vue'
 
 const globalConfig = {
+  mocks: {
+    $vuetify: { display: { mobile: false } },
+  },
   stubs: {
     'v-card': { template: '<div><slot /></div>' },
     'v-card-item': { template: '<div><slot /></div>' },
+    'v-card-text': { template: '<div><slot /></div>' },
     'v-icon': { template: '<i :data-icon="icon" :data-color="color"></i>', props: ['icon', 'color', 'size'] },
+    'v-menu': { template: '<div><slot name="activator" :props="{}" /><slot /></div>' },
+    'v-bottom-sheet': { template: '<div><slot name="activator" :props="{}" /><slot /></div>' },
+    'v-btn': { template: '<button><slot /></button>' },
     AnimatedNumber: {
       props: ['value', 'formatter'],
       template: '<span>{{ formatter ? formatter(value) : value }}</span>',
@@ -84,5 +91,26 @@ describe('TarjetaKPI.vue', () => {
       global: globalConfig,
     })
     expect(wrapper.text()).toContain('10% más que el año pasado')
+  })
+
+  it('ayudaClave muestra el botón de AyudaTermino junto a la etiqueta', () => {
+    const wrapper = mount(TarjetaKPI, {
+      props: { etiqueta: 'Lo que vas a declarar', monto: 50, ayudaClave: 'iva_a_pagar_estimado' },
+      global: globalConfig,
+    })
+    expect(wrapper.findComponent({ name: 'AyudaTermino' }).exists()).toBe(true)
+  })
+
+  it('sin ayudaClave, no monta AyudaTermino', () => {
+    const wrapper = mount(TarjetaKPI, { props: { etiqueta: 'Vendí', monto: 100 }, global: globalConfig })
+    expect(wrapper.findComponent({ name: 'AyudaTermino' }).exists()).toBe(false)
+  })
+
+  it('nota muestra el texto pequeño debajo (ej. "Estimado: ...")', () => {
+    const wrapper = mount(TarjetaKPI, {
+      props: { etiqueta: 'Lo que vas a declarar', monto: 9, nota: 'Estimado: débito − crédito − retenciones.' },
+      global: globalConfig,
+    })
+    expect(wrapper.text()).toContain('Estimado: débito − crédito − retenciones.')
   })
 })

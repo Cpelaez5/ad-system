@@ -1,9 +1,10 @@
 import { test, expect } from './helpers/base.js'
 import { CLIENTE_STORAGE } from './helpers/auth.js'
 
-// Flujo 6 — ¿Cómo voy? (/cliente/dashboard): selector de período, 3
-// tarjetas KPI, sección "Últimos 6 meses"; cambiar a "Mes pasado" cambia el
-// contenido sin errores de consola.
+// Flujo 6 — ¿Cómo voy? (/cliente/dashboard): selector de período, frase de
+// resultado + 3 cifras (Vendí / Gasté / Lo que vas a declarar), sección
+// "Últimos 6 meses"; cambiar a "Mes pasado" cambia el contenido sin errores
+// de consola.
 test.use({ storageState: CLIENTE_STORAGE })
 
 test.describe('Cliente — ¿Cómo voy?', () => {
@@ -19,12 +20,12 @@ test.describe('Cliente — ¿Cómo voy?', () => {
     await expect(selector.getByText('Este año')).toBeVisible()
 
     // Hay datos este año (ver informe E2E), así que con "Este año" las 3
-    // tarjetas KPI y "Últimos 6 meses" deben estar presentes.
+    // cifras en línea y "Últimos 6 meses" deben estar presentes.
     await selector.getByText('Este año').click()
     await expect(page.locator('.tarjeta-kpi')).toHaveCount(3)
     await expect(page.getByText('Vendí', { exact: true })).toBeVisible()
     await expect(page.getByText('Gasté', { exact: true })).toBeVisible()
-    await expect(page.getByText('Me queda', { exact: true })).toBeVisible()
+    await expect(page.getByText('Lo que vas a declarar', { exact: true })).toBeVisible()
     await expect(page.getByText('Últimos 6 meses')).toBeVisible()
 
     // Cambiar a "Mes pasado": cambia el contenido (en este entorno, el

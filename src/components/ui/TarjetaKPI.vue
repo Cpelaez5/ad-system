@@ -8,15 +8,20 @@
     class="tarjeta-kpi ad-move-entrada"
     :style="{ animationDelay: retraso }"
   >
+    <template v-if="ayudaClave" #etiqueta-extra>
+      <AyudaTermino :clave="ayudaClave" />
+    </template>
     <div v-if="texto" class="tarjeta-kpi__comparacion mt-2 d-flex align-center ga-1">
       <v-icon :icon="icono" :color="colorComparacion" size="16" />
       <span class="text-caption" :class="claseTexto">{{ texto }}</span>
     </div>
+    <p v-if="nota" class="tarjeta-kpi__nota text-caption text-medium-emphasis mt-1 mb-0">{{ nota }}</p>
   </ResumenMonto>
 </template>
 
 <script>
 import ResumenMonto from './ResumenMonto.vue'
+import AyudaTermino from './AyudaTermino.vue'
 import { textoComparacion, UMBRAL_SIN_CAMBIO } from '@/utils/resumenFinanciero'
 import { ESCALON_LISTA_MS } from './movimiento.js'
 
@@ -37,7 +42,7 @@ import { ESCALON_LISTA_MS } from './movimiento.js'
 export default {
   name: 'TarjetaKPI',
 
-  components: { ResumenMonto },
+  components: { ResumenMonto, AyudaTermino },
 
   props: {
     etiqueta: { type: String, required: true },
@@ -59,6 +64,10 @@ export default {
     etiquetaPeriodoAnterior: { type: String, default: 'el período anterior' },
     /** Índice de la tarjeta dentro de su fila, para escalonar la entrada. */
     indice: { type: Number, default: 0 },
+    /** Clave del glosario (AyudaTermino) a mostrar junto a la etiqueta. Vacío = sin ayuda. */
+    ayudaClave: { type: String, default: '' },
+    /** Nota pequeña debajo de la comparación (ej. "Estimado: ..."). Vacío = sin nota. */
+    nota: { type: String, default: '' },
   },
 
   computed: {
