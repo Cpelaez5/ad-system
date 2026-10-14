@@ -32,7 +32,7 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 ## 4. Datos y correcciones supervisadas
 | Tarea | Hoy | Herramienta futura |
 |---|---|---|
-| Corregir **compras de mercancía sin movimiento de inventario** (bug corregido el 2026-10-14; 10 compras en 4 negocios) | Script supervisado | "Reprocesar inventario de esta factura" con vista previa antes → después |
+| Corregir **compras de mercancía sin movimiento de inventario** (bug corregido el 2026-10-14). **Hecho:** 3 compras de 2 negocios reales (28 productos, 78 unidades; movimientos con descripción "Corrección: …"). **Falta:** 2 compras de otro negocio con 4 líneas escritas sin producto (crearlo o elegirlo a mano), y las 4 de la cuenta de prueba (no se tocaron porque tienen ajustes manuales) | `scripts/reprocesar-compras-sin-inventario.sql` | "Reprocesar inventario de esta factura" con vista previa antes → después |
 | Revisar **proveedores con RIF inventado** (`PROV-…`) creados por la sincronización antigua | SQL | Lista de proveedores con datos dudosos, con Fusionar / Corregir |
 | Revisar clientes duplicados de la migración (mismo cliente con y sin RIF) | `clientes_negocio`, SQL | Fusionar clientes |
 | Mover empresas autorregistradas cuando haya más de un despacho | Pendiente desde el 2026-10-13 | Transferir empresa entre despachos, con consentimiento |
