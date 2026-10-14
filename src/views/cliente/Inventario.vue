@@ -29,6 +29,7 @@
           </template>
           <v-list density="comfortable" min-width="240">
             <v-list-item prepend-icon="mdi-file-document-outline" title="Escanear documento (IA)" @click="adjustmentDialog = true" />
+            <v-list-item prepend-icon="mdi-file-excel-outline" title="Importar desde Excel" @click="importarDialog = true" />
             <v-divider />
             <v-list-item prepend-icon="mdi-cash-multiple" title="Exportar inventario valorizado" @click="downloadValuation" />
             <v-list-item prepend-icon="mdi-history" title="Exportar Kardex global" @click="downloadKardex" />
@@ -452,6 +453,7 @@
       </template>
     </DialogoAdaptable>
 
+    <ImportarProductosDialog v-model="importarDialog" @importado="() => { loadDashboard(); loadProducts(); }" />
     <InventoryAdjustmentDialog
       v-model="adjustmentDialog"
       @saved="() => { loadDashboard(); loadProducts(); }"
@@ -534,6 +536,7 @@
 <script>
 import inventoryService from '@/services/inventoryService'
 import inventoryExportService from '@/services/inventoryExportService'
+import ImportarProductosDialog from '@/components/inventario/ImportarProductosDialog.vue'
 import InventoryAdjustmentDialog from '@/components/inventory/InventoryAdjustmentDialog.vue'
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
 import EstadoVacio from '@/components/ui/EstadoVacio.vue'
@@ -548,6 +551,7 @@ import { startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, en
 export default {
   name: 'ClienteInventario',
   components: {
+    ImportarProductosDialog,
     InventoryAdjustmentDialog,
     EncabezadoPagina,
     EstadoVacio,
@@ -559,6 +563,7 @@ export default {
   },
   data() {
     return {
+      importarDialog: false,
       activeTab: 'dashboard',
 
       // Date Filters

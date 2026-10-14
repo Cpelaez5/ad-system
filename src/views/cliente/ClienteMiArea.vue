@@ -437,6 +437,8 @@
           </v-col>
         </v-row>
       </section>
+
+      <ConexionesApi v-if="currentUser?.role === 'cliente'" />
     </template>
 
     <!-- Modal de Cambio de Contraseña -->
@@ -525,6 +527,7 @@ import sealService from '@/services/seal-service';
 import venezuelaLocationsService from '@/services/venezuelaLocationsService';
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue';
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
+import ConexionesApi from '@/components/cliente/ConexionesApi.vue';
 import ListaPasos from '@/components/ui/ListaPasos.vue';
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
 import AvisoAmable from '@/components/ui/AvisoAmable.vue';
@@ -533,6 +536,7 @@ import AyudaTermino from '@/components/ui/AyudaTermino.vue';
 export default {
   name: 'ClienteMiArea',
   components: {
+    ConexionesApi,
     EncabezadoPagina,
     DialogoAdaptable,
     ListaPasos,
