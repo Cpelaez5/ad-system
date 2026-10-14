@@ -131,7 +131,7 @@ const GLOSARIO = {
   licencia_actividad_economica: {
     termino: 'Licencia de Actividad Económica',
     simple: 'Permiso de la alcaldía',
-    explicacion: 'Es el permiso que te da la alcaldía para poder tener tu negocio abierto al público. Sin esto no puedes trabajar legalmente.'
+    explicacion: 'Es el permiso que te da la alcaldía para poder tener tu negocio abierto al público (también se le dice Patente de Industria y Comercio). Sin esto no puedes trabajar legalmente.'
   },
   declaracion_iva: {
     termino: 'Declaración de IVA',
