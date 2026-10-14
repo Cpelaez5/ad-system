@@ -61,13 +61,54 @@ describe('SimpleInvoiceForm - Manejo de Multi-Moneda y Tasa de Cambio Flexible (
           exchangeRate: 40.00
         }
       },
-      rateSourceLabel: 'BCV hoy'
+      rateSourceLabel: 'BCV hoy',
+      guardarTasaDeMonedaActual: SimpleInvoiceForm.methods.guardarTasaDeMonedaActual
     };
+    vm.guardarTasaDeMonedaActual = vm.guardarTasaDeMonedaActual.bind(vm);
 
     SimpleInvoiceForm.methods.onManualExchangeRateChange.call(vm, 42.10);
 
     expect(vm.formData.financial.exchangeRate).toBe(42.10);
+    expect(vm.formData.financial.tasas.USD).toBe(42.10);
     expect(vm.rateSourceLabel).toBe('Tasa manual personalizada');
+  });
+
+  it('una tasa manual de yuan queda en financial.tasas.CNY sin tocar la del dólar', () => {
+    const vm = {
+      formData: { financial: { currency: 'CNY', exchangeRate: 40, tasas: { USD: 40 } } },
+      rateSourceLabel: '',
+      guardarTasaDeMonedaActual: null
+    };
+    vm.guardarTasaDeMonedaActual = SimpleInvoiceForm.methods.guardarTasaDeMonedaActual.bind(vm);
+
+    SimpleInvoiceForm.methods.onManualExchangeRateChange.call(vm, '5,6'.replace(',', '.'));
+
+    expect(vm.formData.financial.exchangeRate).toBe(40);
+    expect(vm.formData.financial.tasas).toEqual({ USD: 40, CNY: 5.6 });
+  });
+
+  it('la tasa activa de una moneda "otra" sale de financial.tasas', () => {
+    const vm = { formData: { financial: { currency: 'CNY', tasas: { CNY: 5.6 } } }, esOtraMoneda: true };
+    expect(SimpleInvoiceForm.computed.currentExchangeRateValue.call(vm)).toBe(5.6);
+  });
+
+  it('construye financial.tasas con todas las tasas del día y las editadas por factura', () => {
+    const hoy = new Date();
+    const iso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+    const vm = {
+      formData: {
+        issueDate: iso,
+        financial: { exchangeRate: 45, exchangeRateEur: 1, tasas: { CNY: 5.6 } }
+      },
+      tasasHoy: { USD: 40, EUR: 50, TRY: 1.2 }
+    };
+    const tasas = SimpleInvoiceForm.methods.construirTasasFactura.call(vm);
+    // USD editada para esta factura (45), EUR vigente (la de la factura = 1 es relleno), CNY escrita, TRY vigente
+    expect(tasas).toEqual({ USD: 45, EUR: 50, TRY: 1.2, CNY: 5.6 });
+
+    // Factura de otro día: no se le pegan las tasas de hoy
+    vm.formData.issueDate = '2020-01-01';
+    expect(SimpleInvoiceForm.methods.construirTasasFactura.call(vm)).toEqual({ USD: 45, CNY: 5.6 });
   });
 
   it('el botón Tasa Fecha Factura consulta la tasa histórica exacta de la fecha emitida', async () => {
@@ -202,16 +243,21 @@ describe('SimpleInvoiceForm - Manejo de Multi-Moneda y Tasa de Cambio Flexible (
       rateSourceLabel: '',
       isEditingExchangeRate: true,
       fetchExchangeRate: null,
-      showSnackbar: vi.fn()
+      showSnackbar: vi.fn(),
+      modoTasa: 'automatica',
+      tasasHoy: {}
     };
     vm.fetchExchangeRate = function(date, isManualToday, isUserClick) {
       return SimpleInvoiceForm.methods.fetchExchangeRate.call(vm, date, isManualToday, isUserClick);
     };
+    vm.obtenerTasaVigente = SimpleInvoiceForm.methods.obtenerTasaVigente.bind(vm);
 
     await SimpleInvoiceForm.methods.applyTodayRate.call(vm);
 
     expect(bcvService.getCurrentRate).toHaveBeenCalled();
     expect(vm.formData.financial.exchangeRate).toBe(832.48);
+    expect(vm.formData.financial.exchangeRateEur).toBe(968.06);
+    expect(vm.formData.financial.tasas).toEqual({ USD: 832.48, EUR: 968.06 });
     expect(vm.rateSourceLabel).toBe('BCV oficial hoy');
     expect(vm.isEditingExchangeRate).toBe(false);
   });

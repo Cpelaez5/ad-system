@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const filaClientes = { data: null, error: null }
+const filaInvoices = { data: [], error: null }
 const update = vi.fn()
 const eq = vi.fn()
 vi.mock('@/lib/supabaseClient', () => ({
   supabase: {
     from: vi.fn(() => ({
-      select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(() => Promise.resolve(filaClientes)) })) })),
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn(() => Promise.resolve(filaClientes)),
+          is: vi.fn(() => ({ limit: vi.fn(() => Promise.resolve(filaInvoices)) }))
+        }))
+      })),
       update: (...a) => { update(...a); return { eq: (...b) => { eq(...b); return Promise.resolve({ error: filaClientes.updateError || null }) } } }
     }))
   }
@@ -16,7 +22,7 @@ const getCurrentRate = vi.fn()
 vi.mock('@/services/bcvService.js', () => ({ default: { getCurrentRate: (...a) => getCurrentRate(...a) } }))
 
 import { getCurrentClientId } from '@/utils/tenantHelpers'
-import { preferencia, guardarPreferencia, tasasVigentes, diasDeAntiguedad, _reiniciar } from '@/services/tasaService.js'
+import { preferencia, guardarPreferencia, tasasVigentes, monedasUsadas, diasDeAntiguedad, _reiniciar } from '@/services/tasaService.js'
 
 const AHORA = new Date(2026, 9, 14)
 const bcvOk = (extra = {}) => ({
@@ -66,6 +72,21 @@ describe('preferencia', () => {
     filaClientes.error = null
     filaClientes.data = null
     expect((await preferencia()).modo).toBe('automatica')
+  })
+})
+
+describe('monedasUsadas', () => {
+  it('devuelve las monedas extranjeras usadas, en orden y sin repetir', async () => {
+    filaInvoices.data = [{ moneda: 'VES' }, { moneda: 'CNY' }, { moneda: 'USD' }, { moneda: 'CNY' }, { moneda: null }, { moneda: 'XXX' }]
+    filaInvoices.error = null
+    expect(await monedasUsadas()).toEqual(['USD', 'CNY'])
+  })
+  it('ante un error o sin negocio devuelve []', async () => {
+    filaInvoices.error = { message: 'x' }
+    expect(await monedasUsadas()).toEqual([])
+    filaInvoices.error = null
+    getCurrentClientId.mockReturnValue(null)
+    expect(await monedasUsadas()).toEqual([])
   })
 })
 
