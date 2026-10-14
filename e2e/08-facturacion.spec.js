@@ -59,10 +59,14 @@ test.describe('Cliente — Facturación (Mis movimientos)', () => {
 
     // "Sin hacer scroll": el botón ya está dentro del viewport apenas abre,
     // no hace falta bajar la página para alcanzarlo.
+    // El diálogo entra deslizándose desde abajo: se mide cuando terminó de llegar
+    // (antes se medía a mitad de la animación y daba posiciones de más).
+    await expect.poll(async () => {
+      const b = await cancelar.boundingBox()
+      return b ? Math.round(b.y + b.height) : Infinity
+    }, { timeout: 5000 }).toBeLessThanOrEqual(844)
     const box = await cancelar.boundingBox()
-    expect(box).not.toBeNull()
     expect(box.y).toBeGreaterThanOrEqual(0)
-    expect(box.y + box.height).toBeLessThanOrEqual(844)
 
     await cancelar.click()
     await expect(cancelar).toBeHidden()

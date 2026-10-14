@@ -1,6 +1,6 @@
 <template>
   <v-card class="sif-card" @submit.prevent="handleSubmit">
-  <v-form ref="form">
+  <v-form ref="form" class="sif-form">
 
     <!-- ══════════════════════════════════════════════════════════════════
          MODO SIMPLE — pantalla de éxito (tras guardar, ver handleSubmit /
@@ -3789,12 +3789,25 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
+  max-height: 100%;
+  min-height: 0;
 }
 
-/* v-card-text: Vuetify agrega overflow-y:auto automáticamente cuando scrollable=true en el dialog */
+/* El <v-form> va entre la card y su contenido, así que el overflow automático de
+   Vuetify (que exige .v-card > .v-card-text directo) no aplicaba: en el teléfono el
+   formulario medía ~2500px y "Cancelar" quedaba fuera de alcance (E2E 2026-10-14).
+   El form es una columna flexible; solo .sif-body hace scroll; cabecera y pie fijos. */
+.sif-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .sif-body {
-  flex: 1;
-  /* NO establecer max-height aquí — lo maneja Vuetify con scrollable */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .sif-header { background: #fafafa; white-space: normal; }

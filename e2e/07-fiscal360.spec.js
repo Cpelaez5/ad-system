@@ -13,7 +13,7 @@ test.describe('Cliente — Mis papeles del negocio', () => {
 
     // Avance: "X de Y papeles al día" + un segmento por papel.
     await expect(page.getByText(/papeles? al día/).first()).toBeVisible()
-    await expect(page.locator('.barra-papeles__segmento').first()).toBeVisible()
+    await expect(page.locator('.barra-segmentos__segmento').first()).toBeVisible()
 
     // Siguiente paso (o el mensaje de "todo al día").
     await expect(page.getByText('Tu siguiente paso').or(page.getByText('¡Tu negocio está al día!'))).toBeVisible()
