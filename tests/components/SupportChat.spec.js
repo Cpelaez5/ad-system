@@ -321,7 +321,7 @@ describe('SupportChat', () => {
       await w.get('textarea.hilo__campo').setValue('Gracias')
       await w.get('form.hilo__form').trigger('submit')
       await flushPromises()
-      expect(soporte.responderComoCliente).toHaveBeenCalledWith('c1', 'Gracias')
+      expect(soporte.responderComoCliente).toHaveBeenCalledWith('c1', 'Gracias', undefined) // sin capturas adjuntas
       expect(w.text()).toContain('Gracias')
 
       await w.findAll('button').find((b) => b.text().includes('Ya se resolvió')).trigger('click')
