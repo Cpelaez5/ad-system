@@ -29,7 +29,15 @@
       rows="5"
       maxlength="1500"
       placeholder="Escribe aquí con tus palabras"
+      @paste="alPegar"
+      @dragover="alArrastrar"
+      @drop="alSoltar"
     ></textarea>
+    <div class="paso__adjuntar">
+      <BotonAdjuntar :deshabilitado="lleno || enviando" @archivos="agregar" />
+      <span class="paso__ayuda">Puedes agregar capturas de pantalla (hasta 4).</span>
+    </div>
+    <AdjuntosPendientes :pendientes="pendientes" :aviso="aviso" @quitar="quitar" />
     <p v-if="error" class="paso__error" role="alert">{{ error }}</p>
 
     <div class="paso__acciones">
@@ -48,6 +56,9 @@
  */
 import { computed, ref, watch } from 'vue'
 import { PROMESA_RESPUESTA, TEMAS } from '@/utils/soporte.js'
+import AdjuntosPendientes from './AdjuntosPendientes.vue'
+import BotonAdjuntar from './BotonAdjuntar.vue'
+import { useAdjuntosPendientes } from '@/composables/useAdjuntosPendientes'
 
 const props = defineProps({
   temaInicial: { type: String, default: '' },
@@ -62,12 +73,17 @@ const mensaje = ref(props.mensajeInicial)
 watch(() => props.temaInicial, (v) => { if (!tema.value) tema.value = v })
 watch(() => props.mensajeInicial, (v) => { if (!mensaje.value) mensaje.value = v })
 
-const puedeEnviar = computed(() => !!tema.value && mensaje.value.trim().length >= 5 && !props.enviando)
+const { pendientes, archivos, aviso, lleno, agregar, quitar, limpiar, alPegar, alArrastrar, alSoltar } = useAdjuntosPendientes()
+const puedeEnviar = computed(() =>
+  !!tema.value && (mensaje.value.trim().length >= 5 || pendientes.value.length > 0) && !props.enviando)
 
 function enviar() {
   if (!puedeEnviar.value) return
-  emit('enviar', { categoria: tema.value, mensaje: mensaje.value.trim() })
+  emit('enviar', { categoria: tema.value, mensaje: mensaje.value.trim(), archivos: [...archivos.value] })
 }
+
+// Al terminar un envío sin error se limpian las imágenes (el padre cierra el paso).
+watch(() => props.enviando, (ahora, antes) => { if (antes && !ahora && !props.error) limpiar() })
 </script>
 
 <style scoped>
@@ -98,6 +114,8 @@ function enviar() {
   border: 1.5px solid rgba(var(--v-theme-on-surface), 0.3);
 }
 .paso__texto:focus { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: 1px; }
+.paso__adjuntar { display: flex; align-items: center; gap: 8px; }
+.paso__ayuda { font-size: 0.9375rem; color: rgba(var(--v-theme-on-surface), 0.75); }
 .paso__error { margin: 0; color: rgb(var(--v-theme-error)); font-weight: 600; }
 .paso__acciones { display: flex; flex-direction: column; gap: 4px; }
 </style>

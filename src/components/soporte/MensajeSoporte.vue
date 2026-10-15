@@ -2,12 +2,13 @@
   <div class="msg" :class="[`msg--${lado}`, { 'msg--nota': mensaje.interno }]">
     <div class="msg__burbuja">
       <span v-if="autor" class="msg__autor">{{ autor }}</span>
-      <p class="msg__texto">
+      <p v-if="tieneTexto" class="msg__texto">
         <template v-for="(p, i) in partes" :key="i">
           <strong v-if="p.negrita">{{ p.texto }}</strong>
           <template v-else>{{ p.texto }}</template>
         </template>
       </p>
+      <AdjuntosMensaje :mensaje="mensaje" />
       <span v-if="mensaje.created_at" class="msg__hora">{{ hora }}</span>
     </div>
   </div>
@@ -19,6 +20,7 @@
  * equipo o nota interna). El texto se pinta sin v-html: solo **negritas**.
  */
 import { computed } from 'vue'
+import AdjuntosMensaje from './AdjuntosMensaje.vue'
 import { NOMBRE_EQUIPO, partesTexto } from '@/utils/soporte.js'
 
 const props = defineProps({
@@ -43,6 +45,7 @@ const autor = computed(() => {
   return ''
 })
 
+const tieneTexto = computed(() => !!String(props.mensaje.content || '').trim())
 const partes = computed(() => partesTexto(props.mensaje.content))
 const hora = computed(() =>
   new Date(props.mensaje.created_at).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),

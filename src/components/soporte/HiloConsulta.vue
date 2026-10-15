@@ -40,7 +40,9 @@
       >
         Ya se resolvió
       </v-btn>
-      <form class="hilo__form" @submit.prevent="enviar">
+      <AdjuntosPendientes :pendientes="pendientes" :aviso="aviso" @quitar="quitar" />
+      <form class="hilo__form" @submit.prevent="enviar" @dragover="alArrastrar" @drop="alSoltar">
+        <BotonAdjuntar :deshabilitado="lleno || enviando" @archivos="agregar" />
         <textarea
           v-model="texto"
           class="hilo__campo"
@@ -49,8 +51,9 @@
           :placeholder="resuelta ? 'Escribe aquí si necesitas algo más' : 'Escribe tu respuesta'"
           aria-label="Tu mensaje al equipo"
           @keydown.enter.exact.prevent="enviar"
+          @paste="alPegar"
         ></textarea>
-        <v-btn type="submit" icon="mdi-send" color="primary" aria-label="Enviar" :disabled="!texto.trim() || enviando" :loading="enviando" />
+        <v-btn type="submit" icon="mdi-send" color="primary" aria-label="Enviar" :disabled="!puedeEnviar" :loading="enviando" />
       </form>
     </div>
   </div>
@@ -64,6 +67,9 @@
  */
 import { computed, nextTick, ref, watch } from 'vue'
 import MensajeSoporte from './MensajeSoporte.vue'
+import AdjuntosPendientes from './AdjuntosPendientes.vue'
+import BotonAdjuntar from './BotonAdjuntar.vue'
+import { useAdjuntosPendientes } from '@/composables/useAdjuntosPendientes'
 import { ESTADOS_PARA_CLIENTE, numeroTicket, textoConfirmacion, textoTema } from '@/utils/soporte.js'
 
 const props = defineProps({
@@ -80,12 +86,22 @@ const contenedor = ref(null)
 const resuelta = computed(() => props.consulta.estado_ticket === 'resuelto')
 const calificacion = computed(() => props.consulta.calificacion || 0)
 
+const { pendientes, archivos, aviso, lleno, agregar, quitar, limpiar, alPegar, alArrastrar, alSoltar } = useAdjuntosPendientes()
+const puedeEnviar = computed(() => (!!texto.value.trim() || pendientes.value.length > 0) && !props.enviando)
+
+/** Emite { texto, archivos }: el padre sube las imágenes y guarda el mensaje. */
 function enviar() {
-  const t = texto.value.trim()
-  if (!t || props.enviando) return
-  emit('enviar', t)
-  texto.value = ''
+  if (!puedeEnviar.value) return
+  emit('enviar', { texto: texto.value.trim(), archivos: [...archivos.value] })
 }
+
+// Se vacía el cuadro solo si el envío salió bien: si falla, no se pierde lo escrito ni las imágenes.
+watch(() => props.enviando, (ahora, antes) => {
+  if (antes && !ahora && !props.error) {
+    texto.value = ''
+    limpiar()
+  }
+})
 
 watch(() => props.mensajes.length, async () => {
   await nextTick()
