@@ -121,7 +121,8 @@ const series = computed(() => {
 </script>
 
 <style scoped>
-.uso-ia { max-width: 960px; margin: 0 auto; padding-bottom: 32px; }
+.uso-ia { max-width: 960px; margin: 0 auto; padding: 24px 16px 32px; }
+@media (min-width: 960px) { .uso-ia { padding: 32px 24px 40px; } }
 
 .uso-ia__cifras {
   display: grid;

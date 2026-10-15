@@ -485,22 +485,34 @@ const MESES_LARGOS = [
 ]
 
 /**
- * Frase de resultado del período para la cabecera de "¿Cómo voy?"
- * ("En octubre te quedan $X: vendiste $Y y gastaste $Z."). Usa los mismos
- * totales en USD que las cifras en línea (Vendí/Gasté) — no vuelve a
- * convertir nada.
+ * Resultado del período para la cabecera de "¿Cómo voy?". Antes era una frase
+ * ("En 2026 te quedan -$ 43.776,45: vendiste … y gastaste …") que repetía las cifras
+ * de Vendí/Gasté de abajo y, con pérdida, mostraba un "te quedan" negativo.
+ * Ahora devuelve las piezas para mostrarlo como dato: etiqueta del período, monto
+ * SIN signo, tono (ganancia | perdida | equilibrio) y una frase llana sin cifras.
+ * Usa los mismos totales en USD que Vendí/Gasté — no vuelve a convertir nada.
  */
-export function fraseResultado(periodo, totalVendi, totalGaste, fechaReferencia = new Date()) {
-  const meQueda = (Number(totalVendi) || 0) - (Number(totalGaste) || 0)
-  const monto = (v) => formatMoney(v, 'USD')
+export function resultadoPeriodo(periodo, totalVendi, totalGaste, fechaReferencia = new Date()) {
+  const diferencia = (Number(totalVendi) || 0) - (Number(totalGaste) || 0)
+  const pasado = periodo === 'mes_pasado'
+  let nombre
+  if (periodo === 'este_anio') nombre = String(fechaReferencia.getFullYear())
+  else if (pasado) nombre = MESES_LARGOS[(fechaReferencia.getMonth() - 1 + 12) % 12]
+  else nombre = MESES_LARGOS[fechaReferencia.getMonth()]
 
-  if (periodo === 'mes_pasado') {
-    const mes = MESES_LARGOS[(fechaReferencia.getMonth() - 1 + 12) % 12]
-    return `En ${mes} te quedaron ${monto(meQueda)}: vendiste ${monto(totalVendi)} y gastaste ${monto(totalGaste)}.`
+  // Menos de un centavo de diferencia cuenta como "quedaste igual".
+  const tono = Math.abs(diferencia) < 0.005 ? 'equilibrio' : diferencia > 0 ? 'ganancia' : 'perdida'
+  const frases = {
+    ganancia: pasado ? 'Te quedó: vendiste más de lo que gastaste.' : 'Te queda: vendes más de lo que gastas.',
+    perdida: pasado ? 'Gastaste más de lo que vendiste.' : 'Vas gastando más de lo que vendes.',
+    equilibrio: 'Vendiste lo mismo que gastaste.',
   }
-  if (periodo === 'este_anio') {
-    return `En ${fechaReferencia.getFullYear()} te quedan ${monto(meQueda)}: vendiste ${monto(totalVendi)} y gastaste ${monto(totalGaste)}.`
+  return {
+    etiqueta: `Resultado de ${nombre}`,
+    monto: Math.abs(diferencia),
+    tono,
+    frase: frases[tono],
+    // Pista amable solo con pérdida: muchas veces faltan ventas por anotar.
+    pista: tono === 'perdida' ? '¿Te faltan ventas por anotar? Regístralas para ver tu resultado real.' : '',
   }
-  const mes = MESES_LARGOS[fechaReferencia.getMonth()]
-  return `En ${mes} te quedan ${monto(meQueda)}: vendiste ${monto(totalVendi)} y gastaste ${monto(totalGaste)}.`
 }

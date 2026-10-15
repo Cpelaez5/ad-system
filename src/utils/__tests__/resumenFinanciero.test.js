@@ -20,7 +20,7 @@ import {
   topProveedores,
   calcularVariacion,
   textoComparacion,
-  fraseResultado,
+  resultadoPeriodo,
   UMBRAL_SIN_CAMBIO,
   SIN_CATEGORIA,
   SIN_NOMBRE_CLIENTE,
@@ -364,30 +364,33 @@ describe('calcularIvaEstimado (diferenciador D1: "Lo que vas a declarar")', () =
   })
 })
 
-describe('fraseResultado', () => {
-  const hoy = new Date(2026, 9, 13) // 13 oct 2026
+describe('resultadoPeriodo', () => {
+  const hoy = new Date(2026, 9, 15) // 15 de octubre de 2026
 
-  it('este_mes: en presente, con el nombre del mes actual', () => {
-    expect(fraseResultado('este_mes', 300, 100, hoy)).toBe(
-      'En octubre te quedan $ 200,00: vendiste $ 300,00 y gastaste $ 100,00.'
-    )
+  it('con ganancia: monto positivo, tono ganancia, sin cifras en la frase', () => {
+    const r = resultadoPeriodo('este_mes', 300, 100, hoy)
+    expect(r).toMatchObject({ etiqueta: 'Resultado de octubre', monto: 200, tono: 'ganancia', pista: '' })
+    expect(r.frase).not.toMatch(/\d/)
   })
 
-  it('mes_pasado: en pasado, con el mes anterior', () => {
-    expect(fraseResultado('mes_pasado', 300, 100, hoy)).toBe(
-      'En septiembre te quedaron $ 200,00: vendiste $ 300,00 y gastaste $ 100,00.'
-    )
+  it('con pérdida: el monto va sin signo y se ofrece la pista de ventas faltantes', () => {
+    const r = resultadoPeriodo('este_anio', 9.02, 43785.47, hoy)
+    expect(r.etiqueta).toBe('Resultado de 2026')
+    expect(r.monto).toBeCloseTo(43776.45, 2)
+    expect(r.tono).toBe('perdida')
+    expect(r.frase).toBe('Vas gastando más de lo que vendes.')
+    expect(r.pista).toContain('ventas por anotar')
   })
 
-  it('este_anio: en presente, con el año', () => {
-    expect(fraseResultado('este_anio', 300, 100, hoy)).toBe(
-      'En 2026 te quedan $ 200,00: vendiste $ 300,00 y gastaste $ 100,00.'
-    )
+  it('mes pasado usa el nombre del mes anterior y verbos en pasado', () => {
+    const r = resultadoPeriodo('mes_pasado', 50, 80, hoy)
+    expect(r.etiqueta).toBe('Resultado de septiembre')
+    expect(r.frase).toBe('Gastaste más de lo que vendiste.')
+    expect(resultadoPeriodo('mes_pasado', 50, 10, new Date(2026, 0, 5)).etiqueta).toBe('Resultado de diciembre')
   })
 
-  it('mes_pasado en enero usa diciembre del año anterior (no se rompe en el borde del año)', () => {
-    const eneroHoy = new Date(2026, 0, 10)
-    expect(fraseResultado('mes_pasado', 50, 10, eneroHoy)).toContain('En diciembre')
+  it('sin diferencia queda en equilibrio', () => {
+    expect(resultadoPeriodo('este_mes', 100, 100.001, hoy).tono).toBe('equilibrio')
   })
 })
 

@@ -127,7 +127,8 @@ const accesos = [
 </script>
 
 <style scoped>
-.inicio-sa { max-width: 960px; margin: 0 auto; padding-bottom: 32px; }
+.inicio-sa { max-width: 960px; margin: 0 auto; padding: 24px 16px 32px; }
+@media (min-width: 960px) { .inicio-sa { padding: 32px 24px 40px; } }
 .inicio-sa__frase { font-size: 1.125rem; line-height: 1.5; margin: 0 0 20px; color: rgba(var(--v-theme-on-surface), 0.87); }
 
 .grafico { padding: 16px; }

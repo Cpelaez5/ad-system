@@ -75,6 +75,7 @@ import MenuLateral from './MenuLateral.vue';
 import ClienteBottomNav from './ClienteBottomNav.vue';
 import TrialBanner from './TrialBanner.vue';
 import BloqueoInactividad from './BloqueoInactividad.vue';
+import { tituloEnVista } from '@/composables/useTituloEnVista';
 
 const MENU_MODO_KEY = 'ad_system_menu_modo';
 // Clave anterior (rail sí/no): se respeta al migrar para no cambiarle el menú a nadie.
@@ -149,8 +150,10 @@ export default {
     sidebarExpanded() {
       return this.isLgUp && this.modoMenu === 'fijo';
     },
+    // Si el h1 de la vista ya dice el nombre, la barra no lo repite (aparece al hacer scroll).
     tituloPagina() {
-      return this.$route?.meta?.title || 'Sistema Contable';
+      if (tituloEnVista.value) return '';
+      return this.$route?.meta?.title || 'AD System';
     },
     isClientProfileIncomplete() {
       if (this.currentUser?.role !== 'cliente') return false;

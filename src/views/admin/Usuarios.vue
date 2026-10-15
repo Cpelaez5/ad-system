@@ -345,6 +345,7 @@ async function borrarEnCascada() {
 </script>
 
 <style scoped>
-.usuarios { max-width: 1120px; margin: 0 auto; padding-bottom: 32px; }
+.usuarios { max-width: 1120px; margin: 0 auto; padding: 24px 16px 32px; }
+@media (min-width: 960px) { .usuarios { padding: 32px 24px 40px; } }
 .sin-resultados { padding: 20px 16px; text-align: center; color: rgba(var(--v-theme-on-surface), 0.68); }
 </style>

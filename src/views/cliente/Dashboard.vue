@@ -1,7 +1,6 @@
 <template>
   <v-container fluid class="dashboard-como-voy pa-4 pa-md-6">
-    <h1 class="text-h4 mb-1">¿Cómo voy?</h1>
-    <p class="text-medium-emphasis mb-4">Tus números, sin jerga contable.</p>
+    <EncabezadoPagina titulo="¿Cómo voy?" subtitulo="Tus números, sin jerga contable." />
 
     <!-- ═══ CARGANDO ═══ -->
     <template v-if="loading">
@@ -36,13 +35,16 @@
     <template v-else>
       <SelectorPeriodo v-model="periodo" class="mb-4" />
 
-      <!-- Frase de resultado del período, en llano (reemplaza la vieja
-           tarjeta "Me queda": ese número ya vive aquí). Solo con movimientos
-           — con el período vacío, el EstadoVacio de abajo ya explica qué
-           hacer. -->
-      <p v-if="tieneMovimientos" class="text-h6 font-weight-regular mb-4 dashboard-como-voy__frase">
-        {{ fraseDeResultado }}
-      </p>
+      <!-- Resultado del período como dato (monto sin signo + tono + frase llana), no
+           como una frase con cifras: Vendí/Gasté ya están justo debajo. Solo con
+           movimientos — con el período vacío, el EstadoVacio de abajo explica qué hacer. -->
+      <ResultadoPeriodo
+        v-if="tieneMovimientos"
+        :resultado="resultadoDelPeriodo"
+        :factor-bs="factorBs"
+        class="mb-4"
+        @registrar="registrarVenta"
+      />
 
       <!-- Hallazgo #5: nunca se suman bolívares como si fueran dólares; si a
            alguna factura le falta toda tasa (guardada y BCV), se avisa en
@@ -244,6 +246,8 @@
 // componentes de src/components/ui/.
 // ═══════════════════════════════════════════════════════════
 
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import ResultadoPeriodo from '@/components/ui/ResultadoPeriodo.vue'
 import SelectorPeriodo from '@/components/ui/SelectorPeriodo.vue'
 import TarjetaKPI from '@/components/ui/TarjetaKPI.vue'
 import SeccionPanel from '@/components/ui/SeccionPanel.vue'
@@ -275,13 +279,15 @@ import {
   topClientes,
   calcularVariacion,
   desglosarIvaEstimado,
-  fraseResultado,
+  resultadoPeriodo,
 } from '@/utils/resumenFinanciero'
 
 export default {
   name: 'ClienteDashboardComoVoy',
 
   components: {
+    EncabezadoPagina,
+    ResultadoPeriodo,
     SelectorPeriodo,
     TarjetaKPI,
     SeccionPanel,
@@ -349,8 +355,8 @@ export default {
       return this.totalVendi - this.totalGaste
     },
     /** Frase de resultado del período en llano, arriba de las 3 cifras (sustituye la vieja tarjeta "Me queda"). */
-    fraseDeResultado() {
-      return fraseResultado(this.periodo, this.totalVendi, this.totalGaste)
+    resultadoDelPeriodo() {
+      return resultadoPeriodo(this.periodo, this.totalVendi, this.totalGaste)
     },
 
     /** Facturas del período elegido que no se pudieron convertir a USD (ninguna tasa disponible). */
@@ -581,6 +587,11 @@ export default {
       this.$router.push('/cliente/inicio?registrar=compra')
     },
 
+    /** Pista del resultado con pérdida: suele faltar anotar ventas. */
+    registrarVenta() {
+      this.$router.push('/cliente/inicio?registrar=venta')
+    },
+
     /** Acción del aviso "categoriza tus compras" — a la pestaña de compras de Mis movimientos. */
     irACategorizar() {
       this.$router.push({ name: 'ClienteFacturacion', query: { tab: 'compras' } })
@@ -601,11 +612,6 @@ export default {
 .dashboard-como-voy {
   background-color: rgb(var(--v-theme-background));
   min-height: 100vh;
-}
-
-.dashboard-como-voy__frase {
-  max-width: 62ch;
-  text-wrap: balance;
 }
 
 /* Transición cruzada al cambiar de período (ver movimiento.js): un fundido

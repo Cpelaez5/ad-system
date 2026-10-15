@@ -118,7 +118,8 @@ const pendientes = [
 </script>
 
 <style scoped>
-.operacion { max-width: 960px; margin: 0 auto; padding-bottom: 32px; }
+.operacion { max-width: 960px; margin: 0 auto; padding: 24px 16px 32px; }
+@media (min-width: 960px) { .operacion { padding: 32px 24px 40px; } }
 
 .operacion__tarjetas {
   display: grid;

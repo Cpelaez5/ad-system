@@ -1,7 +1,7 @@
 <template>
   <div class="encabezado-pagina">
     <div class="encabezado-pagina__texto">
-      <h1 class="encabezado-pagina__titulo">{{ titulo }}</h1>
+      <h1 ref="h1" class="encabezado-pagina__titulo">{{ titulo }}</h1>
       <p v-if="subtitulo" class="encabezado-pagina__subtitulo">{{ subtitulo }}</p>
     </div>
     <div v-if="$slots.default" class="encabezado-pagina__acciones">
@@ -11,6 +11,8 @@
 </template>
 
 <script>
+import { observarTitulo } from '@/composables/useTituloEnVista'
+
 /**
  * EncabezadoPagina — título h1 + subtítulo opcional + slot de acciones a la
  * derecha, para usar DENTRO del contenido de cada vista (no es parte del
@@ -33,6 +35,15 @@ export default {
       type: String,
       default: '',
     },
+  },
+
+  // Mientras este h1 se ve, la barra superior no repite el título (useTituloEnVista).
+  mounted() {
+    this.dejarDeObservar = observarTitulo(this.$refs.h1)
+  },
+
+  beforeUnmount() {
+    this.dejarDeObservar?.()
   },
 }
 </script>
