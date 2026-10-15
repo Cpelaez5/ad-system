@@ -119,6 +119,40 @@ function truncateText(doc, text, maxWidth) {
 }
 
 /** Dibuja un rectángulo con bordes definidos */
+/**
+ * Estampa sello y/o firma sobre la línea de firma del agente de retención.
+ * - Imagen combinada (sello + firma en una sola): se usa tal cual.
+ * - Si no: el sello a la izquierda, montado sobre la línea, y la firma a la derecha.
+ *   Antes solo se estampaba UNA imagen aunque el negocio tuviera las dos.
+ * La vista previa de Mi negocio (VistaPreviaSelloFirma.vue) usa estas mismas medidas.
+ */
+export const MEDIDAS_SELLO_FIRMA = {
+  linea: { ancho: 75 },
+  sello: { alto: 22, anchoMax: 35, dx: 10, dy: -18 },
+  firma: { alto: 14, anchoMax: 38, margenDerecho: 4, dy: -13 },
+}
+
+export async function estamparSelloYFirma(doc, config, x, lineY, width) {
+  const M = MEDIDAS_SELLO_FIRMA
+  const poner = async (url, { alto, anchoMax }, calcX, dy) => {
+    if (!url) return
+    try {
+      const img = await getBase64ImageFromURL(url)
+      if (!img?.dataURL) return
+      const ancho = Math.min(anchoMax, alto * (img.width / img.height))
+      doc.addImage(img.dataURL, 'PNG', calcX(ancho), lineY + dy, ancho, alto)
+    } catch (err) {
+      console.warn('No se pudo estampar la imagen de sello o firma', err)
+    }
+  }
+  if (config?.combinedUrl) {
+    await poner(config.combinedUrl, M.sello, () => x + M.sello.dx, M.sello.dy)
+    return
+  }
+  await poner(config?.sealUrl, M.sello, () => x + M.sello.dx, M.sello.dy)
+  await poner(config?.signatureUrl, M.firma, (ancho) => x + width - ancho - M.firma.margenDerecho, M.firma.dy)
+}
+
 function drawBox(doc, x, y, width, height, fillColor = null, strokeColor = COLORS.boxBorder, lineWidth = 0.3) {
   doc.setLineWidth(lineWidth)
   doc.setDrawColor(...strokeColor)
@@ -784,22 +818,7 @@ class RetentionPdfService {
     // Sello Digital del Agente si está configurado (aislado por cliente)
     const effectiveClientId = retData?.client_id || invoice?.clientId || invoice?.client_id || null
     const sealConfig = await sealService.getSealConfig(effectiveClientId)
-    const activeSealUrl = sealConfig?.combinedUrl || sealConfig?.sealUrl || sealConfig?.signatureUrl
-
-    if (activeSealUrl) {
-      try {
-        const sealImg = await getBase64ImageFromURL(activeSealUrl)
-        if (sealImg && sealImg.dataURL) {
-          const sealHeight = 22
-          const sealRatio = sealImg.width / sealImg.height
-          const sealWidth = Math.min(35, sealHeight * sealRatio)
-          const sealX = margin + 15
-          doc.addImage(sealImg.dataURL, 'PNG', sealX, signAreaY - 18, sealWidth, sealHeight)
-        }
-      } catch (sealErr) {
-        console.warn('Could not embed seal image', sealErr)
-      }
-    }
+    await estamparSelloYFirma(doc, sealConfig, margin + 5, signAreaY, signWidth)
 
     // Línea de firma Agente
     doc.setLineWidth(0.4)
@@ -1187,22 +1206,7 @@ class RetentionPdfService {
 
     const effectiveClientId = retData?.client_id || invoice?.clientId || invoice?.client_id || null
     const sealConfig = await sealService.getSealConfig(effectiveClientId)
-    const activeSealUrl = sealConfig?.combinedUrl || sealConfig?.sealUrl || sealConfig?.signatureUrl
-
-    if (activeSealUrl) {
-      try {
-        const sealImg = await getBase64ImageFromURL(activeSealUrl)
-        if (sealImg && sealImg.dataURL) {
-          const sealHeight = 22
-          const sealRatio = sealImg.width / sealImg.height
-          const sealWidth = Math.min(35, sealHeight * sealRatio)
-          const sealX = margin + 15
-          doc.addImage(sealImg.dataURL, 'PNG', sealX, signAreaY - 18, sealWidth, sealHeight)
-        }
-      } catch (sealErr) {
-        console.warn('Could not embed seal image', sealErr)
-      }
-    }
+    await estamparSelloYFirma(doc, sealConfig, margin + 5, signAreaY, signWidth)
 
     // Línea de firma Agente
     doc.setLineWidth(0.4)
@@ -1647,22 +1651,7 @@ class RetentionPdfService {
 
     const effectiveClientId = retData?.client_id || invoice?.clientId || invoice?.client_id || null
     const sealConfig = await sealService.getSealConfig(effectiveClientId)
-    const activeSealUrl = sealConfig?.combinedUrl || sealConfig?.sealUrl || sealConfig?.signatureUrl
-
-    if (activeSealUrl) {
-      try {
-        const sealImg = await getBase64ImageFromURL(activeSealUrl)
-        if (sealImg && sealImg.dataURL) {
-          const sealHeight = 22
-          const sealRatio = sealImg.width / sealImg.height
-          const sealWidth = Math.min(35, sealHeight * sealRatio)
-          const sealX = margin + 15
-          doc.addImage(sealImg.dataURL, 'PNG', sealX, signAreaY - 18, sealWidth, sealHeight)
-        }
-      } catch (sealErr) {
-        console.warn('Could not embed seal image', sealErr)
-      }
-    }
+    await estamparSelloYFirma(doc, sealConfig, margin + 5, signAreaY, signWidth)
 
     // Línea de firma Agente
     doc.setLineWidth(0.4)
@@ -1688,6 +1677,43 @@ class RetentionPdfService {
     const filename = `Comprobante_Retencion_MUNICIPAL_${invoice.invoiceNumber || 'Borrador'}.pdf`
     doc.save(filename)
     return { success: true, filename }
+  }
+  /**
+   * PDF de EJEMPLO (datos ficticios, marca de agua) para ver cómo quedan el sello y la firma.
+   * @param {{ sealUrl?: string, signatureUrl?: string }} config  imágenes a estampar (según lo que elija la persona)
+   */
+  async descargarEjemploSelloFirma(config) {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const margin = 10
+    drawCorporateHeaderBand(doc, pageWidth)
+    doc.setTextColor(...COLORS.black)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.text('COMPROBANTE DE RETENCIÓN DEL IVA — EJEMPLO', pageWidth / 2, 30, { align: 'center' })
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.text('Documento de muestra para ver cómo quedan tu sello y tu firma. No tiene validez fiscal.', pageWidth / 2, 37, { align: 'center' })
+    for (let i = 0; i < 6; i++) drawBox(doc, margin, 48 + i * 14, pageWidth - margin * 2, 10, i === 0 ? COLORS.tableHeaderBg : null)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(48)
+    doc.setTextColor(220, 220, 220)
+    doc.text('EJEMPLO', pageWidth / 2, pageHeight / 2 + 20, { align: 'center', angle: 30 })
+    doc.setTextColor(...COLORS.black)
+    const signAreaY = pageHeight - 35
+    const signWidth = MEDIDAS_SELLO_FIRMA.linea.ancho
+    await estamparSelloYFirma(doc, config, margin + 5, signAreaY, signWidth)
+    doc.setLineWidth(0.4)
+    doc.setDrawColor(...COLORS.black)
+    doc.line(margin + 5, signAreaY, margin + 5 + signWidth, signAreaY)
+    doc.setFontSize(7)
+    doc.text('Firma y Sello del Agente de Retención', margin + 5 + (signWidth / 2), signAreaY + 4, { align: 'center' })
+    const rightSignX = pageWidth - margin - signWidth - 5
+    doc.line(rightSignX, signAreaY, rightSignX + signWidth, signAreaY)
+    doc.text('Firma y Sello del Sujeto a Retención', rightSignX + (signWidth / 2), signAreaY + 4, { align: 'center' })
+    doc.save('Ejemplo_sello_y_firma.pdf')
+    return { success: true }
   }
 }
 

@@ -324,6 +324,16 @@
           <p class="bloque-negocio__ayuda">
             Se estampan solos en tus comprobantes de retención y documentos fiscales. Arrastra una imagen o toca para elegirla (PNG con fondo transparente, JPG, WebP o PDF).
           </p>
+          <v-btn
+            v-if="sealConfig.sealUrl || sealConfig.signatureUrl || sealConfig.combinedUrl"
+            variant="tonal"
+            color="primary"
+            prepend-icon="mdi-file-eye-outline"
+            class="text-none mt-3"
+            @click="vistaSelloAbierta = true"
+          >
+            Ver cómo queda en un documento
+          </v-btn>
         </header>
 
         <v-row>
@@ -480,6 +490,23 @@
       <ConexionesApi v-if="currentUser?.role === 'cliente'" />
     </template>
 
+    <!-- Vista previa del sello y la firma en un comprobante -->
+    <DialogoAdaptable v-model="vistaSelloAbierta" titulo="Así queda en tus documentos" icono="mdi-file-eye-outline" max-width="760">
+      <VistaPreviaSelloFirma
+        v-if="vistaSelloAbierta"
+        ref="vistaSello"
+        :seal-url="sealConfig.sealUrl"
+        :signature-url="sealConfig.signatureUrl"
+        :combined-url="sealConfig.combinedUrl"
+      />
+      <template #acciones>
+        <v-btn variant="text" class="text-none" @click="vistaSelloAbierta = false">Cerrar</v-btn>
+        <v-btn color="primary" variant="flat" class="text-none" prepend-icon="mdi-download" :loading="descargandoEjemplo" @click="descargarEjemploSello">
+          Descargar PDF de ejemplo
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
+
     <!-- Modal de Cambio de Contraseña -->
     <DialogoAdaptable
       v-model="showPasswordModal"
@@ -567,6 +594,7 @@ import venezuelaLocationsService from '@/services/venezuelaLocationsService';
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue';
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
 import ConexionesApi from '@/components/cliente/ConexionesApi.vue';
+import VistaPreviaSelloFirma from '@/components/cliente/VistaPreviaSelloFirma.vue';
 import ListaPasos from '@/components/ui/ListaPasos.vue';
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
 import AvisoAmable from '@/components/ui/AvisoAmable.vue';
@@ -581,6 +609,7 @@ export default {
   name: 'ClienteMiArea',
   components: {
     ConexionesApi,
+    VistaPreviaSelloFirma,
     EncabezadoPagina,
     DialogoAdaptable,
     ListaPasos,
@@ -591,6 +620,8 @@ export default {
   },
   data() {
     return {
+      vistaSelloAbierta: false,
+      descargandoEjemplo: false,
       currentUser: null,
       cargandoInicial: true,
       errorCarga: null,
@@ -730,6 +761,17 @@ export default {
     }
   },
   methods: {
+    async descargarEjemploSello() {
+      this.descargandoEjemplo = true
+      try {
+        const config = this.$refs.vistaSello?.configElegida || this.sealConfig
+        // Carga diferida: jsPDF y el generador solo se bajan si se pide el PDF.
+        const { default: retentionPdfService } = await import('@/services/retention-pdf-service.js')
+        await retentionPdfService.descargarEjemploSelloFirma(config)
+      } finally {
+        this.descargandoEjemplo = false
+      }
+    },
     async cargarTodo() {
       this.cargandoInicial = true;
       this.errorCarga = null;
