@@ -54,6 +54,14 @@
     :show-try-rate="showTryRate"
     :show-rub-rate="showRubRate"
   />
+
+  <!-- Bloqueo por inactividad: una sola vez para todos los roles (solo con sesión). -->
+  <BloqueoInactividad
+    v-if="currentUser?.email"
+    :nombre="nombreCompleto"
+    :correo="currentUser.email"
+    @cerrar-sesion="logout"
+  />
 </template>
 
 <script>
@@ -66,6 +74,7 @@ import BarraSuperior from './BarraSuperior.vue';
 import MenuLateral from './MenuLateral.vue';
 import ClienteBottomNav from './ClienteBottomNav.vue';
 import TrialBanner from './TrialBanner.vue';
+import BloqueoInactividad from './BloqueoInactividad.vue';
 
 const MENU_MODO_KEY = 'ad_system_menu_modo';
 // Clave anterior (rail sí/no): se respeta al migrar para no cambiarle el menú a nadie.
@@ -89,7 +98,7 @@ const RAIL_STORAGE_KEY_ANTERIOR = 'ad_system_sidebar_rail_collapsed';
 export default {
   name: 'AppShell',
 
-  components: { BarraSuperior, MenuLateral, ClienteBottomNav, TrialBanner },
+  components: { BarraSuperior, MenuLateral, ClienteBottomNav, TrialBanner, BloqueoInactividad },
 
   emits: ['banner-visibility-change'],
 
@@ -117,6 +126,10 @@ export default {
   computed: {
     isCliente() {
       return this.currentUser?.role === 'cliente';
+    },
+    nombreCompleto() {
+      const u = this.currentUser || {};
+      return [u.firstName, u.lastName].filter(Boolean).join(' ') || u.username || '';
     },
     isServicesCompany() {
       return this.currentUser?.client?.activity_type === 'services';
