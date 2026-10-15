@@ -23,9 +23,45 @@
             <!-- Zona de Carga de Archivo (oculta si el doc no aplica) -->
             <v-col cols="12" v-if="!formData.noAplica">
               <label class="text-subtitle-2 font-weight-bold mb-2 d-block">
-                1. Subir Documento (PDF o Imagen)
+                1. Sube tu documento (PDF o foto)
               </label>
-              
+
+              <!-- Camino principal: la IA lee la foto o el PDF y llena el formulario -->
+              <div v-if="mostrarIA" class="papel-ia" data-testid="papel-ia">
+                <v-menu v-if="esTelefono" location="bottom start">
+                  <template #activator="{ props: menu }">
+                    <BotonIA
+                      v-bind="menu" icono="mdi-file-document-outline" color="primary" variant="elevated"
+                      size="large" block class="papel-ia__boton" data-testid="papel-llenar-ia"
+                    >Llenar desde la foto o PDF</BotonIA>
+                  </template>
+                  <v-list>
+                    <v-list-item prepend-icon="mdi-camera-outline" title="Tomar foto" @click="$refs.camaraIA?.click()" />
+                    <v-list-item prepend-icon="mdi-file-upload-outline" title="Elegir foto o PDF" @click="$refs.archivoIA?.click()" />
+                  </v-list>
+                </v-menu>
+                <BotonIA
+                  v-else icono="mdi-file-document-outline" color="primary" variant="elevated" size="large"
+                  block class="papel-ia__boton" data-testid="papel-llenar-ia" @click="$refs.archivoIA?.click()"
+                >Llenar desde la foto o PDF</BotonIA>
+                <input ref="camaraIA" type="file" accept="image/*" capture="environment" class="papel-ia__input" @change="elegidoIA">
+                <input ref="archivoIA" type="file" accept="image/*,application/pdf" class="papel-ia__input" data-testid="papel-input-ia" @change="elegidoIA">
+                <p class="papel-ia__ayuda">La IA lee tu documento y llena los datos por ti. Tú solo los revisas.</p>
+                <v-btn variant="text" color="primary" class="text-none" data-testid="papel-escribir" @click="modo = 'manual'">
+                  Escribirlo yo
+                </v-btn>
+              </div>
+
+              <TrabajandoIA v-else-if="leyendoIA" mensaje="Leyendo tu documento…" data-testid="papel-leyendo" />
+
+              <div v-else-if="archivoIA" class="papel-ia__archivo" data-testid="papel-archivo-ia">
+                <v-icon :icon="archivoIA.type === 'application/pdf' ? 'mdi-file-pdf-box' : 'mdi-file-image'" color="primary" />
+                <span class="papel-ia__nombre">{{ archivoIA.name }}</span>
+                <v-btn variant="text" size="small" color="error" class="text-none" @click="quitarArchivoIA">Quitar</v-btn>
+                <MarcaIA v-if="marcaIA" :texto="marcaIA" class="papel-ia__marca" />
+              </div>
+
+              <template v-else>
               <FiscalFileUpload
                 @file-selected="handleFileSelect"
                 @file-removed="handleFileRemove"
@@ -36,6 +72,11 @@
                 :existing-file-name="existingFile?.name"
                 accept="application/pdf,image/jpeg,image/png,image/jpg"
               />
+              </template>
+
+              <p v-if="avisoIA" class="papel-ia__aviso" role="status" data-testid="papel-aviso">
+                <v-icon size="16" class="mr-1">mdi-information-outline</v-icon>{{ avisoIA }}
+              </p>
 
               <!-- OCR Status Alerts -->
               <v-fade-transition>
@@ -293,6 +334,10 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import FiscalFileUpload from '@/components/fiscal/FiscalFileUpload.vue'
+import BotonIA from '@/components/ui/BotonIA.vue'
+import TrabajandoIA from '@/components/ui/TrabajandoIA.vue'
+import MarcaIA from '@/components/ui/MarcaIA.vue'
+import { leerPapel, aPapel, tiposParaIa, avisoDePapel, aplicarSoloVacios } from '@/services/documentoIaService'
 import fiscalOCRService from '@/services/fiscalOCRService'
 import { FISCAL_TYPES } from '@/constants/fiscalDocuments'
 
@@ -311,6 +356,15 @@ const emit = defineEmits(['update:modelValue', 'save', 'close'])
 const form = ref(null)
 const valid = ref(false)
 const newFile = ref(null)
+
+// Llenar con IA (modo papel de documento-ia): el mismo archivo queda como adjunto.
+const modo = ref('ia') // 'ia' = ofrece el botón de IA; 'manual' = subida clásica
+const leyendoIA = ref(false)
+const archivoIA = ref(null)
+const marcaIA = ref('')
+const avisoIA = ref('')
+const esTelefono = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 600px)').matches
+const mostrarIA = computed(() => !props.editingItem && modo.value === 'ia' && !archivoIA.value && !leyendoIA.value && !newFile.value)
 
 // OCR State
 const analyzing = ref(false)
@@ -545,6 +599,40 @@ const extractDateFromText = (text) => {
     return null
 }
 
+const elegidoIA = async (e) => {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  leyendoIA.value = true
+  avisoIA.value = ''
+  marcaIA.value = ''
+  const { papel, error: err } = await leerPapel(file, tiposParaIa(FISCAL_TYPES))
+  leyendoIA.value = false
+  // Aunque la lectura falle, el archivo queda como adjunto: no se sube dos veces.
+  archivoIA.value = file
+  newFile.value = file
+  if (err) { avisoIA.value = err.message; return }
+  const aviso = avisoDePapel(papel)
+  if (aviso) { avisoIA.value = aviso; return }
+  llenarDesdePapel(papel)
+}
+
+const llenarDesdePapel = (papel) => {
+  const datos = aPapel(papel, FISCAL_TYPES)
+  const { campos } = aplicarSoloVacios(formData, datos, ['category', 'doc_type', 'status'])
+  if (datos.isPermanent) { formData.isPermanent = true; formData.expiration_date = null }
+  if (!campos.length) { avisoIA.value = 'No pudimos sacar datos de este documento. Llénalos tú.'; return }
+  marcaIA.value = 'Llenado con IA desde tu documento · revísalo'
+}
+
+const quitarArchivoIA = () => {
+  archivoIA.value = null
+  newFile.value = null
+  marcaIA.value = ''
+  avisoIA.value = ''
+  modo.value = 'ia'
+}
+
 const handleFileRemove = () => {
   newFile.value = null
   analysisComplete.value = false
@@ -589,6 +677,11 @@ const resetForm = () => {
   newFile.value = null
   analyzing.value = false
   analysisComplete.value = false
+  modo.value = 'ia'
+  leyendoIA.value = false
+  archivoIA.value = null
+  marcaIA.value = ''
+  avisoIA.value = ''
   if (form.value) form.value.resetValidation()
 }
 
@@ -621,6 +714,12 @@ watch(() => props.modelValue, (val) => {
 </script>
 
 <style scoped>
+.papel-ia { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.papel-ia__input { display: none; }
+.papel-ia__ayuda { margin: 0; font-size: 0.95rem; color: rgb(var(--v-theme-on-surface)); opacity: 0.75; }
+.papel-ia__archivo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.papel-ia__nombre { font-weight: 600; word-break: break-all; }
+.papel-ia__aviso { margin: 8px 0 0; font-size: 0.95rem; }
 .fiscal-doc-dialog {
   border-radius: 12px;
   overflow: hidden;

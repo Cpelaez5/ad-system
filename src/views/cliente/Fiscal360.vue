@@ -55,6 +55,11 @@
           </v-menu>
         </EncabezadoPagina>
 
+        <p class="mis-papeles__pista-ia" data-testid="papeles-pista-ia">
+          <v-icon icon="mdi-creation" size="18" class="mr-1" aria-hidden="true" />
+          Toma una foto o sube el PDF de un papel y la IA llena los datos por ti. Tú solo los revisas.
+        </p>
+
         <!-- AVANCE + SIGUIENTE PASO -->
         <div class="mis-papeles__panel">
           <section class="mis-papeles__avance" aria-label="Avance de tus papeles">
@@ -1306,6 +1311,8 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.mis-papeles__pista-ia { display: flex; align-items: center; margin: 0 0 12px; font-size: 1rem; }
+.mis-papeles__pista-ia .v-icon { color: var(--ad-ia-1); flex: none; }
 .mis-papeles {
   max-width: 1120px;
   margin: 0 auto;

@@ -55,6 +55,31 @@ async function extraerError(error) {
   return 'RED'
 }
 
+/** Prepara el archivo (imagen reducida o PDF) para enviarlo; lanza un código de error. */
+async function prepararArchivo(file) {
+  if (!file) throw 'TIPO'
+  if (file.type === 'application/pdf') {
+    if (file.size > MAX_BYTES_PDF) throw 'GRANDE'
+    return { base64: await aBase64(file), mime: 'application/pdf' }
+  }
+  if (String(file.type).startsWith('image/')) {
+    let reducida
+    try { reducida = await reducirImagen(file) } catch { throw 'IMAGEN' }
+    return { base64: await aBase64(reducida), mime: 'image/jpeg' }
+  }
+  throw 'TIPO'
+}
+
+async function invocar(file, extra) {
+  const { base64, mime } = await prepararArchivo(file)
+  const { data, error } = await supabase.functions.invoke('documento-ia', {
+    body: { archivo: { base64, mime }, ...extra },
+  })
+  if (error) throw await extraerError(error)
+  if (data?.error) throw data.error.code || 'RED'
+  return data
+}
+
 /**
  * Lee un RIF o una cédula.
  * @param {File} file foto o PDF
@@ -64,32 +89,30 @@ async function extraerError(error) {
 export async function leerDocumento(file, tipoEsperado = 'auto') {
   const fallo = (code) => ({ documento: null, error: { code, message: mensajeDeError(code) } })
   try {
-    if (!file) return fallo('TIPO')
-    let base64
-    let mime
-    if (file.type === 'application/pdf') {
-      if (file.size > MAX_BYTES_PDF) return fallo('GRANDE')
-      base64 = await aBase64(file)
-      mime = 'application/pdf'
-    } else if (String(file.type).startsWith('image/')) {
-      let reducida
-      try { reducida = await reducirImagen(file) } catch { return fallo('IMAGEN') }
-      base64 = await aBase64(reducida)
-      mime = 'image/jpeg'
-    } else {
-      return fallo('TIPO')
-    }
-
-    const { data, error } = await supabase.functions.invoke('documento-ia', {
-      body: { archivo: { base64, mime }, tipo_esperado: tipoEsperado },
-    })
-    if (error) return fallo(await extraerError(error))
-    if (data?.error) return fallo(data.error.code || 'RED')
+    const data = await invocar(file, { tipo_esperado: tipoEsperado })
     if (!data?.documento) return fallo('RESPUESTA_IA')
     avisarIaUsada()
     return { documento: data.documento, error: null }
-  } catch {
-    return fallo('RED')
+  } catch (e) {
+    return fallo(typeof e === 'string' ? e : 'RED')
+  }
+}
+
+/**
+ * Mis papeles: lee un permiso, licencia, solvencia, etc.
+ * @param {File} file foto o PDF
+ * @param {Array<{clave:string, nombre:string}>} tipos papeles de la app (ver tiposParaIa)
+ * @returns {Promise<{papel: object|null, error: {code:string, message:string}|null}>}
+ */
+export async function leerPapel(file, tipos = []) {
+  const fallo = (code) => ({ papel: null, error: { code, message: mensajeDeError(code) } })
+  try {
+    const data = await invocar(file, { modo: 'papel', tipos })
+    if (!data?.papel) return fallo('RESPUESTA_IA')
+    avisarIaUsada()
+    return { papel: data.papel, error: null }
+  } catch (e) {
+    return fallo(typeof e === 'string' ? e : 'RED')
   }
 }
 
@@ -231,6 +254,56 @@ export function restaurar(form, previo) {
   for (const [campo, valor] of Object.entries(previo || {})) form[campo] = valor
 }
 
+// ── Mis papeles ────────────────────────────────────────────────────────
+
+/** Lista { clave: 'CATEGORIA/ID', nombre } de los papeles que la app conoce (para la IA). */
+export function tiposParaIa(fiscalTypes) {
+  const lista = []
+  for (const [categoria, tipos] of Object.entries(fiscalTypes || {})) {
+    for (const t of tipos) lista.push({ clave: `${categoria}/${t.id}`, nombre: t.label })
+  }
+  return lista
+}
+
+/**
+ * Respuesta de la IA (modo papel) → campos del formulario de Mis papeles.
+ * Solo trae lo que la IA sí leyó. `hoy` (AAAA-MM-DD) permite probarlo.
+ * @returns {Object} { category, doc_type, name, emission_date, expiration_date,
+ *                     isPermanent, status, notes }
+ */
+export function aPapel(papel, fiscalTypes, hoy = new Date().toISOString().slice(0, 10)) {
+  if (!papel) return {}
+  const salida = {}
+  const [categoria, id] = texto(papel.tipo_papel).split('/')
+  const tipo = (fiscalTypes?.[categoria] || []).find((t) => t.id === id)
+  if (tipo) {
+    salida.category = categoria
+    salida.doc_type = tipo.id
+    salida.name = texto(papel.titulo) || tipo.label
+    if (tipo.frequency === 'PERMANENT') salida.isPermanent = true
+  } else if (texto(papel.titulo)) {
+    salida.name = texto(papel.titulo)
+  }
+  const emision = fechaIso(papel.fecha_emision)
+  const vence = fechaIso(papel.fecha_vencimiento)
+  if (emision) salida.emission_date = emision
+  if (vence && !salida.isPermanent) {
+    salida.expiration_date = vence
+    salida.status = vence < hoy ? 'VENCIDO' : 'VIGENTE'
+  }
+  const partes = []
+  if (texto(papel.numero)) partes.push(`Número: ${texto(papel.numero)}`)
+  if (texto(papel.emisor)) partes.push(`Emitido por: ${texto(papel.emisor)}`)
+  if (partes.length) salida.notes = partes.join(' · ')
+  return salida
+}
+
+/** Aviso amable si el papel no se pudo leer; null si sirve. */
+export function avisoDePapel(papel) {
+  if (!papel || papel.legible === false) return MSG_ILEGIBLE
+  return null
+}
+
 // ── Fechas ─────────────────────────────────────────────────────────────
 
 /** 'YYYY-MM-DD' (o 'DD/MM/AAAA') a 'YYYY-MM-DD'; '' si no es una fecha. */
@@ -252,6 +325,6 @@ export function fechaParaMostrar(f) {
 }
 
 export default {
-  leerDocumento, mensajeDeError, avisoDeCalidad, aProveedor, aCliente, aEmpresa,
+  leerDocumento, leerPapel, aPapel, tiposParaIa, mensajeDeError, avisoDeCalidad, aProveedor, aCliente, aEmpresa,
   aplicarSoloVacios, restaurar,
 }

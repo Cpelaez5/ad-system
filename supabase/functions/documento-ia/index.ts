@@ -9,6 +9,11 @@
 // Privacidad: el archivo NO se guarda (ni en Storage ni en la BD); se procesa y se descarta.
 // Minimización: de una cédula nunca se extraen fecha de nacimiento, estado civil ni firma.
 // En ai_usage_logs solo quedan el modelo, los tokens y el resultado (sin contenido).
+//
+//   POST { modo: 'papel', archivo, tipos: [{ clave, nombre }] }   (Mis papeles)
+//     → { papel: { tipo_papel, titulo, numero, emisor, fecha_emision, fecha_vencimiento, legible, confianza } }
+//   `tipos` es la lista de papeles de la app; tipo_papel solo puede ser una de sus `clave` (o null).
+//   Sin `modo` (o 'identidad') todo funciona igual que antes.
 // Archivo único a propósito: el deploy con imports relativos falla.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -63,6 +68,33 @@ const SCHEMA = {
   required: ['tipo', 'legible', 'confianza'],
 };
 
+const PROMPT_PAPEL = `Eres un asistente que lee papeles de un negocio venezolano (permisos, licencias, solvencias, declaraciones, actas, RIF, contratos) para llenar un formulario de "Mis papeles".
+Devuelve SOLO estos datos, tal como aparecen (sin inventar):
+- "tipo_papel": la "clave" EXACTA de la lista de tipos permitidos que mejor corresponda al documento; null si ninguno corresponde claramente.
+- "titulo": nombre corto del documento (ej. "Permiso sanitario 2026"), máximo 80 caracteres; null si no se sabe.
+- "numero": número del certificado, licencia, planilla o documento si es visible; si no, null.
+- "emisor": entidad que lo emite (ej. "SENIAT", "Alcaldía de Maracaibo", "IVSS"); si no, null.
+- "fecha_emision": fecha de emisión o última actualización en formato AAAA-MM-DD; null si no aparece.
+- "fecha_vencimiento": fecha hasta la que es válido en formato AAAA-MM-DD; null si no aparece.
+- "legible": false si la imagen está borrosa, cortada o no es un documento.
+- "confianza": "alta", "media" o "baja".
+Las fechas venezolanas vienen DD/MM/AAAA: conviértelas con cuidado. No devuelvas ningún otro dato personal.`;
+
+const SCHEMA_PAPEL = {
+  type: 'OBJECT',
+  properties: {
+    tipo_papel: NUL('STRING'),
+    titulo: NUL('STRING'),
+    numero: NUL('STRING'),
+    emisor: NUL('STRING'),
+    fecha_emision: NUL('STRING'),
+    fecha_vencimiento: NUL('STRING'),
+    legible: { type: 'BOOLEAN' },
+    confianza: { type: 'STRING', enum: ['alta', 'media', 'baja'] },
+  },
+  required: ['legible', 'confianza'],
+};
+
 /** Normaliza un RIF a "L-NNNNNNNN-N"; null si no tiene un formato válido. */
 function normalizarRif(v: unknown): string | null {
   const s = String(v ?? '').toUpperCase().replace(/[^VEJPGC0-9]/g, '');
@@ -102,7 +134,14 @@ Deno.serve(async (req) => {
   const esperado = ['rif', 'cedula'].includes(body?.tipo_esperado) ? body.tipo_esperado : 'auto';
 
   // `accion` permite contar el uso de IA por función (créditos por negocio, migración 20261015160000).
-  const log: Record<string, unknown> = { user_id: user.id, provider: 'gemini', status: 'error', accion: 'documento' };
+  const modoPapel = body?.modo === 'papel';
+  // Lista de papeles permitida (solo modo papel): [{ clave, nombre }], tope de 200.
+  const tipos: { clave: string; nombre: string }[] = modoPapel && Array.isArray(body?.tipos)
+    ? body.tipos.slice(0, 200)
+        .map((t: any) => ({ clave: String(t?.clave ?? '').slice(0, 80), nombre: String(t?.nombre ?? '').slice(0, 120) }))
+        .filter((t: any) => t.clave)
+    : [];
+  const log: Record<string, unknown> = { user_id: user.id, provider: 'gemini', status: 'error', accion: modoPapel ? 'papel' : 'documento' };
   try {
     const { data: ia } = await supabase
       .from('ai_provider_profiles').select('provider, model, encrypted_api_key').eq('is_active', true).maybeSingle();
@@ -124,7 +163,7 @@ Deno.serve(async (req) => {
             { text: PROMPT + (esperado !== 'auto' ? `\nSe espera un documento de tipo "${esperado}".` : '') },
             { inlineData: { mimeType: mime, data: base64 } },
           ] }],
-          generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.1 },
+          generationConfig: { responseMimeType: 'application/json', responseSchema: modoPapel ? SCHEMA_PAPEL : SCHEMA, temperature: 0.1 },
         }),
       });
       datos = await r.json().catch(() => ({}));
@@ -142,6 +181,24 @@ Deno.serve(async (req) => {
     const textoIA = datos?.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
     let d: any;
     try { d = JSON.parse(textoIA); } catch { throw { code: 'RESPUESTA_IA', message: 'No pudimos leer la respuesta de la IA.' }; }
+
+    if (modoPapel) {
+      const papel = {
+        tipo_papel: typeof d.tipo_papel === 'string' && tipos.some((t) => t.clave === d.tipo_papel) ? d.tipo_papel : null,
+        titulo: texto(d.titulo, 80),
+        numero: texto(d.numero, 60),
+        emisor: texto(d.emisor, 100),
+        fecha_emision: fechaISO(d.fecha_emision),
+        fecha_vencimiento: fechaISO(d.fecha_vencimiento),
+        legible: d.legible !== false,
+        confianza: ['alta', 'media', 'baja'].includes(d.confianza) ? d.confianza : 'baja',
+      };
+      log.status = 'success';
+      log.tokens_prompt = datos?.usageMetadata?.promptTokenCount;
+      log.tokens_completion = datos?.usageMetadata?.candidatesTokenCount;
+      await supabase.from('ai_usage_logs').insert(log).then(() => {}, () => {});
+      return respuesta(200, { papel });
+    }
 
     // Saneo y minimización: solo los campos permitidos, con formatos válidos.
     const rif = normalizarRif(d.rif);
