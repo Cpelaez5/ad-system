@@ -10,7 +10,7 @@ test.use({ storageState: CLIENTE_STORAGE })
 const TIMEOUT_REDIRECCION = 25_000
 
 test.describe('Operación — el cliente no puede ver el panel del super admin', () => {
-  for (const ruta of ['/admin/catalogo', '/admin/uso-ia', '/admin/tasas', '/admin/operacion']) {
+  for (const ruta of ['/admin/catalogo', '/admin/uso-ia', '/admin/tasas', '/admin/operacion', '/admin/inicio']) {
     test(`${ruta} redirige al cliente a /cliente/inicio`, async ({ page }) => {
       await page.goto(ruta)
       await expect(page).toHaveURL(/\/cliente\/inicio/, { timeout: TIMEOUT_REDIRECCION })

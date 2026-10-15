@@ -217,6 +217,8 @@ Todos son **envoltorios delgados** sobre el componente de Vuetify equivalente: f
 | `PanelSiguientePaso` | `<v-btn>` | "Tu siguiente paso": UNA acción con botón grande; mensaje de logro cuando `listo`. |
 | `FiltroChips` | `<v-chip-group mandatory>` | Filtros de un toque con cantidad; el activo en negro sólido. |
 | `SeccionLista` | `<section>` | Título de sección + superficie con filas separadas por línea (no una tarjeta por fila). |
+| `CifrasEnLinea` | grid | 3 a 6 cifras clave sin tarjetas de colores: número grande + texto en llano sobre una superficie con líneas; `alerta` usa el color de advertencia del tema. Usado en el Inicio y en Facturación del super admin. |
+| `DialogoConfirmar` | `DialogoAdaptable` | Confirmación de una acción irreversible (anular, eliminar, aprobar, rechazar): dice qué pasará, Cancelar a la mano, botón con el color de la acción; slot para campos extra (motivo). |
 | `ListaPasos` | `BarraSegmentos` + lista | "Primeros pasos" con avance; los pasos se marcan con datos reales. |
 | `ChipTasa` | `<v-chip>` + `<v-tooltip>` | Tasa de cambio compacta SIN etiqueta larga ("$ 36,50"), tooltip fijo "Tasa oficial BCV de hoy". Usado en el app bar (`BarraSuperior`, ≥600px) y en la sección "Tasas del día" de la hoja "Más" del cliente. Pulso sutil cuando `rateValue` cambia. Para la etiqueta larga ("Dólar BCV hoy: Bs 36,50") sigue existiendo `ExchangeRateChip` en `components/common/`. |
 | `EncabezadoPagina` | `<h1>` + `<p>` + slot de acciones | Título editorial de una vista (dentro del contenido, no el app bar): h1 + subtítulo opcional + acciones a la derecha en escritorio (apiladas en móvil). Tipografía según §2.5 (32px móvil / 40px escritorio). |

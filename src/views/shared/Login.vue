@@ -215,6 +215,8 @@ export default {
           window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }))
           if (result.user.role === 'cliente') {
             this.$router.push('/cliente/inicio')
+          } else if (result.user.role === 'super_admin') {
+            this.$router.push('/admin/inicio')
           } else {
             this.$router.push('/dashboard')
           }

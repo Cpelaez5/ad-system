@@ -74,6 +74,10 @@ describe('menuPorRol', () => {
     const keys = items.map((i) => i.key)
     expect(keys).toEqual(['dashboard', 'usuarios', 'facturacion-sistema', 'ai-settings', 'operacion', 'empresas'])
     expect(keys).not.toContain('contador-area')
+    // El Dashboard del super_admin es su propio Inicio; los demás roles siguen con el compartido.
+    expect(items.find((i) => i.key === 'dashboard').to.name).toBe('AdminInicio')
+    expect(getMenuPorRol({ role: 'contador' })[0].to.name).toBe('Dashboard')
+    expect(getMenuPorRol({ role: 'admin' })[0].to.name).toBe('Dashboard')
     const operacion = items.find((i) => i.key === 'operacion')
     expect(operacion.grupo).toBe(true)
     expect(operacion.hijos.map((h) => h.to.name)).toEqual(['AdminOperacion', 'AdminCatalogo', 'AdminUsoIa', 'AdminTasas'])

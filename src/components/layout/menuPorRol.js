@@ -32,7 +32,7 @@ export function getMenuPorRol({ role, isServicesCompany = false } = {}) {
   const items = []
 
   if (['contador', 'admin', 'super_admin'].includes(role)) {
-    items.push({ key: 'dashboard', titulo: 'Dashboard', icono: 'mdi-view-dashboard', to: { name: 'Dashboard' } })
+    items.push({ key: 'dashboard', titulo: 'Dashboard', icono: 'mdi-view-dashboard', to: { name: role === 'super_admin' ? 'AdminInicio' : 'Dashboard' } })
   }
 
   if (role === 'contador' || role === 'admin') {
