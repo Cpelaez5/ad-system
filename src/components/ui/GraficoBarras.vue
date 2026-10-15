@@ -78,17 +78,23 @@ export default {
       const conteo = this.formato === 'entero'
       const fmt = (v, opc) => (conteo ? Number(v || 0).toLocaleString('es-VE') : formatMoney(v, moneda, opc))
       const reducido = prefiereMovimientoReducido()
+      // Cuadrícula y textos según el tema (en oscuro, un gris fijo casi no se veía).
+      const tema = this.$vuetify?.theme?.current
+      const oscuro = !!(tema?.dark ?? tema?.value?.dark)
+      const colorGrilla = oscuro ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)'
+      const colorTexto = oscuro ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.6)'
       const ejeValor = {
         beginAtZero: true,
-        grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false },
+        grid: { color: colorGrilla, drawBorder: false },
         ticks: {
+          color: colorTexto,
           font: { family: 'Montserrat, sans-serif', size: 11 },
           callback: (v) => (conteo ? (Number.isInteger(v) ? Number(v).toLocaleString('es-VE') : '') : formatMoney(v, moneda, { abreviar: true, sinDecimales: true })),
         },
       }
       const ejeCategoria = {
         grid: { display: false },
-        ticks: { font: { family: 'Montserrat, sans-serif', size: 11 } },
+        ticks: { color: colorTexto, font: { family: 'Montserrat, sans-serif', size: 11 } },
       }
       return {
         indexAxis: horizontal ? 'y' : 'x',
