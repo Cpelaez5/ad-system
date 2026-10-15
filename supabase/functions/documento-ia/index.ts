@@ -142,6 +142,10 @@ Deno.serve(async (req) => {
         .filter((t: any) => t.clave)
     : [];
   const log: Record<string, unknown> = { user_id: user.id, provider: 'gemini', status: 'error', accion: modoPapel ? 'papel' : 'documento' };
+  // Modo papel: su propio prompt + la lista de tipos permitidos (clave — nombre).
+  const instrucciones = modoPapel
+    ? PROMPT_PAPEL + '\nTipos permitidos (clave — nombre):\n' + tipos.map((t) => `${t.clave} — ${t.nombre}`).join('\n')
+    : PROMPT + (esperado !== 'auto' ? `\nSe espera un documento de tipo "${esperado}".` : '');
   try {
     const { data: ia } = await supabase
       .from('ai_provider_profiles').select('provider, model, encrypted_api_key').eq('is_active', true).maybeSingle();
@@ -160,7 +164,7 @@ Deno.serve(async (req) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [
-            { text: PROMPT + (esperado !== 'auto' ? `\nSe espera un documento de tipo "${esperado}".` : '') },
+            { text: instrucciones },
             { inlineData: { mimeType: mime, data: base64 } },
           ] }],
           generationConfig: { responseMimeType: 'application/json', responseSchema: modoPapel ? SCHEMA_PAPEL : SCHEMA, temperature: 0.1 },
