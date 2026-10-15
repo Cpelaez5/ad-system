@@ -380,7 +380,7 @@
                 <v-btn variant="tonal" color="secondary" size="small" prepend-icon="mdi-upload" class="text-none flex-grow-1 sello-firma__cambiar" :loading="uploadingSeal" @click="$refs.sealFileInput.click()">
                   {{ sealConfig.sealUrl ? 'Cambiar sello' : 'Cargar sello' }}
                 </v-btn>
-                <v-btn v-if="sealConfig.sealUrl" variant="text" color="error" icon="mdi-delete-outline" size="small" class="flex-shrink-0" aria-label="Eliminar sello" @click="deleteSealAsset('seal')" />
+                <v-btn v-if="sealConfig.sealUrl" variant="text" color="error" icon="mdi-delete-outline" size="small" class="flex-shrink-0" aria-label="Eliminar sello" @click="borrarSelloPendiente = 'seal'" />
               </div>
             </div>
           </v-col>
@@ -428,7 +428,7 @@
                 <v-btn variant="tonal" color="secondary" size="small" prepend-icon="mdi-upload" class="text-none flex-grow-1 sello-firma__cambiar" :loading="uploadingSignature" @click="$refs.signatureFileInput.click()">
                   {{ sealConfig.signatureUrl ? 'Cambiar firma' : 'Cargar firma' }}
                 </v-btn>
-                <v-btn v-if="sealConfig.signatureUrl" variant="text" color="error" icon="mdi-delete-outline" size="small" class="flex-shrink-0" aria-label="Eliminar firma" @click="deleteSealAsset('signature')" />
+                <v-btn v-if="sealConfig.signatureUrl" variant="text" color="error" icon="mdi-delete-outline" size="small" class="flex-shrink-0" aria-label="Eliminar firma" @click="borrarSelloPendiente = 'signature'" />
               </div>
             </div>
           </v-col>
@@ -489,6 +489,26 @@
 
       <ConexionesApi v-if="currentUser?.role === 'cliente'" />
     </template>
+
+    <!-- Confirmar antes de quitar el sello o la firma -->
+    <DialogoAdaptable
+      :model-value="!!borrarSelloPendiente"
+      :titulo="borrarSelloPendiente === 'seal' ? '¿Quitar tu sello?' : '¿Quitar tu firma?'"
+      icono="mdi-delete-outline"
+      max-width="440"
+      @update:model-value="v => { if (!v) borrarSelloPendiente = null }"
+    >
+      <p class="mb-0">
+        Tus próximos comprobantes saldrán {{ borrarSelloPendiente === 'seal' ? 'sin sello' : 'sin firma' }}.
+        Los que ya descargaste no cambian. Puedes volver a cargarlo cuando quieras.
+      </p>
+      <template #acciones>
+        <v-btn variant="text" class="text-none" @click="borrarSelloPendiente = null">Cancelar</v-btn>
+        <v-btn color="error" variant="flat" class="text-none" :loading="borrandoSello" @click="confirmarBorrarSello">
+          Sí, quitar {{ borrarSelloPendiente === 'seal' ? 'el sello' : 'la firma' }}
+        </v-btn>
+      </template>
+    </DialogoAdaptable>
 
     <!-- Vista previa del sello y la firma en un comprobante -->
     <DialogoAdaptable v-model="vistaSelloAbierta" titulo="Así queda en tus documentos" icono="mdi-file-eye-outline" max-width="760">
@@ -621,6 +641,8 @@ export default {
   data() {
     return {
       vistaSelloAbierta: false,
+      borrarSelloPendiente: null,
+      borrandoSello: false,
       descargandoEjemplo: false,
       currentUser: null,
       cargandoInicial: true,
@@ -885,6 +907,16 @@ export default {
       if (type === 'signature') this.arrastrandoFirma = false;
       const file = event.dataTransfer?.files?.[0];
       await this.processFile(file, type);
+    },
+
+    async confirmarBorrarSello() {
+      this.borrandoSello = true
+      try {
+        await this.deleteSealAsset(this.borrarSelloPendiente)
+      } finally {
+        this.borrandoSello = false
+        this.borrarSelloPendiente = null
+      }
     },
 
     async deleteSealAsset(type) {

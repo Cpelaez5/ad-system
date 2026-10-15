@@ -15,6 +15,7 @@ if (!globalThis.visualViewport) {
 const mockGetCurrentUser = vi.fn()
 const mockUpdateUserProfile = vi.fn()
 const mockGetSealConfig = vi.fn()
+const mockRemoveSealAsset = vi.fn()
 
 vi.mock('@/services/userService', () => ({
   default: {
@@ -25,6 +26,7 @@ vi.mock('@/services/userService', () => ({
 vi.mock('@/services/seal-service', () => ({
   default: {
     getSealConfig: (...args) => mockGetSealConfig(...args),
+    removeSealAsset: (...args) => mockRemoveSealAsset(...args),
   },
 }))
 
@@ -182,5 +184,19 @@ describe('ClienteMiArea.vue — Mi negocio', () => {
     expect(wrapper.vm.perfilFiscalCompleto).toBe(false)
     wrapper.vm.form.activity_type = 'goods'
     expect(wrapper.vm.perfilFiscalCompleto).toBe(true)
+  })
+
+  it('la papelera del sello pregunta antes de borrar; solo al confirmar se quita', async () => {
+    mockGetCurrentUser.mockResolvedValue(usuarioBase())
+    mockGetSealConfig.mockResolvedValue({ sealUrl: 'https://x/sello.png', signatureUrl: null, combinedUrl: null })
+    mockRemoveSealAsset.mockResolvedValue({ success: true, config: { sealUrl: null } })
+    const w = montar()
+    await flushPromises()
+    w.vm.borrarSelloPendiente = 'seal'
+    await w.vm.$nextTick()
+    expect(mockRemoveSealAsset).not.toHaveBeenCalled()
+    await w.vm.confirmarBorrarSello()
+    expect(mockRemoveSealAsset).toHaveBeenCalledWith('seal', 'c1')
+    expect(w.vm.borrarSelloPendiente).toBeNull()
   })
 })
