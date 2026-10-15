@@ -101,7 +101,8 @@ Deno.serve(async (req) => {
   if (!base64 || Math.floor(base64.length * 3 / 4) > MAX_BYTES) return error(413, 'GRANDE', 'El archivo pesa más de 8 MB.');
   const esperado = ['rif', 'cedula'].includes(body?.tipo_esperado) ? body.tipo_esperado : 'auto';
 
-  const log: Record<string, unknown> = { user_id: user.id, provider: 'gemini', status: 'error' };
+  // `accion` permite contar el uso de IA por función (créditos por negocio, migración 20261015160000).
+  const log: Record<string, unknown> = { user_id: user.id, provider: 'gemini', status: 'error', accion: 'documento' };
   try {
     const { data: ia } = await supabase
       .from('ai_provider_profiles').select('provider, model, encrypted_api_key').eq('is_active', true).maybeSingle();

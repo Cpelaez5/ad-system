@@ -166,7 +166,8 @@ Deno.serve(async (req) => {
     || (org === perfil.organization_id && (esStaff || cliente === perfil.client_id));
   if (!suya) return error(403, 'AJENA', 'Esa foto no pertenece a tu negocio.');
 
-  const log: Record<string, unknown> = { user_id: user.id, provider: 'gemini', status: 'error' };
+  // `accion` permite contar el uso de IA por función (créditos por negocio, migración 20261015160000).
+  const log: Record<string, unknown> = { user_id: user.id, provider: 'gemini', status: 'error', accion };
 
   try {
     // 4. Leer la foto

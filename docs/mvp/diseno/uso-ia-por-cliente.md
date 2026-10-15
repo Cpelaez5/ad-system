@@ -29,6 +29,20 @@ Los créditos por función viven en una tabla (`ia_tarifas`) que edita el super 
 - **Vista o RPC `uso_ia_mes(p_client_id)`:** devuelve `{ usados, limite, por_accion }`. El cliente solo puede consultar el suyo (RLS / `security definer` que valida `get_current_user_client_id()`).
 - **Corte suave:** antes de llamar a Gemini, la función revisa el saldo. Si ya no quedan créditos, responde `{ error: { code: 'SIN_CREDITOS', message: 'Usaste todos tus créditos de IA de este mes…' } }` y la app ofrece "Mejorar mi plan". Los registros manuales **nunca** se bloquean: solo la ayuda de la IA.
 
+## Lenguaje: el cliente NUNCA ve "tokens" ni "créditos" (pedido del 2026-10-15)
+- Los créditos son solo la unidad **interna** (super admin, cálculos).
+- Al cliente se le habla de **"Tu asistente"**: una **barra** con el porcentaje del mes y una frase según cuánto queda:
+  - menos del 50 %: "Te queda bastante";
+  - del 50 al 80 %: "Vas a mitad de mes de uso";
+  - del 80 al 99 %: "Te queda poco";
+  - 100 %: "Se renueva el 1 de noviembre".
+- El detalle se dice en **acciones**: "Leíste 12 facturas con foto · Mejoraste 3 fotos · Hiciste 18 preguntas". Nunca en números de créditos.
+
+## Dónde se ve la barra
+- **Escritorio:** en el **menú lateral**, encima de "Cerrar sesión", con la etiqueta "Tu asistente" y una barra fina. La barra superior ya está ocupada por las tasas. Con el menú recogido se ve un **círculo de progreso** con un tooltip.
+- **Teléfono:** en la hoja "Más" y en **Mi plan**.
+- Al tocarla se abre el detalle en un diálogo: la barra grande, las acciones del mes, la fecha en que se renueva y, si queda poco, "Mejorar mi plan".
+
 ## Lo que ve el cliente
 - En **Mi plan**, la tarjeta **"Tu IA este mes"**:
   - una barra "34 de 100 créditos";
@@ -42,7 +56,15 @@ Los créditos por función viven en una tabla (`ia_tarifas`) que edita el super 
 - **Acciones:** sumar créditos extra a un negocio y editar las tarifas por función.
 - **Alertas:** negocios que llegan al 100 %, porque son candidatos a mejorar su plan.
 
+## Estado
+- **Hecho (2026-10-15, migración `20261015160000`):**
+  - columnas `client_id`, `accion` y `creditos` en `ai_usage_logs`, llenadas por un trigger que deduce la acción si la función no la manda;
+  - `ia_tarifas`, `subscription_plans.creditos_ia_mes` y `plans.creditos_ia_mes` (topes provisionales: prueba 30, Solo Pro 100, Visionary 200, Business Momentum 300, Enterprise Hub 600, Corporate Nexus 1.000), y `clients.creditos_ia_extra`;
+  - la RPC `uso_ia_mes(p_client_id)`;
+  - `producto-ia` v3 y `documento-ia` v2 mandan su `accion`.
+- **Pendiente:** `ai-chat` y `gemini-ocr` no se pueden volver a publicar con la herramienta actual (usan archivos compartidos), así que su acción la deduce el trigger: el OCR se reconoce por la moneda detectada y lo demás cuenta como chat. Los registros anteriores a hoy de identificar, estante y documento quedaron contados como chat.
+
 ## Fases
-1. Columnas en `ai_usage_logs`, las tarifas y que las funciones las registren (sin bloquear todavía). Barra en Mi plan y tabla por negocio en el panel.
+1. Columnas en `ai_usage_logs`, las tarifas y que las funciones las registren (sin bloquear todavía). Barra en el menú lateral y en Mi plan, y tabla por negocio en el panel.
 2. Límite por plan, corte suave y avisos.
 3. Venta de créditos extra desde Mi plan.
