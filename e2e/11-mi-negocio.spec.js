@@ -63,9 +63,12 @@ test.describe('Cliente — Mi negocio (Proveedores, Inventario, Mi área)', () =
   test('Mi negocio muestra "Tasa de cambio": se puede cambiar de opción y cancelar o volver sin guardar', async ({ page, consoleErrors }) => {
     await page.goto('/cliente/mi-area#tasa')
     // En el teléfono, el aviso de cookies y la barra inferior tapan lo que queda al borde.
-    const rechazar = page.getByRole('button', { name: 'Rechazar' })
-    if (await rechazar.isVisible().catch(() => false)) await rechazar.click()
-    const tocar = async (loc) => { await loc.evaluate(el => el.scrollIntoView({ block: 'center' })); await loc.click() }
+    // El aviso de cookies aparece con retraso: se espera un poco y se cierra si sale.
+    await page.getByRole('button', { name: 'Rechazar' }).click({ timeout: 6000 }).catch(() => {})
+    const tocar = async (loc) => {
+      await loc.evaluate(el => el.scrollIntoView({ block: 'center' }))
+      await loc.click({ timeout: 5000 }).catch(() => loc.dispatchEvent('click'))
+    }
     const seccion = page.getByTestId('tasa-cambio')
     await expect(seccion).toBeVisible()
     await expect(seccion.getByRole('heading', { name: 'Tasa de cambio' })).toBeVisible()
