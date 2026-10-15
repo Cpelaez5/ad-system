@@ -7,7 +7,8 @@ Fecha: 2026-10-15. Pedido del usuario:
 **Estado:**
 - **Hecho (2026-10-15):** la confirmación antes de borrar ("¿Quitar tu sello?").
 - **Ya existe:** la vista previa (`VistaPreviaSelloFirma.vue`).
-- **Pendiente:** los puntos 1 y 2.
+- **Hecho (2026-10-15):** el punto 2, la detección de imágenes blancas (`src/utils/imagenSello.js`, con pruebas; diálogo en Mi negocio con "Sí, en negro", "Tinta azul" y "Dejarla así").
+- **Pendiente:** el punto 1, el ajuste de tamaño y posición.
 
 ## 1. Ajustar tamaño y posición
 - Los ajustes se guardan en la configuración del sello (`seal-service`, junto a `sealUrl` y `signatureUrl`) como `ajustes: { sello: { escala, dx, dy }, firma: { escala, dx, dy } }`:
@@ -22,7 +23,7 @@ Fecha: 2026-10-15. Pedido del usuario:
   Los cambios se ven en vivo en la vista previa.
 - **Límites:** la imagen nunca se sale de la zona de firma del agente; se recorta el movimiento.
 
-## 2. Detectar imágenes que no se verán sobre papel blanco
+## 2. Detectar imágenes que no se verán sobre papel blanco ✅
 - Al subir el sello o la firma, el navegador analiza la imagen en un `canvas`: entre los píxeles visibles (alfa > 20 %), cuenta los muy claros (luminancia > 0,85).
 - Si más del 80 % son claros, la imagen "no se verá" sobre el papel. Se muestra el aviso: **"Tu imagen es blanca o muy clara y no se verá en el papel. ¿La pasamos a color oscuro?"** con dos botones: **"Sí, oscurecerla"** (recomendado) y "Dejarla así".
 - **Oscurecer:** cada píxel visible pasa a **#1E1E1E** (o al azul tinta **#1A3A8A**, opción "Tinta azul", típica de sellos), conservando su transparencia. Se sube la imagen convertida. La original no se guarda.

@@ -490,6 +490,25 @@
       <ConexionesApi v-if="currentUser?.role === 'cliente'" />
     </template>
 
+    <!-- Imagen blanca o muy clara: no se vería sobre el papel -->
+    <DialogoAdaptable
+      :model-value="!!imagenClaraPendiente"
+      titulo="Tu imagen no se verá en el papel"
+      icono="mdi-eye-off-outline"
+      max-width="480"
+      @update:model-value="v => { if (!v) imagenClaraPendiente = null }"
+    >
+      <p class="mb-0">
+        Es blanca o muy clara, y los documentos tienen fondo blanco. ¿La pasamos a un color oscuro?
+        Mantenemos su forma y su fondo transparente.
+      </p>
+      <template #acciones>
+        <v-btn variant="text" class="text-none" :disabled="convirtiendoImagen" @click="resolverImagenClara(null)">Dejarla así</v-btn>
+        <v-btn variant="tonal" color="primary" class="text-none" :loading="convirtiendoImagen" @click="resolverImagenClara('azul')">Tinta azul</v-btn>
+        <v-btn variant="flat" color="primary" class="text-none" :loading="convirtiendoImagen" @click="resolverImagenClara('negro')">Sí, en negro</v-btn>
+      </template>
+    </DialogoAdaptable>
+
     <!-- Confirmar antes de quitar el sello o la firma -->
     <DialogoAdaptable
       :model-value="!!borrarSelloPendiente"
@@ -615,6 +634,7 @@ import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue';
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
 import ConexionesApi from '@/components/cliente/ConexionesApi.vue';
 import VistaPreviaSelloFirma from '@/components/cliente/VistaPreviaSelloFirma.vue';
+import { revisarImagenSello } from '@/utils/imagenSello.js';
 import ListaPasos from '@/components/ui/ListaPasos.vue';
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
 import AvisoAmable from '@/components/ui/AvisoAmable.vue';
@@ -642,6 +662,8 @@ export default {
     return {
       vistaSelloAbierta: false,
       borrarSelloPendiente: null,
+      imagenClaraPendiente: null,
+      convirtiendoImagen: false,
       borrandoSello: false,
       descargandoEjemplo: false,
       currentUser: null,
@@ -898,15 +920,39 @@ export default {
 
     async handleFileUpload(event, type) {
       const file = event.target.files?.[0];
-      await this.processFile(file, type);
       event.target.value = '';
+      await this.revisarYSubir(file, type);
+    },
+
+    // Una imagen blanca o muy clara no se vería sobre el papel: se ofrece oscurecerla.
+    async revisarYSubir(file, type) {
+      if (!file) return;
+      const revision = await revisarImagenSello(file);
+      if (revision?.clara) {
+        this.imagenClaraPendiente = { file, type, revision };
+        return;
+      }
+      await this.processFile(file, type);
+    },
+
+    async resolverImagenClara(tinta) {
+      const pendiente = this.imagenClaraPendiente;
+      if (!pendiente) return;
+      this.convirtiendoImagen = true;
+      try {
+        const archivo = tinta ? await pendiente.revision.convertir(tinta) : pendiente.file;
+        this.imagenClaraPendiente = null;
+        await this.processFile(archivo, pendiente.type);
+      } finally {
+        this.convirtiendoImagen = false;
+      }
     },
 
     async handleDrop(event, type) {
       if (type === 'seal') this.arrastrandoSello = false;
       if (type === 'signature') this.arrastrandoFirma = false;
       const file = event.dataTransfer?.files?.[0];
-      await this.processFile(file, type);
+      await this.revisarYSubir(file, type);
     },
 
     async confirmarBorrarSello() {
