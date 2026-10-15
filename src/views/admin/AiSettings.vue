@@ -1,612 +1,308 @@
 <template>
-  <v-container fluid class="pa-4 pa-sm-6 ai-settings-container">
-    <!-- Encabezado -->
-    <v-row class="mb-4">
-      <v-col cols="12" class="d-flex justify-space-between align-center flex-wrap gap-4">
-        <div>
-          <h1 class="text-h4 font-weight-bold text-white mb-2">Configuración de Inteligencia Artificial</h1>
-          <p class="text-body-1 text-grey-lighten-1 mb-0">
-            Gestiona los perfiles de proveedores IA (Gemini, Deepseek, etc.) y monitorea el consumo del OCR.
-          </p>
-        </div>
-        <div class="d-flex gap-3">
-          <v-btn
-            color="#e0b04f"
-            variant="elevated"
-            class="text-black font-weight-bold px-6 rounded-pill"
-            @click="openNewModal"
-            :disabled="loading"
-          >
-            <v-icon icon="mdi-plus" class="mr-2" size="small"></v-icon>
-            Nuevo Perfil
-          </v-btn>
-        </div>
-      </v-col>
-    </v-row>
+  <div class="ia">
+    <EncabezadoPagina titulo="Configuración de IA" subtitulo="Qué proveedor y modelo de IA usa el sistema para leer facturas y responder en el chat.">
+      <v-btn variant="outlined" size="large" class="text-none" prepend-icon="mdi-chart-box-outline" data-testid="ir-uso" @click="router.push('/admin/uso-ia')">
+        Uso de IA
+      </v-btn>
+      <v-btn color="primary" size="large" class="text-none" prepend-icon="mdi-plus" :disabled="cargando" data-testid="nuevo" @click="abrirNuevo">
+        Nuevo perfil
+      </v-btn>
+    </EncabezadoPagina>
 
-    <!-- Pestañas -->
-    <v-tabs v-model="activeTab" color="#e0b04f" bg-color="transparent" class="mb-6" theme="dark">
-      <v-tab value="config" class="text-none font-weight-bold">
-        <v-icon start>mdi-cog</v-icon> Perfiles y Auditoría
-      </v-tab>
-      <v-tab value="demo" class="text-none font-weight-bold">
-        <v-icon start>mdi-flask</v-icon> Laboratorio de Pruebas
-      </v-tab>
-    </v-tabs>
+    <FiltroChips v-model="vista" etiqueta="Sección" :opciones="opcionesVista" class="mb-4" />
 
-    <v-window v-model="activeTab" class="overflow-visible">
-      
-      <!-- Pestaña Configuración -->
-      <v-window-item value="config">
-        <v-row>
-      <!-- Panel de Perfiles (Izquierda) -->
-      <v-col cols="12" md="5" lg="4">
-        <h3 class="text-h6 text-white mb-4 font-weight-bold">Perfiles Disponibles</h3>
-        
-        <div v-if="loading" class="text-center py-8">
-          <v-progress-circular indeterminate color="#e0b04f"></v-progress-circular>
-        </div>
-        
-        <div v-else-if="profiles.length === 0" class="text-center py-10 bg-surface-dark rounded-lg border-thin">
-          <v-icon icon="mdi-robot-off-outline" size="large" color="grey-lighten-1" class="mb-3"></v-icon>
-          <p class="text-body-2 text-grey-lighten-1 mb-0">No tienes perfiles configurados.</p>
-        </div>
-        
-        <div v-else class="d-flex flex-column gap-4">
-          <!-- Tarjetas de cada perfil -->
-          <v-card 
-            v-for="profile in profiles" 
-            :key="profile.id"
-            :color="profile.is_active ? '#2A2A2E' : 'rgba(255,255,255,0.05)'" 
-            theme="dark" 
-            elevation="2" 
-            class="rounded-lg transition-fast-in-fast-out"
-            :class="profile.is_active ? 'border-active' : 'border-thin'"
-          >
-            <v-card-text class="pa-4">
-              <div class="d-flex justify-space-between align-start mb-3">
-                <div>
-                  <div class="d-flex align-center gap-2 mb-1">
-                    <span class="text-subtitle-1 font-weight-bold text-white">{{ profile.profile_name }}</span>
-                    <v-chip v-if="profile.is_active" color="success" size="x-small" variant="flat" class="text-uppercase font-weight-bold">
-                      Activo
-                    </v-chip>
-                  </div>
-                  <div class="text-caption text-grey-lighten-1 text-capitalize">
-                    <v-icon :icon="profile.provider === 'gemini' ? 'mdi-google' : 'mdi-brain'" size="x-small" class="mr-1"></v-icon>
-                    {{ profile.provider }} • {{ profile.model }}
-                  </div>
-                </div>
-                <!-- Menú de acciones -->
-                <v-menu location="bottom end">
-                  <template v-slot:activator="{ props }">
-                    <v-btn icon="mdi-dots-vertical" variant="text" size="small" color="grey-lighten-1" v-bind="props"></v-btn>
-                  </template>
-                  <v-list density="compact" bg-color="#2A2A2E" theme="dark">
-                    <v-list-item @click="openEditModal(profile)">
-                      <template v-slot:prepend><v-icon icon="mdi-pencil" size="small" class="mr-2"></v-icon></template>
-                      <v-list-item-title>Editar</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item v-if="!profile.is_active" @click="deleteProfile(profile.id)" class="text-error">
-                      <template v-slot:prepend><v-icon icon="mdi-delete" size="small" class="mr-2" color="error"></v-icon></template>
-                      <v-list-item-title>Eliminar</v-list-item-title>
-                    </v-list-item>
-                  </v-list>
-                </v-menu>
-              </div>
+    <template v-if="vista === 'perfiles'">
+      <v-skeleton-loader v-if="cargando" type="article, list-item-two-line" data-testid="cargando" />
 
-              <div class="d-flex align-center mb-4">
-                <v-icon icon="mdi-key-variant" color="grey-lighten-1" size="x-small" class="mr-2"></v-icon>
-                <span class="text-body-2 text-grey-lighten-1 font-mono">••••••••••••{{ profile.key_suffix }}</span>
-              </div>
+      <template v-else>
+        <PanelSiguientePaso
+          class="mb-6"
+          :listo="!siguiente"
+          :titulo="siguiente ? siguiente.titulo : ''"
+          :detalle="siguiente ? siguiente.detalle : ''"
+          :texto-boton="siguiente ? siguiente.boton : ''"
+          titulo-listo="La IA está funcionando"
+          :detalle-listo="activo ? `Se usa «${activo.profile_name}» (${activo.model}).` : ''"
+          @accion="siguiente.accion()"
+        />
 
-              <!-- Botón Activar (si no es activo) -->
-              <v-btn
-                v-if="!profile.is_active"
-                block
-                variant="outlined"
-                color="grey-lighten-1"
-                class="text-none font-weight-medium rounded-pill"
-                @click="activateProfile(profile)"
-                :loading="activatingId === profile.id"
-                :disabled="activatingId !== null"
-              >
-                Cambiar a este modelo
-              </v-btn>
-              
-              <!-- Estado de conexión (si es activo) -->
-              <div v-else class="d-flex align-center bg-black-transparent pa-2 rounded">
-                <v-icon :icon="statusIcon" :color="statusColor" size="small" class="mr-2"></v-icon>
-                <span class="text-caption" :class="`text-${statusColor}`">{{ statusText }}</span>
-              </div>
-            </v-card-text>
-          </v-card>
-        </div>
-      </v-col>
+        <EstadoVacio
+          v-if="perfiles.length === 0"
+          icono="mdi-robot-off-outline"
+          titulo="Todavía no hay perfiles"
+          mensaje="Un perfil guarda el proveedor, el modelo y la llave de API. El primero que crees queda en uso."
+          texto-accion="Crear el primer perfil"
+          @accion="abrirNuevo"
+        />
 
-      <!-- Historial de Uso (Derecha) -->
-      <v-col cols="12" md="7" lg="8">
-        <h3 class="text-h6 text-white mb-4 font-weight-bold d-flex align-center">
-          Auditoría de Uso Reciente
-          <v-spacer></v-spacer>
-          <v-btn icon="mdi-refresh" variant="text" size="small" color="grey-lighten-1" @click="loadUsageLogs" :loading="loadingLogs"></v-btn>
-        </h3>
-        
-        <v-card color="#2A2A2E" theme="dark" elevation="4" class="rounded-lg fill-height border-thin">
-          <v-card-text class="pa-0">
-            <!-- Vista Móvil (Tarjetas) -->
-            <div class="d-md-none pa-4">
-              <div v-if="loadingLogs" class="text-center py-4">
-                <v-progress-circular indeterminate color="#e0b04f"></v-progress-circular>
-              </div>
-              <div v-else-if="usageLogs.length === 0" class="text-center py-8">
-                <p class="text-grey-lighten-1">No hay registros de uso aún.</p>
-              </div>
-              <div v-else class="d-flex flex-column gap-3">
-                <v-card v-for="log in usageLogs" :key="log.id" color="rgba(255,255,255,0.05)" flat class="border-thin">
-                  <v-card-text class="pa-3">
-                    <div class="d-flex justify-space-between align-center mb-2">
-                      <span class="text-caption text-grey-lighten-1">{{ formatDate(log.created_at) }}</span>
-                      <v-chip :color="log.status === 'success' ? 'success' : 'error'" size="x-small" variant="flat">
-                        {{ log.status === 'success' ? 'Éxito' : 'Fallo' }}
-                      </v-chip>
-                    </div>
-                    <div class="d-flex justify-space-between align-center">
-                      <span class="text-body-2 font-weight-medium">{{ log.model }}</span>
-                      <span class="text-body-2 text-gold font-mono">{{ log.costo_estimado ? '$' + Number(log.costo_estimado).toFixed(6) : '-' }}</span>
-                    </div>
-                    <div v-if="log.error_code" class="mt-2 text-caption text-error">
-                      <v-icon icon="mdi-alert" size="x-small" class="mr-1"></v-icon>
-                      {{ log.error_code }}
-                    </div>
-                  </v-card-text>
-                </v-card>
-              </div>
+        <SeccionLista v-else titulo="Perfiles" icono="mdi-robot-outline" :meta="`${perfiles.length} guardado${perfiles.length === 1 ? '' : 's'}`">
+          <FilaPerfilIa
+            v-for="p in perfiles"
+            :key="p.id"
+            :perfil="p"
+            :estado="p.is_active ? estadoActivo : null"
+            :activando="activandoId === p.id"
+            :bloqueado="activandoId !== null"
+            @activar="activar"
+            @editar="abrirEditar"
+            @eliminar="pedirEliminar"
+          />
+        </SeccionLista>
+
+        <SeccionLista
+          class="mt-8"
+          titulo="Uso reciente"
+          icono="mdi-history"
+          ayuda="Las últimas 30 llamadas a la IA. El detalle por día y por modelo está en Uso de IA."
+        >
+          <template #cabecera>
+            <v-btn variant="text" class="text-none" prepend-icon="mdi-refresh" :loading="cargandoLogs" data-testid="recargar-uso" @click="cargarUso">Actualizar</v-btn>
+          </template>
+          <div v-if="cargandoLogs && logs.length === 0" class="vacio-lista">Cargando…</div>
+          <div v-else-if="logs.length === 0" class="vacio-lista" data-testid="sin-uso">Aún no hay llamadas registradas.</div>
+          <div v-for="l in logs" :key="l.id" class="fila-uso" data-testid="fila-uso">
+            <div class="fila-uso__texto">
+              <div class="fila-uso__modelo">{{ l.model }}</div>
+              <div class="fila-uso__sub">{{ formatearFecha(l.created_at) }}<template v-if="l.error_code"> · {{ l.error_code }}</template></div>
             </div>
+            <div class="fila-uso__derecha">
+              <div v-if="l.costo_estimado" class="fila-uso__costo">${{ Number(l.costo_estimado).toFixed(6) }}</div>
+              <v-chip size="small" variant="tonal" :color="l.status === 'success' ? 'success' : 'error'">{{ l.status === 'success' ? 'Éxito' : 'Fallo' }}</v-chip>
+            </div>
+          </div>
+        </SeccionLista>
+      </template>
+    </template>
 
-            <!-- Vista Desktop (Tabla) -->
-            <v-table class="bg-transparent d-none d-md-block" density="comfortable" hover>
-              <thead>
-                <tr>
-                  <th class="text-grey-lighten-1 font-weight-bold text-left">Fecha</th>
-                  <th class="text-grey-lighten-1 font-weight-bold text-left">Estado</th>
-                  <th class="text-grey-lighten-1 font-weight-bold text-left">Modelo</th>
-                  <th class="text-grey-lighten-1 font-weight-bold text-right">Costo (USD)</th>
-                  <th class="text-grey-lighten-1 font-weight-bold text-left">Detalle</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="loadingLogs">
-                  <td colspan="5" class="text-center py-4">
-                    <v-progress-circular indeterminate color="#e0b04f" size="24"></v-progress-circular>
-                  </td>
-                </tr>
-                <tr v-else-if="usageLogs.length === 0">
-                  <td colspan="5" class="text-center py-8 text-grey-lighten-1">No hay registros de uso aún.</td>
-                </tr>
-                <tr v-else v-for="log in usageLogs" :key="log.id">
-                  <td class="text-body-2 text-grey-lighten-2">{{ formatDate(log.created_at) }}</td>
-                  <td>
-                    <v-chip :color="log.status === 'success' ? 'success' : 'error'" size="small" variant="flat">
-                      {{ log.status === 'success' ? 'Éxito' : 'Fallo' }}
-                    </v-chip>
-                  </td>
-                  <td class="text-body-2 text-white">{{ log.model }}</td>
-                  <td class="text-body-2 text-gold font-mono text-right">
-                    {{ log.costo_estimado ? '$' + Number(log.costo_estimado).toFixed(6) : '-' }}
-                  </td>
-                  <td class="text-caption text-grey-lighten-1 text-truncate" style="max-width: 150px;" :title="log.error_message">
-                    {{ log.error_code || '-' }}
-                  </td>
-                </tr>
-              </tbody>
-            </v-table>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-      </v-window-item>
-
-      <!-- Pestaña Demo / Pruebas -->
-      <v-window-item value="demo">
-        
-        <div class="d-flex justify-center mb-6">
-          <v-btn-toggle 
-            v-model="demoType" 
-            color="#e0b04f" 
-            mandatory 
-            rounded="pill" 
-            class="border-thin bg-surface-dark"
-          >
-            <v-btn value="ocr" class="text-none font-weight-medium px-6">
-              <v-icon start size="small">mdi-file-document-outline</v-icon>
-              Extraer Factura
-            </v-btn>
-            <v-btn value="chat" class="text-none font-weight-medium px-6">
-              <v-icon start size="small">mdi-message-text-outline</v-icon>
-              Chat Libre
-            </v-btn>
-          </v-btn-toggle>
-        </div>
-
-        <v-card color="#121212" theme="dark" elevation="0" class="border-thin rounded-lg">
-          <OCRDemo v-if="demoType === 'ocr'" />
-          <AiChatDemo v-if="demoType === 'chat'" />
-        </v-card>
-
-      </v-window-item>
-
-    </v-window>
-
-    <!-- Modal de Edición/Creación -->
-    <v-dialog v-model="showEditModal" max-width="500px" persistent>
-      <v-card color="#2A2A2E" theme="dark" class="rounded-lg border-thin">
-        <v-card-title class="text-h6 font-weight-bold pa-5 pb-3">
-          {{ editForm.id ? 'Editar Perfil IA' : 'Nuevo Perfil IA' }}
-        </v-card-title>
-        
-        <v-card-text class="pa-5 pt-0">
-          <v-form ref="form" @submit.prevent="saveSettings" :disabled="saving">
-            
-            <v-text-field
-              v-model="editForm.profileName"
-              label="Nombre del Perfil"
-              placeholder="Ej. Gemini Producción"
-              variant="outlined"
-              color="#e0b04f"
-              bg-color="rgba(0,0,0,0.2)"
-              class="mb-4"
-              required
-            ></v-text-field>
-
-            <v-select
-              v-model="editForm.provider"
-              :items="[
-                { title: 'Google Gemini', value: 'gemini' },
-                { title: 'DeepSeek', value: 'deepseek' }
-              ]"
-              label="Proveedor"
-              variant="outlined"
-              color="#e0b04f"
-              bg-color="rgba(0,0,0,0.2)"
-              class="mb-4"
-              hide-details="auto"
-            ></v-select>
-
-            <v-text-field
-              v-model="editForm.model"
-              label="Modelo API"
-              placeholder="ej. gemini-3.7-flash"
-              variant="outlined"
-              color="#e0b04f"
-              bg-color="rgba(0,0,0,0.2)"
-              hint="Sugerencias: gemini-3.1-pro-preview, gemini-3.7-flash, deepseek-chat"
-              persistent-hint
-              class="mb-4"
-              required
-            ></v-text-field>
-
-            <v-text-field
-              v-model="editForm.apiKey"
-              label="Llave de API"
-              type="password"
-              autocomplete="new-password"
-              :placeholder="editForm.id ? 'Deja en blanco para mantener la actual' : 'Pega tu API Key aquí'"
-              variant="outlined"
-              color="#e0b04f"
-              bg-color="rgba(0,0,0,0.2)"
-              :required="!editForm.id"
-              hide-details="auto"
-            ></v-text-field>
-
-          </v-form>
-        </v-card-text>
-
-        <v-divider color="rgba(255,255,255,0.1)"></v-divider>
-
-        <v-card-actions class="pa-4 bg-black-transparent">
-          <v-spacer></v-spacer>
-          <v-btn
-            color="grey-lighten-1"
-            variant="text"
-            @click="showEditModal = false"
-            :disabled="saving"
-            class="text-none font-weight-medium"
-          >
-            Cancelar
-          </v-btn>
-          <v-btn
-            color="#e0b04f"
-            variant="flat"
-            @click="saveSettings"
-            :loading="saving"
-            class="text-black font-weight-bold px-4 ml-2 text-none"
-          >
-            Guardar
-          </v-btn>
-        </v-card-actions>
+    <template v-else>
+      <p class="text-body-1 text-medium-emphasis mb-4">Prueba el perfil que está en uso sin tocar datos de ningún negocio.</p>
+      <FiltroChips v-model="demo" etiqueta="Tipo de prueba" :opciones="opcionesDemo" class="mb-4" />
+      <v-card variant="outlined" class="laboratorio">
+        <OCRDemo v-if="demo === 'ocr'" />
+        <AiChatDemo v-if="demo === 'chat'" />
       </v-card>
-    </v-dialog>
-  </v-container>
+    </template>
+
+    <DialogoPerfilIa v-model="dialogoPerfil" :perfil="perfilEnEdicion" :cargando="guardando" @guardar="guardar" />
+
+    <DialogoAdaptable v-model="dialogoEliminar" titulo="Eliminar perfil" icono="mdi-delete-outline" :cargando="eliminando" max-width="480">
+      <p class="text-body-1 mb-0">
+        ¿Eliminar el perfil <strong>{{ aEliminar?.profile_name }}</strong>? Se borra también su llave guardada. Esto no se puede deshacer.
+      </p>
+      <template #acciones>
+        <v-btn variant="text" class="text-none" :disabled="eliminando" @click="dialogoEliminar = false">Cancelar</v-btn>
+        <v-btn color="error" size="large" class="text-none" :loading="eliminando" data-testid="confirmar-eliminar" @click="eliminar">Eliminar</v-btn>
+      </template>
+    </DialogoAdaptable>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { supabase } from '@/lib/supabaseClient';
-import OCRDemo from '@/views/shared/OCRDemo.vue';
-import AiChatDemo from '@/components/chat/AiChatDemo.vue';
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { supabase } from '@/lib/supabaseClient'
+import { useNotificacionStore } from '@/store/notificacionStore'
+import OCRDemo from '@/views/shared/OCRDemo.vue'
+import AiChatDemo from '@/components/chat/AiChatDemo.vue'
+import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
+import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
+import FiltroChips from '@/components/ui/FiltroChips.vue'
+import SeccionLista from '@/components/ui/SeccionLista.vue'
+import EstadoVacio from '@/components/ui/EstadoVacio.vue'
+import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
+import FilaPerfilIa from '@/components/admin/ia/FilaPerfilIa.vue'
+import DialogoPerfilIa from '@/components/admin/ia/DialogoPerfilIa.vue'
+import { estadoConexion, deducirEstado, sufijoDeLlave } from '@/components/admin/ia/iaUtil'
+import { formatFechaLocal } from '@/utils/fechas'
 
-const activeTab = ref('config');
-const demoType = ref('chat'); // chat por defecto para probar la novedad
-const form = ref(null);
+const notificaciones = useNotificacionStore()
+const router = useRouter()
 
-const loading = ref(true);
-const loadingLogs = ref(true);
-const saving = ref(false);
-const activatingId = ref(null);
-const showEditModal = ref(false);
+const vista = ref('perfiles')
+const demo = ref('chat')
+const opcionesVista = [
+  { valor: 'perfiles', texto: 'Perfiles' },
+  { valor: 'pruebas', texto: 'Laboratorio de pruebas' },
+]
+const opcionesDemo = [
+  { valor: 'chat', texto: 'Chat libre' },
+  { valor: 'ocr', texto: 'Extraer factura' },
+]
 
-const profiles = ref([]);
-const usageLogs = ref([]);
-const connectionStatus = ref('connected'); // Solo aplica al perfil activo
+const cargando = ref(true)
+const cargandoLogs = ref(true)
+const guardando = ref(false)
+const eliminando = ref(false)
+const activandoId = ref(null)
 
-const editForm = ref({
-  id: null,
-  profileName: '',
-  provider: 'gemini',
-  model: 'gemini-3.7-flash',
-  apiKey: ''
-});
+const perfiles = ref([])
+const logs = ref([])
+const estadoClave = ref('connected')
 
-// Computed properties for Active Profile
-const activeProfile = computed(() => {
-  return profiles.value.find(p => p.is_active) || null;
-});
+const dialogoPerfil = ref(false)
+const perfilEnEdicion = ref(null)
+const dialogoEliminar = ref(false)
+const aEliminar = ref(null)
 
-const statusColor = computed(() => {
-  if (connectionStatus.value === 'connected') return 'success';
-  if (connectionStatus.value === 'invalid_key') return 'error';
-  if (connectionStatus.value === 'quota_exceeded') return 'warning';
-  return 'grey';
-});
+const activo = computed(() => perfiles.value.find((p) => p.is_active) || null)
+const estadoActivo = computed(() => estadoConexion(estadoClave.value))
 
-const statusIcon = computed(() => {
-  if (connectionStatus.value === 'connected') return 'mdi-check-circle';
-  if (connectionStatus.value === 'invalid_key') return 'mdi-close-circle';
-  if (connectionStatus.value === 'quota_exceeded') return 'mdi-alert-circle';
-  return 'mdi-help-circle';
-});
-
-const statusText = computed(() => {
-  if (connectionStatus.value === 'connected') return 'Conexión Establecida';
-  if (connectionStatus.value === 'invalid_key') return 'Llave Inválida / Rechazada';
-  if (connectionStatus.value === 'quota_exceeded') return 'Límite de Cuota Alcanzado';
-  return 'Estado Desconocido';
-});
+// UNA cosa que hacer ahora: crear el primero, activar uno, o arreglar la llave/cuota.
+const siguiente = computed(() => {
+  if (perfiles.value.length === 0) {
+    return { titulo: 'Crea tu primer perfil de IA', detalle: 'Sin un perfil, el OCR de facturas y el chat no pueden funcionar.', boton: 'Crear perfil', accion: abrirNuevo }
+  }
+  if (!activo.value) {
+    const primero = perfiles.value[0]
+    return { titulo: 'Ningún perfil está en uso', detalle: 'Sin un perfil en uso, la IA no responde.', boton: `Usar «${primero.profile_name}»`, accion: () => activar(primero) }
+  }
+  if (estadoClave.value === 'invalid_key') {
+    return { titulo: 'La llave del perfil en uso fue rechazada', detalle: 'Pega una llave nueva para que la IA vuelva a funcionar.', boton: 'Cambiar la llave', accion: () => abrirEditar(activo.value) }
+  }
+  if (estadoClave.value === 'quota_exceeded') {
+    return { titulo: 'El perfil en uso llegó a su límite', detalle: 'Cambia a otro perfil o espera a que se renueve la cuota.', boton: 'Ver uso de IA', accion: () => router.push('/admin/uso-ia') }
+  }
+  return null
+})
 
 onMounted(async () => {
-  await loadProfiles();
-  await loadUsageLogs();
-});
+  await cargarPerfiles()
+  await cargarUso()
+})
 
-function openNewModal() {
-  editForm.value = {
-    id: null,
-    profileName: '',
-    provider: 'gemini',
-    model: '',
-    apiKey: ''
-  };
-  showEditModal.value = true;
-}
-
-function openEditModal(profile) {
-  editForm.value = {
-    id: profile.id,
-    profileName: profile.profile_name,
-    provider: profile.provider,
-    model: profile.model,
-    apiKey: '' // No mostrar por seguridad
-  };
-  showEditModal.value = true;
-}
-
-async function loadProfiles() {
-  loading.value = true;
+async function cargarPerfiles() {
+  cargando.value = true
   try {
-    const { data, error } = await supabase
-      .from('ai_provider_profiles')
-      .select('*')
-      .order('is_active', { ascending: false }) // Activo primero
-      .order('created_at', { ascending: false });
-      
-    if (data) {
-      profiles.value = data;
-      checkConnectionStatus();
-    }
-  } catch (err) {
-    console.error("Error cargando perfiles:", err);
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function activateProfile(profile) {
-  if (profile.is_active) return;
-  activatingId.value = profile.id;
-  try {
-    // 1. Apagar todos primero para evitar conflicto en el índice único parcial
-    const { error: err1 } = await supabase
-      .from('ai_provider_profiles')
-      .update({ is_active: false })
-      .eq('is_active', true);
-    if (err1) throw err1;
-
-    // 2. Encender el seleccionado
-    const { error: err2 } = await supabase
-      .from('ai_provider_profiles')
-      .update({ is_active: true })
-      .eq('id', profile.id);
-    if (err2) throw err2;
-
-    await loadProfiles();
-  } catch (err) {
-    console.error("Error activando perfil:", err);
-    alert('Error al cambiar de perfil. Inténtalo de nuevo.');
-  } finally {
-    activatingId.value = null;
-  }
-}
-
-async function deleteProfile(id) {
-  if (!confirm('¿Estás seguro de que deseas eliminar este perfil IA?')) return;
-  try {
-    await supabase.from('ai_provider_profiles').delete().eq('id', id);
-    await loadProfiles();
-  } catch (err) {
-    console.error("Error eliminando perfil:", err);
-  }
-}
-
-async function loadUsageLogs() {
-  loadingLogs.value = true;
-  try {
+    // Sin encrypted_api_key: la llave nunca viaja al navegador, solo sus últimos 4.
     const { data } = await supabase
-      .from('ai_usage_logs')
-      .select('*')
+      .from('ai_provider_profiles')
+      .select('id, profile_name, provider, model, is_active, key_suffix, created_at')
+      .order('is_active', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(30);
-      
     if (data) {
-      usageLogs.value = data;
-      checkConnectionStatus(); 
+      perfiles.value = data
+      recalcularEstado()
     }
   } catch (err) {
-    console.error("Error cargando logs:", err);
+    console.error('Error cargando perfiles:', err)
   } finally {
-    loadingLogs.value = false;
+    cargando.value = false
   }
 }
 
-function checkConnectionStatus() {
-  if (!usageLogs.value.length || !activeProfile.value) return;
-  
-  // Validamos si el último log pertenece al modelo actualmente activo
-  const lastLog = usageLogs.value[0];
-  if (lastLog.provider !== activeProfile.value.provider || lastLog.model !== activeProfile.value.model) {
-    connectionStatus.value = 'connected'; // Asumimos OK hasta que haya un log real
-    return;
-  }
-
-  if (lastLog.status === 'success') {
-    connectionStatus.value = 'connected';
-  } else if (lastLog.error_code === 'INVALID_KEY') {
-    connectionStatus.value = 'invalid_key';
-  } else if (lastLog.error_code === 'QUOTA_EXCEEDED' || lastLog.error_code === 'PREVIEW_RATE_LIMIT') {
-    connectionStatus.value = 'quota_exceeded';
-  }
-}
-
-async function saveSettings() {
-  if (!editForm.value.profileName || !editForm.value.model || (!editForm.value.id && !editForm.value.apiKey)) {
-    alert("Por favor completa los campos requeridos.");
-    return;
-  }
-
-  saving.value = true;
+async function cargarUso() {
+  cargandoLogs.value = true
   try {
-    let keySuffix = '0000';
-    if (editForm.value.apiKey) {
-      const keyStr = editForm.value.apiKey;
-      keySuffix = keyStr.substring(keyStr.length - 4);
+    const { data } = await supabase.from('ai_usage_logs').select('*').order('created_at', { ascending: false }).limit(30)
+    if (data) {
+      logs.value = data
+      recalcularEstado()
     }
-
-    const payload = {
-      profile_name: editForm.value.profileName,
-      provider: editForm.value.provider,
-      model: editForm.value.model,
-    };
-    
-    if (editForm.value.apiKey) {
-      // FIX: En backend real, encriptar vía RPC o Edge Function
-      payload.encrypted_api_key = editForm.value.apiKey; 
-      payload.key_suffix = keySuffix;
-    }
-
-    if (editForm.value.id) {
-      // Actualizar existente
-      const { error } = await supabase.from('ai_provider_profiles')
-        .update(payload)
-        .eq('id', editForm.value.id);
-      if (error) throw error;
-    } else {
-      // Crear nuevo (Será inactivo por defecto si ya hay otro activo, o activo si es el primero)
-      payload.is_active = profiles.value.length === 0;
-      const { error } = await supabase.from('ai_provider_profiles')
-        .insert(payload);
-      if (error) throw error;
-    }
-    
-    showEditModal.value = false;
-    await loadProfiles();
-    
   } catch (err) {
-    console.error(err);
-    alert('Error al guardar la configuración: ' + (err.message || 'Error desconocido'));
+    console.error('Error cargando el uso:', err)
   } finally {
-    saving.value = false;
+    cargandoLogs.value = false
   }
 }
 
-function formatDate(dateString) {
-  const d = new Date(dateString);
-  return d.toLocaleString('es-VE', { 
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  });
+function recalcularEstado() {
+  const clave = deducirEstado(logs.value, activo.value)
+  if (clave) estadoClave.value = clave
+}
+
+function abrirNuevo() {
+  perfilEnEdicion.value = null
+  dialogoPerfil.value = true
+}
+
+function abrirEditar(perfil) {
+  perfilEnEdicion.value = perfil
+  dialogoPerfil.value = true
+}
+
+async function activar(perfil) {
+  if (perfil.is_active) return
+  activandoId.value = perfil.id
+  try {
+    // Primero se apagan todos: evita el conflicto del índice único parcial.
+    const { error: e1 } = await supabase.from('ai_provider_profiles').update({ is_active: false }).eq('is_active', true)
+    if (e1) throw e1
+    const { error: e2 } = await supabase.from('ai_provider_profiles').update({ is_active: true }).eq('id', perfil.id)
+    if (e2) throw e2
+    await cargarPerfiles()
+    notificaciones.mostrar(`Ahora se usa «${perfil.profile_name}»`, 'success')
+  } catch (err) {
+    console.error('Error activando perfil:', err)
+    notificaciones.mostrar('No se pudo cambiar de perfil. Inténtalo de nuevo.', 'error')
+  } finally {
+    activandoId.value = null
+  }
+}
+
+function pedirEliminar(perfil) {
+  aEliminar.value = perfil
+  dialogoEliminar.value = true
+}
+
+async function eliminar() {
+  if (!aEliminar.value) return
+  eliminando.value = true
+  try {
+    const { error } = await supabase.from('ai_provider_profiles').delete().eq('id', aEliminar.value.id)
+    if (error) throw error
+    dialogoEliminar.value = false
+    await cargarPerfiles()
+    notificaciones.mostrar('Perfil eliminado', 'success')
+  } catch (err) {
+    console.error('Error eliminando perfil:', err)
+    notificaciones.mostrar('No se pudo eliminar el perfil.', 'error')
+  } finally {
+    eliminando.value = false
+  }
+}
+
+async function guardar(f) {
+  guardando.value = true
+  try {
+    const payload = { profile_name: f.profileName, provider: f.provider, model: f.model }
+    if (f.apiKey) {
+      // Pendiente de backend (heredado): cifrar en una Edge Function o RPC.
+      payload.encrypted_api_key = f.apiKey
+      payload.key_suffix = sufijoDeLlave(f.apiKey)
+    }
+    if (f.id) {
+      const { error } = await supabase.from('ai_provider_profiles').update(payload).eq('id', f.id)
+      if (error) throw error
+    } else {
+      // El primero queda en uso; los demás, guardados.
+      payload.is_active = perfiles.value.length === 0
+      const { error } = await supabase.from('ai_provider_profiles').insert(payload)
+      if (error) throw error
+    }
+    dialogoPerfil.value = false
+    await cargarPerfiles()
+    notificaciones.mostrar('Perfil guardado', 'success')
+  } catch (err) {
+    console.error(err)
+    notificaciones.mostrar('No se pudo guardar: ' + (err.message || 'error desconocido'), 'error')
+  } finally {
+    guardando.value = false
+  }
+}
+
+function formatearFecha(valor) {
+  return formatFechaLocal(valor, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) || ''
 }
 </script>
 
 <style scoped>
-.ai-settings-container {
-  background-color: #010101;
-  min-height: 100vh;
-}
-
-.border-thin {
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-.border-active {
-  border: 1px solid #e0b04f !important;
-  box-shadow: 0 0 10px rgba(224, 176, 79, 0.1) !important;
-}
-
-/* Forzar color blanco/gris en pestañas inactivas */
-:deep(.v-tab:not(.v-tab--selected)) {
-  color: #BDBDBD !important;
-}
-
-.text-gold {
-  color: #e0b04f !important;
-}
-
-.bg-black-transparent {
-  background-color: rgba(0, 0, 0, 0.2) !important;
-}
-.bg-surface-dark {
-  background-color: #121212 !important;
-}
-
-/* Scrollbar para la tabla en desktop */
-.v-table {
-  background: transparent !important;
-}
-.v-table th {
-  background: rgba(0, 0, 0, 0.2) !important;
-  border-bottom: 1px solid rgba(255,255,255,0.1) !important;
-}
-.v-table td {
-  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
-}
+.ia { max-width: 1120px; margin: 0 auto; padding-bottom: 32px; }
+.vacio-lista { padding: 20px 16px; text-align: center; color: rgba(var(--v-theme-on-surface), 0.68); }
+.fila-uso { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
+.fila-uso__texto { min-width: 0; }
+.fila-uso__modelo { font-weight: 600; overflow-wrap: anywhere; }
+.fila-uso__sub { font-size: 0.85rem; color: rgba(var(--v-theme-on-surface), 0.65); overflow-wrap: anywhere; }
+.fila-uso__derecha { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.fila-uso__costo { font-size: 0.85rem; font-variant-numeric: tabular-nums; color: rgba(var(--v-theme-on-surface), 0.75); }
+.laboratorio { overflow: hidden; }
 </style>
