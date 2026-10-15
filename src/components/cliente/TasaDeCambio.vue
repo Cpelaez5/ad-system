@@ -117,9 +117,14 @@
         <v-expansion-panel-text>
           <ul class="tasa__historial-lista">
             <li v-for="d in historial" :key="d.fecha" class="tasa__historial-fila">
-              <span class="tasa__historial-fecha">{{ formatFechaCorta(d.fecha) }}</span>
+              <span class="tasa__historial-fecha">
+                {{ formatFechaCorta(d.fecha) }}<span v-if="d.en" class="tasa__historial-hora"> · {{ horaCaracas(d.en) }}</span>
+              </span>
               <span class="tasa__historial-valores">
-                <span v-for="(valor, codigo) in d.tasas" :key="codigo">{{ codigo }} Bs {{ formatTasa(valor) }}</span>
+                <span v-for="(valor, codigo) in d.tasas" :key="codigo" class="tasa__historial-valor">
+                  <span class="tasa__historial-moneda">{{ codigo }}</span>
+                  Bs {{ tasaParaCampo(valor) }}
+                </span>
               </span>
             </li>
           </ul>
@@ -135,7 +140,7 @@ import AvisoAmable from '@/components/ui/AvisoAmable.vue'
 import { preferencia, guardarPreferencia, tasasVigentes, monedasUsadas, diasDeAntiguedad, historialTasas } from '@/services/tasaService.js'
 import { MONEDAS, CODIGOS_CON_TASA, MONEDAS_OTRAS, formatearTasaEscrita, parsearTasaEscrita, tasaParaCampo } from '@/utils/monedas.js'
 import { formatTasa } from '@/utils/formatMoney.js'
-import { formatFechaCorta } from '@/utils/fechas.js'
+import { formatFechaCorta, horaCaracas } from '@/utils/fechas.js'
 
 const BASICAS = ['USD', 'EUR']
 
@@ -273,6 +278,8 @@ export default {
     },
 
     formatearTasaEscrita,
+    tasaParaCampo,
+    horaCaracas,
     /** "104036.77" → "104.036,77" (mismo formato que se usa al escribir). */
     formatoCampo(n) {
       return tasaParaCampo(n)
@@ -307,7 +314,8 @@ export default {
       if (!guardada) return 'Aún no la escribes'
       if (!guardada.fecha) return 'Actualizada: fecha desconocida'
       const vieja = diasDeAntiguedad(guardada.fecha) > 1
-      return `Actualizada el ${formatFechaCorta(guardada.fecha)}${vieja ? ' · tiene más de un día, revisa si cambió' : ''}`
+      const hora = guardada.en ? ` a las ${horaCaracas(guardada.en)}` : ''
+      return `Actualizada el ${formatFechaCorta(guardada.fecha)}${hora}${vieja ? ' · tiene más de un día, revisa si cambió' : ''}`
     },
 
     /** Tasas a guardar: las que no cambiaron conservan su fecha; las nuevas llevan la de hoy. */
@@ -317,7 +325,7 @@ export default {
         const n = this.valorCampo(cod)
         if (n === null) continue
         const previa = this.guardado.tasas[cod]
-        salida[cod] = previa && previa.tasa === n ? { tasa: n, fecha: previa.fecha } : { tasa: n }
+        salida[cod] = previa && previa.tasa === n ? { tasa: n, fecha: previa.fecha, en: previa.en } : { tasa: n }
       }
       return salida
     },
@@ -442,5 +450,21 @@ export default {
   margin: 8px 0 0;
   font-size: 0.8125rem;
   color: rgba(var(--v-theme-on-surface), 0.68);
+}
+.tasa__historial-hora {
+  font-weight: 400;
+  color: rgba(var(--v-theme-on-surface), 0.68);
+}
+.tasa__historial-valor {
+  white-space: nowrap;
+}
+.tasa__historial-moneda {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(var(--v-theme-on-surface), 0.08);
 }
 </style>

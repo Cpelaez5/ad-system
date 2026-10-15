@@ -42,7 +42,8 @@ function limpiarManuales(raw) {
     const tasa = Number(v && typeof v === 'object' ? v.tasa : v)
     if (!Number.isFinite(tasa) || tasa <= 0) continue
     const fecha = v && typeof v === 'object' && v.fecha ? String(v.fecha).slice(0, 10) : null
-    salida[cod] = { tasa, fecha }
+    const en = v && typeof v === 'object' && v.en ? String(v.en) : null
+    salida[cod] = en ? { tasa, fecha, en } : { tasa, fecha }
   }
   return salida
 }
@@ -89,7 +90,9 @@ export async function guardarPreferencia({ modo, tasas = {}, avisoAceptado = fal
       return { ok: false, error: 'Revisa las tasas: deben ser números mayores que cero.' }
     }
     const fecha = v && typeof v === 'object' && v.fecha ? String(v.fecha).slice(0, 10) : hoy
-    manuales[cod] = { tasa, fecha }
+    // `en`: momento exacto de la actualización (para mostrar la hora). Las que no cambian lo conservan.
+    const en = v && typeof v === 'object' && v.en ? String(v.en) : (v && typeof v === 'object' && v.fecha ? null : new Date().toISOString())
+    manuales[cod] = en ? { tasa, fecha, en } : { tasa, fecha }
   }
   if (modo === 'manual' && Object.keys(manuales).length === 0) {
     return { ok: false, error: 'Escribe al menos una tasa para usar tus propias tasas.' }
@@ -221,7 +224,7 @@ export async function historialTasas({ clientId, limite = 60 } = {}) {
     if (!id) return []
     const { data, error } = await supabase
       .from('tasas_historial')
-      .select('moneda, tasa, fecha')
+      .select('moneda, tasa, fecha, updated_at')
       .eq('client_id', id)
       .order('fecha', { ascending: false })
       .limit(limite * 5)
@@ -232,15 +235,22 @@ export async function historialTasas({ clientId, limite = 60 } = {}) {
   }
 }
 
-/** [{ moneda, tasa, fecha }] → [{ fecha, tasas: { USD: 879.12, ... } }], más reciente primero. */
+/**
+ * [{ moneda, tasa, fecha, updated_at? }] → [{ fecha, en, tasas: { USD: 879.12, ... } }], más
+ * reciente primero. `en` es la última actualización de ese día (para mostrar la hora).
+ */
 export function agruparPorDia(filas) {
   const porDia = new Map()
   for (const f of filas || []) {
     const fecha = String(f.fecha).slice(0, 10)
-    if (!porDia.has(fecha)) porDia.set(fecha, {})
-    porDia.get(fecha)[f.moneda] = Number(f.tasa)
+    if (!porDia.has(fecha)) porDia.set(fecha, { tasas: {}, en: null })
+    const dia = porDia.get(fecha)
+    dia.tasas[f.moneda] = Number(f.tasa)
+    if (f.updated_at && (!dia.en || f.updated_at > dia.en)) dia.en = f.updated_at
   }
-  return [...porDia.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([fecha, tasas]) => ({ fecha, tasas }))
+  return [...porDia.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([fecha, { tasas, en }]) => ({ fecha, en, tasas }))
 }
 
 /**

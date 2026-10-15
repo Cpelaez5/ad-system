@@ -48,3 +48,11 @@ export function formatFechaLocal(valor, opciones = { day: '2-digit', month: '2-d
   const fecha = parseFechaLocal(valor)
   return fecha ? fecha.toLocaleDateString(locale, opciones) : ''
 }
+
+/** Hora de un instante ISO en Caracas, para personas: "3:42 p. m.". '' si no se entiende. */
+export function horaCaracas(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return new Intl.DateTimeFormat('es-VE', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Caracas' }).format(d)
+}

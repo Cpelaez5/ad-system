@@ -9,12 +9,12 @@ describe('tasaService — historial y recordatorio', () => {
   it('agrupa el historial por día, del más reciente al más viejo', () => {
     const r = agruparPorDia([
       { moneda: 'USD', tasa: '870', fecha: '2026-10-13' },
-      { moneda: 'USD', tasa: '879.12', fecha: '2026-10-14' },
-      { moneda: 'EUR', tasa: '977.68', fecha: '2026-10-14' },
+      { moneda: 'USD', tasa: '879.12', fecha: '2026-10-14', updated_at: '2026-10-14T13:05:00Z' },
+      { moneda: 'EUR', tasa: '977.68', fecha: '2026-10-14', updated_at: '2026-10-14T19:42:00Z' },
     ])
     expect(r).toEqual([
-      { fecha: '2026-10-14', tasas: { USD: 879.12, EUR: 977.68 } },
-      { fecha: '2026-10-13', tasas: { USD: 870 } },
+      { fecha: '2026-10-14', en: '2026-10-14T19:42:00Z', tasas: { USD: 879.12, EUR: 977.68 } },
+      { fecha: '2026-10-13', en: null, tasas: { USD: 870 } },
     ])
   })
 

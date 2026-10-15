@@ -8,12 +8,14 @@ const preferencia = vi.fn()
 const guardarPreferencia = vi.fn()
 const tasasVigentes = vi.fn()
 const monedasUsadas = vi.fn()
+const historialTasas = vi.fn().mockResolvedValue([])
 vi.mock('@/services/tasaService.js', () => ({
   preferencia: (...a) => preferencia(...a),
   guardarPreferencia: (...a) => guardarPreferencia(...a),
   tasasVigentes: (...a) => tasasVigentes(...a),
   monedasUsadas: (...a) => monedasUsadas(...a),
   diasDeAntiguedad: (f) => (f === '2026-10-01' ? 13 : 0),
+  historialTasas: (...a) => historialTasas(...a),
 }))
 
 import TasaDeCambio from '../TasaDeCambio.vue'
@@ -167,5 +169,18 @@ describe('TasaDeCambio', () => {
     const input = w.find('[data-testid="tasa-campo-USD"] input')
     await input.setValue('104036,77')
     expect(input.element.value).toBe('104.036,77')
+  })
+
+  it('el historial muestra "USD Bs 879,12" sin repetir Bs, con la hora', async () => {
+    historialTasas.mockResolvedValueOnce([{ fecha: '2026-10-15', en: '2026-10-15T19:42:00Z', tasas: { USD: 879.12, EUR: 104036.77 } }])
+    const w = await montar()
+    await flushPromises()
+    await w.find('[data-testid="tasa-historial"] .v-expansion-panel-title').trigger('click')
+    await flushPromises()
+    const texto = w.find('[data-testid="tasa-historial"]').text()
+    expect(texto).toContain('Bs 879,12')
+    expect(texto).toContain('Bs 104.036,77')
+    expect(texto).toContain('3:42')
+    expect(texto).not.toMatch(/Bs\S*\s+Bs/)
   })
 })

@@ -72,7 +72,7 @@
  */
 import { preferencia, tasasVigentes, guardarPreferencia, monedasUsadas } from '@/services/tasaService.js'
 import { MONEDAS, formatearTasaEscrita, parsearTasaEscrita, tasaParaCampo } from '@/utils/monedas.js'
-import { formatFechaCorta, hoyISO } from '@/utils/fechas.js'
+import { formatFechaCorta, hoyISO, horaCaracas } from '@/utils/fechas.js'
 
 export default {
   name: 'TasaRapida',
@@ -155,7 +155,9 @@ export default {
     pista(m) {
       const g = this.manualesGuardadas[m]
       if (!g?.fecha) return 'Sin tasa guardada'
-      return g.fecha === hoyISO() ? 'Actualizada hoy' : `Última: ${formatFechaCorta(g.fecha)}`
+      const hora = g.en ? horaCaracas(g.en) : ''
+      if (g.fecha === hoyISO()) return hora ? `Actualizada hoy a las ${hora}` : 'Actualizada hoy'
+      return `Última: ${formatFechaCorta(g.fecha)}${hora ? `, ${hora}` : ''}`
     },
     copiarAutomaticas() {
       for (const m of this.monedasVisibles) if (this.automaticas[m]) this.campos[m] = tasaParaCampo(this.automaticas[m])
