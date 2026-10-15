@@ -80,8 +80,10 @@
           label="Concepto Municipal (Alcaldía)"
           variant="outlined"
           density="comfortable"
-          hint="Selecciona el concepto municipal"
+          :hint="sugeridoPorLicencia ? 'Sugerido por la actividad del proveedor' : 'Selecciona el concepto municipal'"
           persistent-hint
+          data-testid="ajuste-concepto-municipal"
+          @update:model-value="sugeridoPorLicencia = false"
           clearable
           class="ml-4 mb-2"
         >
@@ -117,7 +119,7 @@
 
 <script>
 import proveedorService from '@/services/proveedorService.js'
-import { municipalConceptsService } from '@/services/municipalConceptsService.js'
+import { municipalConceptsService, resolverMunicipio, sugerirConceptoPorLicencia } from '@/services/municipalConceptsService.js'
 
 export default {
   name: 'RetentionAdjustSheet',
@@ -133,7 +135,12 @@ export default {
     tipoPersona: {
       type: String,
       default: null
-    }
+    },
+    // Municipio del negocio (nombre o id): filtra los conceptos municipales.
+    municipio: { type: String, default: '' },
+    estado: { type: String, default: '' },
+    // Licencia de actividad económica del proveedor: si coincide con un código, se sugiere.
+    licencia: { type: String, default: '' }
   },
   emits: ['update:modelValue', 'update:config'],
   data() {
@@ -147,7 +154,8 @@ export default {
         concepto_municipal_id: null
       },
       conceptosIslr: [],
-      conceptosMunicipales: []
+      conceptosMunicipales: [],
+      sugeridoPorLicencia: false
     }
   },
   computed: {
@@ -196,11 +204,26 @@ export default {
         console.warn('Error fetching conceptos ISLR in RetentionAdjustSheet:', err)
       }
     },
+    preseleccionarPorLicencia() {
+      this.sugeridoPorLicencia = false
+      if (this.localConfig.concepto_municipal_id) return
+      const sugerido = sugerirConceptoPorLicencia(this.conceptosMunicipales, this.licencia)
+      if (sugerido) {
+        this.localConfig.concepto_municipal_id = sugerido.id
+        this.sugeridoPorLicencia = true
+      }
+    },
     async fetchConceptosMunicipales() {
       try {
-        const result = await municipalConceptsService.getConcepts();
+        let municipioId
+        if (this.municipio) {
+          const m = await municipalConceptsService.getMunicipios()
+          municipioId = resolverMunicipio(this.municipio, m.data || [], { estado: this.estado })?.id
+        }
+        const result = await municipalConceptsService.getConcepts({ municipioId });
         if (result.success) {
           this.conceptosMunicipales = result.data;
+          this.preseleccionarPorLicencia()
         }
       } catch (err) {
         console.warn('Error fetching conceptos municipales:', err);
