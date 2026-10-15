@@ -51,6 +51,7 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 - Vigilar las **llaves de API** (uso, abusos, revocar). Hoy en `api_keys`. A futuro: vista de llaves por negocio con último uso y volumen, y un botón Revocar.
 - Revisar el historial de **importaciones** (`importaciones_productos`) cuando un cliente reporte un problema. A futuro: vista por negocio con "Deshacer" asistido.
 - **Pagos de suscripción:** el flujo de aprobación ya existe en el panel; sumar recordatorios y reportes.
+- Seguridad: la llave del proveedor de IA (`ai_provider_profiles.encrypted_api_key`) se guarda **sin cifrar**, aunque solo la lee el super admin (RLS) y ya no viaja al navegador. Pasarla a Supabase Vault y que las funciones la lean de ahí.
 - Seguridad: activar "Leaked password protection" en Supabase Auth (aviso del linter) y mover `pg_net` fuera del esquema `public`.
 
 ## 6. Pendientes del usuario fuera del sistema
