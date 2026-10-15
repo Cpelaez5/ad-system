@@ -26,7 +26,7 @@ class ExportService {
   // Método principal para exportar tablas
   async exportTable(invoices, currencyDisplay = 'VES', filename, mode = 'SENIAT', userCompanyInfo = null) {
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'Sistema Contable';
+    workbook.creator = 'AD System';
     workbook.created = new Date();
 
     let worksheet;

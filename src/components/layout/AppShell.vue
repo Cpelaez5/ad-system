@@ -150,7 +150,7 @@ export default {
       return this.isLgUp && this.modoMenu === 'fijo';
     },
     tituloPagina() {
-      return this.$route?.meta?.title || 'Sistema Contable';
+      return this.$route?.meta?.title || 'AD System';
     },
     isClientProfileIncomplete() {
       if (this.currentUser?.role !== 'cliente') return false;

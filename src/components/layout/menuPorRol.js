@@ -78,7 +78,6 @@ export function getMenuPorRol({ role, isServicesCompany = false } = {}) {
           { key: 'operacion-tasas', titulo: 'Tasas globales', icono: 'mdi-cash-sync', to: { name: 'AdminTasas' } },
         ],
       },
-      { key: 'empresas', titulo: 'Empresas', icono: 'mdi-office-building', to: { name: 'Dashboard' } }
     )
   }
 

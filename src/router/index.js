@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { logger } from '@/utils/logger'
 import { useNotificacionStore } from '@/store/notificacionStore'
 import { resolveProfileRedirect } from './profileRedirect'
+import { resolverAcceso, ROLES_VALIDOS } from './accesoRutas'
 import { isChunkLoadError, hasPendingChunkReload, markChunkReloadPending, clearChunkReloadFlag } from '@/utils/chunkReloadGuard'
 
 // Vistas compartidas (accesibles por todos los usuarios autenticados)
@@ -140,13 +141,14 @@ const routes = [
   {
     path: '/registration-success',
     name: 'RegistrationSuccess',
-    component: () => import('@/views/auth/RegistrationSuccess.vue')
+    component: () => import('@/views/auth/RegistrationSuccess.vue'),
+    meta: { requiresAuth: false, title: 'Revisa tu correo | AD SYSTEM' }
   },
   {
     path: '/welcome',
     name: 'Welcome',
     component: () => import('@/views/onboarding/Welcome.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, title: 'Bienvenida | AD SYSTEM' }
   },
   {
     path: '/login',
@@ -337,6 +339,19 @@ const routes = [
     component: () => import('../views/shared/TrialExpired.vue'),
     meta: { requiresAuth: true, title: 'Prueba Expirada' }
   },
+  // Rutas "padre" sin pantalla propia: llevan al inicio del rol (antes mostraban el marco vacío)
+  { path: '/cliente', redirect: '/cliente/inicio' },
+  { path: '/admin', redirect: '/admin/inicio' },
+  { path: '/super-admin', redirect: '/admin/inicio' },
+  { path: '/contador', redirect: '/dashboard' },
+  { path: '/organizacion', redirect: '/dashboard' },
+  { path: '/inicio', redirect: '/dashboard' },
+  {
+    path: '/sin-permiso',
+    name: 'SinPermiso',
+    component: () => import('@/views/errores/SinPermiso.vue'),
+    meta: { requiresAuth: true, title: 'Sin permiso | AD SYSTEM' }
+  },
   ...(import.meta.env.DEV ? [
     {
       path: '/ocr-demo',
@@ -350,7 +365,14 @@ const routes = [
       component: () => import('@/components/common/TestForm.vue'),
       meta: { requiresAuth: false, title: 'Formulario de Prueba' }
     }
-  ] : [])
+  ] : []),
+  // Cualquier otra dirección: pantalla 404 (debe ir al final)
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('@/views/errores/NoEncontrada.vue'),
+    meta: { requiresAuth: false, title: 'Página no encontrada | AD SYSTEM' }
+  }
 ]
 
 // Crear el router
@@ -378,7 +400,7 @@ router.beforeEach(async (to, from, next) => {
       localStorage.removeItem('currentUser')
       localStorage.removeItem('authToken')
       localStorage.removeItem('current_organization_id')
-      next('/login')
+      next({ path: '/login', query: { redirect: to.fullPath } })
       return
     }
 
@@ -388,7 +410,7 @@ router.beforeEach(async (to, from, next) => {
       const currentUser = await userService.getCurrentUser()
 
       if (!currentUser) {
-        next('/login')
+        next({ path: '/login', query: { redirect: to.fullPath } })
         return
       }
 
@@ -412,7 +434,7 @@ router.beforeEach(async (to, from, next) => {
       }
 
       // Verificar que el rol sea válido
-      const validRoles = ['super_admin', 'admin', 'contador', 'cliente']
+      const validRoles = ROLES_VALIDOS
       if (!validRoles.includes(userRole)) {
         logger.error('Router guard: rol de usuario no válido', userRole)
         useNotificacionStore().mostrar(
@@ -472,28 +494,15 @@ router.beforeEach(async (to, from, next) => {
         return
       }
 
-      // Redirigir admin/contador desde /cliente/* a /dashboard
-      if (to.path.startsWith('/cliente/') && (userRole === 'admin' || userRole === 'contador' || userRole === 'super_admin')) {
-        next(userRole === 'super_admin' ? '/admin/inicio' : '/dashboard')
+      // El dashboard viejo ya no sirve al super admin: su inicio es /admin/inicio
+      if (to.path === '/dashboard' && userRole === 'super_admin') {
+        next('/admin/inicio')
         return
       }
 
-      // Verificar roles si la ruta lo requiere
-      if (to.meta.roles && !to.meta.roles.includes(userRole)) {
-        useNotificacionStore().mostrar(
-          'Tu cuenta no tiene permiso para ver esa pantalla. Te llevamos a tu inicio.',
-          'warning'
-        )
-        // Redirigir según el rol del usuario
-        if (userRole === 'cliente') {
-          next('/cliente/inicio')
-        } else if (userRole === 'super_admin') {
-          next('/admin/inicio')
-        } else if (userRole === 'contador' || userRole === 'admin') {
-          next('/dashboard')
-        } else {
-          next('/login')
-        }
+      // Rol sin permiso para esta ruta: pantalla 403 (no un redireccionamiento silencioso)
+      if (resolverAcceso(to, currentUser).accion === 'prohibido') {
+        next('/sin-permiso')
         return
       }
 
@@ -515,7 +524,7 @@ router.beforeEach(async (to, from, next) => {
 // Hook global para actualizar dinámicamente las cabeceras HTML para SEO y experiencia de usuario
 router.afterEach((to) => {
   // 1. Título dinámico
-  const baseTitle = 'AD SYSTEM'
+  const baseTitle = 'AD System'
   if (to.meta && to.meta.title) {
     document.title = to.meta.title
   } else {
