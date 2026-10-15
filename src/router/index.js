@@ -36,6 +36,7 @@ const FacturacionSistema = () => import('../views/admin/FacturacionSistema.vue')
 const AiSettings = () => import('../views/admin/AiSettings.vue')
 // Panel de Operación del super admin
 const OperacionPortada = () => import('../views/admin/OperacionPortada.vue')
+const InicioSuperAdmin = () => import('../views/admin/InicioSuperAdmin.vue')
 const CatalogoGlobal = () => import('../views/admin/CatalogoGlobal.vue')
 const UsoIa = () => import('../views/admin/UsoIa.vue')
 const TasasGlobales = () => import('../views/admin/TasasGlobales.vue')
@@ -264,6 +265,7 @@ const routes = [
     component: AiSettings,
     meta: { requiresAuth: true, title: 'Configuración IA', roles: ['super_admin'] }
   },
+  { path: '/admin/inicio', name: 'AdminInicio', component: InicioSuperAdmin, meta: { requiresAuth: true, title: 'Dashboard', roles: ['super_admin'] } },
   { path: '/admin/operacion', name: 'AdminOperacion', component: OperacionPortada, meta: { requiresAuth: true, title: 'Operación', roles: ['super_admin'] } },
   { path: '/admin/catalogo', name: 'AdminCatalogo', component: CatalogoGlobal, meta: { requiresAuth: true, title: 'Catálogo global', roles: ['super_admin'] } },
   { path: '/admin/uso-ia', name: 'AdminUsoIa', component: UsoIa, meta: { requiresAuth: true, title: 'Uso de IA', roles: ['super_admin'] } },
@@ -439,7 +441,7 @@ router.beforeEach(async (to, from, next) => {
 
       // Redirigir admin/contador desde /cliente/* a /dashboard
       if (to.path.startsWith('/cliente/') && (userRole === 'admin' || userRole === 'contador' || userRole === 'super_admin')) {
-        next('/dashboard')
+        next(userRole === 'super_admin' ? '/admin/inicio' : '/dashboard')
         return
       }
 
@@ -452,7 +454,9 @@ router.beforeEach(async (to, from, next) => {
         // Redirigir según el rol del usuario
         if (userRole === 'cliente') {
           next('/cliente/inicio')
-        } else if (userRole === 'contador' || userRole === 'admin' || userRole === 'super_admin') {
+        } else if (userRole === 'super_admin') {
+          next('/admin/inicio')
+        } else if (userRole === 'contador' || userRole === 'admin') {
           next('/dashboard')
         } else {
           next('/login')
