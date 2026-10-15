@@ -69,11 +69,14 @@ describe('menuPorRol', () => {
     expect(keys).not.toContain('ai-settings')
   })
 
-  it('super_admin ve Dashboard, Usuarios, Facturación del Sistema, Configuración IA y Empresas, pero NO el área de contador', () => {
+  it('super_admin ve Dashboard, Usuarios, Facturación del Sistema, Configuración IA, el grupo Operación y Empresas, pero NO el área de contador', () => {
     const items = getMenuPorRol({ role: 'super_admin' })
     const keys = items.map((i) => i.key)
-    expect(keys).toEqual(['dashboard', 'usuarios', 'facturacion-sistema', 'ai-settings', 'empresas'])
+    expect(keys).toEqual(['dashboard', 'usuarios', 'facturacion-sistema', 'ai-settings', 'operacion', 'empresas'])
     expect(keys).not.toContain('contador-area')
+    const operacion = items.find((i) => i.key === 'operacion')
+    expect(operacion.grupo).toBe(true)
+    expect(operacion.hijos.map((h) => h.to.name)).toEqual(['AdminOperacion', 'AdminCatalogo', 'AdminUsoIa', 'AdminTasas'])
   })
 
   it('un rol desconocido no revienta y devuelve una lista vacía', () => {

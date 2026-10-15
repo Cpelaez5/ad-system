@@ -34,6 +34,11 @@ const Archivo = () => import('../views/contador/Archivo.vue')
 const Usuarios = () => import('../views/admin/Usuarios.vue')
 const FacturacionSistema = () => import('../views/admin/FacturacionSistema.vue')
 const AiSettings = () => import('../views/admin/AiSettings.vue')
+// Panel de Operación del super admin
+const OperacionPortada = () => import('../views/admin/OperacionPortada.vue')
+const CatalogoGlobal = () => import('../views/admin/CatalogoGlobal.vue')
+const UsoIa = () => import('../views/admin/UsoIa.vue')
+const TasasGlobales = () => import('../views/admin/TasasGlobales.vue')
 
 // Componentes de prueba
 
@@ -259,6 +264,10 @@ const routes = [
     component: AiSettings,
     meta: { requiresAuth: true, title: 'Configuración IA', roles: ['super_admin'] }
   },
+  { path: '/admin/operacion', name: 'AdminOperacion', component: OperacionPortada, meta: { requiresAuth: true, title: 'Operación', roles: ['super_admin'] } },
+  { path: '/admin/catalogo', name: 'AdminCatalogo', component: CatalogoGlobal, meta: { requiresAuth: true, title: 'Catálogo global', roles: ['super_admin'] } },
+  { path: '/admin/uso-ia', name: 'AdminUsoIa', component: UsoIa, meta: { requiresAuth: true, title: 'Uso de IA', roles: ['super_admin'] } },
+  { path: '/admin/tasas', name: 'AdminTasas', component: TasasGlobales, meta: { requiresAuth: true, title: 'Tasas globales', roles: ['super_admin'] } },
   {
     path: '/profile',
     name: 'Profile',

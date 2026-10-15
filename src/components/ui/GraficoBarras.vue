@@ -35,6 +35,8 @@ export default {
     moneda: { type: String, default: 'USD' },
     altura: { type: Number, default: 280 },
     horizontal: { type: Boolean, default: false },
+    /** 'moneda' (por defecto) o 'entero' para conteos (llamadas, días…). */
+    formato: { type: String, default: 'moneda' },
   },
 
   computed: {
@@ -73,13 +75,15 @@ export default {
     opcionesGrafico() {
       const moneda = this.moneda
       const horizontal = this.horizontal
+      const conteo = this.formato === 'entero'
+      const fmt = (v, opc) => (conteo ? Number(v || 0).toLocaleString('es-VE') : formatMoney(v, moneda, opc))
       const reducido = prefiereMovimientoReducido()
       const ejeValor = {
         beginAtZero: true,
         grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false },
         ticks: {
           font: { family: 'Montserrat, sans-serif', size: 11 },
-          callback: (v) => formatMoney(v, moneda, { abreviar: true, sinDecimales: true }),
+          callback: (v) => (conteo ? (Number.isInteger(v) ? Number(v).toLocaleString('es-VE') : '') : formatMoney(v, moneda, { abreviar: true, sinDecimales: true })),
         },
       }
       const ejeCategoria = {
@@ -111,7 +115,7 @@ export default {
             titleFont: { family: 'Montserrat' },
             bodyFont: { family: 'Montserrat' },
             callbacks: {
-              label: (ctx) => ` ${ctx.dataset.label}: ${formatMoney((horizontal ? ctx.parsed.x : ctx.parsed.y) || 0, moneda)}`,
+              label: (ctx) => ` ${ctx.dataset.label}: ${fmt((horizontal ? ctx.parsed.x : ctx.parsed.y) || 0)}`,
             },
           },
         },
