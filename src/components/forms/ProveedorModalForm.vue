@@ -80,6 +80,15 @@
             <!-- PESTAÑA 1: DATOS GENERALES -->
             <v-window-item value="general">
               <v-row dense>
+                <!-- Llenar con un documento (RIF o cédula): solo al crear -->
+                <v-col v-if="!isEdit" cols="12" class="pb-2">
+                  <LlenarConDocumento
+                    :formulario="formData"
+                    :mapear="aProveedor"
+                    :forzar="['tipo_persona']"
+                  />
+                </v-col>
+
                 <!-- Razón Social -->
                 <v-col cols="12">
                   <v-text-field
@@ -379,9 +388,12 @@
 <script>
 import proveedorService from '@/services/proveedorService.js'
 import { buscarProveedorPorRif, rifParaCatalogo } from '@/services/catalogoService'
+import { aProveedor } from '@/services/documentoIaService'
+import LlenarConDocumento from '@/components/ui/LlenarConDocumento.vue'
 
 export default {
   name: 'ProveedorModalForm',
+  components: { LlenarConDocumento },
   props: {
     modelValue: {
       type: Boolean,
@@ -483,6 +495,7 @@ export default {
     ])
   },
   methods: {
+    aProveedor,
     initForm() {
       this.activeTab = 'general'
       clearTimeout(this.catalogoTimer)

@@ -66,6 +66,29 @@
             <v-icon v-if="empresaCompleta" icon="mdi-check-circle" size="18" color="success" class="ml-1" />
           </h2>
           <p class="bloque-negocio__ayuda">Así identificamos tu negocio en tus facturas y comprobantes.</p>
+          <LlenarConDocumento
+            :formulario="form"
+            :mapear="mapearEmpresa"
+            tipo-esperado="rif"
+            :validar="validarRifPropio"
+            class="mt-3"
+            @datos="onDocumentoEmpresa"
+            @llenado="onStateChange"
+          />
+          <v-alert
+            v-if="ofertaRif"
+            type="info"
+            variant="tonal"
+            density="comfortable"
+            class="mt-3"
+            data-testid="oferta-rif-papeles"
+          >
+            ¿Guardamos también tu RIF en Mis papeles con vencimiento el {{ ofertaRif.fechaTexto }}?
+            <template #append>
+              <v-btn variant="text" class="text-none" :disabled="guardandoRif" @click="ofertaRif = null">No, gracias</v-btn>
+              <v-btn color="primary" variant="flat" class="text-none" :loading="guardandoRif" data-testid="guardar-rif-papeles" @click="guardarRifEnPapeles">Sí, guardar</v-btn>
+            </template>
+          </v-alert>
         </header>
 
         <v-form ref="companyForm" v-model="companyFormValid" @submit.prevent="updateCompanyData">
@@ -548,6 +571,9 @@ import ListaPasos from '@/components/ui/ListaPasos.vue';
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
 import AvisoAmable from '@/components/ui/AvisoAmable.vue';
 import AyudaTermino from '@/components/ui/AyudaTermino.vue';
+import LlenarConDocumento from '@/components/ui/LlenarConDocumento.vue';
+import fiscalService from '@/services/fiscalService';
+import { aEmpresa, rifCoincide, fechaIso, fechaParaMostrar } from '@/services/documentoIaService';
 import { RUBROS } from '@/constants/rubros';
 import { obtenerRubro, guardarRubro } from '@/services/rubroService';
 
@@ -561,6 +587,7 @@ export default {
     PanelSiguientePaso,
     AvisoAmable,
     AyudaTermino,
+    LlenarConDocumento,
   },
   data() {
     return {
@@ -577,6 +604,8 @@ export default {
       arrastrandoSello: false,
       arrastrandoFirma: false,
       companyFormValid: true,
+      ofertaRif: null,
+      guardandoRif: false,
       rubros: RUBROS,
       rubroGuardado: null,
       personalFormValid: true,
@@ -969,6 +998,44 @@ export default {
         this.snackbar = { show: true, text: error.message || 'Error desconocido', color: 'error' };
       } finally {
         this.loadingPassword = false;
+      }
+    },
+
+    // ── Llenar con un documento (RIF propio) ──
+    mapearEmpresa(doc) {
+      return aEmpresa(doc, this.states);
+    },
+    validarRifPropio(doc) {
+      if (doc.tipo === 'cedula') return 'Para los datos de la empresa necesitamos tu RIF, no la cédula.';
+      if (this.form.rif && doc.rif && !rifCoincide(this.form.rif, doc.rif)) {
+        return 'Ese RIF no es el de tu negocio, así que no llenamos nada.';
+      }
+      return null;
+    },
+    onDocumentoEmpresa(doc, archivo) {
+      this.ofertaRif = null;
+      if (doc?.legible === false || doc?.tipo === 'cedula') return;
+      if (this.validarRifPropio(doc)) return;
+      const iso = fechaIso(doc.fecha_vencimiento);
+      if (!iso) return;
+      this.ofertaRif = { archivo, iso, fechaTexto: fechaParaMostrar(iso) };
+    },
+    async guardarRifEnPapeles() {
+      if (!this.ofertaRif) return;
+      this.guardandoRif = true;
+      try {
+        const res = await fiscalService.saveFiscalDoc({
+          name: 'RIF', category: 'LEGAL', doc_type: 'RIF', status: 'VIGENTE',
+          expiration_date: this.ofertaRif.iso,
+        }, this.ofertaRif.archivo);
+        if (res.success) {
+          this.snackbar = { show: true, text: 'Guardamos tu RIF en Mis papeles', color: 'success' };
+          this.ofertaRif = null;
+        } else {
+          this.snackbar = { show: true, text: 'No pudimos guardar tu RIF en Mis papeles. Puedes subirlo desde Mis papeles.', color: 'error' };
+        }
+      } finally {
+        this.guardandoRif = false;
       }
     },
 

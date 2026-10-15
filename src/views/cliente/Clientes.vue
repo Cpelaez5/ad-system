@@ -231,6 +231,7 @@
       :cargando="guardando"
     >
       <v-form ref="formulario" @submit.prevent="guardar">
+        <LlenarConDocumento v-if="!editandoId" :formulario="form" :mapear="aCliente" :forzar="['tipo_persona']" class="mb-4" />
         <v-btn-toggle v-model="form.tipo_persona" mandatory color="primary" variant="outlined" divided class="mb-4 w-100" aria-label="Tipo de cliente">
           <v-btn value="natural" class="text-none flex-grow-1" prepend-icon="mdi-account-outline">Persona</v-btn>
           <v-btn value="juridica" class="text-none flex-grow-1" prepend-icon="mdi-domain">Empresa</v-btn>
@@ -280,6 +281,8 @@ import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
 import FiltroChips from '@/components/ui/FiltroChips.vue'
 import SeccionLista from '@/components/ui/SeccionLista.vue'
+import LlenarConDocumento from '@/components/ui/LlenarConDocumento.vue'
+import { aCliente } from '@/services/documentoIaService.js'
 import clientesNegocioService, { esFrecuente, sinDatosFiscales, diasDesde } from '@/services/clientesNegocioService.js'
 import bcvService from '@/services/bcvService'
 import { normalizarRif } from '@/utils/rif.js'
@@ -294,7 +297,7 @@ const FORM_VACIO = () => ({
 
 export default {
   name: 'ClientesView',
-  components: { EncabezadoPagina, EstadoVacio, DialogoAdaptable, PanelSiguientePaso, FiltroChips, SeccionLista },
+  components: { EncabezadoPagina, EstadoVacio, DialogoAdaptable, PanelSiguientePaso, FiltroChips, SeccionLista, LlenarConDocumento },
   data() {
     return {
       loading: true,
@@ -443,6 +446,7 @@ export default {
       this.$router.push({ path: '/cliente/facturacion', query: { cliente: c.id } })
     },
 
+    aCliente,
     // ── Crear / editar ──
     abrirNuevo() {
       this.editandoId = null
