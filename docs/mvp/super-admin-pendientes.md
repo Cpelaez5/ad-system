@@ -7,10 +7,10 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 ## 1. Catálogo global (proveedores y productos)
 | Tarea | Hoy | Herramienta futura en el panel |
 |---|---|---|
-| Revisar y **verificar** proveedores del catálogo (razón social correcta, RIF real) | `catalogo_proveedores.verificado` por SQL | Lista "Por verificar" ordenada por confirmaciones, con botones Verificar / Corregir / Fusionar |
+| ✅ Revisar y **verificar** proveedores del catálogo (razón social correcta, RIF real) | Hecho: `/admin/catalogo` (Por verificar por confirmaciones, Verificar, Editar, Eliminar, Agregar). **Falta:** Fusionar | Lista "Por verificar" ordenada por confirmaciones, con botones Verificar / Corregir / Fusionar |
 | **Fusionar duplicados** (mismo producto con dos códigos, nombres distintos) | No existe | Comparador lado a lado |
-| Cargar la **semilla de productos** (200 a 500 por rubro) con foto de estudio | No existe | Importador Excel del catálogo (reutiliza `importacionProductos`) + generación de fotos con Nano Banana por lote |
-| Subir y reemplazar **fotos de estudio** del catálogo | Bucket público `catalogo` (solo super admin) | Galería con "Generar con IA", "Subir" y "Aprobar" |
+| ✅ Cargar la **semilla de productos** (200 a 500 por rubro) con foto de estudio | Hecho: "Importar Excel" en `/admin/catalogo` (upsert por código de barras, fuente `importado`). **Falta:** generación de fotos con Nano Banana por lote | Importador Excel del catálogo (reutiliza `importacionProductos`) + generación de fotos con Nano Banana por lote |
+| ✅ Subir y reemplazar **fotos de estudio** del catálogo | Hecho: "Subir foto de estudio" en `/admin/catalogo` (bucket `catalogo`, `productos/<código>.<ext>`). **Falta:** "Generar con IA" (botón en "Próximamente": la función `producto-ia` solo acepta rutas del bucket privado `productos` de un negocio) | Galería con "Generar con IA", "Subir" y "Aprobar" |
 | Mantener la **taxonomía de categorías** | `src/constants/rubros.js` (los campos por rubro) | Editor de categorías y de campos por rubro |
 | Decidir el uso de **Open Food Facts** (licencia ODbL) | Decisión pendiente | — (legal) |
 | Revisar los aportes sospechosos (ej. un mismo negocio con nombres raros) | `catalogo_aportes`, solo SQL | Vista de aportes por fecha, sin exponer a los negocios a otros clientes |
@@ -25,7 +25,7 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 ## 3. IA (costos, calidad y configuración)
 | Tarea | Hoy | Herramienta futura |
 |---|---|---|
-| Vigilar **costo y errores de IA** (OCR, identificar, estante, Nano Banana) | `ai_usage_logs`, solo SQL | Tablero: uso por día y por negocio, costo estimado, tasa de error y top de códigos de error |
+| ✅ Vigilar **costo y errores de IA** (OCR, identificar, estante, Nano Banana) | Hecho: `/admin/uso-ia` (llamadas por día, % de error, tokens, costo, por modelo y top de errores; sin nombres ni correos). **Falta:** uso por negocio | Tablero: uso por día y por negocio, costo estimado, tasa de error y top de códigos de error |
 | Cambiar el **modelo** activo y la llave | `ai_provider_profiles` (Ajustes de IA ya existe) | Ya existe en parte: sumar la prueba de conexión y el modelo de imágenes (`PRODUCTO_IMAGEN_MODEL`) |
 | Fijar **límites por plan** (cuántas fotos IA o mejoras al mes) | No existe | Topes por plan + aviso al cliente cuando se acerca |
 | Revisar las respuestas del chat calificadas 👎 y corregirlas (materia prima del afinamiento) | No existe | Bandeja de revisión de chats con corrección del contador |
@@ -40,6 +40,8 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 | Mover empresas autorregistradas cuando haya más de un despacho | Pendiente desde el 2026-10-13 | Transferir empresa entre despachos, con consentimiento |
 
 ## 5. Operación
+- ✅ **Tasas globales:** `/admin/tasas` muestra los últimos 60 días hábiles (USD, EUR, CNY, TRY, RUB) con su fuente, marca los días sin tasa y permite corregir o agregar una (fuente `MANUAL-SUPERADMIN`).
+- ✅ **Portada de Operación:** `/admin/operacion` resume lo por verificar, los errores de IA de la semana y los días sin tasa.
 - Activar el **cron de avisos de vencimiento** (`avisos-vencimiento`) al lanzar.
 - Vigilar las **llaves de API** (uso, abusos, revocar). Hoy en `api_keys`. A futuro: vista de llaves por negocio con último uso y volumen, y un botón Revocar.
 - Revisar el historial de **importaciones** (`importaciones_productos`) cuando un cliente reporte un problema. A futuro: vista por negocio con "Deshacer" asistido.
