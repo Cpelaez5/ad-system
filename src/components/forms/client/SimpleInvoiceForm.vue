@@ -1470,6 +1470,9 @@
     v-if="formData.flow === 'COMPRA'"
     v-model="showAdjustSheet"
     :config="retentionConfig"
+    :municipio="formData.client?.municipio_id || formData.client?.municipio || ''"
+    :estado="formData.client?.estado || ''"
+    :licencia="formData.issuer?.licencia_actividad_economica || ''"
     @update:config="cfg => { retentionConfig = cfg; calcularRetenciones(); }"
   />
 </template>

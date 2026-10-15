@@ -314,6 +314,12 @@
         </div>
       </section>
 
+      <RetencionesMunicipales
+        v-if="form.es_agente_retencion_municipal"
+        :municipio="form.municipio"
+        :estado="form.estado"
+      />
+
       <!-- ═════════════ BLOQUE C: SELLO Y FIRMA ═════════════ -->
       <section ref="refSello" class="bloque-negocio">
         <header class="bloque-negocio__cabecera">
@@ -643,6 +649,7 @@ import VistaPreviaSelloFirma from '@/components/cliente/VistaPreviaSelloFirma.vu
 import { normalizarAjustes } from '@/utils/ajustesSello.js';
 import { revisarImagenSello } from '@/utils/imagenSello.js';
 import TasaDeCambio from '@/components/cliente/TasaDeCambio.vue';
+import RetencionesMunicipales from '@/components/cliente/RetencionesMunicipales.vue';
 import ListaPasos from '@/components/ui/ListaPasos.vue';
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
 import AvisoAmable from '@/components/ui/AvisoAmable.vue';
@@ -659,6 +666,7 @@ export default {
     ConexionesApi,
     VistaPreviaSelloFirma,
     TasaDeCambio,
+    RetencionesMunicipales,
     EncabezadoPagina,
     DialogoAdaptable,
     ListaPasos,
