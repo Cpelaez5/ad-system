@@ -162,6 +162,7 @@
 
 <script>
 import { analyticsService } from '@/services/analyticsService'
+import { homeDeRol, rutaSegura } from '@/router/accesoRutas'
 import LogoAnimado from '@/components/ui/LogoAnimado.vue'
 
 export default {
@@ -213,13 +214,8 @@ export default {
           analyticsService.trackEvent('Login', { role: result.user.role })
           
           window.dispatchEvent(new CustomEvent('userUpdated', { detail: result.user }))
-          if (result.user.role === 'cliente') {
-            this.$router.push('/cliente/inicio')
-          } else if (result.user.role === 'super_admin') {
-            this.$router.push('/admin/inicio')
-          } else {
-            this.$router.push('/dashboard')
-          }
+          // Si venía de una pantalla privada (?redirect=), vuelve ahí; si no, a su inicio
+          this.$router.push(rutaSegura(this.$route.query.redirect) || homeDeRol(result.user.role))
         } else {
           alert(result.message || 'Usuario o contraseña incorrectos')
         }
@@ -279,11 +275,8 @@ export default {
     if (usuarioAutenticado === 'true') {
        try {
          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-         if (currentUser.role === 'cliente') {
-           this.$router.push('/cliente/inicio')
-         } else {
-           this.$router.push('/dashboard')
-         }
+         const destino = rutaSegura(this.$route.query.redirect)
+         this.$router.push(destino || (currentUser.role ? homeDeRol(currentUser.role) : '/dashboard'))
        } catch (e) {
          this.$router.push('/dashboard')
        }

@@ -124,7 +124,7 @@ export default {
   },
 
   props: {
-    tituloPagina: { type: String, default: 'Sistema Contable' },
+    tituloPagina: { type: String, default: 'AD System' },
     mostrarMenu: { type: Boolean, default: false },
     bcvRate: { type: Object, default: null },
     bcvLoading: { type: Boolean, default: false },

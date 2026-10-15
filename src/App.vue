@@ -50,6 +50,7 @@ import AppSnackbar from './components/common/AppSnackbar.vue'
 import userSettingsService from '@/services/user-settings-service.js'
 import { useNotificacionStore } from '@/store/notificacionStore'
 const RUTAS_AYUDA = ['Ayuda', 'AyudaApi', 'AyudaArticulo']
+const RUTAS_ERROR = ['NotFound', 'SinPermiso']
 // (Se elimina ThemeFavicon para usar solo los <link rel="icon"> de index.html)
 
 export default {
@@ -70,7 +71,18 @@ export default {
     }
   },
   computed: {
+    // 404 y 403: dentro del marco de la app si hay sesión, solas si no.
+    conSesion() {
+      // `this.$route.fullPath` hace que se reevalúe en cada navegación.
+      void this.$route.fullPath;
+      try {
+        return localStorage.getItem('usuarioAutenticado') === 'true';
+      } catch {
+        return false;
+      }
+    },
     showNavigation() {
+      if (RUTAS_ERROR.includes(this.$route.name)) return this.conSesion;
       const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout', 'Legal', ...RUTAS_AYUDA];
       return !publicRoutes.includes(this.$route.name);
     },

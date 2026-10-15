@@ -31,7 +31,7 @@ describe('BarraSuperior', () => {
 
   it('usa el título por defecto si no se pasa ninguno', () => {
     const wrapper = mount(BarraSuperior, { global: globalConfig })
-    expect(wrapper.text()).toContain('Sistema Contable')
+    expect(wrapper.text()).toContain('AD System')
   })
 
   it('actualiza el título mostrado cuando cambia la prop (crossfade de ruta)', async () => {
