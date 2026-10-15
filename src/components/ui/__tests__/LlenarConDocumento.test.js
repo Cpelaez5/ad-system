@@ -84,7 +84,7 @@ describe('LlenarConDocumento.vue', () => {
     expect(form.rif).toBe('J-40123456-7')
     expect(form.tipo_persona).toBe('JURIDICA')
     expect(w.emitted('datos')[0]).toEqual([RIF, archivo])
-    expect(w.find('[data-testid="llenar-marca"]').text()).toContain('Llenado con IA desde el RIF · revisa los datos')
+    expect(w.find('[data-testid="llenar-marca"]').text()).toContain('Llenado con IA desde tu documento · revisa los datos')
 
     await w.find('[data-testid="llenar-deshacer"]').trigger('click')
     expect(form.rif).toBe('')

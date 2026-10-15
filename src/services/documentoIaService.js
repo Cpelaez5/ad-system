@@ -105,13 +105,12 @@ export function esIlegible(doc) {
   return !doc || doc.legible === false
 }
 
-/** "el RIF" / "la cédula" para la marca. */
-export function origenDelDocumento(doc) {
-  return doc?.tipo === 'cedula' ? 'la cédula' : 'el RIF'
-}
-
-export function marcaDeLlenado(doc) {
-  return `Llenado con IA desde ${origenDelDocumento(doc)} · revisa los datos`
+/**
+ * Marca tras llenar el formulario. Genérica a propósito: la persona pudo subir
+ * otro documento (pasaporte, registro mercantil…) y nombrar "el RIF" confunde.
+ */
+export function marcaDeLlenado() {
+  return 'Llenado con IA desde tu documento · revisa los datos'
 }
 
 // ── Utilidades ─────────────────────────────────────────────────────────

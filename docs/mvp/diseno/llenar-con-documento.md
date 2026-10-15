@@ -13,7 +13,7 @@ Fecha: 2026-10-14. Pedido del usuario:
   - **Botón:** "Llenar con un documento", con el ícono `mdi-card-account-details-outline`. En el teléfono ofrece "Tomar foto" (cámara trasera) o "Subir foto o PDF".
   - **Imagen:** se reduce en el navegador (lado mayor de unos 1600 px, JPEG 0,85) antes de enviarla. El PDF va tal cual si pesa menos de 8 MB.
   - **Mientras trabaja:** muestra el mensaje "Leyendo tu documento…".
-  - **Al terminar:** emite `datos`. El formulario llena **solo los campos vacíos** y marca "Llenado con IA desde el RIF · revisa los datos". Hay un enlace "Deshacer" que restaura lo anterior.
+  - **Al terminar:** emite `datos`. El formulario llena **solo los campos vacíos** y marca "Llenado con IA desde tu documento · revisa los datos" (genérica: la persona pudo subir otro documento). Hay un enlace "Deshacer" que restaura lo anterior.
   - **Si la lectura falla:** si `legible` es false o la confianza es baja, muestra "No pudimos leer bien el documento. Prueba con una foto más clara, de frente y con buena luz". Nunca bloquea el formulario.
 - **Servicio `documentoIaService.js`:** `leerDocumento(file, tipoEsperado)` y un mapeo puro por formulario, con tests: `aProveedor(doc)`, `aCliente(doc)` y `aEmpresa(doc)`.
 

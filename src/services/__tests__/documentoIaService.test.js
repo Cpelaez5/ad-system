@@ -112,9 +112,9 @@ describe('calidad, marca y fechas', () => {
     expect(avisoDeCalidad({ legible: true, confianza: 'baja' })).toBe(MSG_ILEGIBLE)
     expect(avisoDeCalidad(RIF)).toBeNull()
   })
-  it('la marca dice desde el RIF o desde la cédula', () => {
-    expect(marcaDeLlenado(RIF)).toBe('Llenado con IA desde el RIF · revisa los datos')
-    expect(marcaDeLlenado(CEDULA)).toBe('Llenado con IA desde la cédula · revisa los datos')
+  it('la marca no nombra el tipo de documento (pudo ser otro)', () => {
+    expect(marcaDeLlenado(RIF)).toBe('Llenado con IA desde tu documento · revisa los datos')
+    expect(marcaDeLlenado(CEDULA)).toBe('Llenado con IA desde tu documento · revisa los datos')
   })
   it('formatea fechas DD/MM/AAAA', () => {
     expect(fechaParaMostrar('2027-01-15')).toBe('15/01/2027')
