@@ -22,7 +22,7 @@
     </v-main>
     
     <!-- Chat de soporte IA (visible solo para clientes) -->
-    <SupportChat v-if="showNavigation" />
+    <SupportChat v-if="showNavigation || esAyuda" />
     
     <!-- Banner de Cookies -->
     <CookieConsent />
@@ -49,6 +49,7 @@ import CookieConsent from './components/common/CookieConsent.vue'
 import AppSnackbar from './components/common/AppSnackbar.vue'
 import userSettingsService from '@/services/user-settings-service.js'
 import { useNotificacionStore } from '@/store/notificacionStore'
+const RUTAS_AYUDA = ['Ayuda', 'AyudaApi', 'AyudaArticulo']
 // (Se elimina ThemeFavicon para usar solo los <link rel="icon"> de index.html)
 
 export default {
@@ -70,11 +71,16 @@ export default {
   },
   computed: {
     showNavigation() {
-      const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout', 'Legal'];
+      const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout', 'Legal', ...RUTAS_AYUDA];
       return !publicRoutes.includes(this.$route.name);
     },
     llenarAlto() {
       return ['Login', 'Register'].includes(this.$route.name);
+    },
+    // Las pantallas de ayuda traen su propio marco, pero el chat de soporte sí
+    // debe poder abrirse desde ellas (botón "Escríbenos por el chat").
+    esAyuda() {
+      return RUTAS_AYUDA.includes(this.$route.name);
     },
     showFooter() {
       const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout', 'Legal'];

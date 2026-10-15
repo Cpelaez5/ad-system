@@ -80,6 +80,12 @@
         title="Ayuda"
         @click="$emit('ayuda')"
       />
+      <v-list-item
+        prepend-icon="mdi-book-open-page-variant-outline"
+        title="Guías de ayuda"
+        data-testid="hoja-guias-ayuda"
+        @click="$emit('navegar', '/ayuda')"
+      />
 
       <v-divider class="my-2" />
       <v-list-item

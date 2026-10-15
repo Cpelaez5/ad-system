@@ -42,6 +42,10 @@
         </div>
         
         <div class="legal-links d-flex flex-wrap justify-center gap-3">
+          <router-link to="/ayuda" class="text-caption text-medium-emphasis text-decoration-none hover-primary" data-testid="pie-ayuda">
+            Ayuda
+          </router-link>
+          <span class="text-caption text-medium-emphasis mx-1 hidden-sm-and-down">•</span>
           <router-link to="/legal?tab=terminos" class="text-caption text-medium-emphasis text-decoration-none hover-primary">
             Términos y Condiciones
           </router-link>
