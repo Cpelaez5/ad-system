@@ -60,6 +60,36 @@ test.describe('Cliente — Mi negocio (Proveedores, Inventario, Mi área)', () =
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 
+  test('Mi negocio muestra "Tasa de cambio": se puede cambiar de opción y cancelar o volver sin guardar', async ({ page, consoleErrors }) => {
+    await page.goto('/cliente/mi-area#tasa')
+    const seccion = page.getByTestId('tasa-cambio')
+    await expect(seccion).toBeVisible()
+    await expect(seccion.getByRole('heading', { name: 'Tasa de cambio' })).toBeVisible()
+    await expect(seccion.getByText('Automática (BCV)')).toBeVisible()
+    await expect(seccion.getByText('La defino yo')).toBeVisible()
+    await expect(seccion.getByTestId('tasa-aviso')).toContainText('servicio externo basado en el BCV')
+
+    // Cambiar a "La defino yo": aparecen los campos de USD y EUR; Cancelar vuelve sin guardar nada.
+    const manual = seccion.getByTestId('tasa-opcion-manual')
+    const automatica = seccion.getByTestId('tasa-opcion-automatica')
+    const modoInicial = await automatica.getAttribute('aria-checked')
+    await (modoInicial === 'true' ? manual : automatica).click()
+    if (modoInicial === 'true') {
+      await expect(seccion.getByTestId('tasa-campo-USD')).toBeVisible()
+      await expect(seccion.getByTestId('tasa-campo-EUR')).toBeVisible()
+    }
+    await expect(seccion.getByTestId('tasa-cancelar')).toBeVisible()
+    await seccion.getByTestId('tasa-cancelar').click()
+    await expect(automatica).toHaveAttribute('aria-checked', modoInicial)
+
+    // Cambiar y volver a la opción inicial sin guardar: no quedan cambios pendientes.
+    await (modoInicial === 'true' ? manual : automatica).click()
+    await (modoInicial === 'true' ? automatica : manual).click()
+    await expect(seccion.getByTestId('tasa-guardar')).toHaveCount(0)
+
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
   test('un diálogo de Proveedores abre con "Cancelar" visible sin scroll y se cierra sin guardar', async ({ page, consoleErrors }) => {
     await page.goto('/cliente/proveedores')
     await expect(page).toHaveURL(/\/cliente\/proveedores/)
