@@ -31,6 +31,11 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 | Revisar las respuestas del chat calificadas 👎 y corregirlas (materia prima del afinamiento) | No existe | Bandeja de revisión de chats con corrección del contador |
 | Mantener la **ayuda pública** y la documentación de la API que lee la IA | Pendiente (fase final) | Editor de artículos de ayuda + reindexado |
 
+### Uso de IA por cliente (pedido del 2026-10-15)
+| Tarea | Hoy | Herramienta futura |
+|---|---|---|
+| Llevar y limitar el uso de IA **por negocio** (créditos por plan, extras, tarifas por función) | `ai_usage_logs` no guarda el negocio ni la función | Tabla por negocio en Uso de IA + editor de tarifas y créditos extra (`diseno/uso-ia-por-cliente.md`) |
+
 ## 4. Datos y correcciones supervisadas
 | Tarea | Hoy | Herramienta futura |
 |---|---|---|

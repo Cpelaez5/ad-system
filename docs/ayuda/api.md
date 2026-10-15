@@ -168,7 +168,7 @@ Solo `nombre` es obligatorio. Los campos y respuestas van en español.
 | `costo` | número | Costo unitario. No puede ser negativo. Solo para productos. |
 | `moneda` | texto | `VES`, `USD` o `EUR`. |
 | `iva` | texto | `general`, `reducido`, `lujo` o `exento`. |
-| `unidad` | texto | `UND`, `KG`, `LT`, `MT`, `PAQ` o `CAJA`. |
+| `unidad` | texto | `UND`, `KG`, `LTS`, `MTS`, `CAJA` o `BULTO`. También acepta `LT`/`L` (→ `LTS`), `MT`/`M` (→ `MTS`), `UN`/`UNID` (→ `UND`) y `PAQ` (→ `BULTO`). |
 | `existencias` | número | Solo al crear. No puede ser negativo. Solo para productos. |
 | `existencias_minimas` | número | Aviso de stock bajo. No puede ser negativo. Solo para productos. |
 | `atributos` | objeto | Datos extra según el rubro, como `{ "talla": "M" }`. Debe ser un objeto, no una lista. |
@@ -201,7 +201,7 @@ Los errores de un producto en particular no hacen fallar la llamada: llegan en l
 - `"precio" no puede ser negativo`
 - `"moneda" debe ser VES, USD o EUR`
 - `"iva" debe ser general, reducido, lujo o exento`
-- `"unidad" debe ser UND, KG, LT, MT, PAQ, CAJA`
+- `"unidad" debe ser UND, KG, LTS, MTS, CAJA, BULTO`
 - `"atributos" debe ser un objeto`
 - `No pudimos crearlo` / `No pudimos actualizarlo`
 

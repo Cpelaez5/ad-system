@@ -25,7 +25,15 @@ const CORS = {
 const MAX_LOTE = 500;
 const IVA: Record<string, string> = { general: 'IVA_G', reducido: 'IVA_R', lujo: 'IVA_A', exento: 'EXENTO' };
 const IVA_INVERSO = Object.fromEntries(Object.entries(IVA).map(([k, v]) => [v, k]));
-const UNIDADES = ['UND', 'KG', 'LT', 'MT', 'PAQ', 'CAJA'];
+// Unidades oficiales de la app (las del formulario de Mi mercancía) y variantes aceptadas.
+const UNIDADES = ['UND', 'KG', 'LTS', 'MTS', 'CAJA', 'BULTO'];
+const ALIAS_UNIDAD: Record<string, string> = {
+  UND: 'UND', UN: 'UND', UNID: 'UND', U: 'UND', UNIDAD: 'UND',
+  KG: 'KG', KILO: 'KG', KILOS: 'KG',
+  LTS: 'LTS', LT: 'LTS', L: 'LTS', LITRO: 'LTS', LITROS: 'LTS',
+  MTS: 'MTS', MT: 'MTS', M: 'MTS', METRO: 'MTS', METROS: 'MTS',
+  CAJA: 'CAJA', BULTO: 'BULTO', PAQ: 'BULTO', PAQUETE: 'BULTO',
+};
 
 const json = (status: number, cuerpo: unknown) =>
   new Response(JSON.stringify(cuerpo), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -58,8 +66,8 @@ function aColumnas(p: any): { fila?: Record<string, unknown>; error?: string; ex
   if (moneda && !['VES', 'USD', 'EUR'].includes(moneda)) return { error: '"moneda" debe ser VES, USD o EUR' };
   const iva = p.iva ? IVA[String(p.iva).toLowerCase()] : undefined;
   if (p.iva && !iva) return { error: '"iva" debe ser general, reducido, lujo o exento' };
-  const unidad = p.unidad ? String(p.unidad).toUpperCase() : undefined;
-  if (unidad && !UNIDADES.includes(unidad)) return { error: `"unidad" debe ser ${UNIDADES.join(', ')}` };
+  const unidad = p.unidad ? ALIAS_UNIDAD[String(p.unidad).trim().toUpperCase()] : undefined;
+  if (p.unidad && !unidad) return { error: `"unidad" debe ser ${UNIDADES.join(', ')}` };
   if (p.atributos !== undefined && (typeof p.atributos !== 'object' || Array.isArray(p.atributos))) return { error: '"atributos" debe ser un objeto' };
 
   const fila: Record<string, unknown> = { name: nombre, tipo };
