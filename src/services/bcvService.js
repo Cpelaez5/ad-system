@@ -66,10 +66,9 @@ class BCVService {
       // ── Persistir y cachear ──
       this.setCachedRate(rateData);
 
-      // Guardar en DB (async, no bloquea)
-      this.persistRateToDB(rateData).catch(err => {
-        console.warn('⚠️ Error guardando tasa en DB:', err);
-      });
+      // La tabla global exchange_rates ya no se escribe desde el navegador: la llena la
+      // función tasas-diarias (pg_cron, lunes a viernes) y los usuarios solo la leen
+      // (migración 20261015140000). persistRateToDB queda para el super admin.
 
       // Calcular tendencia vs día anterior para USD
       try {
