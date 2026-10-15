@@ -143,7 +143,8 @@ export default {
 <style scoped>
 .signup-container {
   display: flex;
-  min-height: 100vh;
+  /* Llena lo que deja el pie (App.vue → .v-main--llenar); antes 100vh empujaba el pie y obligaba a hacer scroll. */
+  min-height: 100%;
   background: #fff;
   overflow: hidden;
 }

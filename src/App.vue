@@ -12,7 +12,8 @@
     />
     
     <!-- Contenido principal -->
-    <v-main>
+    <!-- Login y registro llenan el alto disponible SIN empujar el pie fuera de la pantalla -->
+    <v-main :class="{ 'v-main--llenar': llenarAlto }">
       <router-view v-slot="{ Component }">
         <PageTransition name="fade" mode="out-in">
           <component :is="Component" />
@@ -71,6 +72,9 @@ export default {
     showNavigation() {
       const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout', 'Legal'];
       return !publicRoutes.includes(this.$route.name);
+    },
+    llenarAlto() {
+      return ['Login', 'Register'].includes(this.$route.name);
     },
     showFooter() {
       const publicRoutes = ['LandingPage', 'Login', 'Register', 'Pricing', 'ClienteCheckout', 'Legal'];
@@ -137,5 +141,14 @@ export default {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* Login/registro: el contenido ocupa el alto de la pantalla menos el pie (sin scroll en escritorio) */
+.v-main--llenar {
+  display: flex;
+  flex-direction: column;
+}
+.v-main--llenar > * {
+  flex: 1 1 auto;
 }
 </style>
