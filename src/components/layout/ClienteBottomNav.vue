@@ -39,8 +39,10 @@
         <span>Mis números</span>
       </v-btn>
 
-      <v-btn value="mas" aria-label="Más opciones" @click="sheetMas = true">
-        <v-icon>mdi-menu</v-icon>
+      <v-btn value="mas" :aria-label="noLeidosSoporte ? 'Más opciones: tienes respuestas del equipo' : 'Más opciones'" @click="sheetMas = true">
+        <v-badge :model-value="noLeidosSoporte > 0" dot color="error" floating>
+          <v-icon>mdi-menu</v-icon>
+        </v-badge>
         <span>Más</span>
       </v-btn>
     </v-bottom-navigation>
@@ -73,6 +75,7 @@
     <!-- Hoja "Más": resto del menú + tasas del día + ayuda + cerrar sesión. -->
     <HojaInferior v-model="sheetMas" titulo="Más opciones">
       <HojaMas
+        :no-leidos-soporte="noLeidosSoporte"
         :is-services-company="isServicesCompany"
         :bcv-rate="bcvRate"
         :tasa-info="tasaInfo"
@@ -121,6 +124,7 @@ export default {
       currentUserData: null,
       sheetRegistrar: false,
       sheetMas: false,
+      noLeidosSoporte: (typeof window !== 'undefined' && window.__adSoporteNoLeidos) || 0,
     };
   },
 
@@ -161,15 +165,21 @@ export default {
     window.addEventListener('storage', this.loadUser);
     window.addEventListener('userUpdated', this.loadUser);
     window.addEventListener('ad-user-updated', this.loadUser);
+    window.addEventListener('ad-soporte-no-leidos', this.alCambiarNoLeidos);
   },
 
   beforeUnmount() {
     window.removeEventListener('storage', this.loadUser);
     window.removeEventListener('userUpdated', this.loadUser);
     window.removeEventListener('ad-user-updated', this.loadUser);
+    window.removeEventListener('ad-soporte-no-leidos', this.alCambiarNoLeidos);
   },
 
   methods: {
+    /** Respuestas del equipo de soporte sin leer (lo avisa SupportChat.vue). */
+    alCambiarNoLeidos(e) {
+      this.noLeidosSoporte = Number(e?.detail?.cantidad) || 0;
+    },
     loadUser() {
       try {
         this.currentUserData = JSON.parse(localStorage.getItem('currentUser') || '{}');

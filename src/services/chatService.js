@@ -241,7 +241,9 @@ ${INSTRUCCION_ESCALAR}`
     const saludo = userName ? `¡Hola, ${userName}! 👋` : '¡Hola! 👋'
     const modulo = routeTitle || 'AD System'
 
-    return `${saludo} Soy parte del equipo de soporte. Actualmente te encuentras en **${modulo}**. ${viewContext.description.replace('El usuario está en ', 'Aquí puedes ').replace('El usuario está viendo ', 'Aquí puedes ver ')} ¿En qué te puedo ayudar hoy?`
+    // Honesto y simple: es el asistente con IA (no "el equipo"), y sin textos internos del prompt.
+    void viewContext
+    return `${saludo} Soy tu asistente de AD System. Pregúntame lo que necesites sobre **${modulo}**, o toca una de las guías de abajo. Si prefieres hablar con una persona, toca «Escribirle al equipo».`
   }
 
   // ─── Comunicación con la IA (Edge Function `ai-chat`) ───

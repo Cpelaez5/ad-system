@@ -78,8 +78,14 @@
       <v-list-item
         prepend-icon="mdi-help-circle-outline"
         title="Ayuda"
+        :subtitle="noLeidosSoporte ? 'El equipo te respondió' : undefined"
+        data-testid="hoja-ayuda"
         @click="$emit('ayuda')"
-      />
+      >
+        <template v-if="noLeidosSoporte" #append>
+          <v-badge :content="noLeidosSoporte" color="error" inline />
+        </template>
+      </v-list-item>
       <v-list-item
         prepend-icon="mdi-book-open-page-variant-outline"
         title="Guías de ayuda"
@@ -122,6 +128,8 @@ export default {
   name: 'HojaMas',
 
   props: {
+    /** Respuestas del equipo de soporte sin leer. */
+    noLeidosSoporte: { type: Number, default: 0 },
     isServicesCompany: { type: Boolean, default: false },
     bcvRate: { type: Object, default: null },
     /** { modo, desactualizada, fallo, fecha } de la tasa vigente (ver AppShell). */

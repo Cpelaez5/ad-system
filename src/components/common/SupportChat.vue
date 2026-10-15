@@ -155,6 +155,8 @@ export default {
   watch: {
     noLeidos(n) {
       // Para que otras partes (p. ej. la hoja "Más" del teléfono) puedan mostrar el punto.
+      // También queda el último valor, por si la hoja "Más" se monta después del aviso.
+      window.__adSoporteNoLeidos = n
       window.dispatchEvent(new CustomEvent('ad-soporte-no-leidos', { detail: { cantidad: n } }))
     },
     'currentUser.id'() {
