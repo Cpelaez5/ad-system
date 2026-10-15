@@ -103,7 +103,7 @@ export default {
             },
           },
           tooltip: {
-            backgroundColor: 'rgba(31, 53, 92, 0.95)',
+            backgroundColor: 'rgba(42, 42, 46, 0.95)',
             titleColor: '#fff',
             bodyColor: '#fff',
             cornerRadius: 10,

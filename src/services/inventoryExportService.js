@@ -14,7 +14,7 @@ class InventoryExportService {
 
         // Estilos
         const titleStyle = { font: { bold: true, size: 16 } };
-        const headerStyle = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F355C' } } };
+        const headerStyle = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2A2A2E' } } };
         const currencyFormat = '"Bs" #,##0.00';
 
         // Títulos

@@ -16,15 +16,15 @@ import systemLogo from '/ADSystem/logo.png'
 // Constantes de diseño corporativo
 // ══════════════════════════════════════════════════════
 const COLORS = {
-  primary:   [168, 28, 34],     // #A81C22 - Rojo corporativo
-  secondary: [31, 53, 92],      // #1F355C - Azul oscuro
-  accent:    [224, 176, 79],    // #E0B04F - Dorado
+  primary:   [142, 24, 24],     // #8E1818 - Granate AD System
+  secondary: [42, 42, 46],      // #2A2A2E - Carbón AD System (antes azul de AD Business Group)
+  accent:    [142, 24, 24],    // #8E1818 - Granate (antes dorado de AD Business Group)
   grey:      [120, 120, 120],
   lightGrey: [200, 200, 200],
   bgLight:   [248, 249, 252],   // Fondo sutil para secciones
   white:     [255, 255, 255],
   black:     [40, 40, 40],
-  tableHead: [31, 53, 92],      // Fondo del header de la tabla
+  tableHead: [42, 42, 46],      // Fondo del header de la tabla
   tableAlt:  [245, 247, 250],   // Fila alterna
   tableBorder: [220, 225, 230], // Bordes sutiles de tabla
   success:   [46, 125, 50],

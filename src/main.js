@@ -87,7 +87,7 @@ const vuetify = createVuetify({
           metal: '#9CA3AF',          /* Gris "metal" del favicon oficial — fondos secundarios/bordes, siempre con texto oscuro encima */
           granateOscuro: '#320B0B',  /* Variante oscura oficial del logo — estado activo/presionado, fondos oscuros */
           error: '#D32F2F',          /* Rojo de error — tono distinto del granate de marca a propósito (ver doc) */
-          info: '#1F355C',           /* Azul de apoyo para información */
+          info: '#475569',           /* Pizarra — información (2026-10-15: antes azul #1F355C de AD Business Group) */
           success: '#2E7D32',        /* Verde oscurecido: el verde Material estándar (#4CAF50) no pasa AA con texto blanco */
           warning: '#E0B04F',        /* Dorado — advertencias: SIEMPRE con texto/ícono oscuro, nunca blanco */
           surface: '#FFFFFF',        /* Blanco */
