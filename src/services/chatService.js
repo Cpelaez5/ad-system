@@ -14,6 +14,7 @@
 import { supabase } from '@/lib/supabaseClient'
 import { callAiGenerate } from '@/services/ai/aiGenerateClient'
 import { contextoAyudaParaChat } from '@/services/ayudaService'
+import { INSTRUCCION_ESCALAR, esSinCreditos } from '@/utils/soporte.js'
 
 // ═══════════════════════════════════════════════════
 // LÍMITES POR PLAN (Infraestructura lógica)
@@ -104,11 +105,6 @@ const VIEW_CONTEXT_MAP = {
       'Ver top productos vendidos',
       'Ver estado del expediente fiscal (vigentes, en trámite, por vencer)',
       'Las cards son arrastrables para reorganizar el layout'
-    ],
-    quickActions: [
-      { label: '¿Qué significan los KPIs?', message: '¿Qué significa cada tarjeta de KPI en mi dashboard?', predefinedResponse: 'Los KPIs te muestran un resumen de tu negocio en el período seleccionado. **Ingresos** son tus ventas totales, **Egresos** son tus gastos y compras, el **Margen** es la ganancia (Ingresos - Egresos), y el **Inventario** es el valor total de la mercancía que tienes en stock.' },
-      { label: '¿Cómo cambio de moneda?', message: '¿Cómo puedo cambiar la moneda de visualización?', predefinedResponse: 'Para cambiar la moneda, ve a las opciones en la parte superior derecha de tu Dashboard (cerca de tu perfil) y selecciona **USD** o **VES**. Todos los montos se recalcularán automáticamente usando la tasa del BCV del día.' },
-      { label: '¿Cómo leo los gráficos?', message: '¿Cómo interpreto los gráficos de mi dashboard?', predefinedResponse: 'El **gráfico de rendimiento** compara tus ingresos contra tus egresos mes a mes, mostrándote la tendencia de tu rentabilidad. El **gráfico de distribución** te permite ver en qué categorías se están concentrando la mayor parte de tus gastos.' }
     ]
   },
 
@@ -125,11 +121,6 @@ const VIEW_CONTEXT_MAP = {
       'Exportar facturas a Excel (formato SENIAT) o PDF',
       'Ver estadísticas: total facturas, emitidas, pagadas, monto total',
       'Generar recibos PDF individuales'
-    ],
-    quickActions: [
-      { label: '¿Cómo creo una factura?', message: '¿Cómo creo una nueva factura paso a paso?', predefinedResponse: 'Para crear una factura, haz clic en el botón **"+ Nueva Factura"**. Llena los datos del cliente, agrega los productos o servicios, verifica los montos e impuestos, y finalmente haz clic en **"Guardar"**. Tu factura quedará en estado Borrador hasta que la emitas.' },
-      { label: '¿Cómo uso el escáner OCR?', message: '¿Cómo puedo escanear una factura física?', predefinedResponse: 'Ve a la opción **"Escanear Factura"**. Puedes tomarle una foto a la factura con tu celular o subir un archivo PDF/Imagen. El sistema leerá automáticamente el RIF, nombre, montos y número de factura, ahorrándote tiempo de carga manual.' },
-      { label: '¿Cómo exporto a Excel?', message: '¿Cómo exporto mis facturas a Excel en formato SENIAT?', predefinedResponse: 'Selecciona las facturas que deseas exportar (o filtra por mes) y haz clic en el botón **"Exportar"**. Selecciona la opción **"Formato Excel (SENIAT)"** y el sistema descargará el archivo listo para tu contador.' }
     ]
   },
 
@@ -143,11 +134,6 @@ const VIEW_CONTEXT_MAP = {
       'Filtrar documentos por estado y categoría',
       'Descargar documentos almacenados',
       'Ver estadísticas del expediente: cuántos vigentes, en trámite, vencidos'
-    ],
-    quickActions: [
-      { label: '¿Qué documentos necesito?', message: '¿Cuáles documentos fiscales necesito tener al día?', predefinedResponse: 'Normalmente, debes mantener al día: **RIF** vigente de la empresa, **Registro Mercantil**, y los permisos de funcionamiento (**Patente de Industria y Comercio**, **Conformidad de Bomberos**, etc.). Depende de la naturaleza de tu empresa.' },
-      { label: '¿Cómo subo un documento?', message: '¿Cómo puedo subir un documento a mi expediente?', predefinedResponse: 'Haz clic en el botón **"+ Nuevo Documento"**, selecciona la categoría (Ej: Legal, Tributario), ingresa la fecha de vencimiento si aplica, y sube el archivo PDF o Imagen. El sistema te alertará antes de que se venza.' },
-      { label: '¿Qué pasa si un doc vence?', message: '¿Qué sucede cuando un documento se vence?', predefinedResponse: 'El sistema marcará el documento en rojo como **"Vencido"** y te enviará alertas. Debes gestionar la renovación con la entidad correspondiente y, una vez tengas el nuevo documento, actualizarlo en tu Expediente Fiscal 360.' }
     ]
   },
 
@@ -161,11 +147,6 @@ const VIEW_CONTEXT_MAP = {
       'El inventario se actualiza automáticamente con las compras y ventas',
       'Exportar inventario a Excel',
       'Ver valor total del inventario en costo y precio de venta'
-    ],
-    quickActions: [
-      { label: '¿Cómo agrego un producto?', message: '¿Cómo agrego un producto a mi inventario?', predefinedResponse: 'Ve a Inventario y haz clic en **"+ Nuevo Producto"**. Ingresa el código, nombre, y establece tanto el costo como el precio de venta. Si tienes stock inicial, colócalo allí.' },
-      { label: '¿Cómo actualizo el stock?', message: '¿Cómo se actualiza mi stock?', predefinedResponse: 'El stock **se actualiza automáticamente** cuando registras facturas de Venta (resta stock) y facturas de Compra (suma stock). También puedes hacer ajustes manuales si haces un conteo físico.' },
-      { label: '¿Qué es alerta de stock?', message: '¿Qué significa la alerta de stock bajo?', predefinedResponse: 'El sistema te avisará cuando un producto llegue al nivel mínimo que tú hayas definido, para que sepas cuándo es el momento de contactar a tus proveedores y reponer mercancía.' }
     ]
   },
 
@@ -176,10 +157,6 @@ const VIEW_CONTEXT_MAP = {
       'Comparar funcionalidades entre planes',
       'Ver precio mensual y anual de cada plan',
       'Cambiar de plan'
-    ],
-    quickActions: [
-      { label: '¿Qué plan me conviene?', message: '¿Cuál plan me conviene según mi empresa?', predefinedResponse: 'Si eres independiente o un negocio pequeño, el **Plan Básico** suele ser suficiente. Si necesitas reportes avanzados, IA y multiusuario, te recomendamos el **Plan Profesional**. Para múltiples sucursales, el **Plan Empresarial** es ideal.' },
-      { label: '¿Cómo cambio de plan?', message: '¿Cómo cambio mi suscripción actual?', predefinedResponse: 'Puedes hacer clic en el botón **"Cambiar Plan"** debajo de la suscripción deseada. Sigue los pasos para confirmar tu selección y emitiremos la factura correspondiente.' }
     ]
   },
 
@@ -190,10 +167,6 @@ const VIEW_CONTEXT_MAP = {
       'Ver estado de pagos: pendiente, pagado, vencido',
       'Reportar un pago realizado',
       'Ver métodos de pago disponibles'
-    ],
-    quickActions: [
-      { label: '¿Cómo reporto un pago?', message: '¿Cómo reporto el pago de mi suscripción?', predefinedResponse: 'Ubica la factura pendiente en tu listado, haz clic en **"Reportar Pago"**, ingresa los datos de la transferencia (banco, referencia, fecha, monto) y sube el comprobante. Nuestro equipo lo validará a la brevedad.' },
-      { label: '¿Métodos de pago?', message: '¿Cuáles métodos de pago aceptan?', predefinedResponse: 'Aceptamos transferencias bancarias nacionales, Pago Móvil, Zelle y, en algunos casos, Binance o efectivo en nuestras oficinas. Podrás ver los detalles bancarios al momento de reportar el pago.' }
     ]
   },
 
@@ -202,10 +175,6 @@ const VIEW_CONTEXT_MAP = {
     capabilities: [
       'Ver información de su perfil y empresa',
       'Ver datos de su organización contadora'
-    ],
-    quickActions: [
-      { label: '¿Cómo edito mis datos?', message: '¿Cómo puedo editar mis datos de empresa?', predefinedResponse: 'En tu Área Personal, ve a la sección de **"Perfil de Empresa"** y haz clic en "Editar". Allí podrás modificar tu nombre, dirección, logo y datos de contacto.' },
-      { label: '¿Quién es mi contador?', message: '¿Cómo veo la info de mi organización contadora?', predefinedResponse: 'En la sección **"Mi Contador"** dentro de Mi Área, encontrarás los datos de contacto y RIF de la firma contable que está administrando tu empresa en este momento.' }
     ]
   }
 }
@@ -216,10 +185,6 @@ const DEFAULT_VIEW_CONTEXT = {
   capabilities: [
     'Navegar entre los diferentes módulos del sistema',
     'Acceder al Dashboard, Facturación, Expediente Fiscal, Inventario'
-  ],
-  quickActions: [
-    { label: '¿Qué hago aquí?', message: '¿Qué puedo hacer en AD System?', predefinedResponse: 'AD System es tu plataforma contable integral. Puedes gestionar tus facturas, llevar control de inventario, organizar tu expediente fiscal y tener visibilidad de la salud financiera de tu negocio en tiempo real.' },
-    { label: '¿Por dónde empiezo?', message: '¿Por dónde me recomiendas empezar?', predefinedResponse: 'Te recomendamos empezar por configurar el **Perfil de tu Empresa** en Mi Área. Luego, carga tus **Documentos Fiscales**, y finalmente empieza a registrar tus **Facturas** para que tu Dashboard comience a mostrar métricas reales.' }
   ]
 }
 
@@ -258,17 +223,10 @@ class ChatService {
 
     contextBlock += `\nIMPORTANTE: Responde SOLO sobre funcionalidades que existen en este módulo. Si el usuario pregunta sobre algo de otro módulo, indícale dónde encontrarlo.`
 
-    return SYSTEM_PROMPT_BASE + contextBlock + (guiasAyuda || '')
-  }
+    return SYSTEM_PROMPT_BASE + contextBlock + (guiasAyuda || '') + `
 
-  /**
-   * Obtiene las quick actions (botones de respuestas predefinidas) para la vista actual.
-   * @param {string} routeName - Nombre de la ruta actual
-   * @returns {Array<{label: string, message: string}>}
-   */
-  getQuickActions(routeName) {
-    const viewContext = VIEW_CONTEXT_MAP[routeName] || DEFAULT_VIEW_CONTEXT
-    return viewContext.quickActions || []
+CUANDO NO SEPAS:
+${INSTRUCCION_ESCALAR}`
   }
 
   /**
@@ -350,18 +308,22 @@ class ChatService {
     } catch (error) {
       console.error('❌ Error comunicándose con la IA:', error)
 
+      // Sin créditos de IA: la pantalla muestra el aviso amable con guías y "Escribirle al equipo".
+      if (esSinCreditos(error)) {
+        throw Object.assign(new Error('SIN_CREDITOS'), { code: 'SIN_CREDITOS' })
+      }
       // Mensaje de fallback amigable según el código de error de la Edge Function
       if (error.code === 'UNAUTHORIZED' || error.code === 'INVALID_KEY') {
-        throw new Error('El servicio de IA no está disponible temporalmente. Por favor, intenta más tarde.')
+        throw Object.assign(new Error('El servicio de IA no está disponible temporalmente. Por favor, intenta más tarde.'), { code: error.code })
       }
       if (error.code === 'QUOTA_EXCEEDED' || error.code === 'PREVIEW_RATE_LIMIT') {
-        throw new Error('Hemos recibido muchas consultas. Por favor espera un momento y vuelve a intentar. ⏳')
+        throw Object.assign(new Error('Hemos recibido muchas consultas. Por favor espera un momento y vuelve a intentar. ⏳'), { code: error.code })
       }
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         throw new Error('Parece que no tienes conexión a internet. Verifica tu conexión y vuelve a intentar. 📡')
       }
 
-      throw new Error('Ocurrió un error al procesar tu consulta. Por favor, intenta de nuevo.')
+      throw Object.assign(new Error('Ocurrió un error al procesar tu consulta. Por favor, intenta de nuevo.'), { code: error?.code || 'AI_ERROR' })
     }
   }
 

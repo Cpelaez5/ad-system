@@ -1,13 +1,9 @@
 <template>
-  <!-- ═══════════════════════════════════════════════ -->
-  <!-- FAB: Botón flotante de chat (solo para clientes) -->
-  <!-- ═══════════════════════════════════════════════ -->
+  <!-- Chat de soporte del cliente: Asistente (guías + IA) y Mis consultas (tickets con el equipo).
+       Especificación: docs/mvp/diseno/soporte-y-tickets.md -->
   <div v-if="isCliente" class="support-chat-wrapper">
-
-    <!-- Botón flotante: oculto en móvil (<600px), donde tapaba el botón
-         "Más" de la barra inferior del cliente. En móvil se abre desde la
-         hoja "Más" → "Ayuda" (ver ClienteBottomNav.vue/HojaMas.vue), que
-         dispara el evento 'ad-open-support-chat' escuchado abajo. -->
+    <!-- Botón flotante: oculto en móvil (<600px), donde tapaba el botón "Más" de la barra
+         inferior. En móvil se abre desde "Más" → "Ayuda" con el evento 'ad-open-support-chat'. -->
     <transition name="fab-bounce">
       <v-btn
         v-if="!isChatOpen && !isMobile"
@@ -15,168 +11,79 @@
         icon
         size="56"
         elevation="8"
+        color="secondary"
+        :aria-label="noLeidos ? `Ayuda, ${noLeidos} mensajes nuevos` : 'Ayuda'"
         @click="openChat"
       >
-        <v-icon size="28" color="white">mdi-chat</v-icon>
-
-        <!-- Badge de mensajes no leídos (futuro) -->
-        <div v-if="false" class="fab-badge">1</div>
+        <v-icon size="28">mdi-chat</v-icon>
+        <span v-if="noLeidos > 0" class="fab-badge" data-test="punto-fab"></span>
       </v-btn>
     </transition>
 
-    <!-- ═══════════════════════════════════════════════ -->
-    <!-- PANEL DE CHAT -->
-    <!-- ═══════════════════════════════════════════════ -->
     <transition name="chat-panel">
-      <div v-if="isChatOpen" class="chat-panel" :class="{ 'chat-panel--mobile': isMobile }">
-
-        <!-- Header del chat -->
+      <div v-if="isChatOpen" class="chat-panel" :class="{ 'chat-panel--mobile': isMobile }" role="dialog" aria-label="Ayuda y soporte">
         <div class="chat-header">
-          <div class="chat-header__info">
-            <div class="chat-header__avatar">
-              <v-icon color="white" size="22">mdi-face-agent</v-icon>
-            </div>
-            <div>
-              <h4 class="chat-header__title">Soporte AD System</h4>
-              <span class="chat-header__status">
-                <span class="status-dot"></span>
-                En línea
-              </span>
-            </div>
-          </div>
-          <div class="chat-header__actions">
-            <!-- Indicador de mensajes restantes -->
-            <v-chip
-              v-if="dailyLimitInfo.limit > 0 && dailyLimitInfo.remaining >= 0"
-              size="x-small"
-              variant="tonal"
-              color="white"
-              class="mr-1"
-            >
-              {{ dailyLimitInfo.remaining }}/{{ dailyLimitInfo.limit }}
-            </v-chip>
-            <v-btn icon variant="text" size="small" @click="closeChat" class="chat-close-btn">
-              <v-icon color="white" size="20">mdi-close</v-icon>
-            </v-btn>
-          </div>
+          <h4 class="chat-header__title">Ayuda</h4>
+          <v-btn icon="mdi-close" variant="text" aria-label="Cerrar la ayuda" class="chat-close-btn" @click="closeChat" />
         </div>
 
-        <!-- Área de mensajes -->
-        <div ref="messagesContainer" class="chat-messages" @scroll="handleScroll">
-
-          <!-- Mensaje de bienvenida -->
-          <div class="message message--assistant message--welcome">
-            <div class="message__avatar">
-              <v-icon color="#2A2A2E" size="18">mdi-face-agent</v-icon>
-            </div>
-            <div class="message__bubble">
-              <p class="message__text" v-html="formatMessage(welcomeMessage)"></p>
-            </div>
-          </div>
-
-          <!-- Quick Actions (botones predefinidos) -->
-          <div v-if="messages.length === 0 && quickActions.length > 0" class="quick-actions">
-            <button
-              v-for="(action, idx) in quickActions"
-              :key="'qa-' + idx"
-              class="quick-action-btn"
-              @click="sendQuickAction(action)"
-            >
-              <v-icon size="14" class="mr-1">mdi-lightning-bolt</v-icon>
-              {{ action.label }}
-            </button>
-          </div>
-
-          <!-- Mensajes de la conversación -->
-          <template v-for="(msg, index) in messages" :key="'msg-' + index">
-            <div
-              class="message"
-              :class="{
-                'message--user': msg.role === 'user',
-                'message--assistant': msg.role === 'assistant',
-                'message--system': msg.role === 'system'
-              }"
-            >
-              <!-- Avatar del asistente -->
-              <div v-if="msg.role === 'assistant'" class="message__avatar">
-                <v-icon color="#2A2A2E" size="18">mdi-face-agent</v-icon>
-              </div>
-
-              <!-- Burbuja del mensaje -->
-              <div class="message__bubble">
-                <p class="message__text" v-html="formatMessage(msg.content)"></p>
-                <span class="message__time">{{ formatTime(msg.created_at) }}</span>
-              </div>
-            </div>
-          </template>
-
-          <!-- Indicador de "escribiendo..." -->
-          <div v-if="isTyping" class="message message--assistant message--typing">
-            <div class="message__avatar">
-              <v-icon color="#2A2A2E" size="18">mdi-face-agent</v-icon>
-            </div>
-            <div class="message__bubble typing-bubble">
-              <div class="typing-dots">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Mensaje de error -->
-          <div v-if="errorMessage" class="message message--system">
-            <div class="message__bubble message__bubble--error">
-              <v-icon size="16" color="#c62828" class="mr-1">mdi-alert-circle</v-icon>
-              <p class="message__text">{{ errorMessage }}</p>
-            </div>
-          </div>
-
-          <!-- Mensaje de límite alcanzado -->
-          <div v-if="limitReached" class="message message--system">
-            <div class="message__bubble message__bubble--limit">
-              <v-icon size="16" color="#8E1818" class="mr-1">mdi-clock-outline</v-icon>
-              <p class="message__text">{{ dailyLimitInfo.message }}</p>
-            </div>
-          </div>
+        <div class="chat-tabs" role="tablist">
+          <button type="button" role="tab" class="chat-tab" :class="{ 'chat-tab--activa': pestana === 'asistente' }" :aria-selected="pestana === 'asistente'" @click="pestana = 'asistente'">
+            Asistente
+          </button>
+          <button type="button" role="tab" class="chat-tab" :class="{ 'chat-tab--activa': pestana === 'consultas' }" :aria-selected="pestana === 'consultas'" @click="irAConsultas">
+            Mis consultas
+            <span v-if="noLeidos > 0" class="chat-tab__punto" data-test="punto-pestana" :aria-label="`${noLeidos} mensajes nuevos`"></span>
+          </button>
         </div>
 
-        <!-- Input de mensaje -->
-        <div class="chat-input">
-          <div class="chat-input__container">
-            <input
-              ref="chatInput"
-              v-model="inputMessage"
-              type="text"
-              class="chat-input__field"
-              placeholder="Escribe tu pregunta..."
-              :disabled="isTyping || limitReached || !aiEnabled"
-              @keyup.enter="sendMessage"
-              maxlength="500"
-            />
-            <v-btn
-              icon
-              variant="text"
-              size="small"
-              class="chat-input__send"
-              :disabled="!inputMessage.trim() || isTyping || limitReached || !aiEnabled"
-              @click="sendMessage"
-            >
-              <v-icon
-                size="22"
-                :color="inputMessage.trim() && !isTyping ? '#8E1818' : '#aaa'"
-              >
-                mdi-send
-              </v-icon>
-            </v-btn>
-          </div>
-          <p class="chat-input__hint">
-            Escribe tu mensaje... · 
-            <span v-if="dailyLimitInfo.message && !limitReached" class="limit-hint">
-              {{ dailyLimitInfo.message }}
-            </span>
-            <span v-else>Presiona Enter para enviar</span>
-          </p>
+        <!-- Asistente (v-show: conserva la conversación al cambiar de pestaña) -->
+        <div v-show="pestana === 'asistente'" class="chat-cuerpo">
+          <PasoEscribirEquipo
+            v-if="escribirEquipo"
+            :tema-inicial="borrador.tema"
+            :mensaje-inicial="borrador.borrador"
+            :enviando="enviandoTicket"
+            :error="errorTicket"
+            @enviar="enviarTicket"
+            @cancelar="cancelarEscribir"
+          />
+          <PanelAsistente
+            v-show="!escribirEquipo"
+            ref="panel"
+            :usuario="currentUser || {}"
+            :ruta="rutaActual"
+            :ia-disponible="aiEnabled"
+            :limite-alcanzado="limitReached"
+            :mensaje-limite="dailyLimitInfo.message"
+            @escribir-equipo="empezarAEscribir"
+            @abrir-guia="irAGuia"
+          />
+        </div>
+
+        <!-- Mis consultas -->
+        <div v-if="pestana === 'consultas'" class="chat-cuerpo">
+          <HiloConsulta
+            v-if="ticketAbierto"
+            :consulta="ticketAbierto"
+            :mensajes="mensajesTicket"
+            :cargando="cargandoHilo"
+            :error="errorHilo"
+            :enviando="enviandoRespuesta"
+            @volver="cerrarTicket"
+            @enviar="responder"
+            @resolver="resolver"
+            @calificar="calificarTicket"
+          />
+          <ListaConsultas
+            v-else
+            :consultas="consultas"
+            :cargando="cargandoConsultas"
+            :error="errorConsultas"
+            @abrir="abrirTicket"
+            @escribir="irAEscribir"
+            @reintentar="refrescarConsultas"
+          />
         </div>
       </div>
     </transition>
@@ -185,99 +92,74 @@
 
 <script>
 import chatService from '@/services/chatService'
+import * as soporte from '@/services/soporteService'
+import { resumenParaTicket, textoTema, totalNoLeidosCliente } from '@/utils/soporte.js'
+import PanelAsistente from '@/components/soporte/PanelAsistente.vue'
+import PasoEscribirEquipo from '@/components/soporte/PasoEscribirEquipo.vue'
+import ListaConsultas from '@/components/soporte/ListaConsultas.vue'
+import HiloConsulta from '@/components/soporte/HiloConsulta.vue'
 
 export default {
   name: 'SupportChat',
+  components: { PanelAsistente, PasoEscribirEquipo, ListaConsultas, HiloConsulta },
 
   data() {
     return {
-      // Estado del chat
       isChatOpen: false,
-      isTyping: false,
-      inputMessage: '',
-      errorMessage: '',
-
-      // Mensajes de la conversación (solo en memoria para UI)
-      messages: [],
-
-      // Conversación en Supabase
-      conversationId: null,
-
-      // Historial para enviar a DeepSeek (formato simplificado)
-      conversationHistory: [],
-
-      // Usuario actual
+      isMobile: false,
       currentUser: null,
+      pestana: 'asistente',
+      dailyLimitInfo: { allowed: true, remaining: -1, limit: -1, message: '' },
 
-      // Límites
-      dailyLimitInfo: {
-        allowed: true,
-        remaining: -1,
-        limit: -1,
-        message: ''
-      },
+      // Escribirle al equipo
+      escribirEquipo: false,
+      borrador: { conversationId: null, preguntas: [], borrador: '', tema: '' },
+      enviandoTicket: false,
+      errorTicket: '',
 
-      // Responsive
-      isMobile: false
+      // Mis consultas
+      consultas: [],
+      cargandoConsultas: false,
+      errorConsultas: '',
+      ticketAbierto: null,
+      mensajesTicket: [],
+      cargandoHilo: false,
+      errorHilo: '',
+      enviandoRespuesta: false,
+
+      // Tiempo real
+      cancelarConsultas: null,
+      cancelarMensajes: null,
+      suscritoA: null,
     }
   },
 
   computed: {
-    /**
-     * Verifica si el usuario tiene rol cliente
-     */
     isCliente() {
       return this.currentUser?.role === 'cliente'
     },
-
-    /**
-     * Verifica si la IA está habilitada para el plan del usuario
-     */
     aiEnabled() {
-      const planLimits = chatService.getPlanLimits(this.currentUser?.plan_id)
-      return planLimits.enabled
+      return chatService.getPlanLimits(this.currentUser?.plan_id).enabled
     },
-
-    /**
-     * Verifica si se alcanzó el límite diario
-     */
     limitReached() {
       return !this.dailyLimitInfo.allowed
     },
-
-    /**
-     * Quick actions contextuales según la ruta actual
-     */
-    quickActions() {
-      return chatService.getQuickActions(this.$route.name)
+    rutaActual() {
+      return { name: this.$route?.name, title: this.$route?.meta?.title, query: this.$route?.query || {} }
     },
-
-    /**
-     * Mensaje de bienvenida contextualizado
-     */
-    welcomeMessage() {
-      const userName = this.currentUser?.firstName || this.currentUser?.first_name || ''
-      return chatService.getWelcomeMessage(
-        this.$route.name,
-        this.$route.meta?.title,
-        userName
-      )
-    }
+    noLeidos() {
+      return totalNoLeidosCliente(this.consultas)
+    },
   },
 
   watch: {
-    /**
-     * Cuando el usuario navega a otra vista, actualizar contexto
-     */
-    '$route'(to) {
-      if (this.isChatOpen && this.conversationId) {
-        chatService.updateConversationRoute(
-          this.conversationId,
-          to.name,
-          to.meta?.title
-        )
-      }
-    }
+    noLeidos(n) {
+      // Para que otras partes (p. ej. la hoja "Más" del teléfono) puedan mostrar el punto.
+      window.dispatchEvent(new CustomEvent('ad-soporte-no-leidos', { detail: { cantidad: n } }))
+    },
+    'currentUser.id'() {
+      this.suscribirConsultas()
+    },
   },
 
   mounted() {
@@ -285,699 +167,317 @@ export default {
     this.checkMobile()
     window.addEventListener('resize', this.checkMobile)
     window.addEventListener('userUpdated', this.loadUser)
-    // Disparado por el ítem "Ayuda" de la hoja "Más" en móvil (la burbuja
-    // flotante está oculta ahí), ver ClienteBottomNav.vue/HojaMas.vue.
     window.addEventListener('ad-open-support-chat', this.openChat)
+    this.suscribirConsultas()
   },
 
   beforeUnmount() {
     window.removeEventListener('resize', this.checkMobile)
     window.removeEventListener('userUpdated', this.loadUser)
     window.removeEventListener('ad-open-support-chat', this.openChat)
+    this.cancelarConsultas?.()
+    this.cancelarMensajes?.()
   },
 
   methods: {
-    // ─── Inicialización ───
-
-    /**
-     * Carga los datos del usuario desde localStorage
-     */
+    // ─── Usuario y pantalla ───
     loadUser() {
       try {
-        const userData = JSON.parse(localStorage.getItem('currentUser') || '{}')
-        this.currentUser = userData
+        this.currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
       } catch (error) {
         console.error('Error cargando usuario en SupportChat:', error)
         this.currentUser = {}
       }
     },
-
-    /**
-     * Detecta si estamos en móvil para ajustar el layout
-     */
     checkMobile() {
       this.isMobile = window.innerWidth < 600
     },
 
-    // ─── Control del Chat ───
-
-    /**
-     * Abre el panel de chat
-     */
+    // ─── Abrir y cerrar ───
     async openChat() {
       this.isChatOpen = true
-      this.errorMessage = ''
-
-      // Verificar límites
-      await this.refreshLimits()
-
-      // Crear conversación en Supabase si no existe
-      if (!this.conversationId && this.currentUser?.id) {
-        const conversation = await chatService.createConversation({
-          userId: this.currentUser.id,
-          organizationId: this.currentUser.organization_id,
-          clientId: this.currentUser.client_id,
-          routeName: this.$route.name,
-          routeTitle: this.$route.meta?.title
-        })
-        if (conversation) {
-          this.conversationId = conversation.id
-        }
-      }
-
-      // Focus en el input después de la animación
-      this.$nextTick(() => {
-        setTimeout(() => {
-          this.$refs.chatInput?.focus()
-        }, 350)
-      })
+      this.refreshLimits()
+      await this.refrescarConsultas()
+      // Si el equipo le respondió, lo primero que ve es esa respuesta.
+      if (this.noLeidos > 0) this.irAConsultas()
     },
-
-    /**
-     * Cierra el panel de chat (no elimina el historial de la sesión)
-     */
     closeChat() {
       this.isChatOpen = false
+      this.cancelarMensajes?.()
+      this.cancelarMensajes = null
+      this.ticketAbierto = null
     },
-
-    // ─── Envío de Mensajes ───
-
-    /**
-     * Envía un mensaje del usuario
-     */
-    async sendMessage() {
-      const text = this.inputMessage.trim()
-      if (!text || this.isTyping || this.limitReached) return
-
-      // Limpiar estado
-      this.inputMessage = ''
-      this.errorMessage = ''
-
-      // Agregar mensaje del usuario a la UI
-      const userMsg = {
-        role: 'user',
-        content: text,
-        created_at: new Date().toISOString()
-      }
-      this.messages.push(userMsg)
-      this.conversationHistory.push({ role: 'user', content: text })
-
-      // Guardar en Supabase (background, no bloquea)
-      chatService.saveMessage(this.conversationId, 'user', text, {
-        route: this.$route.name
-      })
-
-      // Scroll al fondo
-      this.scrollToBottom()
-
-      // Mostrar indicador de "escribiendo..."
-      this.isTyping = true
-
-      try {
-        // Obtener contexto de la vista actual
-        const viewContext = {
-          routeName: this.$route.name,
-          routeTitle: this.$route.meta?.title,
-          queryParams: this.$route.query
-        }
-
-        // Llamar a DeepSeek
-        const response = await chatService.sendMessage(
-          text,
-          this.conversationHistory,
-          viewContext
-        )
-
-        // Agregar respuesta de IA a la UI
-        const assistantMsg = {
-          role: 'assistant',
-          content: response,
-          created_at: new Date().toISOString()
-        }
-        this.messages.push(assistantMsg)
-        this.conversationHistory.push({ role: 'assistant', content: response })
-
-        // Guardar respuesta en Supabase (background)
-        chatService.saveMessage(this.conversationId, 'assistant', response, {
-          route: this.$route.name,
-          model: 'deepseek-chat'
-        })
-
-        // Actualizar límites después de cada mensaje
-        await this.refreshLimits()
-
-      } catch (error) {
-        this.errorMessage = error.message
-      } finally {
-        this.isTyping = false
-        this.scrollToBottom()
-      }
-    },
-
-    /**
-     * Envía un quick action (botón predefinido)
-     */
-    async sendQuickAction(action) {
-      if (action.predefinedResponse) {
-        // 1. Mostrar mensaje del usuario
-        const text = action.message
-        this.inputMessage = ''
-        
-        const userMsg = { role: 'user', content: text, created_at: new Date().toISOString() }
-        this.messages.push(userMsg)
-        this.conversationHistory.push({ role: 'user', content: text })
-        
-        // Guardar silenciosamente
-        chatService.saveMessage(this.conversationId, 'user', text, { route: this.$route.name })
-        this.scrollToBottom()
-        
-        // 2. Simular que el agente lee y escribe
-        this.isTyping = true
-        await new Promise(resolve => setTimeout(resolve, 800))
-        this.isTyping = false
-        
-        // 3. Mostrar la respuesta predefinida
-        const response = action.predefinedResponse
-        const assistantMsg = { role: 'assistant', content: response, created_at: new Date().toISOString() }
-        this.messages.push(assistantMsg)
-        this.conversationHistory.push({ role: 'assistant', content: response })
-        
-        // Guardar silenciosamente
-        chatService.saveMessage(this.conversationId, 'assistant', response, { route: this.$route.name, type: 'predefined' })
-        this.scrollToBottom()
-      } else {
-        // Fallback si no hay respuesta predefinida, usar DeepSeek
-        this.inputMessage = action.message
-        this.sendMessage()
-      }
-    },
-
-    // ─── Límites ───
-
-    /**
-     * Actualiza la información de límites diarios
-     */
     async refreshLimits() {
       if (!this.currentUser?.id) return
-
-      this.dailyLimitInfo = await chatService.checkDailyLimit(
-        this.currentUser.id,
-        this.currentUser.plan_id
-      )
+      this.dailyLimitInfo = await chatService.checkDailyLimit(this.currentUser.id, this.currentUser.plan_id)
+    },
+    irAGuia(ruta) {
+      this.closeChat()
+      this.$router?.push(ruta)
     },
 
-    // ─── Utilidades de UI ───
-
-    /**
-     * Scroll automático al último mensaje
-     */
-    scrollToBottom() {
-      this.$nextTick(() => {
-        const container = this.$refs.messagesContainer
-        if (container) {
-          container.scrollTop = container.scrollHeight
+    // ─── Escribirle al equipo ───
+    empezarAEscribir(datos) {
+      this.borrador = { ...datos }
+      this.errorTicket = ''
+      this.escribirEquipo = true
+      this.pestana = 'asistente'
+    },
+    irAEscribir() {
+      this.empezarAEscribir({ conversationId: null, preguntas: [], borrador: '', tema: '' })
+    },
+    cancelarEscribir() {
+      this.escribirEquipo = false
+      this.errorTicket = ''
+    },
+    async enviarTicket({ categoria, mensaje }) {
+      this.enviandoTicket = true
+      this.errorTicket = ''
+      try {
+        let id = this.borrador.conversationId
+        if (!id) {
+          const c = await chatService.createConversation({
+            userId: this.currentUser.id,
+            organizationId: this.currentUser.organization_id,
+            clientId: this.currentUser.client_id,
+            routeName: this.$route?.name,
+            routeTitle: this.$route?.meta?.title,
+          })
+          id = c?.id
         }
-      })
+        if (!id) {
+          this.errorTicket = 'No pudimos enviar tu consulta. Intenta de nuevo.'
+          return
+        }
+        const resumen = resumenParaTicket({
+          preguntas: this.borrador.preguntas,
+          pantalla: this.$route?.meta?.title || '',
+          tema: textoTema(categoria),
+        })
+        const { data, error } = await soporte.escribirAlEquipo({
+          conversationId: id,
+          categoria,
+          mensaje,
+          resumen,
+          routeTitle: this.$route?.meta?.title || '',
+        })
+        if (error) {
+          this.errorTicket = error
+          return
+        }
+        this.$refs.panel?.reiniciar()
+        this.escribirEquipo = false
+        this.borrador = { conversationId: null, preguntas: [], borrador: '', tema: '' }
+        await this.refrescarConsultas()
+        this.pestana = 'consultas'
+        this.abrirTicket(data)
+      } finally {
+        this.enviandoTicket = false
+      }
     },
 
-    /**
-     * Formatea un timestamp a hora legible
-     */
-    formatTime(isoString) {
-      if (!isoString) return ''
-      const date = new Date(isoString)
-      return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+    // ─── Mis consultas ───
+    irAConsultas() {
+      this.pestana = 'consultas'
+      if (!this.ticketAbierto) this.refrescarConsultas()
+    },
+    async refrescarConsultas() {
+      if (!this.currentUser?.id) return
+      this.cargandoConsultas = true
+      const { data, error } = await soporte.listarMisConsultas(this.currentUser.id)
+      this.consultas = data
+      this.errorConsultas = error || ''
+      this.cargandoConsultas = false
+    },
+    async abrirTicket(consulta) {
+      this.ticketAbierto = { ...consulta }
+      this.mensajesTicket = []
+      this.errorHilo = ''
+      this.cargandoHilo = true
+      this.cancelarMensajes?.()
+      this.cancelarMensajes = soporte.suscribirMensajes(consulta.id, (m) => this.alLlegarMensaje(m))
+      const { data, error } = await soporte.cargarMensajes(consulta.id)
+      this.mensajesTicket = data
+      this.errorHilo = error || ''
+      this.cargandoHilo = false
+      this.marcarLeida(consulta.id)
+    },
+    cerrarTicket() {
+      this.cancelarMensajes?.()
+      this.cancelarMensajes = null
+      this.ticketAbierto = null
+    },
+    /** El equipo respondió con el hilo abierto: se agrega al instante y queda leído. */
+    alLlegarMensaje(m) {
+      if (!m || m.interno) return
+      if (this.mensajesTicket.some((x) => x.id === m.id)) return
+      this.mensajesTicket = [...this.mensajesTicket, m]
+      if (m.role === 'agent' && this.ticketAbierto) this.marcarLeida(this.ticketAbierto.id)
+    },
+    async marcarLeida(id) {
+      const c = this.consultas.find((x) => x.id === id)
+      if (c && c.no_leidos_cliente > 0) {
+        c.no_leidos_cliente = 0
+        soporte.marcarLeidoCliente(id)
+      } else if (this.ticketAbierto?.id === id && this.ticketAbierto.no_leidos_cliente > 0) {
+        soporte.marcarLeidoCliente(id)
+      }
+      if (this.ticketAbierto?.id === id) this.ticketAbierto.no_leidos_cliente = 0
+    },
+    async responder(texto) {
+      this.enviandoRespuesta = true
+      const { data, error } = await soporte.responderComoCliente(this.ticketAbierto.id, texto)
+      this.enviandoRespuesta = false
+      if (error) {
+        this.errorHilo = error
+        return
+      }
+      this.errorHilo = ''
+      this.alLlegarMensaje(data)
+      if (this.ticketAbierto.estado_ticket === 'resuelto' || this.ticketAbierto.estado_ticket === 'esperando_cliente') {
+        this.ticketAbierto.estado_ticket = 'en_curso'
+      }
+    },
+    async resolver() {
+      const { error } = await soporte.marcarResuelta(this.ticketAbierto.id)
+      if (error) this.errorHilo = error
+      else this.ticketAbierto.estado_ticket = 'resuelto'
+    },
+    async calificarTicket(valor) {
+      const { error } = await soporte.calificar(this.ticketAbierto.id, valor)
+      if (error) this.errorHilo = error
+      else this.ticketAbierto.calificacion = valor
     },
 
-    /**
-     * Formatea el contenido del mensaje (negrita con **, saltos de línea)
-     */
-    formatMessage(text) {
-      if (!text) return ''
-      return text
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>')
+    // ─── Tiempo real de la lista (no leídos, estado) ───
+    suscribirConsultas() {
+      const id = this.currentUser?.id
+      if (!this.isCliente || !id || this.suscritoA === id) return
+      this.cancelarConsultas?.()
+      this.suscritoA = id
+      this.refrescarConsultas()
+      this.cancelarConsultas = soporte.suscribirMisConsultas(id, (c) => this.alCambiarConsulta(c))
     },
-
-    /**
-     * Maneja el scroll (para futuro: cargar historial antiguo)
-     */
-    handleScroll() {
-      // Preparado para paginación de historial en el futuro
-    }
-  }
+    alCambiarConsulta(c) {
+      if (!c || c.mode !== 'human') return
+      const i = this.consultas.findIndex((x) => x.id === c.id)
+      const abierta = this.ticketAbierto?.id === c.id
+      const fusion = { ...(i >= 0 ? this.consultas[i] : {}), ...c }
+      // Con el hilo a la vista, lo nuevo ya se está leyendo.
+      if (abierta && this.isChatOpen) fusion.no_leidos_cliente = 0
+      if (i >= 0) this.consultas.splice(i, 1, fusion)
+      else this.consultas.unshift(fusion)
+      if (abierta) {
+        this.ticketAbierto = { ...this.ticketAbierto, ...fusion }
+        if (c.no_leidos_cliente > 0) soporte.marcarLeidoCliente(c.id)
+      }
+    },
+  },
 }
 </script>
 
 <style scoped>
-/* ═══════════════════════════════════════════════════
-   VARIABLES LOCALES
-   ═══════════════════════════════════════════════════ */
-
-.support-chat-wrapper {
-  --chat-primary: #2A2A2E;
-  --chat-accent: #8E1818;
-  --chat-bg: #f8f9fa;
-  --chat-user-bg: #2A2A2E;
-  --chat-assistant-bg: #ffffff;
-  --chat-radius: 20px;
-  --chat-width: 380px;
-  --chat-height: 560px;
-}
-
-/* ═══════════════════════════════════════════════════
-   FAB (Botón flotante)
-   ═══════════════════════════════════════════════════ */
+.support-chat-wrapper { font-family: 'Montserrat', sans-serif; }
 
 .chat-fab {
   position: fixed !important;
   bottom: 24px;
   right: 24px;
   z-index: 1500;
-  background: linear-gradient(135deg, #2A2A2E 0%, #3F3F46 100%) !important;
-  box-shadow: 0 6px 24px rgba(42, 42, 46, 0.45) !important;
-  transition: transform 0.3s ease, box-shadow 0.3s ease !important;
 }
-
-.chat-fab:hover {
-  transform: scale(1.08) !important;
-  box-shadow: 0 8px 32px rgba(42, 42, 46, 0.55) !important;
-}
-
 .fab-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 20px;
-  height: 20px;
-  background: #A81C22;
-  color: white;
-  font-size: 11px;
-  font-weight: 700;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid white;
+  background: rgb(var(--v-theme-error));
+  border: 2px solid rgb(var(--v-theme-surface));
 }
-
-/* Animación de entrada del FAB */
-.fab-bounce-enter-active {
-  animation: fabBounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.fab-bounce-leave-active {
-  animation: fabBounceOut 0.2s ease-in;
-}
-@keyframes fabBounceIn {
-  0% { transform: scale(0); opacity: 0; }
-  60% { transform: scale(1.15); }
-  100% { transform: scale(1); opacity: 1; }
-}
-@keyframes fabBounceOut {
-  to { transform: scale(0); opacity: 0; }
-}
-
-/* ═══════════════════════════════════════════════════
-   PANEL DE CHAT
-   ═══════════════════════════════════════════════════ */
+.fab-bounce-enter-active { animation: fabIn 0.25s ease-out; }
+.fab-bounce-leave-active { animation: fabIn 0.15s ease-in reverse; }
+@keyframes fabIn { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 .chat-panel {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: var(--chat-width);
-  height: var(--chat-height);
+  width: 400px;
+  height: 640px;
   max-height: calc(100vh - 48px);
-  background: var(--chat-bg);
-  border-radius: var(--chat-radius);
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 1500;
-  font-family: 'Montserrat', sans-serif;
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-background));
+  border-radius: 20px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
 }
-
-/* Versión móvil: fullscreen */
 .chat-panel--mobile {
   bottom: 0;
   right: 0;
   width: 100vw;
   height: 100vh;
-  max-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   border-radius: 0;
+  border: 0;
 }
-
-/* Animación de apertura/cierre */
-.chat-panel-enter-active {
-  animation: chatSlideUp 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.chat-panel-leave-active {
-  animation: chatSlideDown 0.25s ease-in;
-}
-@keyframes chatSlideUp {
-  0% { transform: translateY(20px) scale(0.95); opacity: 0; }
-  100% { transform: translateY(0) scale(1); opacity: 1; }
-}
-@keyframes chatSlideDown {
-  0% { transform: translateY(0) scale(1); opacity: 1; }
-  100% { transform: translateY(20px) scale(0.95); opacity: 0; }
-}
-
-/* ═══════════════════════════════════════════════════
-   HEADER
-   ═══════════════════════════════════════════════════ */
+.chat-panel-enter-active { animation: panelIn 0.22s ease-out; }
+.chat-panel-leave-active { animation: panelIn 0.15s ease-in reverse; }
+@keyframes panelIn { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 .chat-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  background: linear-gradient(135deg, #2A2A2E 0%, #3F3F46 100%);
-  color: white;
-  flex-shrink: 0;
+  padding: 6px 8px 6px 18px;
+  background: rgb(var(--v-theme-surface));
 }
+.chat-header__title { margin: 0; font-size: 1.25rem; font-weight: 700; }
 
-.chat-header__info {
+.chat-tabs {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  background: rgb(var(--v-theme-surface));
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.14);
 }
-
-.chat-header__avatar {
-  width: 36px;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.chat-header__title {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 14px;
+.chat-tab {
+  position: relative;
+  flex: 1;
+  min-height: 48px;
+  font: inherit;
+  font-size: 1rem;
   font-weight: 600;
-  margin: 0;
-  line-height: 1.2;
-}
-
-.chat-header__status {
-  font-size: 11px;
-  opacity: 0.85;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  background: #4CAF50;
-  border-radius: 50%;
-  display: inline-block;
-  animation: statusPulse 2s infinite;
-}
-
-@keyframes statusPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.chat-header__actions {
-  display: flex;
-  align-items: center;
-}
-
-.chat-close-btn {
-  color: white !important;
-}
-
-/* ═══════════════════════════════════════════════════
-   ÁREA DE MENSAJES
-   ═══════════════════════════════════════════════════ */
-
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* Scrollbar sutil */
-.chat-messages::-webkit-scrollbar {
-  width: 4px;
-}
-.chat-messages::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 2px;
-}
-
-/* ═══════════════════════════════════════════════════
-   MENSAJES
-   ═══════════════════════════════════════════════════ */
-
-.message {
-  display: flex;
-  gap: 8px;
-  animation: messageIn 0.3s ease;
-}
-
-@keyframes messageIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Mensaje del usuario: alineado a la derecha */
-.message--user {
-  flex-direction: row-reverse;
-}
-
-.message--user .message__bubble {
-  background: var(--chat-user-bg);
-  color: white;
-  border-radius: 16px 16px 4px 16px;
-  max-width: 85%;
-}
-
-.message--user .message__time {
-  color: rgba(255, 255, 255, 0.6);
-  text-align: right;
-}
-
-/* Mensaje del asistente: alineado a la izquierda */
-.message--assistant .message__bubble {
-  background: var(--chat-assistant-bg);
-  color: #333;
-  border-radius: 16px 16px 16px 4px;
-  max-width: 85%;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-/* Mensaje de sistema (errores, límites) */
-.message--system {
-  justify-content: center;
-}
-
-.message--system .message__bubble {
-  background: #fff3e0;
-  color: #6d4c00;
-  border-radius: 12px;
-  max-width: 90%;
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.message__bubble--error {
-  background: #fce4ec !important;
-  color: #c62828 !important;
-}
-
-.message__bubble--limit {
-  background: #fff8e1 !important;
-  color: #6d4c00 !important;
-}
-
-/* Avatar del asistente */
-.message__avatar {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  background: rgba(42, 42, 46, 0.08);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 2px;
-}
-
-/* Burbuja */
-.message__bubble {
-  padding: 10px 14px;
-  font-size: 13px;
-  line-height: 1.5;
-  word-break: break-word;
-}
-
-.message__text {
-  margin: 0;
-}
-
-.message__time {
-  font-size: 10px;
-  color: #999;
-  margin-top: 4px;
-  display: block;
-}
-
-/* Mensaje de bienvenida */
-.message--welcome .message__bubble {
-  background: linear-gradient(135deg, #f7f7f8 0%, #efeff1 100%);
-  border: 1px solid rgba(42, 42, 46, 0.1);
-}
-
-/* ═══════════════════════════════════════════════════
-   INDICADOR DE ESCRIBIENDO
-   ═══════════════════════════════════════════════════ */
-
-.typing-bubble {
-  padding: 12px 18px !important;
-}
-
-.typing-dots {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.typing-dots span {
-  width: 7px;
-  height: 7px;
-  background: #999;
-  border-radius: 50%;
-  animation: typingBounce 1.4s infinite ease-in-out;
-}
-
-.typing-dots span:nth-child(1) { animation-delay: 0s; }
-.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes typingBounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-6px); opacity: 1; }
-}
-
-/* ═══════════════════════════════════════════════════
-   QUICK ACTIONS (Botones predefinidos)
-   ═══════════════════════════════════════════════════ */
-
-.quick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 4px 0 8px;
-  animation: messageIn 0.4s ease 0.2s both;
-}
-
-.quick-action-btn {
-  background: white;
-  border: 1px solid rgba(42, 42, 46, 0.15);
-  border-radius: 20px;
-  padding: 7px 14px;
-  font-size: 12px;
-  font-family: 'Montserrat', sans-serif;
-  color: #2A2A2E;
   cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  line-height: 1.3;
-}
-
-.quick-action-btn:hover {
-  background: #2A2A2E;
-  color: white;
-  border-color: #2A2A2E;
-  transform: translateY(-1px);
-  box-shadow: 0 3px 10px rgba(42, 42, 46, 0.2);
-}
-
-.quick-action-btn:active {
-  transform: translateY(0);
-}
-
-/* ═══════════════════════════════════════════════════
-   INPUT DE MENSAJE
-   ═══════════════════════════════════════════════════ */
-
-.chat-input {
-  padding: 12px 14px 10px;
-  background: white;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  flex-shrink: 0;
-}
-
-.chat-input__container {
-  display: flex;
-  align-items: center;
-  background: #f3f4f6;
-  border-radius: 24px;
-  padding: 4px 4px 4px 16px;
-  transition: box-shadow 0.2s ease;
-}
-
-.chat-input__container:focus-within {
-  box-shadow: 0 0 0 2px rgba(42, 42, 46, 0.15);
-}
-
-.chat-input__field {
-  flex: 1;
-  border: none;
+  color: rgba(var(--v-theme-on-surface), 0.75);
   background: transparent;
-  outline: none;
-  font-size: 13px;
-  font-family: 'Montserrat', sans-serif;
-  color: #333;
-  padding: 8px 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+}
+.chat-tab--activa {
+  color: rgb(var(--v-theme-on-surface));
+  border-bottom-color: rgb(var(--v-theme-primary));
+}
+.chat-tab:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
+.chat-tab__punto {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-error));
 }
 
-.chat-input__field::placeholder {
-  color: #aaa;
-}
-
-.chat-input__field:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.chat-input__send {
-  flex-shrink: 0;
-}
-
-.chat-input__hint {
-  font-size: 10px;
-  color: #bbb;
-  text-align: center;
-  margin: 6px 0 0;
-}
-
-.limit-hint {
-  color: #8E1818;
-  font-weight: 500;
-}
-
-/* ═══════════════════════════════════════════════════
-   RESPONSIVE
-   ═══════════════════════════════════════════════════ */
+.chat-cuerpo { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 
 @media (max-width: 599px) {
-  .chat-fab {
-    bottom: 16px;
-    right: 16px;
-  }
+  .chat-fab { bottom: 16px; right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fab-bounce-enter-active, .fab-bounce-leave-active, .chat-panel-enter-active, .chat-panel-leave-active { animation: none; }
 }
 </style>
