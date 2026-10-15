@@ -80,7 +80,7 @@ describe('menuPorRol', () => {
     expect(getMenuPorRol({ role: 'admin' })[0].to.name).toBe('Dashboard')
     const operacion = items.find((i) => i.key === 'operacion')
     expect(operacion.grupo).toBe(true)
-    expect(operacion.hijos.map((h) => h.to.name)).toEqual(['AdminOperacion', 'AdminCatalogo', 'AdminUsoIa', 'AdminTasas'])
+    expect(operacion.hijos.map((h) => h.to.name)).toEqual(['AdminOperacion', 'AdminCatalogo', 'AdminSoporte', 'AdminUsoIa', 'AdminTasas'])
   })
 
   it('un rol desconocido no revienta y devuelve una lista vacía', () => {

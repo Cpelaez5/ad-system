@@ -42,6 +42,7 @@ import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
 import SeccionLista from '@/components/ui/SeccionLista.vue'
 import { contarPorVerificar, contarErroresIa7Dias, filasTasas } from '@/services/superAdminService'
+import { contarSinResponder } from '@/services/soporteService'
 import { construirTablaTasas, huecosDeTasas, textoFaltan } from '@/utils/tasasAdmin'
 
 const cargando = ref(true)
@@ -49,19 +50,26 @@ const error = ref('')
 const porVerificar = ref({ proveedores: 0, productos: 0 })
 const erroresIa = ref(0)
 const diasSinTasa = ref(0)
+const sinResponder = ref(0)
 
 onMounted(async () => {
-  const [a, b, c] = await Promise.all([contarPorVerificar(), contarErroresIa7Dias(), filasTasas()])
+  const [a, b, c, d] = await Promise.all([contarPorVerificar(), contarErroresIa7Dias(), filasTasas(), contarSinResponder()])
   porVerificar.value = a.data
   erroresIa.value = b.data
   diasSinTasa.value = huecosDeTasas(construirTablaTasas(c.data)).length
-  error.value = [a.error, b.error, c.error].filter(Boolean).join(' ')
+  sinResponder.value = d.data
+  error.value = [a.error, b.error, c.error, d.error].filter(Boolean).join(' ')
   cargando.value = false
 })
 
 const totalVerificar = computed(() => porVerificar.value.proveedores + porVerificar.value.productos)
 
 const tarjetas = computed(() => [
+  {
+    clave: 'soporte', to: '/admin/soporte', icono: 'mdi-lifebuoy',
+    titulo: 'Soporte', cifra: sinResponder.value, alerta: sinResponder.value > 0,
+    detalle: sinResponder.value === 1 ? 'consulta espera respuesta' : 'consultas esperan respuesta',
+  },
   {
     clave: 'catalogo', to: '/admin/catalogo', icono: 'mdi-book-open-page-variant-outline',
     titulo: 'Catálogo global', cifra: totalVerificar.value, alerta: totalVerificar.value > 0,
@@ -80,6 +88,9 @@ const tarjetas = computed(() => [
 ])
 
 const siguiente = computed(() => {
+  if (sinResponder.value > 0) {
+    return { titulo: `${sinResponder.value} ${sinResponder.value === 1 ? 'consulta espera' : 'consultas esperan'} tu respuesta`, detalle: 'Los negocios escribieron al equipo desde el chat de ayuda.', boton: 'Abrir soporte', to: '/admin/soporte' }
+  }
   if (diasSinTasa.value > 0) {
     return { titulo: textoFaltan(diasSinTasa.value) + ' de tasa', detalle: 'Los negocios usan estas tasas para convertir sus facturas.', boton: 'Revisar tasas', to: '/admin/tasas' }
   }
@@ -114,7 +125,8 @@ const pendientes = [
   grid-template-columns: 1fr;
   gap: 12px;
 }
-@media (min-width: 720px) { .operacion__tarjetas { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 720px) { .operacion__tarjetas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .operacion__tarjetas { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 .tarjeta {
   display: flex;

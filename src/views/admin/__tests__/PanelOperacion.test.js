@@ -28,6 +28,7 @@ const servicio = vi.hoisted(() => ({
   guardarTasaManual: vi.fn(),
 }))
 vi.mock('@/services/superAdminService', () => servicio)
+vi.mock('@/services/soporteService', () => ({ contarSinResponder: vi.fn(async () => ({ data: 0, error: null })) }))
 vi.mock('@/services/importacionProductosService', () => ({ leerArchivo: vi.fn() }))
 
 const mostrar = vi.hoisted(() => vi.fn())
@@ -222,7 +223,7 @@ describe('TasasGlobales', () => {
 })
 
 describe('OperacionPortada', () => {
-  it('resume las tres herramientas con enlaces y lista lo pendiente', async () => {
+  it('resume las herramientas con enlaces y lista lo pendiente', async () => {
     servicio.contarErroresIa7Dias.mockResolvedValue({ data: 4, error: null })
     servicio.filasTasas.mockResolvedValue({ data: [], error: null })
     const w = montar(OperacionPortada)
@@ -230,6 +231,7 @@ describe('OperacionPortada', () => {
     expect(w.get('[data-testid="tarjeta-catalogo"]').text()).toContain('5')
     expect(w.get('[data-testid="tarjeta-catalogo"]').text()).toContain('2 proveedores y 3 productos por verificar')
     expect(w.get('[data-testid="tarjeta-ia"]').text()).toContain('4')
+    expect(w.get('[data-testid="tarjeta-soporte"]').attributes('href')).toBe('/admin/soporte')
     expect(w.get('[data-testid="tarjeta-tasas"]').attributes('href')).toBe('/admin/tasas')
     expect(w.get('[data-testid="tarjeta-catalogo"]').attributes('href')).toBe('/admin/catalogo')
     expect(w.get('[data-testid="tarjeta-ia"]').attributes('href')).toBe('/admin/uso-ia')

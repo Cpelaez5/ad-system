@@ -73,6 +73,7 @@ export function getMenuPorRol({ role, isServicesCompany = false } = {}) {
         hijos: [
           { key: 'operacion-resumen', titulo: 'Resumen', icono: 'mdi-view-dashboard-outline', to: { name: 'AdminOperacion' } },
           { key: 'operacion-catalogo', titulo: 'Catálogo global', icono: 'mdi-book-open-page-variant-outline', to: { name: 'AdminCatalogo' } },
+          { key: 'operacion-soporte', titulo: 'Soporte', icono: 'mdi-lifebuoy', to: { name: 'AdminSoporte' } },
           { key: 'operacion-uso-ia', titulo: 'Uso de IA', icono: 'mdi-chart-bar', to: { name: 'AdminUsoIa' } },
           { key: 'operacion-tasas', titulo: 'Tasas globales', icono: 'mdi-cash-sync', to: { name: 'AdminTasas' } },
         ],
