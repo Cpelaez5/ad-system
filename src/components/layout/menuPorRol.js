@@ -65,6 +65,18 @@ export function getMenuPorRol({ role, isServicesCompany = false } = {}) {
     items.push(
       { key: 'facturacion-sistema', titulo: 'Facturación', icono: 'mdi-receipt-text-outline', to: { name: 'FacturacionSistema' } },
       { key: 'ai-settings', titulo: 'Configuración IA', icono: 'mdi-robot-outline', to: { name: 'AiSettings' } },
+      {
+        key: 'operacion',
+        titulo: 'Operación',
+        icono: 'mdi-tools',
+        grupo: true,
+        hijos: [
+          { key: 'operacion-resumen', titulo: 'Resumen', icono: 'mdi-view-dashboard-outline', to: { name: 'AdminOperacion' } },
+          { key: 'operacion-catalogo', titulo: 'Catálogo global', icono: 'mdi-book-open-page-variant-outline', to: { name: 'AdminCatalogo' } },
+          { key: 'operacion-uso-ia', titulo: 'Uso de IA', icono: 'mdi-chart-bar', to: { name: 'AdminUsoIa' } },
+          { key: 'operacion-tasas', titulo: 'Tasas globales', icono: 'mdi-cash-sync', to: { name: 'AdminTasas' } },
+        ],
+      },
       { key: 'empresas', titulo: 'Empresas', icono: 'mdi-office-building', to: { name: 'Dashboard' } }
     )
   }
