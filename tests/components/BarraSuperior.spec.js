@@ -11,6 +11,12 @@ const globalConfig = {
   stubs: {
     ChipTasa: { template: '<span class="chip-tasa-stub" />', props: ['currency', 'rateValue', 'loading', 'error'] },
     MenuUsuario: true,
+    TasaRapida: { template: '<div class="tasa-rapida-stub" />' },
+    // v-menu: renderiza el activador (los chips) y el contenido solo si está abierto.
+    VMenu: {
+      props: ['modelValue', 'disabled'],
+      template: `<div><slot name="activator" :props="{ onClick: () => $emit('update:modelValue', true) }" /><slot v-if="modelValue" /></div>`,
+    },
   },
 }
 
@@ -39,15 +45,27 @@ describe('BarraSuperior', () => {
     expect(wrapper.text()).not.toContain('Inicio')
   })
 
-  it('el cliente va a Mi negocio → Tasa de cambio al tocar un chip de tasa', async () => {
+  it('el cliente abre el acceso rápido de la tasa (no refresca ni navega)', async () => {
     const push = vi.fn()
     const wrapper = mount(BarraSuperior, {
       props: { bcvRate: { dollar: 36.5 }, currentUser: { role: 'cliente' } },
       global: { ...globalConfig, mocks: { $router: { push } } },
     })
     wrapper.vm.alTocarTasa()
-    expect(push).toHaveBeenCalledWith('/cliente/mi-area#tasa')
+    expect(push).not.toHaveBeenCalled()
     expect(wrapper.emitted('refresh-bcv')).toBeFalsy()
+    wrapper.vm.menuTasa = true
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.tasa-rapida-stub').exists()).toBe(true)
+  })
+
+  it('recuerda actualizar la tasa manual entre semana si no es de hoy', () => {
+    const wrapper = mount(BarraSuperior, {
+      props: { currentUser: { role: 'cliente' }, tasaInfo: { modo: 'manual', fecha: '2000-01-03' } },
+      global: globalConfig,
+    })
+    const dia = new Date().getDay()
+    expect(wrapper.find('[data-testid="recordatorio-tasa"]').exists()).toBe(dia !== 0 && dia !== 6)
   })
 
   it('otros roles refrescan la tasa al tocar un chip', () => {

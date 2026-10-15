@@ -104,12 +104,33 @@
         </v-btn>
       </div>
     </template>
+
+    <!-- Historial de las tasas que el negocio definió a mano (tasas_historial) -->
+    <v-expansion-panels v-if="historial.length" variant="accordion" class="tasa__historial mt-4" data-testid="tasa-historial">
+      <v-expansion-panel elevation="0">
+        <v-expansion-panel-title>
+          <v-icon icon="mdi-history" size="20" class="mr-2" />
+          Historial de tus tasas ({{ historial.length }} {{ historial.length === 1 ? 'día' : 'días' }})
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <ul class="tasa__historial-lista">
+            <li v-for="d in historial" :key="d.fecha" class="tasa__historial-fila">
+              <span class="tasa__historial-fecha">{{ formatFechaCorta(d.fecha) }}</span>
+              <span class="tasa__historial-valores">
+                <span v-for="(valor, codigo) in d.tasas" :key="codigo">{{ codigo }} Bs {{ formatTasa(valor) }}</span>
+              </span>
+            </li>
+          </ul>
+          <p class="tasa__historial-nota">Cada factura guarda además la tasa con la que se registró.</p>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
   </section>
 </template>
 
 <script>
 import AvisoAmable from '@/components/ui/AvisoAmable.vue'
-import { preferencia, guardarPreferencia, tasasVigentes, monedasUsadas, diasDeAntiguedad } from '@/services/tasaService.js'
+import { preferencia, guardarPreferencia, tasasVigentes, monedasUsadas, diasDeAntiguedad, historialTasas } from '@/services/tasaService.js'
 import { MONEDAS, CODIGOS_CON_TASA, MONEDAS_OTRAS, parsearTasa } from '@/utils/monedas.js'
 import { formatTasa } from '@/utils/formatMoney.js'
 import { formatFechaCorta } from '@/utils/fechas.js'
@@ -129,6 +150,7 @@ export default {
 
   data() {
     return {
+      historial: [],
       cargando: true,
       guardando: false,
       error: '',
@@ -207,6 +229,8 @@ export default {
   },
 
   methods: {
+    formatFechaCorta,
+    formatTasa,
     irAqui() {
       this.$nextTick(() => this.$el?.scrollIntoView?.({ block: 'start' }))
     },
@@ -214,7 +238,12 @@ export default {
     nombreMoneda: (c) => MONEDAS[c]?.nombre || c,
     simbolo: (c) => MONEDAS[c]?.simbolo || c,
 
+    async cargarHistorial() {
+      this.historial = await historialTasas({ limite: 60 })
+    },
+
     async cargar() {
+      this.cargarHistorial()
       this.cargando = true
       try {
         const [pref, usadas] = await Promise.all([preferencia(), monedasUsadas()])
@@ -382,5 +411,32 @@ export default {
 }
 @media (prefers-reduced-motion: reduce) {
   .tasa__opcion { transition: none; }
+}
+.tasa__historial-lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.tasa__historial-fila {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+.tasa__historial-fecha {
+  font-weight: 600;
+}
+.tasa__historial-valores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: rgba(var(--v-theme-on-surface), 0.8);
+}
+.tasa__historial-nota {
+  margin: 8px 0 0;
+  font-size: 0.8125rem;
+  color: rgba(var(--v-theme-on-surface), 0.68);
 }
 </style>

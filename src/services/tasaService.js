@@ -9,9 +9,12 @@
  * - `desactualizada` = la tasa tiene más de 1 día.
  * - Staff (admin/contador) que mira a un cliente pasa `{ clientId }`; sin contexto,
  *   la preferencia es automática.
+ * - Historial: cada vez que se guardan tasas manuales queda una fila por moneda y día en
+ *   `tasas_historial` (se puede consultar en Mi negocio → Tasa de cambio).
+ * - Recordatorio: en modo manual, de lunes a viernes, si la tasa no es de hoy.
  */
 import { supabase } from '@/lib/supabaseClient'
-import { getCurrentClientId } from '@/utils/tenantHelpers'
+import { getCurrentClientId, getCurrentOrganizationId } from '@/utils/tenantHelpers'
 import bcvService from '@/services/bcvService.js'
 import { hoyISO, parseFechaLocal } from '@/utils/fechas.js'
 import { CODIGOS_CON_TASA, normalizarTasas } from '@/utils/monedas.js'
@@ -98,6 +101,7 @@ export async function guardarPreferencia({ modo, tasas = {}, avisoAceptado = fal
     if (avisoAceptado) cambios.tasa_aviso_aceptado_en = new Date().toISOString()
     const { error } = await supabase.from('clients').update(cambios).eq('id', id)
     if (error) return { ok: false, error: 'No pudimos guardar la tasa. Intenta de nuevo.' }
+    if (modo === 'manual') await registrarEnHistorial(id, manuales)
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(EVENTO_TASA_CAMBIO))
     return { ok: true }
   } catch {
@@ -189,3 +193,64 @@ export function _reiniciar() {
 }
 
 export default { preferencia, guardarPreferencia, tasasVigentes, monedasUsadas, diasDeAntiguedad }
+
+/**
+ * Guarda una fila por moneda y fecha en `tasas_historial` (si ya existe la de ese día, la
+ * reemplaza). Nunca bloquea el guardado de la preferencia.
+ */
+async function registrarEnHistorial(clientId, manuales) {
+  try {
+    const organizationId = getCurrentOrganizationId()
+    if (!organizationId) return
+    const filas = Object.entries(manuales).map(([moneda, { tasa, fecha }]) => ({
+      client_id: clientId, organization_id: organizationId, moneda, tasa, fecha, updated_at: new Date().toISOString()
+    }))
+    if (filas.length) await supabase.from('tasas_historial').upsert(filas, { onConflict: 'client_id,moneda,fecha' })
+  } catch {
+    /* el historial es un extra: no impide guardar la tasa */
+  }
+}
+
+/**
+ * Historial de tasas manuales del negocio, agrupado por día (más reciente primero).
+ * @returns {Promise<Array<{ fecha: string, tasas: Object<string, number> }>>}
+ */
+export async function historialTasas({ clientId, limite = 60 } = {}) {
+  try {
+    const id = clientId || getCurrentClientId()
+    if (!id) return []
+    const { data, error } = await supabase
+      .from('tasas_historial')
+      .select('moneda, tasa, fecha')
+      .eq('client_id', id)
+      .order('fecha', { ascending: false })
+      .limit(limite * 5)
+    if (error || !Array.isArray(data)) return []
+    return agruparPorDia(data).slice(0, limite)
+  } catch {
+    return []
+  }
+}
+
+/** [{ moneda, tasa, fecha }] → [{ fecha, tasas: { USD: 879.12, ... } }], más reciente primero. */
+export function agruparPorDia(filas) {
+  const porDia = new Map()
+  for (const f of filas || []) {
+    const fecha = String(f.fecha).slice(0, 10)
+    if (!porDia.has(fecha)) porDia.set(fecha, {})
+    porDia.get(fecha)[f.moneda] = Number(f.tasa)
+  }
+  return [...porDia.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([fecha, tasas]) => ({ fecha, tasas }))
+}
+
+/**
+ * ¿Hay que recordarle al cliente que actualice su tasa? Solo en modo manual, de lunes a
+ * viernes, si alguna de sus tasas no es de hoy.
+ * @param {{ modo?: string, fecha?: string|null }} info  resultado de tasasVigentes()
+ */
+export function necesitaRecordatorio(info, ahora = new Date()) {
+  if (!info || info.modo !== 'manual') return false
+  const dia = ahora.getDay()
+  if (dia === 0 || dia === 6) return false
+  return !info.fecha || info.fecha < hoyISO(ahora)
+}

@@ -62,6 +62,10 @@ test.describe('Cliente — Mi negocio (Proveedores, Inventario, Mi área)', () =
 
   test('Mi negocio muestra "Tasa de cambio": se puede cambiar de opción y cancelar o volver sin guardar', async ({ page, consoleErrors }) => {
     await page.goto('/cliente/mi-area#tasa')
+    // En el teléfono, el aviso de cookies y la barra inferior tapan lo que queda al borde.
+    const rechazar = page.getByRole('button', { name: 'Rechazar' })
+    if (await rechazar.isVisible().catch(() => false)) await rechazar.click()
+    const tocar = async (loc) => { await loc.evaluate(el => el.scrollIntoView({ block: 'center' })); await loc.click() }
     const seccion = page.getByTestId('tasa-cambio')
     await expect(seccion).toBeVisible()
     await expect(seccion.getByRole('heading', { name: 'Tasa de cambio' })).toBeVisible()
@@ -73,18 +77,18 @@ test.describe('Cliente — Mi negocio (Proveedores, Inventario, Mi área)', () =
     const manual = seccion.getByTestId('tasa-opcion-manual')
     const automatica = seccion.getByTestId('tasa-opcion-automatica')
     const modoInicial = await automatica.getAttribute('aria-checked')
-    await (modoInicial === 'true' ? manual : automatica).click()
+    await tocar(modoInicial === 'true' ? manual : automatica)
     if (modoInicial === 'true') {
       await expect(seccion.getByTestId('tasa-campo-USD')).toBeVisible()
       await expect(seccion.getByTestId('tasa-campo-EUR')).toBeVisible()
     }
     await expect(seccion.getByTestId('tasa-cancelar')).toBeVisible()
-    await seccion.getByTestId('tasa-cancelar').click()
+    await tocar(seccion.getByTestId('tasa-cancelar'))
     await expect(automatica).toHaveAttribute('aria-checked', modoInicial)
 
     // Cambiar y volver a la opción inicial sin guardar: no quedan cambios pendientes.
-    await (modoInicial === 'true' ? manual : automatica).click()
-    await (modoInicial === 'true' ? automatica : manual).click()
+    await tocar(modoInicial === 'true' ? manual : automatica)
+    await tocar(modoInicial === 'true' ? automatica : manual)
     await expect(seccion.getByTestId('tasa-guardar')).toHaveCount(0)
 
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])

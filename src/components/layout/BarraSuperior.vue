@@ -12,9 +12,24 @@
 
     <v-spacer />
 
-    <!-- Tasas: chips compactos sin etiqueta larga, solo ≥600px (en móvil viven
-         en la hoja "Más" → sección "Tasas del día", ver HojaMas.vue) -->
-    <div class="d-none d-sm-flex align-center ga-2 mr-2">
+    <!-- Tasas: el cliente las toca para el acceso rápido (TasaRapida); los demás roles
+         refrescan. Chips solo ≥600px (en móvil viven en la hoja "Más"); el recordatorio
+         de tasa manual se ve en todos los tamaños. -->
+    <v-menu v-model="menuTasa" :disabled="!esCliente" :close-on-content-click="false" location="bottom end" offset="8">
+      <template #activator="{ props: menuProps }">
+    <div v-bind="esCliente ? menuProps : {}" class="d-flex align-center ga-2 mr-2">
+      <v-chip
+        v-if="recordarTasa"
+        color="warning"
+        variant="flat"
+        size="small"
+        prepend-icon="mdi-bell-ring-outline"
+        class="barra-superior__recordatorio"
+        data-testid="recordatorio-tasa"
+      >
+        Actualiza tu tasa
+      </v-chip>
+    <div class="d-none d-sm-flex align-center ga-2">
       <ChipTasa
         v-if="showUsdRate"
         currency="USD"
@@ -71,6 +86,10 @@
         @click="alTocarTasa"
       />
     </div>
+    </div>
+      </template>
+      <TasaRapida v-if="menuTasa" @cerrar="menuTasa = false" />
+    </v-menu>
 
     <MenuUsuario
       :current-user="currentUser"
@@ -82,6 +101,8 @@
 
 <script>
 import ChipTasa from '@/components/ui/ChipTasa.vue'
+import TasaRapida from '@/components/cliente/TasaRapida.vue'
+import { necesitaRecordatorio } from '@/services/tasaService.js'
 import MenuUsuario from './MenuUsuario.vue'
 import { formatFechaCorta } from '@/utils/fechas.js'
 
@@ -95,7 +116,11 @@ import { formatFechaCorta } from '@/utils/fechas.js'
 export default {
   name: 'BarraSuperior',
 
-  components: { ChipTasa, MenuUsuario },
+  components: { ChipTasa, MenuUsuario, TasaRapida },
+
+  data() {
+    return { menuTasa: false }
+  },
 
   props: {
     tituloPagina: { type: String, default: 'Sistema Contable' },
@@ -121,6 +146,10 @@ export default {
     esCliente() {
       return this.currentUser?.role === 'cliente'
     },
+    /** De lunes a viernes, en modo manual, si la tasa no es de hoy. */
+    recordarTasa() {
+      return this.esCliente && necesitaRecordatorio(this.tasaInfo)
+    },
     chipManual() {
       return this.tasaInfo?.modo === 'manual'
     },
@@ -138,12 +167,9 @@ export default {
   },
 
   methods: {
-    /** El cliente va a Mi negocio → Tasa de cambio; el resto de roles refresca la tasa. */
+    /** El cliente abre el acceso rápido (lo maneja el v-menu); el resto de roles refresca la tasa. */
     alTocarTasa() {
-      if (this.esCliente && this.$router) {
-        this.$router.push('/cliente/mi-area#tasa')
-        return
-      }
+      if (this.esCliente) return
       this.$emit('refresh-bcv')
     },
   },
@@ -153,6 +179,11 @@ export default {
 <style scoped>
 .barra-superior {
   z-index: 1000 !important;
+}
+
+.barra-superior__recordatorio {
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .barra-superior__titulo {

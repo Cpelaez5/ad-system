@@ -34,7 +34,12 @@ Las del BCV: **VES, USD, EUR, CNY, TRY, RUB**. El formulario de registro ofrece 
 - **Barra superior:** los chips muestran la tasa vigente y una marca "Manual" si aplica. Se ven en ámbar si la tasa manual tiene más de 1 día, o si la automática falló y se está usando la última conocida.
 - **En el registro de una factura:** la tasa se prellena con la vigente y siempre se puede editar para esa factura (la de la factura real puede ser otra, por ejemplo la del día de emisión).
 
+## Agregado el 2026-10-15 (pedidos del usuario)
+- **Historial de tasas manuales:** tabla `tasas_historial`, con una fila por moneda y por día. Se guarda en cada cambio y se consulta en Mi negocio → Tasa de cambio → "Historial de tus tasas". Cada factura guarda además su propia tasa.
+- **Acceso rápido desde la barra superior:** al tocar los chips de la tasa, el cliente abre `TasaRapida.vue`. Ahí cambia entre Automática y La defino yo, escribe las tasas del día (acepta "879,12") y puede copiar la del BCV como punto de partida. Los otros roles siguen refrescando la tasa al tocar.
+- **Recordatorio:** en modo manual, **de lunes a viernes**, si la tasa no es de hoy, aparece un chip ámbar "Actualiza tu tasa" en la barra (también en el teléfono), que abre el acceso rápido.
+- **Base global de tasas:** `exchange_rates` (fecha, moneda, tasa, fuente), con USD, EUR, CNY, TRY y RUB. La Edge Function `tasas-diarias` la llena con pg_cron de **lunes a viernes, a las 10:00 y a las 18:00 (Caracas)**. Antes solo se llenaba cuando alguien abría la app, y en los últimos 30 días faltaban 11 días hábiles.
+
 ## Fuera de alcance
 - Tasas de mercado paralelo (no oficial).
 - Conversión automática del IGTF.
-- Historial de tasas manuales (se guarda solo la última de cada moneda).
