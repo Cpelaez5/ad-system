@@ -98,3 +98,16 @@ h1 *, h2 *, h3 *, h4 *, h5 *, h6 *, p *, span *, div *, a *, button *, input *, 
 .v-icon.text-warning {
   color: #E0B04F !important;
 }
+
+/* ── Etiquetas flotantes de campos con borde ────────────────────────────────
+   Al escribir, la etiqueta sube y queda sobre el borde: sobresale ~8px por
+   encima del campo. v-window (pestañas, pasos) trae overflow:hidden en ambos
+   ejes y la cortaba cuando el primer campo estaba arriba del todo. Solo hace
+   falta recortar en horizontal (la transición entre pestañas es lateral). */
+@supports (overflow: clip) {
+  /* Doble clase: el CSS de Vuetify carga después y empataría en especificidad. */
+  .v-window.v-window {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+}
