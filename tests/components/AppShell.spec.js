@@ -127,6 +127,31 @@ describe('AppShell', () => {
     await flushPromises()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findComponent(ClienteBottomNav).props('bcvRate')).toEqual({ dollar: 36.5, euro: 39.1 })
+    expect(wrapper.findComponent(ClienteBottomNav).props('bcvRate')).toMatchObject({ dollar: 36.5, euro: 39.1 })
+    // La tasa vigente (automática por defecto): sin marca de manual ni de aviso
+    expect(wrapper.findComponent(BarraSuperior).props('tasaInfo')).toMatchObject({ modo: 'automatica', fallo: false })
+    expect(wrapper.vm.avisoTasaFallo).toBe(false)
+  })
+
+  it('si la tasa automática no responde, el cliente recibe un aviso no bloqueante (una sola vez)', async () => {
+    const { default: bcvService } = await import('@/services/bcvService.js')
+    bcvService.getCurrentRate.mockResolvedValueOnce({ success: false, error: 'sin red' })
+    const wrapper = mountShell({ role: 'cliente', xs: true, lgAndUp: false })
+    await flushPromises()
+    expect(wrapper.vm.tasaInfo.fallo).toBe(true)
+    expect(wrapper.vm.avisoTasaFallo).toBe(true)
+
+    // "Escribirla yo" lleva a Mi negocio → Tasa de cambio
+    wrapper.vm.escribirTasa()
+    expect(wrapper.vm.avisoTasaFallo).toBe(false)
+    expect(wrapper.vm.$router.push).toHaveBeenCalledWith('/cliente/mi-area#tasa')
+  })
+
+  it('el aviso de tasa caída no se muestra a otros roles', async () => {
+    const { default: bcvService } = await import('@/services/bcvService.js')
+    bcvService.getCurrentRate.mockResolvedValueOnce({ success: false, error: 'sin red' })
+    const wrapper = mountShell({ role: 'contador', xs: false, lgAndUp: true })
+    await flushPromises()
+    expect(wrapper.vm.avisoTasaFallo).toBe(false)
   })
 })

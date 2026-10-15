@@ -111,6 +111,10 @@
               <dd>{{ money(resumenMes.retenciones) }}</dd>
             </div>
           </dl>
+          <p v-if="resumenMes.sinTasa" class="movimientos__sin-tasa" data-test="sin-tasa">
+            {{ textoSinTasa(resumenMes.sinTasa) }} (no entran en estas cifras).
+            <router-link to="/cliente/mi-area#tasa">Revisar mi tasa</router-link>
+          </p>
         </section>
 
         <PanelSiguientePaso
@@ -1197,6 +1201,8 @@ import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue'
 import { formatMoney } from '@/utils/formatMoney.js'
 import { formatFechaCorta } from '@/utils/fechas.js'
 import { resumenDelMes, siguientePasoMovimientos } from '@/utils/resumenMovimientos.js'
+import { textoSinTasa } from '@/utils/monedas.js'
+import { tasasVigentes } from '@/services/tasaService.js'
 
 export default {
   name: 'FacturacionCliente',
@@ -1243,7 +1249,9 @@ export default {
       convertedStatsCashea: 0,
       convertedAmounts: {},
       cachedRate: null,
-      
+      // Tasas vigentes del negocio ({ USD, EUR, ... }), automáticas o manuales
+      tasasHoy: {},
+
       // Tab actual
       limiteMovil: TANDA_MOVIL,
       tandaMovil: TANDA_MOVIL,
@@ -1365,8 +1373,11 @@ export default {
     opcionesMoneda() {
       return this.currencyFilterOptions.map((o) => ({ valor: o.value, texto: o.text }));
     },
+    tasasParaResumen() {
+      return { ...this.tasasHoy, USD: this.tasasHoy.USD || this.cachedRate || undefined };
+    },
     resumenMes() {
-      return resumenDelMes(this.invoices, this.cachedRate);
+      return resumenDelMes(this.invoices, this.tasasParaResumen);
     },
     fraseMes() {
       const r = this.resumenMes;
@@ -1374,7 +1385,7 @@ export default {
       return `Este mes vendiste ${formatMoney(r.vendi, 'USD')} y gastaste ${formatMoney(r.gaste, 'USD')}.`;
     },
     pasoSiguiente() {
-      const p = siguientePasoMovimientos(this.invoices, this.cachedRate);
+      const p = siguientePasoMovimientos(this.invoices, this.tasasParaResumen);
       const plural = (n, uno, varios) => (n === 1 ? uno : varios);
       if (p.tipo === 'borradores') {
         return {
@@ -1610,13 +1621,20 @@ export default {
       this.currentTab = this.$route.query.tab;
     }
     
-    // Cargar tasa inmediatamente para cálculos correctos
+    // Cargar tasa inmediatamente para cálculos correctos (la vigente: automática o la que definió el cliente)
     try {
+        const vigentes = await tasasVigentes();
+        this.tasasHoy = vigentes.tasas || {};
+        if (vigentes.tasas?.USD) this.cachedRate = vigentes.tasas.USD;
+    } catch (e) { console.error('Error cargando tasa inicial:', e); }
+    if (!this.cachedRate) {
+      try {
         const rate = await bcvService.getCurrentRate();
         if (rate?.data?.dollar) {
             this.cachedRate = parseFloat(rate.data.dollar);
         }
-    } catch (e) { console.error('Error cargando tasa inicial:', e); }
+      } catch (e) { console.error('Error cargando tasa inicial:', e); }
+    }
 
     await this.loadUser();
     await this.loadProveedores();
@@ -1645,6 +1663,7 @@ export default {
     }
   },
   methods: {
+    textoSinTasa,
     formatFechaCorta,
     money(monto) {
       return formatMoney(monto, 'USD');
@@ -2802,6 +2821,12 @@ export default {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
+}
+
+.movimientos__sin-tasa {
+  margin: 8px 0 0;
+  font-size: 1rem;
+  color: rgb(var(--v-theme-warning-darken-1, var(--v-theme-warning)));
 }
 
 .movimientos__cifras {

@@ -35,6 +35,27 @@ describe('HojaMas', () => {
     expect(wrapper.text()).not.toContain('Inicio')
   })
 
+  it('ofrece "Cambiar mi tasa" que lleva a Mi negocio → Tasa de cambio', async () => {
+    const wrapper = mount(HojaMas, { props: { isServicesCompany: false }, global: globalConfig })
+    await wrapper.find('[data-testid="hoja-cambiar-tasa"]').trigger('click')
+    expect(wrapper.emitted('navegar').at(-1)[0]).toBe('/cliente/mi-area#tasa')
+  })
+
+  it('avisa cuando la tasa falló o está desactualizada y rotula las tasas manuales', () => {
+    const fallo = mount(HojaMas, { props: { tasaInfo: { modo: 'automatica', fallo: true } }, global: globalConfig })
+    expect(fallo.find('[data-testid="hoja-aviso-tasa"]').text()).toContain('No pudimos actualizar la tasa del BCV')
+
+    const vieja = mount(HojaMas, {
+      props: { tasaInfo: { modo: 'manual', desactualizada: true, fecha: '2026-10-10' } },
+      global: globalConfig,
+    })
+    expect(vieja.text()).toContain('Tus tasas (manual)')
+    expect(vieja.find('[data-testid="hoja-aviso-tasa"]').text()).toContain('10/10/2026')
+
+    const bien = mount(HojaMas, { props: { tasaInfo: { modo: 'automatica' } }, global: globalConfig })
+    expect(bien.find('[data-testid="hoja-aviso-tasa"]').exists()).toBe(false)
+  })
+
   it('oculta "Mi mercancía" si isServicesCompany=true (igual que el drawer de escritorio)', () => {
     const conInventario = mount(HojaMas, { props: { isServicesCompany: false }, global: globalConfig })
     expect(conInventario.text()).toContain('Mi mercancía')

@@ -46,6 +46,10 @@
             </template>
             <template v-else>Nadie te debe nada ahora.</template>
           </p>
+          <p v-if="sinTasaTotal" class="text-warning" data-testid="sin-tasa">
+            {{ textoSinTasa(sinTasaTotal) }} (no entran en los totales).
+            <router-link to="/cliente/mi-area#tasa">Revisar mi tasa</router-link>
+          </p>
           <v-text-field
             v-model="busqueda"
             placeholder="Buscar por nombre o RIF"
@@ -284,7 +288,8 @@ import SeccionLista from '@/components/ui/SeccionLista.vue'
 import LlenarConDocumento from '@/components/ui/LlenarConDocumento.vue'
 import { aCliente } from '@/services/documentoIaService.js'
 import clientesNegocioService, { esFrecuente, sinDatosFiscales, diasDesde } from '@/services/clientesNegocioService.js'
-import bcvService from '@/services/bcvService'
+import { tasasVigentes } from '@/services/tasaService.js'
+import { textoSinTasa } from '@/utils/monedas.js'
 import { normalizarRif } from '@/utils/rif.js'
 import { formatMoney } from '@/utils/formatMoney.js'
 import { formatFechaCorta } from '@/utils/fechas.js'
@@ -305,6 +310,7 @@ export default {
       exportando: false,
       clientes: [],
       tasa: 0,
+      tasas: {},
       busqueda: '',
       filtro: 'TODOS',
       mostrar: 20,
@@ -325,6 +331,7 @@ export default {
     }
   },
   computed: {
+    sinTasaTotal() { return this.clientes.reduce((a, c) => a + (c.totales.sinTasa || 0), 0) },
     deudores() { return this.clientes.filter((c) => c.totales.porCobrar > 0) },
     totalPorCobrar() { return this.deudores.reduce((a, c) => a + c.totales.porCobrar, 0) },
     // El que lleva más tiempo debiendo es a quien conviene cobrarle primero.
@@ -395,16 +402,18 @@ export default {
 
     async cargarTasa() {
       try {
-        const r = await bcvService.getCurrentRate()
-        this.tasa = Number(r?.data?.dollar) || 0
-      } catch { this.tasa = 0 }
+        const v = await tasasVigentes()
+        this.tasas = v.tasas || {}
+        this.tasa = Number(v.tasas?.USD) || 0
+      } catch { this.tasas = {}; this.tasa = 0 }
     },
+    textoSinTasa,
     async loadData() {
       this.loading = true
       this.loadError = false
       try {
         if (!this.tasa) await this.cargarTasa()
-        this.clientes = await clientesNegocioService.listar({ tasa: this.tasa })
+        this.clientes = await clientesNegocioService.listar({ tasas: this.tasas })
       } catch (e) {
         console.error('Error cargando clientes:', e)
         this.loadError = true
@@ -431,7 +440,7 @@ export default {
       this.detalleAbierto = true
       this.cargandoDetalle = true
       try {
-        this.detalle = await clientesNegocioService.obtener(c.id, { tasa: this.tasa })
+        this.detalle = await clientesNegocioService.obtener(c.id, { tasas: this.tasas })
         if (!this.detalle) this.detalleAbierto = false
       } catch (e) {
         console.error('Error cargando el cliente:', e)

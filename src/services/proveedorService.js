@@ -12,24 +12,27 @@
 import { supabase } from '@/lib/supabaseClient'
 import { getCurrentOrganizationId, getCurrentClientId } from '@/utils/tenantHelpers'
 import { normalizarRif } from '@/utils/rif.js'
-import { aVES } from '@/utils/resumenMovimientos.js'
-import bcvService from '@/services/bcvService.js'
+import { montoFacturaEn } from '@/utils/monedas.js'
+import { tasasVigentes } from '@/services/tasaService.js'
 
-/** Tasa BCV (Bs por USD) para convertir compras en dólares; 0 si no hay. */
+/** Tasas vigentes del negocio ({ USD, EUR, ... }); {} si no hay. */
 async function tasaBcv() {
   try {
-    const r = await bcvService.getCurrentRate()
-    return Number(r?.data?.dollar) || 0
+    const r = await tasasVigentes()
+    return r?.tasas || {}
   } catch {
-    return 0
+    return {}
   }
 }
 
-/** Total de una factura de compra en Bs, respetando su moneda. */
-function totalCompraEnBs(inv, tasa) {
+/**
+ * Total de una factura de compra en Bs, respetando su moneda: usa la tasa de la propia
+ * factura y, si no la tiene, la vigente. Sin ninguna tasa devuelve 0 (no se inventa).
+ */
+export function totalCompraEnBs(inv, tasas) {
   const f = inv.financial || {}
   const monto = f.totalSales || f.total || f.totalAmount || inv.total_amount || 0
-  return aVES(monto, f.currency || 'VES', tasa)
+  return montoFacturaEn(inv, 'VES', tasas, { monto }).monto
 }
 
 // Caché en memoria

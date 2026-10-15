@@ -487,6 +487,8 @@
         </v-row>
       </section>
 
+      <TasaDeCambio v-if="currentUser?.role === 'cliente'" />
+
       <ConexionesApi v-if="currentUser?.role === 'cliente'" />
     </template>
 
@@ -635,6 +637,7 @@ import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
 import ConexionesApi from '@/components/cliente/ConexionesApi.vue';
 import VistaPreviaSelloFirma from '@/components/cliente/VistaPreviaSelloFirma.vue';
 import { revisarImagenSello } from '@/utils/imagenSello.js';
+import TasaDeCambio from '@/components/cliente/TasaDeCambio.vue';
 import ListaPasos from '@/components/ui/ListaPasos.vue';
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
 import AvisoAmable from '@/components/ui/AvisoAmable.vue';
@@ -650,6 +653,7 @@ export default {
   components: {
     ConexionesApi,
     VistaPreviaSelloFirma,
+    TasaDeCambio,
     EncabezadoPagina,
     DialogoAdaptable,
     ListaPasos,

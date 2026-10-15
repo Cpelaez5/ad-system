@@ -4,7 +4,7 @@
       <v-chip
         v-bind="tooltipProps"
         :class="['chip-tasa', { 'chip-tasa--pulso': pulso }]"
-        color="secondary"
+        :color="aviso ? 'warning' : 'secondary'"
         variant="flat"
         :size="size"
         :disabled="loading"
@@ -13,6 +13,7 @@
       >
         <v-icon v-if="loading" size="14" class="mr-1 chip-tasa__spin">mdi-loading</v-icon>
         <span class="chip-tasa__valor" aria-hidden="true">{{ texto }}</span>
+        <span v-if="manual" class="chip-tasa__marca" aria-hidden="true">Manual</span>
       </v-chip>
     </template>
   </v-tooltip>
@@ -74,6 +75,21 @@ export default {
       type: String,
       default: 'small',
     },
+    /** La tasa la definió el cliente (muestra la marca "Manual"). */
+    manual: {
+      type: Boolean,
+      default: false,
+    },
+    /** Se ve en ámbar: la tasa está desactualizada o la automática falló. */
+    aviso: {
+      type: Boolean,
+      default: false,
+    },
+    /** Frase extra para el tooltip y el lector de pantalla (p. ej. "Es del 10/10"). */
+    nota: {
+      type: String,
+      default: '',
+    },
   },
 
   emits: ['click'],
@@ -96,15 +112,19 @@ export default {
       // la moneda cotizada — esto NO son dólares/euros, son bolívares).
       return `${this.currency} ${formatTasa(this.rateValue)}`
     },
+    origen() {
+      return this.manual ? `Tu tasa del ${this.nombreMoneda}` : `Tasa oficial BCV del ${this.nombreMoneda}`
+    },
     tituloTooltip() {
-      return `Tasa oficial BCV del ${this.nombreMoneda}`
+      return [this.origen, this.nota].filter(Boolean).join('. ')
     },
     ariaLabel() {
-      if (this.error) return `Tasa oficial BCV del ${this.nombreMoneda}: no disponible. Pulsa para reintentar.`
+      if (this.error) return `${this.origen}: no disponible. Pulsa para reintentar.`
       if (this.rateValue === null || this.rateValue === undefined) {
-        return `Tasa oficial BCV del ${this.nombreMoneda}: cargando.`
+        return `${this.origen}: cargando.`
       }
-      return `Tasa oficial BCV del ${this.nombreMoneda}: ${formatTasa(this.rateValue)}. Pulsa para actualizar.`
+      const accion = this.manual || this.aviso ? 'Pulsa para cambiarla en Mi negocio.' : 'Pulsa para actualizar.'
+      return [`${this.origen}: ${formatTasa(this.rateValue)}.`, this.nota ? `${this.nota}.` : '', accion].filter(Boolean).join(' ')
     },
   },
 
@@ -150,6 +170,17 @@ export default {
   0% { transform: scale(1); }
   40% { transform: scale(1.08); }
   100% { transform: scale(1); }
+}
+
+.chip-tasa__marca {
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid currentColor;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .chip-tasa__spin {

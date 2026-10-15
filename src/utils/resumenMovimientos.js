@@ -1,32 +1,14 @@
 import { parseFechaLocal } from '@/utils/fechas.js'
+import { montoFacturaEn } from '@/utils/monedas.js'
 
 /**
  * Cálculos de "Mis movimientos" (resumen del mes y siguiente paso).
- * Todo en dólares: una factura en bolívares se divide entre la tasa BCV; si
- * no hay tasa, las facturas en bolívares se dejan fuera (no se inventa un
- * monto). Las ANULADAS y los BORRADORES no cuentan como dinero real.
+ * Todo en dólares, con `montoFacturaEn` (src/utils/monedas.js): cada factura se
+ * convierte con SU tasa guardada y, si no la tiene, con la tasa vigente (`tasas`:
+ * un número = tasa del dólar, o un objeto { USD, EUR, ... }). Si no hay ninguna
+ * tasa, la factura se deja fuera (no se inventa un monto) y se cuenta en `sinTasa`.
+ * Las ANULADAS y los BORRADORES no cuentan como dinero real.
  */
-
-export function aUSD(monto, moneda, tasa) {
-  const n = Number(monto) || 0
-  if (!n) return 0
-  if (moneda === 'USD') return n
-  if (moneda === 'VES' || !moneda) return tasa > 0 ? n / tasa : 0
-  return 0 // EUR: sin tasa disponible todavía
-}
-
-/**
- * Monto en bolívares (para totales fiscales como los de proveedores, que van en Bs).
- * VES queda igual; USD se multiplica por la tasa BCV; sin tasa, o en EUR, devuelve 0
- * (no se inventa un monto).
- */
-export function aVES(monto, moneda, tasa) {
-  const n = Number(monto) || 0
-  if (!n) return 0
-  if (moneda === 'VES' || !moneda) return n
-  if (moneda === 'USD') return tasa > 0 ? n * tasa : 0
-  return 0
-}
 
 function cuenta(inv) {
   return inv.status !== 'ANULADA' && inv.status !== 'BORRADOR'
@@ -49,43 +31,51 @@ function esDelMes(inv, ahora) {
   return !!d && d.getFullYear() === ahora.getFullYear() && d.getMonth() === ahora.getMonth()
 }
 
-/** { vendi, gaste, retenciones } del mes de `ahora`, en USD. */
-export function resumenDelMes(invoices, tasa, ahora = new Date()) {
-  const r = { vendi: 0, gaste: 0, retenciones: 0 }
+/** { vendi, gaste, retenciones, sinTasa } del mes de `ahora`, en USD. */
+export function resumenDelMes(invoices, tasas, ahora = new Date()) {
+  const r = { vendi: 0, gaste: 0, retenciones: 0, sinTasa: 0 }
   for (const inv of invoices || []) {
     if (!cuenta(inv) || !esDelMes(inv, ahora)) continue
-    const moneda = inv.financial?.currency || 'VES'
+    if (inv.flow !== 'VENTA' && inv.flow !== 'COMPRA') continue
+    const total = montoFacturaEn(inv, 'USD', tasas)
+    if (total.sinTasa) {
+      r.sinTasa++
+      continue
+    }
     if (inv.flow === 'VENTA') {
-      r.vendi += aUSD(inv.financial?.totalSales, moneda, tasa)
-    } else if (inv.flow === 'COMPRA') {
-      r.gaste += aUSD(inv.financial?.totalSales, moneda, tasa)
-      r.retenciones += aUSD(retencionDe(inv), moneda, tasa)
+      r.vendi += total.monto
+    } else {
+      r.gaste += total.monto
+      r.retenciones += montoFacturaEn(inv, 'USD', tasas, { monto: retencionDe(inv) }).monto
     }
   }
   return r
 }
 
 /** Ventas a crédito o vencidas que todavía no se cobran, en USD. */
-export function porCobrar(invoices, tasa) {
+export function porCobrar(invoices, tasas) {
   let monto = 0
   let cantidad = 0
+  let sinTasa = 0
   for (const inv of invoices || []) {
     if (inv.flow !== 'VENTA' || (inv.status !== 'CRÉDITO' && inv.status !== 'VENCIDA')) continue
     cantidad++
-    monto += aUSD(inv.financial?.totalSales, inv.financial?.currency || 'VES', tasa)
+    const r = montoFacturaEn(inv, 'USD', tasas)
+    if (r.sinTasa) sinTasa++
+    else monto += r.monto
   }
-  return { monto, cantidad }
+  return { monto, cantidad, sinTasa }
 }
 
 /**
  * Siguiente paso, por prioridad: borradores > por cobrar > retenciones.
  * Devuelve { tipo: 'borradores'|'cobrar'|'retenciones'|'listo', cantidad, monto? }.
  */
-export function siguientePasoMovimientos(invoices, tasa) {
+export function siguientePasoMovimientos(invoices, tasas) {
   const lista = invoices || []
   const borradores = lista.filter((i) => i.status === 'BORRADOR').length
   if (borradores) return { tipo: 'borradores', cantidad: borradores }
-  const cobrar = porCobrar(lista, tasa)
+  const cobrar = porCobrar(lista, tasas)
   if (cobrar.cantidad && cobrar.monto > 0) return { tipo: 'cobrar', ...cobrar }
   const conRetencion = lista.filter((i) => i.flow === 'COMPRA' && cuenta(i) && tieneRetencion(i)).length
   if (conRetencion) return { tipo: 'retenciones', cantidad: conRetencion }

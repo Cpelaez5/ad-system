@@ -41,6 +41,10 @@
         <p v-if="mostrarEquivalenteBs" class="inicio-frase-bs text-medium-emphasis">
           ≈ {{ bsVendido }} vendidos · {{ bsGastado }} gastados · {{ bsDiferencia }} de diferencia
         </p>
+        <p v-if="avisoSinTasa" class="inicio-frase-bs text-warning" data-test="sin-tasa">
+          {{ avisoSinTasa }} este mes (no entran en estas cifras).
+          <router-link to="/cliente/mi-area#tasa">Revisar mi tasa</router-link>
+        </p>
       </header>
 
       <!-- Aviso de éxito tras guardar un registro -->
@@ -192,7 +196,8 @@ import { hoyISO, parseFechaLocal } from '@/utils/fechas'
 import invoiceService from '@/services/invoiceService'
 import fiscalService from '@/services/fiscalService'
 import billingService from '@/services/billingService'
-import bcvService from '@/services/bcvService'
+import { tasasVigentes } from '@/services/tasaService'
+import { sumarFacturasEn, textoSinTasa } from '@/utils/monedas'
 import { guardarRegistro } from '@/services/registroService'
 import { formatMoney } from '@/utils/formatMoney'
 import { useNotificacionStore } from '@/store/notificacionStore'
@@ -253,7 +258,7 @@ export default {
 
       ventasMes: [],
       comprasMes: [],
-      tasaBCV: null,
+      tasasHoy: {},
 
       pendientes: [],
 
@@ -303,7 +308,14 @@ export default {
     },
 
     factorConversion() {
-      return this.tasaBCV?.dollar || 0
+      return this.tasasHoy?.USD || 0
+    },
+
+    /** Facturas del mes que no entran en las cifras por no tener ninguna tasa. */
+    avisoSinTasa() {
+      const n = sumarFacturasEn(this.ventasMes, 'USD', this.tasasHoy).sinTasa
+        + sumarFacturasEn(this.comprasMes, 'USD', this.tasasHoy).sinTasa
+      return textoSinTasa(n)
     },
 
     mostrarEquivalenteBs() {
@@ -437,7 +449,7 @@ export default {
           invoiceService.getInvoices({ flow: 'COMPRA', clientId: currentUser.client_id }),
           fiscalService.getFiscalDocs({ trashed: false }),
           billingService.getInvoices(currentUser.client_id),
-          bcvService.getCurrentRate(),
+          tasasVigentes(),
           sealService.getSealConfig(currentUser.client_id),
         ])
 
@@ -448,8 +460,8 @@ export default {
           ? (billingRes.value.data || [])
           : []
 
-        if (bcvRes.status === 'fulfilled' && bcvRes.value?.success) {
-          this.tasaBCV = bcvRes.value.data
+        if (bcvRes.status === 'fulfilled' && bcvRes.value?.tasas) {
+          this.tasasHoy = bcvRes.value.tasas
         }
 
         const { inicio, fin } = this.rangoMesActual()
@@ -493,24 +505,9 @@ export default {
       })
     },
 
-    /** Suma montos estandarizando a USD (misma regla que Dashboard.vue → sumarMontos). */
+    /** Suma montos en USD con la tasa de cada factura (y la vigente si le falta); sin tasa, no suma. */
     sumarMontosUSD(facturas) {
-      const bcvRate = this.tasaBCV?.dollar || 1
-      const bcvEur = this.tasaBCV?.euro || 1
-
-      return (facturas || []).reduce((sum, inv) => {
-        const amount = parseFloat(inv.financial?.totalSales) || 0
-        const currency = inv.financial?.currency || 'VES'
-
-        let amountUSD = amount
-        if (currency === 'VES') {
-          amountUSD = bcvRate > 0 ? amount / bcvRate : amount
-        } else if (currency === 'EUR') {
-          amountUSD = (bcvEur > 0 && bcvRate > 0) ? (amount * bcvEur) / bcvRate : amount
-        }
-
-        return sum + amountUSD
-      }, 0)
+      return sumarFacturasEn(facturas, 'USD', this.tasasHoy).total
     },
 
     /** Construye hasta 3 pendientes: documentos fiscales por vencer/vencidos + plan de suscripción. */

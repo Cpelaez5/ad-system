@@ -494,18 +494,53 @@
           </v-col>
 
           <!-- Moneda -->
-          <v-col cols="12" sm="3">
-            <v-select
-              v-model="formData.financial.currency"
-              :items="currencies"
-              label="Moneda"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              class="mb-2"
-              :append-inner-icon="getAiIcon('currency')"
-              :color="getAiColor('currency') || 'primary'"
-            />
+          <v-col cols="12" sm="6" md="4">
+            <div class="moneda-selector mb-2" role="radiogroup" aria-label="Moneda de la factura" data-testid="moneda-selector">
+              <div class="moneda-selector__etiqueta">
+                Moneda
+                <v-icon v-if="getAiIcon('currency')" :icon="getAiIcon('currency')" size="16" :color="getAiColor('currency') || 'primary'" />
+              </div>
+              <div class="moneda-selector__botones">
+                <v-btn
+                  v-for="cod in monedasVista"
+                  :key="cod"
+                  role="radio"
+                  :aria-checked="formData.financial.currency === cod ? 'true' : 'false'"
+                  :variant="formData.financial.currency === cod ? 'flat' : 'outlined'"
+                  :color="formData.financial.currency === cod ? 'primary' : undefined"
+                  class="text-none moneda-selector__boton"
+                  :data-testid="`moneda-${cod}`"
+                  @click="elegirMoneda(cod)"
+                >
+                  {{ currencyLabel(cod) }}
+                </v-btn>
+                <v-menu>
+                  <template #activator="{ props: menuProps }">
+                    <v-btn
+                      v-bind="menuProps"
+                      role="radio"
+                      :aria-checked="esOtraMoneda ? 'true' : 'false'"
+                      :variant="esOtraMoneda ? 'flat' : 'outlined'"
+                      :color="esOtraMoneda ? 'primary' : undefined"
+                      append-icon="mdi-menu-down"
+                      class="text-none moneda-selector__boton"
+                      data-testid="moneda-otra"
+                    >
+                      {{ esOtraMoneda ? currencyLabel(formData.financial.currency) : 'Otra moneda' }}
+                    </v-btn>
+                  </template>
+                  <v-list>
+                    <v-list-item
+                      v-for="cod in monedasOtras"
+                      :key="cod"
+                      :title="`${MONEDAS[cod].nombre} (${cod})`"
+                      :data-testid="`moneda-opcion-${cod}`"
+                      @click="elegirMoneda(cod)"
+                    />
+                  </v-list>
+                </v-menu>
+              </div>
+            </div>
           </v-col>
 
           <!-- Método de pago -->
@@ -994,12 +1029,12 @@
         </v-row>
 
         <!-- Tasa de cambio — USD y EUR (Multi-Moneda First-Mobile) -->
-        <div v-if="formData.financial.currency === 'USD' || formData.financial.currency === 'EUR'" class="mt-3 pa-3 bg-grey-lighten-5 rounded-lg border">
+        <div v-if="esMonedaExtranjera" class="mt-3 pa-3 bg-grey-lighten-5 rounded-lg border" data-testid="tasa-factura">
           <div class="d-flex flex-wrap align-center justify-space-between ga-2">
             <!-- Tasa y Fuente -->
             <div class="d-flex align-center flex-wrap ga-2">
-              <v-icon :color="formData.financial.currency === 'USD' ? 'info' : 'warning'" size="18">
-                {{ formData.financial.currency === 'USD' ? 'mdi-currency-usd' : 'mdi-currency-eur' }}
+              <v-icon :color="formData.financial.currency === 'EUR' ? 'warning' : 'info'" size="18">
+                {{ iconoMoneda }}
               </v-icon>
               
               <span class="text-caption font-weight-medium">
@@ -1446,6 +1481,8 @@ import { procesarComprobanteOCR } from '@/services/gemini/geminiOcrService.js';
 import inventoryService from '@/services/inventoryService.js';
 import { excedeStock } from '@/utils/stockVenta';
 import bcvService from '@/services/bcvService.js';
+import { tasasVigentes } from '@/services/tasaService.js';
+import { MONEDAS, MONEDAS_VISTA, MONEDAS_OTRAS, normalizarTasas } from '@/utils/monedas.js';
 import proveedorService from '@/services/proveedorService.js';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
@@ -1535,6 +1572,12 @@ export default {
       manualTotalOverride: false,
       isEditingExchangeRate: false,
       rateSourceLabel: 'BCV oficial',
+      // Tasas vigentes del negocio (automáticas o definidas por el cliente), ver tasaService
+      tasasHoy: {},
+      modoTasa: 'automatica',
+      MONEDAS,
+      monedasVista: MONEDAS_VISTA,
+      monedasOtras: MONEDAS_OTRAS,
       saving:         false,
       savingStep:     '',
       showFlowError:  false,
@@ -1652,7 +1695,7 @@ export default {
       // Catálogos
       documentTypes: [],
       invoiceStatuses: ['BORRADOR','EMITIDA','CRÉDITO','PAGADA','ANULADA'],
-      currencies: ['VES','USD','EUR'],
+      currencies: ['VES','USD','EUR','CNY','TRY','RUB'],
       paymentMethods: [
         { title: 'Efectivo', value: 'EFECTIVO', icon: 'mdi-cash', color: 'green' },
         { title: 'Pago Móvil', value: 'PAGO_MOVIL', icon: 'mdi-cellphone', color: 'blue' },
@@ -1690,7 +1733,7 @@ export default {
           municipalRetention: 0, igtf: 0,
           ivaRetentionNumber: '', islrRetentionNumber: '', municipalRetentionNumber: '',
           retentionDate: hoyISO(),
-          currency: 'VES', exchangeRate: 1, exchangeRateEur: null,
+          currency: 'VES', exchangeRate: 1, exchangeRateEur: null, tasas: {},
           paymentMethod: null, paymentReference: '',
           credit: null
         },
@@ -1710,9 +1753,20 @@ export default {
     // Símbolo de moneda dinámico
     currencySymbol() {
       const cur = this.formData.financial.currency;
-      if (cur === 'USD') return '$';
-      if (cur === 'EUR') return '€';
-      return 'Bs';
+      return MONEDAS[cur]?.simbolo || 'Bs';
+    },
+
+    // Moneda extranjera (cualquiera distinta del bolívar): pide tasa de cambio
+    esMonedaExtranjera() {
+      const cur = this.formData.financial.currency;
+      return !!cur && cur !== 'VES' && !!MONEDAS[cur];
+    },
+    esOtraMoneda() {
+      return MONEDAS_OTRAS.includes(this.formData.financial.currency);
+    },
+    iconoMoneda() {
+      const cur = this.formData.financial.currency;
+      return { USD: 'mdi-currency-usd', EUR: 'mdi-currency-eur', CNY: 'mdi-currency-cny', TRY: 'mdi-currency-try', RUB: 'mdi-currency-rub' }[cur] || 'mdi-cash';
     },
 
     // Muestra el buscador de productos si es VENTA o COMPRA de mercancía
@@ -1829,6 +1883,9 @@ export default {
       if (this.formData.financial.currency === 'EUR') {
         return this.formData.financial.exchangeRateEur || 1;
       }
+      if (this.esOtraMoneda) {
+        return this.formData.financial.tasas?.[this.formData.financial.currency] || 1;
+      }
       return 1;
     },
 
@@ -1837,12 +1894,7 @@ export default {
         return this.currentExchangeRateValue;
       },
       set(val) {
-        const num = parseFloat(val) || 0;
-        if (this.formData.financial.currency === 'USD') {
-          this.formData.financial.exchangeRate = num;
-        } else if (this.formData.financial.currency === 'EUR') {
-          this.formData.financial.exchangeRateEur = num;
-        }
+        this.guardarTasaDeMonedaActual(parseFloat(val) || 0);
       }
     },
 
@@ -1852,7 +1904,9 @@ export default {
         ? this.formData.financial.exchangeRate
         : this.formData.financial.currency === 'EUR'
           ? this.formData.financial.exchangeRateEur
-          : 1;
+          : this.esOtraMoneda
+            ? this.formData.financial.tasas?.[this.formData.financial.currency]
+            : 1;
       const rate = parseFloat(this.currentExchangeRateValue ?? directRate) || directRate || 1;
       return total * rate;
     },
@@ -2046,7 +2100,7 @@ export default {
       if (!this.isMappingOcr) this.calculateTotals();
     },
     'formData.financial.currency'(cur) {
-      if (cur === 'USD' || cur === 'EUR') {
+      if (cur && cur !== 'VES' && MONEDAS[cur]) {
         this.fetchExchangeRate(this.formData.issueDate);
       }
     },
@@ -2560,13 +2614,19 @@ export default {
       try {
         const today = hoyISO();
         let r;
-        
-        // Si se fuerza hoy o la fecha de la factura es de hoy, usamos la tasa EN VIVO
-        if (isManualToday || date === today) {
-          r = await bcvService.getCurrentRate();
-          this.rateSourceLabel = 'BCV oficial hoy';
+
+        // Un cliente con tasas definidas por él las usa al registrar (aunque la factura sea de otro día),
+        // salvo que pida a propósito la oficial de la fecha ("Tasa Fecha Factura") o esté editando.
+        const usarVigente = isManualToday || date === today || (this.modoTasa === 'manual' && !isUserClick && !this.isEditing);
+
+        // Si se fuerza hoy o la fecha de la factura es de hoy, usamos la tasa VIGENTE (automática o la del cliente)
+        if (usarVigente) {
+          r = await this.obtenerTasaVigente();
           if (isUserClick) {
-            this.showSnackbar('Tasa oficial BCV del día de hoy aplicada', 'success');
+            this.showSnackbar(
+              this.modoTasa === 'manual' ? 'Tu tasa de hoy aplicada' : 'Tasa oficial BCV del día de hoy aplicada',
+              'success'
+            );
           }
         } else {
           r = await bcvService.getRateForDate(date);
@@ -2612,6 +2672,8 @@ export default {
           if (r.data.euro) {
             this.formData.financial.exchangeRateEur = r.data.euro;
           }
+          // Todas las tasas de ese día (USD, EUR, CNY, TRY, RUB): se guardan con la factura
+          this.formData.financial.tasas = { ...normalizarTasas(r.data) };
         }
       } catch (e) {
         console.warn('⚠️ No se pudo obtener tasa BCV:', e);
@@ -2630,13 +2692,74 @@ export default {
     },
 
     onManualExchangeRateChange(val) {
-      const num = parseFloat(val) || 0;
-      if (this.formData.financial.currency === 'USD') {
+      this.guardarTasaDeMonedaActual(parseFloat(val) || 0);
+      this.rateSourceLabel = 'Tasa manual personalizada';
+    },
+
+    /** Escribe la tasa (Bs por unidad) de la moneda elegida en los campos de la factura. */
+    guardarTasaDeMonedaActual(num) {
+      const cur = this.formData.financial.currency;
+      if (cur === 'USD') {
         this.formData.financial.exchangeRate = num;
-      } else if (this.formData.financial.currency === 'EUR') {
+      } else if (cur === 'EUR') {
         this.formData.financial.exchangeRateEur = num;
       }
-      this.rateSourceLabel = 'Tasa manual personalizada';
+      if (cur && cur !== 'VES') {
+        this.formData.financial.tasas = { ...(this.formData.financial.tasas || {}), [cur]: num };
+      }
+    },
+
+    /** "$ Dólar", "€ Euro", "Bs Bolívar": símbolo + nombre en español. */
+    currencyLabel(cod) {
+      const m = MONEDAS[cod];
+      return m ? `${m.simbolo} ${m.nombre}` : cod;
+    },
+
+    /** Elige la moneda de la factura (VES/USD/EUR a la vista, el resto en "Otra moneda"). */
+    elegirMoneda(cod) {
+      this.formData.financial.currency = cod;
+    },
+
+    /**
+     * Tasas vigentes del negocio (automáticas o definidas por el cliente), con la forma de
+     * bcvService para reutilizar el resto del flujo. Falla suave: { success: false }.
+     */
+    async obtenerTasaVigente() {
+      try {
+        const v = await tasasVigentes();
+        this.tasasHoy = v.tasas || {};
+        this.modoTasa = v.modo || 'automatica';
+        if (v.modo === 'manual') this.rateSourceLabel = 'Tu tasa (manual)';
+        else if (v.fallo) this.rateSourceLabel = 'Última tasa conocida del BCV';
+        else this.rateSourceLabel = 'BCV oficial hoy';
+        if (!v.tasas?.USD) return { success: false };
+        return {
+          success: true,
+          data: {
+            dollar: v.tasas.USD,
+            euro: v.tasas.EUR || null,
+            yuan: v.tasas.CNY || null,
+            lira: v.tasas.TRY || null,
+            rublo: v.tasas.RUB || null,
+          },
+        };
+      } catch {
+        return { success: false };
+      }
+    },
+
+    /** Todas las tasas que se guardan con la factura: las del día (vigentes si es de hoy) + las editadas. */
+    construirTasasFactura() {
+      const f = this.formData.financial;
+      const esHoy = this.normalizeDateToYMD
+        ? this.normalizeDateToYMD(this.formData.issueDate) === hoyISO()
+        : this.formData.issueDate === hoyISO();
+      const tasas = { ...(esHoy ? this.tasasHoy : {}), ...normalizarTasas(f.tasas) };
+      const usd = Number(f.exchangeRate);
+      const eur = Number(f.exchangeRateEur);
+      if (usd > 1) tasas.USD = usd;
+      if (eur > 1) tasas.EUR = eur;
+      return tasas;
     },
 
     // ── Verificar duplicado ────────────────────────────────────────────────────
@@ -3376,7 +3499,11 @@ export default {
         // PASO 6: MONEDA Y NOTAS
         // ═══════════════════════════════════════════════════════════════
         if (data.currency) {
-          this.formData.financial.currency = data.currency;
+          // Yuan por OCR (Amazon/Alibaba): "RMB" y "¥" son el CNY. El cambio de moneda dispara
+          // la búsqueda de su tasa (ver el watcher de formData.financial.currency).
+          const alias = { RMB: 'CNY', '¥': 'CNY', '€': 'EUR', '$': 'USD', 'BS': 'VES', 'BS.': 'VES' };
+          const codigo = alias[String(data.currency).trim().toUpperCase()] || String(data.currency).trim().toUpperCase();
+          this.formData.financial.currency = MONEDAS[codigo] ? codigo : data.currency;
         }
         if (data.notes) {
           this.formData.notes = data.notes;
@@ -3500,7 +3627,18 @@ export default {
       //     los montos en bolívares (libros, retenciones) saldrían mal sin que nadie lo note.
       const moneda = this.formData.financial.currency;
       const tasa = Number(this.formData.financial.exchangeRate);
-      if (moneda && moneda !== 'VES' && !esAnulada && (!tasa || tasa <= 1)) {
+      // Yuan, lira y rublo: se exige la tasa de ESA moneda (la del dólar no sirve para convertirlas)
+      if (MONEDAS_OTRAS.includes(moneda) && !esAnulada && !(Number(this.formData.financial.tasas?.[moneda]) > 0)) {
+        this.isEditingExchangeRate = true;
+        if (this.simple) this.simpleDetailsOpen = true;
+        this.showSnackbar(
+          `Falta la tasa del ${(MONEDAS[moneda]?.nombre || moneda).toLowerCase()} (${moneda}). Escríbela en "Tasa de cambio" o toca "Usar tasa de hoy".`,
+          'error',
+          8000
+        );
+        return false;
+      }
+      if (moneda && moneda !== 'VES' && !MONEDAS_OTRAS.includes(moneda) && !esAnulada && (!tasa || tasa <= 1)) {
         this.isEditingExchangeRate = true;
         if (this.simple) this.simpleDetailsOpen = true;
         this.showSnackbar(
@@ -3538,6 +3676,9 @@ export default {
       try {
         // Clonar para no mutar el original en caso de error
         const payload = JSON.parse(JSON.stringify(this.formData));
+
+        // Todas las tasas vigentes del día, para poder convertir la factura a cualquier moneda después
+        payload.financial.tasas = this.construirTasasFactura();
 
         if (this.retentionConfig.aplicarIslr && this.retentionConfig.conceptoIslr) {
            payload.islr_concept_id = this.retentionConfig.conceptoIslr;
@@ -3847,6 +3988,22 @@ export default {
 </script>
 
 <style scoped>
+/* ─── Selector de moneda: VES/USD/EUR a la vista + "Otra moneda" ─────── */
+.moneda-selector__etiqueta {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: rgba(var(--v-theme-on-surface), 0.72);
+}
+.moneda-selector__botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.moneda-selector__boton {
+  min-height: 44px;
+}
+
 /* ─── Layout ─────────────────────────────────────────────── */
 
 /* v-card ocupa toda la altura disponible del diálogo */
