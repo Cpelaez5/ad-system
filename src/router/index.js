@@ -99,6 +99,37 @@ const routes = [
       description: 'Políticas de privacidad, tratamiento de datos y términos de condiciones de AD SYSTEM.'
     }
   },
+  // Ayuda pública (sin sesión). `/ayuda/api` va antes de `/ayuda/:slug`.
+  {
+    path: '/ayuda',
+    name: 'Ayuda',
+    component: () => import('@/views/ayuda/AyudaInicio.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Ayuda | AD SYSTEM',
+      description: 'Guías cortas y paso a paso para usar AD System: registrar ventas y compras, tus papeles, tu mercancía y más.'
+    }
+  },
+  {
+    path: '/ayuda/api',
+    name: 'AyudaApi',
+    component: () => import('@/views/ayuda/AyudaApi.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'API de productos | Ayuda de AD SYSTEM',
+      description: 'Documentación de la API de productos de AD System para programadores.'
+    }
+  },
+  {
+    path: '/ayuda/:slug',
+    name: 'AyudaArticulo',
+    component: () => import('@/views/ayuda/AyudaArticulo.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Ayuda | AD SYSTEM',
+      description: 'Guía de ayuda de AD System.'
+    }
+  },
   {
     path: '/registration-success',
     name: 'RegistrationSuccess',

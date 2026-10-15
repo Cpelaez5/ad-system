@@ -36,6 +36,9 @@
         <v-list-item @click="goToSettings">
           <v-list-item-title>Configuración</v-list-item-title>
         </v-list-item>
+        <v-list-item to="/ayuda" data-testid="menu-usuario-ayuda">
+          <v-list-item-title>Ayuda</v-list-item-title>
+        </v-list-item>
         <v-divider />
         <v-list-item @click="logout">
           <v-list-item-title>Cerrar Sesión</v-list-item-title>

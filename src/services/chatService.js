@@ -13,6 +13,7 @@
 
 import { supabase } from '@/lib/supabaseClient'
 import { callAiGenerate } from '@/services/ai/aiGenerateClient'
+import { contextoAyudaParaChat } from '@/services/ayudaService'
 
 // ═══════════════════════════════════════════════════
 // LÍMITES POR PLAN (Infraestructura lógica)
@@ -235,9 +236,10 @@ class ChatService {
    * @param {string} routeName - Nombre de la ruta actual del router
    * @param {string} routeTitle - Título meta de la ruta
    * @param {Object} queryParams - Query params de la ruta (ej: { tab: 'compras' })
+   * @param {string} [guiasAyuda] - Bloque con las guías de la ayuda pública más relevantes (ver ayudaBusqueda.js)
    * @returns {string} System prompt enriquecido
    */
-  buildSystemPrompt(routeName, routeTitle, queryParams = {}) {
+  buildSystemPrompt(routeName, routeTitle, queryParams = {}, guiasAyuda = '') {
     const viewContext = VIEW_CONTEXT_MAP[routeName] || DEFAULT_VIEW_CONTEXT
 
     let contextBlock = `\nCONTEXTO ACTUAL DEL USUARIO:\n`
@@ -256,7 +258,7 @@ class ChatService {
 
     contextBlock += `\nIMPORTANTE: Responde SOLO sobre funcionalidades que existen en este módulo. Si el usuario pregunta sobre algo de otro módulo, indícale dónde encontrarlo.`
 
-    return SYSTEM_PROMPT_BASE + contextBlock
+    return SYSTEM_PROMPT_BASE + contextBlock + (guiasAyuda || '')
   }
 
   /**
@@ -294,10 +296,13 @@ class ChatService {
    * @returns {Promise<string>} Respuesta de la IA
    */
   async sendMessage(userMessage, conversationHistory = [], viewContext = {}) {
+    // v0 de contexto: las 3 guías de la ayuda pública más relevantes a la pregunta.
+    const guiasAyuda = await contextoAyudaParaChat(userMessage)
     const systemPrompt = this.buildSystemPrompt(
       viewContext.routeName,
       viewContext.routeTitle,
-      viewContext.queryParams
+      viewContext.queryParams,
+      guiasAyuda
     )
 
     // Asegurar que no haya roles duplicados consecutivos para no romper modelos estrictos (como Gemma 3)
