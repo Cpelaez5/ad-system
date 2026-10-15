@@ -26,3 +26,9 @@ Fecha: 2026-10-15. Pedido del usuario: "revisar el status de este módulo, /muni
 5. Aceptar 0 % y revisar las 7 retenciones municipales existentes.
 
 Anotado también en `docs/mvp/super-admin-pendientes.md`: cargar las alícuotas por municipio.
+
+## Arreglos rápidos aplicados (2026-10-15)
+- El **contador** ya puede crear, editar y borrar códigos (migración `20261015100000`).
+- El **cliente** ya no ve "Nuevo Código" ni las acciones de la tabla. En su lugar aparece "Tu contador administra estos códigos…".
+- Se acepta **0 %**.
+- Sigue pendiente el rediseño por municipio (puntos 1 a 4 de la propuesta).

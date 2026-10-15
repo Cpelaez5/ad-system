@@ -5,14 +5,19 @@
         <h1 class="text-h4 font-weight-bold" style="color:#2A2A2E;">Retenciones Municipales</h1>
         <p class="text-body-1 text-medium-emphasis">Gestiona tus Códigos de Actividad Económica y Porcentajes de Retención de Alcaldía</p>
       </div>
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialog()" rounded="lg" elevation="2">
+      <v-btn v-if="puedeEditar" color="primary" prepend-icon="mdi-plus" @click="openDialog()" rounded="lg" elevation="2">
         Nuevo Código
       </v-btn>
     </div>
 
+    <!-- Solo el despacho (admin/contador) administra los códigos; el cliente los consulta. -->
+    <v-alert v-if="!puedeEditar" type="info" variant="tonal" class="mb-4" density="comfortable">
+      Tu contador administra estos códigos. Si no encuentras el de tu actividad, escríbele por el chat de ayuda.
+    </v-alert>
+
     <v-card class="rounded-xl border" elevation="0">
       <v-data-table
-        :headers="headers"
+        :headers="puedeEditar ? headers : headers.filter(h => h.key !== 'actions')"
         :items="conceptos"
         :loading="loading"
         hover
@@ -80,7 +85,7 @@
               variant="outlined"
               suffix="%"
               :rules="[
-                v => !!v || 'Requerido',
+                v => (v !== '' && v !== null && v !== undefined) || 'Requerido',
                 v => v >= 0 || 'No puede ser negativo',
                 v => v <= 100 || 'Máximo 100%'
               ]"
@@ -109,6 +114,7 @@
 
 <script>
 import municipalConceptsService from '@/services/municipalConceptsService'
+import userService from '@/services/userService'
 
 export default {
   name: 'MunicipalSettings',
@@ -137,10 +143,17 @@ export default {
         descripcion: '',
         porcentaje: ''
       },
-      snackbar: { show: false, text: '', color: 'success' }
+      snackbar: { show: false, text: '', color: 'success' },
+      puedeEditar: false
     }
   },
   async mounted() {
+    try {
+      const usuario = await userService.getCurrentUser()
+      this.puedeEditar = ['admin', 'contador', 'super_admin'].includes(usuario?.role)
+    } catch {
+      this.puedeEditar = false
+    }
     await this.loadConceptos();
   },
   methods: {
