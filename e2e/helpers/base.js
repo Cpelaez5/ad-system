@@ -88,6 +88,12 @@ export const test = base.extend({
   // de la app: en una máquina normal esto no pasa. `page.goto` se envuelve
   // para recargar hasta 2 veces si Vue nunca llegó a montar nada en `#app`.
   page: async ({ page }, use) => {
+    // El aviso de cookies tapa media pantalla en el teléfono e intercepta clics que no
+    // tienen nada que ver con él: se da por respondido antes de cargar cada página
+    // (su propio comportamiento se prueba aparte, sin este fixture).
+    await page.addInitScript(() => {
+      try { if (!localStorage.getItem('ad_cookie_consent')) localStorage.setItem('ad_cookie_consent', 'rejected') } catch { /* sin storage */ }
+    })
     const originalGoto = page.goto.bind(page)
     page.goto = async (url, options) => {
       let response
