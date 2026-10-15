@@ -5,7 +5,7 @@ import TrabajandoIA from '../TrabajandoIA.vue'
 import MarcaIA from '../MarcaIA.vue'
 
 const stubs = {
-  'v-btn': { template: '<button v-bind="$attrs"><slot /></button>' },
+  'v-btn': { template: '<button v-bind="$attrs"><slot name="prepend" /><slot /></button>' },
   'v-icon': { props: ['icon'], template: '<i :data-icon="icon" />' },
 }
 const global = { stubs }
@@ -17,9 +17,15 @@ describe('BotonIA', () => {
     expect(w.classes()).toContain('ad-ia--bloque')
     const btn = w.find('button')
     expect(btn.text()).toBe('Tomar foto')
-    expect(btn.attributes('prepend-icon')).toBe('mdi-creation')
+    expect(w.find('[data-icon="mdi-creation"]').exists()).toBe(true)
     expect(btn.attributes('variant')).toBe('tonal')
     expect(btn.attributes('color')).toBe('primary')
+  })
+
+  it('con ícono propio muestra ese ícono y los destellos para el cambio al pasar el mouse', () => {
+    const w = mount(BotonIA, { props: { icono: 'mdi-camera-outline' }, slots: { default: 'Tomar foto' }, global })
+    expect(w.find('[data-icon="mdi-camera-outline"]').classes()).toContain('boton-ia__icono--propio')
+    expect(w.find('[data-icon="mdi-creation"]').classes()).toContain('boton-ia__icono--ia')
   })
 
   it('el clic llega al botón', async () => {

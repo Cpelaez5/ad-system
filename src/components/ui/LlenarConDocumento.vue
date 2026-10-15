@@ -3,6 +3,7 @@
     <v-menu v-if="esTelefono" location="bottom start">
       <template #activator="{ props: menu }">
         <BotonIA
+        icono="mdi-card-account-details-outline"
           v-bind="menu"
           variant="tonal"
           color="primary"
@@ -20,6 +21,7 @@
       </v-list>
     </v-menu>
     <BotonIA
+        icono="mdi-card-account-details-outline"
       v-else
       variant="tonal"
       color="primary"

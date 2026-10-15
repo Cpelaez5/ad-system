@@ -20,7 +20,7 @@
         titulo="Mi mercancía"
         subtitulo="Toma una foto de tu producto y nosotros llenamos los datos"
       >
-        <BotonIA color="primary" variant="flat" size="large" class="mi-mercancia__tomar" @click="tomarFoto">
+        <BotonIA icono="mdi-camera-outline" color="primary" variant="flat" size="large" class="mi-mercancia__tomar" @click="tomarFoto">
           Tomar foto
         </BotonIA>
         <v-menu location="bottom end">
@@ -46,8 +46,8 @@
       </EncabezadoPagina>
 
       <div class="mi-mercancia__rapidas">
-        <BotonIA variant="tonal" color="secondary" density="comfortable" @click="fotoEstante">Foto del estante</BotonIA>
-        <BotonIA variant="tonal" color="secondary" density="comfortable" @click="subirFotoGaleria">Subir foto</BotonIA>
+        <BotonIA icono="mdi-bookshelf" variant="tonal" color="secondary" density="comfortable" @click="fotoEstante">Foto del estante</BotonIA>
+        <BotonIA icono="mdi-image-outline" variant="tonal" color="secondary" density="comfortable" @click="subirFotoGaleria">Subir foto</BotonIA>
         <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-pencil-outline" class="text-none" @click="openProductDialog()">Escribirlo yo</v-btn>
         <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-briefcase-plus-outline" class="text-none" @click="openProductDialog(null, 'servicio')">Nuevo servicio</v-btn>
       </div>
