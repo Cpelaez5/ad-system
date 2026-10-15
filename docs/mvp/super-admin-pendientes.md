@@ -15,6 +15,8 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 | Decidir el uso de **Open Food Facts** (licencia ODbL) | Decisión pendiente | — (legal) |
 | Revisar los aportes sospechosos (ej. un mismo negocio con nombres raros) | `catalogo_aportes`, solo SQL | Vista de aportes por fecha, sin exponer a los negocios a otros clientes |
 
+| Cargar y mantener las **alícuotas de retención municipal por municipio** (ordenanzas de cada alcaldía) | No existe (ver `auditoria/retenciones-municipales-2026-10-15.md`) | Editor del catálogo municipal con fuente y fecha de la ordenanza |
+
 ## 2. Legal y textos
 - Términos de uso: mencionar el **catálogo compartido** (qué se comparte y qué nunca), la **API** y el uso de **IA** (fotos, OCR, chat).
 - Política de privacidad: datos que se mandan a Gemini, retención de fotos, consentimiento para mejorar la IA (`estrategia/ia-vectorial-y-documentacion.md` §4).
