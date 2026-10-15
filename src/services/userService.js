@@ -593,6 +593,22 @@ const userService = {
       }
     },
 
+    // Actualiza nombre, apellido, rol y estado de un usuario (pantalla Usuarios).
+    // La vista lo invocaba pero no existía: editar un usuario fallaba.
+    async updateUser(id, data) {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          first_name: data.firstName,
+          last_name: data.lastName,
+          role: data.role,
+          is_active: data.isActive
+        })
+        .eq('id', id);
+      if (error) throw error;
+      return { success: true };
+    },
+
     // Obtener roles disponibles
     getRoles() {
       return roles;
