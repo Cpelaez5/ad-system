@@ -14,6 +14,7 @@
 
 import { jsPDF } from 'jspdf'
 import sealService from '@/services/seal-service.js'
+import { normalizarAjustes, cajaImagen } from '@/utils/ajustesSello.js'
 import { supabase } from '@/lib/supabaseClient'
 import venezuelaLocationsService from '@/services/venezuelaLocationsService.js'
 import systemLogo from '/ADSystem/logo.png'
@@ -126,31 +127,33 @@ function truncateText(doc, text, maxWidth) {
  *   Antes solo se estampaba UNA imagen aunque el negocio tuviera las dos.
  * La vista previa de Mi negocio (VistaPreviaSelloFirma.vue) usa estas mismas medidas.
  */
+// Largo de la línea de firma (mm). El tamaño y la posición del sello y la firma
+// viven en src/utils/ajustesSello.js (BASE + ajustes del cliente).
 export const MEDIDAS_SELLO_FIRMA = {
   linea: { ancho: 75 },
-  sello: { alto: 22, anchoMax: 35, dx: 10, dy: -18 },
-  firma: { alto: 14, anchoMax: 38, margenDerecho: 4, dy: -13 },
 }
 
 export async function estamparSelloYFirma(doc, config, x, lineY, width) {
-  const M = MEDIDAS_SELLO_FIRMA
-  const poner = async (url, { alto, anchoMax }, calcX, dy) => {
+  // Tamaño y posición: medidas base + ajustes del cliente (src/utils/ajustesSello.js),
+  // las mismas que usa la vista previa de Mi negocio.
+  const ajustes = normalizarAjustes(config?.ajustes)
+  const poner = async (url, tipo) => {
     if (!url) return
     try {
       const img = await getBase64ImageFromURL(url)
       if (!img?.dataURL) return
-      const ancho = Math.min(anchoMax, alto * (img.width / img.height))
-      doc.addImage(img.dataURL, 'PNG', calcX(ancho), lineY + dy, ancho, alto)
+      const c = cajaImagen(tipo, ajustes[tipo], width, img.width / img.height)
+      doc.addImage(img.dataURL, 'PNG', x + c.x, lineY + c.y, c.ancho, c.alto)
     } catch (err) {
       console.warn('No se pudo estampar la imagen de sello o firma', err)
     }
   }
   if (config?.combinedUrl) {
-    await poner(config.combinedUrl, M.sello, () => x + M.sello.dx, M.sello.dy)
+    await poner(config.combinedUrl, 'sello')
     return
   }
-  await poner(config?.sealUrl, M.sello, () => x + M.sello.dx, M.sello.dy)
-  await poner(config?.signatureUrl, M.firma, (ancho) => x + width - ancho - M.firma.margenDerecho, M.firma.dy)
+  await poner(config?.sealUrl, 'sello')
+  await poner(config?.signatureUrl, 'firma')
 }
 
 function drawBox(doc, x, y, width, height, fillColor = null, strokeColor = COLORS.boxBorder, lineWidth = 0.3) {

@@ -539,11 +539,15 @@
         :seal-url="sealConfig.sealUrl"
         :signature-url="sealConfig.signatureUrl"
         :combined-url="sealConfig.combinedUrl"
+        v-model:ajustes="ajustesSello"
       />
       <template #acciones>
         <v-btn variant="text" class="text-none" @click="vistaSelloAbierta = false">Cerrar</v-btn>
-        <v-btn color="primary" variant="flat" class="text-none" prepend-icon="mdi-download" :loading="descargandoEjemplo" @click="descargarEjemploSello">
-          Descargar PDF de ejemplo
+        <v-btn variant="tonal" color="primary" class="text-none" prepend-icon="mdi-download" :loading="descargandoEjemplo" @click="descargarEjemploSello">
+          PDF de ejemplo
+        </v-btn>
+        <v-btn color="primary" variant="flat" class="text-none" prepend-icon="mdi-content-save-outline" :loading="guardandoAjustes" :disabled="!ajustesCambiados" data-testid="guardar-ajustes-sello" @click="guardarAjustesSello">
+          Guardar ajustes
         </v-btn>
       </template>
     </DialogoAdaptable>
@@ -636,6 +640,7 @@ import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue';
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue';
 import ConexionesApi from '@/components/cliente/ConexionesApi.vue';
 import VistaPreviaSelloFirma from '@/components/cliente/VistaPreviaSelloFirma.vue';
+import { normalizarAjustes } from '@/utils/ajustesSello.js';
 import { revisarImagenSello } from '@/utils/imagenSello.js';
 import TasaDeCambio from '@/components/cliente/TasaDeCambio.vue';
 import ListaPasos from '@/components/ui/ListaPasos.vue';
@@ -665,6 +670,8 @@ export default {
   data() {
     return {
       vistaSelloAbierta: false,
+      ajustesSello: normalizarAjustes(null),
+      guardandoAjustes: false,
       borrarSelloPendiente: null,
       imagenClaraPendiente: null,
       convirtiendoImagen: false,
@@ -711,6 +718,9 @@ export default {
     };
   },
   computed: {
+    ajustesCambiados() {
+      return JSON.stringify(normalizarAjustes(this.ajustesSello)) !== JSON.stringify(normalizarAjustes(this.sealConfig?.ajustes))
+    },
     userInitials() {
       return ((this.form.firstName?.charAt(0) || '') + (this.form.lastName?.charAt(0) || '')).toUpperCase();
     },
@@ -808,7 +818,30 @@ export default {
       this.$nextTick(() => this.irABloque(this.siguienteBloque || this.bloques[0]));
     }
   },
+  watch: {
+    // Al abrir la vista previa se parte de los ajustes guardados.
+    vistaSelloAbierta(abierta) {
+      if (abierta) this.ajustesSello = normalizarAjustes(this.sealConfig?.ajustes)
+    },
+  },
+
   methods: {
+    async guardarAjustesSello() {
+      this.guardandoAjustes = true
+      try {
+        const clientId = this.currentUser?.client_id || this.currentUser?.client?.id || null
+        const r = await sealService.guardarAjustes(this.ajustesSello, clientId)
+        if (r.success) {
+          this.sealConfig = r.config
+          this.snackbar = { show: true, text: 'Listo: tus próximos comprobantes saldrán así.', color: 'success' }
+        } else {
+          this.snackbar = { show: true, text: 'No pudimos guardar los ajustes. Intenta de nuevo.', color: 'error' }
+        }
+      } finally {
+        this.guardandoAjustes = false
+      }
+    },
+
     async descargarEjemploSello() {
       this.descargandoEjemplo = true
       try {

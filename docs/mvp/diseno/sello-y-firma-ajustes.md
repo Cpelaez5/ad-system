@@ -8,9 +8,9 @@ Fecha: 2026-10-15. Pedido del usuario:
 - **Hecho (2026-10-15):** la confirmación antes de borrar ("¿Quitar tu sello?").
 - **Ya existe:** la vista previa (`VistaPreviaSelloFirma.vue`).
 - **Hecho (2026-10-15):** el punto 2, la detección de imágenes blancas (`src/utils/imagenSello.js`, con pruebas; diálogo en Mi negocio con "Sí, en negro", "Tinta azul" y "Dejarla así").
-- **Pendiente:** el punto 1, el ajuste de tamaño y posición.
+- **Hecho (2026-10-15):** el punto 1, el ajuste de tamaño y posición (`src/utils/ajustesSello.js` → `cajaImagen`, compartida por el PDF y la vista previa; `seal-service.guardarAjustes`). El arrastre en escritorio queda pendiente: las flechas cubren el caso.
 
-## 1. Ajustar tamaño y posición
+## 1. Ajustar tamaño y posición ✅
 - Los ajustes se guardan en la configuración del sello (`seal-service`, junto a `sealUrl` y `signatureUrl`) como `ajustes: { sello: { escala, dx, dy }, firma: { escala, dx, dy } }`:
   - `escala` va de 0,6 a 1,6 (por defecto 1);
   - `dx` y `dy` son milímetros, entre −20 y +20 (por defecto 0).

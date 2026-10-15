@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient'
+import { normalizarAjustes } from '@/utils/ajustesSello.js'
 import preferencesService from '@/services/preferencesService.js'
 import { getCurrentOrganizationId, getCurrentClientId } from '@/utils/tenantHelpers'
 import { obtenerUrlFirmada } from '@/services/storageUrlService.js'
@@ -130,7 +131,8 @@ class SealService {
           sealUrl: remotePref.sealUrl || null,
           signatureUrl: remotePref.signatureUrl || null,
           combinedUrl: remotePref.combinedUrl || null,
-          activeMode: remotePref.activeMode || 'auto'
+          activeMode: remotePref.activeMode || 'auto',
+          ajustes: normalizarAjustes(remotePref.ajustes)
         }
         localStorage.setItem(storageKey, JSON.stringify(merged))
         return merged
@@ -144,7 +146,8 @@ class SealService {
       sealUrl: null,
       signatureUrl: null,
       combinedUrl: null,
-      activeMode: 'auto'
+      activeMode: 'auto',
+      ajustes: normalizarAjustes(null)
     }
   }
 
@@ -297,6 +300,29 @@ class SealService {
       return { success: true, config: displayConfig }
     } catch (error) {
       console.error('❌ [SealService] Error en removeSealAsset:', error)
+      return { success: false, message: error.message }
+    }
+  }
+
+  /**
+   * Guarda el tamaño y la posición del sello y la firma (ver src/utils/ajustesSello.js).
+   * @param {{ sello, firma }} ajustes
+   * @returns {Promise<{ success: boolean, config?: object, message?: string }>}
+   */
+  async guardarAjustes(ajustes, explicitClientId = null) {
+    try {
+      const { clientId, userId } = await this._resolveContext(explicitClientId)
+      const storageKey = this._getStorageKey(clientId, userId)
+      const preferenceKey = this._getPreferenceKey(clientId, userId)
+      const rawConfig = await this._getRawConfig(storageKey, preferenceKey)
+      const updatedConfig = { ...rawConfig, ajustes: normalizarAjustes(ajustes) }
+      localStorage.setItem(storageKey, JSON.stringify(updatedConfig))
+      await preferencesService.setPreference(preferenceKey, updatedConfig)
+      const displayConfig = await this._toDisplayConfig(updatedConfig)
+      window.dispatchEvent(new CustomEvent('ad-seal-config-changed', { detail: { clientId, config: displayConfig } }))
+      return { success: true, config: displayConfig }
+    } catch (error) {
+      console.error('❌ [SealService] Error en guardarAjustes:', error)
       return { success: false, message: error.message }
     }
   }
