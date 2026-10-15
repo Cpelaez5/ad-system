@@ -190,3 +190,34 @@ export function textoSinTasa(cantidad) {
   if (n <= 0) return ''
   return n === 1 ? '1 factura sin tasa' : `${n} facturas sin tasa`
 }
+
+/**
+ * Campo de tasa en bolívares con formato venezolano mientras se escribe: "104.036,77".
+ * Los puntos de miles los pone el sistema; un punto que escribe la persona al final se
+ * toma como la coma decimal (costumbre de escribir "879.12").
+ */
+export function formatearTasaEscrita(texto, decimales = 2) {
+  let t = String(texto ?? '').replace(/[^\d.,]/g, '')
+  if (t.endsWith('.') && !t.includes(',')) t = t.slice(0, -1) + ','
+  const i = t.indexOf(',')
+  let entero = (i >= 0 ? t.slice(0, i) : t).replace(/[.,]/g, '')
+  const dec = i >= 0 ? t.slice(i + 1).replace(/[.,]/g, '').slice(0, decimales) : null
+  entero = entero.replace(/^0+(?=\d)/, '')
+  if (!entero && dec === null) return ''
+  const conPuntos = (entero || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return dec === null ? conPuntos : `${conPuntos},${dec}`
+}
+
+/** Lee el campo formateado ("104.036,77" → 104036.77). null si no es un número mayor que cero. */
+export function parsearTasaEscrita(texto) {
+  const t = String(texto ?? '').trim().replace(/\./g, '').replace(',', '.')
+  if (!/^\d+(\.\d+)?$/.test(t)) return null
+  const n = Number(t)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+/** Número → texto del campo ("104036.77" → "104.036,77"). */
+export function tasaParaCampo(n) {
+  const v = Number(n)
+  return v > 0 ? formatearTasaEscrita(v.toFixed(2).replace('.', ',')) : ''
+}

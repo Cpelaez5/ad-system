@@ -15,7 +15,7 @@
 
       <!-- Automática: muestra lo que trae el servicio -->
       <template v-else-if="modo === 'automatica'">
-        <div v-for="m in monedas" :key="m" class="tasa-rapida__fila">
+        <div v-for="m in monedasVisibles" :key="m" class="tasa-rapida__fila">
           <span>{{ nombre(m) }}</span>
           <strong>{{ automaticas[m] ? 'Bs ' + formatoTasa(automaticas[m]) : '—' }}</strong>
         </div>
@@ -27,11 +27,12 @@
       <!-- Manual: la escribe el cliente -->
       <template v-else>
         <v-text-field
-          v-for="m in monedas"
+          v-for="m in monedasVisibles"
           :key="m"
-          v-model="campos[m]"
+          :model-value="campos[m]"
           :label="nombre(m)"
           prefix="Bs"
+          placeholder="Ej. 879,12"
           inputmode="decimal"
           variant="outlined"
           density="comfortable"
@@ -39,8 +40,12 @@
           persistent-hint
           class="mb-2"
           :data-testid="`tasa-rapida-${m}`"
+          @update:model-value="v => (campos[m] = formatearTasaEscrita(v))"
           @keyup.enter="guardar"
         />
+        <v-btn v-if="!mostrarTodas && monedasOcultas.length" variant="text" size="small" class="text-none px-1" prepend-icon="mdi-plus" @click="mostrarTodas = true">
+          Agregar otra moneda
+        </v-btn>
         <v-btn v-if="automaticas.USD" variant="text" size="small" class="text-none px-1" prepend-icon="mdi-content-copy" @click="copiarAutomaticas">
           Usar la del BCV como punto de partida
         </v-btn>
@@ -66,11 +71,15 @@
  * siguen en Mi negocio → Tasa de cambio (TasaDeCambio.vue).
  */
 import { preferencia, tasasVigentes, guardarPreferencia, monedasUsadas } from '@/services/tasaService.js'
-import { MONEDAS } from '@/utils/monedas.js'
+import { MONEDAS, formatearTasaEscrita, parsearTasaEscrita, tasaParaCampo } from '@/utils/monedas.js'
 import { formatFechaCorta, hoyISO } from '@/utils/fechas.js'
 
 export default {
   name: 'TasaRapida',
+  props: {
+    /** Moneda del chip que se tocó: solo se muestra esa (las demás, con "Agregar otra moneda"). */
+    moneda: { type: String, default: null },
+  },
   emits: ['guardado', 'cerrar'],
   data() {
     return {
@@ -85,15 +94,26 @@ export default {
       campos: {},
       manualesGuardadas: {},
       automaticas: {},
+      mostrarTodas: false,
     }
   },
   computed: {
     fechaHoy() {
       return formatFechaCorta(hoyISO())
     },
+    /** Tocó un chip: solo esa moneda. Desde el recordatorio: las que ya tiene guardadas (o el dólar). */
+    monedasVisibles() {
+      if (this.mostrarTodas) return this.monedas
+      if (this.moneda) return [this.moneda]
+      const guardadas = Object.keys(this.manualesGuardadas)
+      return guardadas.length ? guardadas : ['USD']
+    },
+    monedasOcultas() {
+      return this.monedas.filter((m) => !this.monedasVisibles.includes(m))
+    },
     puedeGuardar() {
       if (this.modo === 'automatica') return this.prefModo !== 'automatica' && (this.avisoAceptado || this.entiendo)
-      return this.monedas.some((m) => this.numero(this.campos[m]) > 0)
+      return this.monedasVisibles.some((m) => this.numero(this.campos[m]) > 0)
     },
   },
   async mounted() {
@@ -113,7 +133,8 @@ export default {
           if (r?.success && r.data) this.automaticas = { USD: r.data.dollar, EUR: r.data.euro, CNY: r.data.yuan, TRY: r.data.lira, RUB: r.data.rublo }
         } catch { /* sin referencia */ }
       }
-      for (const m of this.monedas) this.campos[m] = this.manualesGuardadas[m]?.tasa ?? ''
+      if (this.moneda && !this.monedas.includes(this.moneda)) this.monedas.push(this.moneda)
+      for (const m of this.monedas) this.campos[m] = tasaParaCampo(this.manualesGuardadas[m]?.tasa)
     } finally {
       this.cargando = false
     }
@@ -123,12 +144,10 @@ export default {
       const m = MONEDAS[codigo]
       return m?.nombre ? `${m.nombre} (${codigo})` : codigo
     },
+    formatearTasaEscrita,
+    /** El campo siempre tiene el formato "104.036,77". */
     numero(v) {
-      if (v === null || v === undefined || v === '') return 0
-      // Acepta "879,12", "1.234,56" y "879.12"
-      const t = String(v).trim()
-      const n = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t)
-      return Number.isFinite(n) ? n : 0
+      return parsearTasaEscrita(v) || 0
     },
     formatoTasa(n) {
       return Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
@@ -139,16 +158,18 @@ export default {
       return g.fecha === hoyISO() ? 'Actualizada hoy' : `Última: ${formatFechaCorta(g.fecha)}`
     },
     copiarAutomaticas() {
-      for (const m of this.monedas) if (this.automaticas[m]) this.campos[m] = Number(this.automaticas[m]).toFixed(2)
+      for (const m of this.monedasVisibles) if (this.automaticas[m]) this.campos[m] = tasaParaCampo(this.automaticas[m])
     },
     async guardar() {
       if (!this.puedeGuardar) return
       this.error = ''
       this.guardando = true
       try {
-        const tasas = {}
+        // Se conservan las tasas ya guardadas de las otras monedas (con su fecha);
+        // solo cambian las que la persona escribió aquí, con fecha de hoy.
+        const tasas = { ...this.manualesGuardadas }
         if (this.modo === 'manual') {
-          for (const m of this.monedas) {
+          for (const m of this.monedasVisibles) {
             const n = this.numero(this.campos[m])
             if (n > 0) tasas[m] = n
           }

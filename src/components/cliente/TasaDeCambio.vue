@@ -52,8 +52,10 @@
         <div class="tasa__campos">
           <div v-for="cod in monedasVisibles" :key="cod" class="tasa__campo">
             <v-text-field
-              v-model="campos[cod]"
+              :model-value="campos[cod]"
               :label="`${nombreMoneda(cod)} (${cod})`"
+              placeholder="Ej. 879,12"
+              @update:model-value="v => (campos[cod] = formatearTasaEscrita(v))"
               :prefix="`Bs por ${simbolo(cod)}1 =`"
               inputmode="decimal"
               variant="outlined"
@@ -131,7 +133,7 @@
 <script>
 import AvisoAmable from '@/components/ui/AvisoAmable.vue'
 import { preferencia, guardarPreferencia, tasasVigentes, monedasUsadas, diasDeAntiguedad, historialTasas } from '@/services/tasaService.js'
-import { MONEDAS, CODIGOS_CON_TASA, MONEDAS_OTRAS, parsearTasa } from '@/utils/monedas.js'
+import { MONEDAS, CODIGOS_CON_TASA, MONEDAS_OTRAS, formatearTasaEscrita, parsearTasaEscrita, tasaParaCampo } from '@/utils/monedas.js'
 import { formatTasa } from '@/utils/formatMoney.js'
 import { formatFechaCorta } from '@/utils/fechas.js'
 
@@ -270,8 +272,10 @@ export default {
       this.error = ''
     },
 
+    formatearTasaEscrita,
+    /** "104036.77" → "104.036,77" (mismo formato que se usa al escribir). */
     formatoCampo(n) {
-      return String(n).replace('.', ',')
+      return tasaParaCampo(n)
     },
 
     elegirModo(valor) {
@@ -287,13 +291,13 @@ export default {
     valorCampo(cod) {
       const t = this.campos[cod]
       if (t === undefined || t === null || String(t).trim() === '') return null
-      return parsearTasa(t)
+      return parsearTasaEscrita(t)
     },
 
     errorCampo(cod) {
       const t = this.campos[cod]
       if (t === undefined || t === null || String(t).trim() === '') return ''
-      return parsearTasa(t) ? '' : 'Escribe un número mayor que cero, por ejemplo 877,90'
+      return parsearTasaEscrita(t) ? '' : 'Escribe un número mayor que cero, por ejemplo 877,90'
     },
 
     notaCampo(cod) {

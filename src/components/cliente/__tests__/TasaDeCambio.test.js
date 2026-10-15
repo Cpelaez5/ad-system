@@ -100,10 +100,13 @@ describe('TasaDeCambio', () => {
     expect(guardarPreferencia).toHaveBeenCalledWith({ modo: 'manual', tasas: { USD: { tasa: 877.9 } }, avisoAceptado: false })
   })
 
-  it('rechaza una tasa que no es número y no deja guardar', async () => {
+  it('no deja escribir letras y rechaza una tasa en cero', async () => {
     const w = await montar()
     await t(w, 'tasa-opcion-manual').trigger('click')
-    await w.find('[data-testid="tasa-campo-USD"] input').setValue('abc')
+    const input = w.find('[data-testid="tasa-campo-USD"] input')
+    await input.setValue('abc')
+    expect(input.element.value).toBe('')
+    await input.setValue('0')
     expect(w.text()).toContain('Escribe un número mayor que cero')
     expect(t(w, 'tasa-guardar').attributes('disabled')).toBeDefined()
   })
@@ -156,5 +159,13 @@ describe('TasaDeCambio', () => {
     await flushPromises()
     expect(w.text()).toContain('No pudimos guardar la tasa')
     expect(w.find('[data-testid="tasa-campo-USD"] input').element.value).toBe('800')
+  })
+
+  it('formatea en bolívares mientras se escribe: 104036,77 → 104.036,77', async () => {
+    const w = await montar()
+    await t(w, 'tasa-opcion-manual').trigger('click')
+    const input = w.find('[data-testid="tasa-campo-USD"] input')
+    await input.setValue('104036,77')
+    expect(input.element.value).toBe('104.036,77')
   })
 })

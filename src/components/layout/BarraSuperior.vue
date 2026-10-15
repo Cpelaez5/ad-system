@@ -26,6 +26,7 @@
         prepend-icon="mdi-bell-ring-outline"
         class="barra-superior__recordatorio"
         data-testid="recordatorio-tasa"
+        @click="monedaTasa = null"
       >
         Actualiza tu tasa
       </v-chip>
@@ -39,7 +40,7 @@
         :manual="chipManual"
         :aviso="chipAviso"
         :nota="chipNota"
-        @click="alTocarTasa"
+        @click="alTocarTasa('USD')"
       />
       <ChipTasa
         v-if="showEurRate && !bcvLoading && bcvRate?.euro"
@@ -50,7 +51,7 @@
         :aviso="chipAviso"
         :nota="chipNota"
         class="d-none d-md-inline-flex"
-        @click="alTocarTasa"
+        @click="alTocarTasa('EUR')"
       />
       <ChipTasa
         v-if="showCnyRate && !bcvLoading && bcvRate?.yuan"
@@ -61,7 +62,7 @@
         :aviso="chipAviso"
         :nota="chipNota"
         class="d-none d-lg-inline-flex"
-        @click="alTocarTasa"
+        @click="alTocarTasa('CNY')"
       />
       <ChipTasa
         v-if="showTryRate && !bcvLoading && bcvRate?.lira"
@@ -72,7 +73,7 @@
         :aviso="chipAviso"
         :nota="chipNota"
         class="d-none d-lg-inline-flex"
-        @click="alTocarTasa"
+        @click="alTocarTasa('TRY')"
       />
       <ChipTasa
         v-if="showRubRate && !bcvLoading && bcvRate?.rublo"
@@ -83,12 +84,12 @@
         :aviso="chipAviso"
         :nota="chipNota"
         class="d-none d-lg-inline-flex"
-        @click="alTocarTasa"
+        @click="alTocarTasa('RUB')"
       />
     </div>
     </div>
       </template>
-      <TasaRapida v-if="menuTasa" @cerrar="menuTasa = false" />
+      <TasaRapida v-if="menuTasa" :moneda="monedaTasa" @cerrar="menuTasa = false" />
     </v-menu>
 
     <MenuUsuario
@@ -119,7 +120,7 @@ export default {
   components: { ChipTasa, MenuUsuario, TasaRapida },
 
   data() {
-    return { menuTasa: false }
+    return { menuTasa: false, monedaTasa: null }
   },
 
   props: {
@@ -168,8 +169,11 @@ export default {
 
   methods: {
     /** El cliente abre el acceso rápido (lo maneja el v-menu); el resto de roles refresca la tasa. */
-    alTocarTasa() {
-      if (this.esCliente) return
+    alTocarTasa(moneda = null) {
+      if (this.esCliente) {
+        this.monedaTasa = moneda
+        return
+      }
       this.$emit('refresh-bcv')
     },
   },
