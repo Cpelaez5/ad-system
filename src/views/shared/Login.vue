@@ -616,6 +616,16 @@ export default {
 }
 
 /* Responsive */
+/* Escritorio con poca altura (p. ej. 1080p con barras del navegador): todo cabe
+   junto con el pie sin hacer scroll. */
+@media (min-width: 961px) and (max-height: 920px) {
+  .login-form-wrapper { padding: 24px 40px; }
+  .form-header { margin-bottom: 24px; }
+  .form-title { font-size: 28px; }
+  .form-group { margin-bottom: 16px; }
+  .divider { margin: 16px 0; }
+}
+
 @media (max-width: 960px) {
   .login-visual {
     display: none;

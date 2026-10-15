@@ -1,66 +1,23 @@
 <template>
-  <v-footer
-    color="grey-lighten-4"
-    class="text-center"
-    padless
-  >
-    <v-card
-      flat
-      tile
-      width="100%"
-      class="grey-lighten-4 text-center"
-    >
-      <v-card-text class="py-2">
-        <v-row justify="center" no-gutters>
-          <v-col cols="12" md="4" class="mb-2 mb-md-0">
-            <div class="text-body-2 d-flex align-center justify-center">
-              <v-icon size="small" class="mr-1">mdi-shield-check</v-icon>
-              Sistema Seguro y Confiable
-            </div>
-          </v-col>
-          <v-col cols="12" md="4" class="mb-2 mb-md-0">
-            <div class="text-body-2 d-flex align-center justify-center">
-              <v-icon size="small" class="mr-1">mdi-cloud-check</v-icon>
-              Respaldo en la Nube
-            </div>
-          </v-col>
-          <v-col cols="12" md="4">
-            <div class="text-body-2 d-flex align-center justify-center">
-              <v-icon size="small" class="mr-1">mdi-headset</v-icon>
-              Soporte 24/7
-            </div>
-          </v-col>
-        </v-row>
-      </v-card-text>
+  <!-- Pie de las páginas públicas (landing, login, registro, precios, legal).
+       Una sola barra compacta: en escritorio todo en una línea para que el login
+       quepa en la primera pantalla; en el teléfono, apilado y breve. -->
+  <footer class="pie" role="contentinfo">
+    <ul class="pie__beneficios" aria-label="Por qué AD System">
+      <li><v-icon icon="mdi-shield-check" size="16" />Sistema seguro</li>
+      <li><v-icon icon="mdi-cloud-check" size="16" />Respaldo en la nube</li>
+      <li><v-icon icon="mdi-headset" size="16" />Soporte 24/7</li>
+    </ul>
 
-      <v-divider></v-divider>
+    <nav class="pie__enlaces" aria-label="Enlaces legales y ayuda">
+      <router-link to="/ayuda" data-testid="pie-ayuda">Ayuda</router-link>
+      <router-link to="/legal?tab=terminos">Términos</router-link>
+      <router-link to="/legal?tab=privacidad">Privacidad</router-link>
+      <router-link to="/legal?tab=datos">Tratamiento de datos</router-link>
+    </nav>
 
-      <v-card-text class="py-2 pb-4">
-        <div class="text-body-2 mb-2">
-          © {{ currentYear }} AD SYSTEM. 
-          Todos los derechos reservados.
-        </div>
-        
-        <div class="legal-links d-flex flex-wrap justify-center gap-3">
-          <router-link to="/ayuda" class="text-caption text-medium-emphasis text-decoration-none hover-primary" data-testid="pie-ayuda">
-            Ayuda
-          </router-link>
-          <span class="text-caption text-medium-emphasis mx-1 hidden-sm-and-down">•</span>
-          <router-link to="/legal?tab=terminos" class="text-caption text-medium-emphasis text-decoration-none hover-primary">
-            Términos y Condiciones
-          </router-link>
-          <span class="text-caption text-medium-emphasis mx-1 hidden-sm-and-down">•</span>
-          <router-link to="/legal?tab=privacidad" class="text-caption text-medium-emphasis text-decoration-none hover-primary">
-            Política de Privacidad
-          </router-link>
-          <span class="text-caption text-medium-emphasis mx-1 hidden-sm-and-down">•</span>
-          <router-link to="/legal?tab=datos" class="text-caption text-medium-emphasis text-decoration-none hover-primary">
-            Tratamiento de Datos
-          </router-link>
-        </div>
-      </v-card-text>
-    </v-card>
-  </v-footer>
+    <p class="pie__copy">© {{ currentYear }} AD System</p>
+  </footer>
 </template>
 
 <script>
@@ -75,20 +32,63 @@ export default {
 </script>
 
 <style scoped>
-.v-footer {
+.pie {
   margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding: 12px 24px;
+  background: rgb(var(--v-theme-surface));
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  color: rgba(var(--v-theme-on-surface), 0.68);
+  font-size: 0.8125rem;
 }
 
-.v-card-text {
-  padding: 8px 16px;
+.pie__beneficios,
+.pie__enlaces {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.gap-3 {
-  gap: 12px;
+.pie__beneficios li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.hover-primary:hover {
-  color: var(--v-theme-primary) !important;
-  text-decoration: underline !important;
+.pie__enlaces a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.pie__enlaces a:hover,
+.pie__enlaces a:focus-visible {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: underline;
+}
+
+.pie__copy {
+  margin: 0;
+}
+
+/* Teléfono: centrado y apilado, sin ocupar media pantalla */
+@media (max-width: 959px) {
+  .pie {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 12px 16px 16px;
+  }
+  .pie__beneficios,
+  .pie__enlaces {
+    justify-content: center;
+  }
 }
 </style>
