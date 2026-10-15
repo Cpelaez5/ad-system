@@ -69,18 +69,17 @@
             <v-btn value="original" class="text-none">Original</v-btn>
             <v-btn value="mejorada" class="text-none" prepend-icon="mdi-auto-fix">Mejorada</v-btn>
           </v-btn-toggle>
-          <v-btn
+          <BotonIA
             v-if="form.foto_path && !mejoradaPath"
             variant="outlined"
             color="primary"
-            class="text-none pf-foto__mejorar"
-            prepend-icon="mdi-auto-fix"
+            class="pf-foto__mejorar"
             :loading="mejorando"
             :disabled="subiendoFoto"
             @click="mejorar"
           >
             Mejorar foto con IA
-          </v-btn>
+          </BotonIA>
           <div v-if="ofertaFotoCatalogo && !form.foto_path" class="pf-catalogo-foto" data-testid="catalogo-oferta-foto">
             <img :src="ofertaFotoCatalogo.url" alt="Foto del catálogo de AD System" class="pf-catalogo-foto__img" loading="lazy">
             <v-btn variant="tonal" color="primary" class="text-none" :loading="copiandoFoto" prepend-icon="mdi-image-plus-outline" @click="usarFotoCatalogo">
@@ -314,6 +313,7 @@
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
 import FotoProducto from '@/components/inventory/FotoProducto.vue'
+import BotonIA from '@/components/ui/BotonIA.vue'
 import EscanerCodigoBarras from '@/components/inventory/EscanerCodigoBarras.vue'
 import inventoryService from '@/services/inventoryService'
 import { subirFoto, urlFoto, mejorarFoto, borrarFotos, unidadDelFormulario } from '@/services/productoFotoService'

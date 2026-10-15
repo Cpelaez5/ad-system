@@ -1,0 +1,123 @@
+/* ========================================
+   IDENTIDAD VISUAL DE LA IA ("el brillo")
+   Ver docs/mvp/diseno/identidad-ia.md
+   Un borde con degradado granate -> rosado claro -> granate que recorre
+   el contorno muy despacio. Sin parpadeos; se apaga con reduced-motion.
+   ======================================== */
+
+/* Permite animar el ángulo del degradado. Si el navegador no lo soporta,
+   el ángulo queda fijo (borde estático). */
+@property --ad-ia-angulo {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --ad-ia-1: #8e1818;          /* granate de marca */
+  --ad-ia-2: #f0b8b8;          /* rosado claro derivado del granate */
+  --ad-ia-fondo-suave: rgba(142, 24, 24, 0.07);
+  --ad-ia-luz: rgba(240, 184, 184, 0.45);
+  --ad-ia-duracion: 7s;
+}
+
+.v-theme--dark {
+  /* En oscuro el degradado sube de luminosidad para verse sobre #1e1e1e */
+  --ad-ia-1: #d98a8a;
+  --ad-ia-2: #ffe1e1;
+  --ad-ia-fondo-suave: rgba(217, 138, 138, 0.1);
+  --ad-ia-luz: rgba(255, 225, 225, 0.22);
+}
+
+@keyframes ad-ia-giro {
+  to { --ad-ia-angulo: 360deg; }
+}
+
+@keyframes ad-ia-barrido {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* Contenedor con borde de IA. Funciona sobre cualquier bloque con radio. */
+.ad-ia {
+  position: relative;
+  display: inline-flex;
+  border-radius: var(--ad-ia-radio, 8px);
+  isolation: isolate;
+}
+
+.ad-ia--bloque {
+  display: flex;
+  width: 100%;
+}
+
+.ad-ia--contenedor {
+  display: block;
+}
+
+.ad-ia::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: var(--ad-ia-borde, 2px);
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--ad-ia-angulo),
+    var(--ad-ia-1),
+    var(--ad-ia-2),
+    var(--ad-ia-1)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: ad-ia-giro var(--ad-ia-duracion) linear infinite;
+}
+
+.ad-ia > .v-btn {
+  border-radius: inherit;
+  flex: 1 1 auto;
+}
+
+/* Bloque que la IA está llenando: velo suave + barrido de luz lento. */
+.ad-ia--trabajando {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--ad-ia-radio, 12px);
+  background: var(--ad-ia-fondo-suave);
+}
+
+.ad-ia--trabajando::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, var(--ad-ia-luz) 50%, transparent 80%);
+  animation: ad-ia-barrido 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Marca fina "Llenado con IA · revisa" */
+.ad-ia-marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 8px;
+  border-left: 2px solid transparent;
+  border-image: linear-gradient(to bottom, var(--ad-ia-1), var(--ad-ia-2)) 1;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 500;
+  color: rgb(var(--v-theme-on-surface));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ad-ia::before,
+  .ad-ia--trabajando::after {
+    animation: none;
+  }
+  .ad-ia--trabajando::after {
+    opacity: 0;
+  }
+}

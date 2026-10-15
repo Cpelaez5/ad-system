@@ -20,9 +20,9 @@
         titulo="Mi mercancía"
         subtitulo="Toma una foto de tu producto y nosotros llenamos los datos"
       >
-        <v-btn color="primary" size="large" prepend-icon="mdi-camera-outline" class="text-none mi-mercancia__tomar" @click="tomarFoto">
+        <BotonIA color="primary" variant="flat" size="large" class="mi-mercancia__tomar" @click="tomarFoto">
           Tomar foto
-        </v-btn>
+        </BotonIA>
         <v-menu location="bottom end">
           <template #activator="{ props: menuProps }">
             <v-btn v-bind="menuProps" icon="mdi-dots-vertical" variant="text" size="large" aria-label="Más opciones" />
@@ -46,8 +46,8 @@
       </EncabezadoPagina>
 
       <div class="mi-mercancia__rapidas">
-        <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-bookshelf" class="text-none" @click="fotoEstante">Foto del estante</v-btn>
-        <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-image-outline" class="text-none" @click="subirFotoGaleria">Subir foto</v-btn>
+        <BotonIA variant="tonal" color="secondary" density="comfortable" @click="fotoEstante">Foto del estante</BotonIA>
+        <BotonIA variant="tonal" color="secondary" density="comfortable" @click="subirFotoGaleria">Subir foto</BotonIA>
         <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-pencil-outline" class="text-none" @click="openProductDialog()">Escribirlo yo</v-btn>
         <v-btn variant="tonal" color="secondary" density="comfortable" prepend-icon="mdi-briefcase-plus-outline" class="text-none" @click="openProductDialog(null, 'servicio')">Nuevo servicio</v-btn>
       </div>
@@ -519,6 +519,7 @@ import FiltroChips from '@/components/ui/FiltroChips.vue'
 import SeccionLista from '@/components/ui/SeccionLista.vue'
 import FotoProducto from '@/components/inventory/FotoProducto.vue'
 import ProductoFormDialog from '@/components/inventory/ProductoFormDialog.vue'
+import BotonIA from '@/components/ui/BotonIA.vue'
 import CrearConFotoDialog from '@/components/inventory/CrearConFotoDialog.vue'
 import EstanteDialog from '@/components/inventory/EstanteDialog.vue'
 import { firmarVarias } from '@/services/productoFotoService'
@@ -540,6 +541,7 @@ export default {
     SeccionLista,
     FotoProducto,
     ProductoFormDialog,
+    BotonIA,
     CrearConFotoDialog,
     EstanteDialog
   },
@@ -1283,7 +1285,8 @@ export default {
     scrollbar-width: none;
   }
   .mi-mercancia__rapidas::-webkit-scrollbar { display: none; }
-  .mi-mercancia__rapidas :deep(.v-btn) { flex: 0 0 auto; }
+  .mi-mercancia__rapidas :deep(.v-btn),
+  .mi-mercancia__rapidas :deep(.ad-ia) { flex: 0 0 auto; }
   .mi-mercancia__tomar { flex: 1 1 auto; min-height: 56px; font-size: 1.0625rem; }
   .mi-mercancia__panel { gap: 10px; margin: 4px 0 12px; }
   .mi-mercancia__avance { padding: 12px 16px; gap: 8px; }

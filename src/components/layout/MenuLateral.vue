@@ -72,6 +72,9 @@
 
     <template #append>
       <v-divider class="menu-lateral__divisor" />
+      <div v-if="role === 'cliente'" class="menu-lateral__asistente">
+        <TuAsistente variante="compacta" />
+      </div>
       <v-list density="comfortable" nav class="menu-lateral__lista">
         <v-list-item prepend-icon="mdi-logout" title="Cerrar sesión" value="logout" @click="$emit('logout')" />
       </v-list>
@@ -81,6 +84,7 @@
 
 <script>
 import LogoAnimado from '@/components/ui/LogoAnimado.vue'
+import TuAsistente from '@/components/cliente/TuAsistente.vue'
 import { getMenuPorRol } from './menuPorRol.js'
 
 /**
@@ -103,7 +107,7 @@ import { getMenuPorRol } from './menuPorRol.js'
 export default {
   name: 'MenuLateral',
 
-  components: { LogoAnimado },
+  components: { LogoAnimado, TuAsistente },
 
   props: {
     /** Abierto/cerrado cuando el drawer es temporary (tablet / móvil no-cliente). */
@@ -278,6 +282,27 @@ export default {
 
 .menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .v-list-group__header .v-list-item__append {
   display: none;
+}
+
+/* Tu asistente (solo cliente): barra fina; recogido, solo el círculo */
+.menu-lateral .menu-lateral__asistente {
+  padding: 8px 12px 0;
+}
+
+.menu-lateral .ta-compacta__circulo {
+  display: none;
+}
+
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .ta-compacta__barra {
+  display: none;
+}
+
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .ta-compacta__circulo {
+  display: flex;
+}
+
+.menu-lateral.v-navigation-drawer--rail:not(.v-navigation-drawer--is-hovering) .menu-lateral__asistente {
+  padding-inline: 8px;
 }
 
 .menu-lateral .menu-lateral__divisor {

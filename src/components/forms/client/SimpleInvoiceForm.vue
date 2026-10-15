@@ -64,11 +64,10 @@
       <v-divider />
       <v-card-text class="pa-5">
         <template v-if="extracting">
-          <div class="text-center py-6" data-testid="simple-leyendo">
+          <TrabajandoIA :mensaje="simpleReadingMessage" class="py-6" data-testid="simple-leyendo">
             <v-progress-circular indeterminate color="primary" size="56" width="5" class="mb-4" />
-            <p class="text-body-1 font-weight-medium mb-5">{{ simpleReadingMessage }}</p>
-            <v-skeleton-loader type="article" class="mx-auto" max-width="340" />
-          </div>
+            <v-skeleton-loader type="article" class="mx-auto mt-4" max-width="340" />
+          </TrabajandoIA>
         </template>
         <template v-else>
           <TarjetaAccion
@@ -278,13 +277,13 @@
       <!-- ══════════════════════════════════════════════════════
            SECCIÓN 0: ESCANEAR CON IA (siempre visible arriba)
       ══════════════════════════════════════════════════════════ -->
-      <div class="sif-section sif-ocr-banner" :class="{ 'sif-ocr-active': ocrPanelOpen }">
+      <div class="sif-section sif-ocr-banner ad-ia ad-ia--contenedor" :class="{ 'sif-ocr-active': ocrPanelOpen }">
         <div
           class="d-flex align-center justify-space-between cursor-pointer"
           @click="ocrPanelOpen = !ocrPanelOpen"
         >
           <div class="d-flex align-center ga-2">
-            <v-icon color="primary" size="22">mdi-robot-outline</v-icon>
+            <v-icon size="22" class="sif-ia-icono">mdi-creation</v-icon>
             <span class="font-weight-medium text-body-2">
               ¿Tienes la factura en papel o PDF? <strong>Deja que la IA la lea por ti</strong>
             </span>
@@ -1487,6 +1486,7 @@ import bcvService from '@/services/bcvService.js';
 import { tasasVigentes } from '@/services/tasaService.js';
 import { MONEDAS, MONEDAS_VISTA, MONEDAS_OTRAS, normalizarTasas } from '@/utils/monedas.js';
 import proveedorService from '@/services/proveedorService.js';
+import TrabajandoIA from '@/components/ui/TrabajandoIA.vue';
 import AppSnackbar from '@/components/common/AppSnackbar.vue';
 import FileUploadZone from '@/components/common/FileUploadZone.vue';
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
@@ -1541,7 +1541,7 @@ let _itemKey = 0;
 
 export default {
   name: 'SimpleInvoiceForm',
-  components: { EnvolturaDetallesContables,
+  components: { TrabajandoIA, EnvolturaDetallesContables,
     AppSnackbar, FileUploadZone, CustomDatePicker, ProductAutocomplete,
     ExpenseCategorySelector, ProveedorAutocomplete, ClienteNegocioAutocomplete, ProveedorModalForm,
     RetentionSummaryCard, RetentionAdjustSheet, NumericInput,
@@ -4083,13 +4083,15 @@ export default {
 
 /* ─── OCR Banner ─────────────────────────────────────────── */
 .sif-ocr-banner {
-  background: linear-gradient(135deg, #f3f4ff 0%, #fafafa 100%);
-  border-left: 3px solid #5c6bc0;
+  /* Identidad visual de la IA: borde animado (.ad-ia) y velo suave del token */
+  --ad-ia-radio: 12px;
+  background: var(--ad-ia-fondo-suave);
+  border-radius: 12px;
 }
 .sif-ocr-active {
-  border-left-color: #3949ab;
-  background: linear-gradient(135deg, #e8eaf6 0%, #f3f4ff 100%);
+  background: var(--ad-ia-fondo-suave);
 }
+.sif-ia-icono { color: var(--ad-ia-1); }
 
 /* ─── Flow cards ─────────────────────────────────────────── */
 .sif-flow-card {

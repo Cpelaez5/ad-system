@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient'
+import { avisarIaUsada } from '@/utils/eventosIa'
 import { reducirImagen } from '@/services/productoFotoService'
 
 export const MAX_BYTES_PDF = 8 * 1024 * 1024
@@ -85,6 +86,7 @@ export async function leerDocumento(file, tipoEsperado = 'auto') {
     if (error) return fallo(await extraerError(error))
     if (data?.error) return fallo(data.error.code || 'RED')
     if (!data?.documento) return fallo('RESPUESTA_IA')
+    avisarIaUsada()
     return { documento: data.documento, error: null }
   } catch {
     return fallo('RED')

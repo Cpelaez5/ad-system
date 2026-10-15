@@ -1,5 +1,6 @@
 import imageCompression from 'browser-image-compression';
 import { supabase } from '@/lib/supabaseClient';
+import { avisarIaUsada } from '@/utils/eventosIa';
 
 const MAX_FILE_SIZE_MB = 15;
 const MAX_FILE_SIZE_B  = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -168,5 +169,6 @@ export async function procesarComprobanteOCR(
     };
   }
 
+  avisarIaUsada();
   return result.data;
 }
