@@ -2,6 +2,8 @@
   <div class="soporte">
     <EncabezadoPagina titulo="Soporte" subtitulo="Las consultas que los negocios le escriben al equipo." />
 
+    <div class="soporte__sonido"><BotonSonido :silenciado="sonido.silenciado.value" @alternar="sonido.alternar" /></div>
+
     <FiltroChips v-model="filtro" :opciones="opciones" etiqueta="Filtrar consultas por estado" class="mb-3" />
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-3" role="alert">
@@ -72,11 +74,15 @@ import FiltroChips from '@/components/ui/FiltroChips.vue'
 import EstadoVacio from '@/components/ui/EstadoVacio.vue'
 import HiloEquipo from '@/components/soporte/HiloEquipo.vue'
 import * as soporte from '@/services/soporteService'
+import * as adjuntosServicio from '@/services/adjuntosSoporteService'
+import { useSonidoMensaje } from '@/composables/useSonidoMensaje'
+import BotonSonido from '@/components/soporte/BotonSonido.vue'
 import {
   ESTADOS_TICKET, ORDEN_ESTADOS, conteosPorEstado, filtrarBandeja, guardarRespuestas, haceCuanto,
   leerRespuestas, numeroTicket, ordenarBandeja, pasaDelLimite, textoTema,
 } from '@/utils/soporte.js'
 
+const sonido = useSonidoMensaje()
 const consultas = ref([])
 const cargando = ref(true)
 const error = ref('')
@@ -134,9 +140,16 @@ async function abrir(c) {
 
 function cerrar() { seleccionada.value = null }
 
-async function enviar({ texto, interno }) {
+async function enviar({ texto, interno, archivos = [] }) {
   enviando.value = true
-  const { data, error: e } = await soporte.enviarComoEquipo(seleccionada.value.id, texto, { interno })
+  let adjuntos = []
+  if (archivos.length) {
+    const subida = await adjuntosServicio.subirAdjuntos(seleccionada.value.id, archivos)
+    if (subida.error) { enviando.value = false; errorHilo.value = subida.error; return }
+    adjuntos = subida.data
+  }
+  const opciones = adjuntos.length ? { interno, adjuntos } : { interno }
+  const { data, error: e } = await soporte.enviarComoEquipo(seleccionada.value.id, texto, opciones)
   enviando.value = false
   if (e) { errorHilo.value = e; return }
   errorHilo.value = ''
@@ -180,6 +193,8 @@ let reloj = null
 function alCambiar({ tabla, payload }) {
   if (tabla === 'mensajes') {
     const m = payload.new
+    // Un cliente le escribió al equipo (no su charla con la IA ni notas): suena la campanita.
+    if (m?.role === 'user' && !m.interno && m.metadata?.tipo === 'ticket') sonido.reproducir()
     if (seleccionada.value && m.conversation_id === seleccionada.value.id) {
       agregar(m)
       if (m.role === 'user') soporte.marcarLeidoEquipo(m.conversation_id)
@@ -203,6 +218,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .soporte { max-width: 1120px; margin: 0 auto; padding-bottom: 32px; }
+.soporte__sonido { display: flex; justify-content: flex-end; margin-bottom: 4px; }
 .soporte__cuerpo { display: grid; grid-template-columns: 1fr; gap: 16px; }
 @media (min-width: 960px) {
   .soporte__cuerpo--hilo { grid-template-columns: minmax(300px, 380px) 1fr; align-items: start; }

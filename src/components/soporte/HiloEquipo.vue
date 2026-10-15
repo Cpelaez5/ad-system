@@ -56,7 +56,7 @@
       </p>
     </div>
 
-    <form class="hilo__responder" @submit.prevent="enviar">
+    <form class="hilo__responder" @submit.prevent="enviar" @dragover="alArrastrar" @drop="alSoltar">
       <div class="hilo__modo" role="group" aria-label="Tipo de mensaje">
         <v-btn :variant="!nota ? 'flat' : 'outlined'" :color="!nota ? 'primary' : undefined" class="text-none" @click="nota = false">Responder al cliente</v-btn>
         <v-btn :variant="nota ? 'flat' : 'outlined'" :color="nota ? 'warning' : undefined" class="text-none" @click="nota = true">Nota interna</v-btn>
@@ -85,10 +85,15 @@
         maxlength="3000"
         :placeholder="nota ? 'Nota solo para el equipo' : 'Escribe la respuesta al cliente'"
         :aria-label="nota ? 'Nota interna' : 'Respuesta al cliente'"
+        @paste="alPegar"
       ></textarea>
-      <v-btn type="submit" :color="nota ? 'warning' : 'primary'" size="large" class="text-none" :disabled="!texto.trim() || enviando" :loading="enviando">
-        {{ nota ? 'Guardar nota' : 'Enviar respuesta' }}
-      </v-btn>
+      <AdjuntosPendientes :pendientes="pendientes" :aviso="aviso" @quitar="quitar" />
+      <div class="hilo__enviar">
+        <BotonAdjuntar :deshabilitado="lleno || enviando" @archivos="agregar" />
+        <v-btn type="submit" :color="nota ? 'warning' : 'primary'" size="large" class="text-none hilo__enviar-btn" :disabled="!puedeEnviar" :loading="enviando">
+          {{ nota ? 'Guardar nota' : 'Enviar respuesta' }}
+        </v-btn>
+      </div>
     </form>
   </section>
 </template>
@@ -101,6 +106,9 @@
  */
 import { computed, nextTick, ref, watch } from 'vue'
 import MensajeSoporte from './MensajeSoporte.vue'
+import AdjuntosPendientes from './AdjuntosPendientes.vue'
+import BotonAdjuntar from './BotonAdjuntar.vue'
+import { useAdjuntosPendientes } from '@/composables/useAdjuntosPendientes'
 import { ESTADOS_TICKET, ORDEN_ESTADOS, PRIORIDADES, numeroTicket, textoTema } from '@/utils/soporte.js'
 
 const props = defineProps({
@@ -124,14 +132,23 @@ const itemsPrioridad = Object.entries(PRIORIDADES).map(([value, title]) => ({ ti
 const asignadaAMi = computed(() => !!props.miId && props.consulta.asignado_a === props.miId)
 const resumen = computed(() => props.consulta.metadata?.resumen || '')
 
+const { pendientes, archivos, aviso, lleno, agregar, quitar, limpiar, alPegar, alArrastrar, alSoltar } = useAdjuntosPendientes()
+const puedeEnviar = computed(() => (!!texto.value.trim() || pendientes.value.length > 0) && !props.enviando)
+
 function enviar() {
-  const t = texto.value.trim()
-  if (!t || props.enviando) return
-  emit('enviar', { texto: t, interno: nota.value })
-  texto.value = ''
+  if (!puedeEnviar.value) return
+  emit('enviar', { texto: texto.value.trim(), interno: nota.value, archivos: [...archivos.value] })
 }
 
-watch(() => props.consulta.id, () => { texto.value = ''; nota.value = false })
+// Se vacía el cuadro solo si el envío salió bien.
+watch(() => props.enviando, (ahora, antes) => {
+  if (antes && !ahora && !props.error) {
+    texto.value = ''
+    limpiar()
+  }
+})
+
+watch(() => props.consulta.id, () => { texto.value = ''; nota.value = false; limpiar() })
 watch(() => props.mensajes.length, async () => {
   await nextTick()
   if (contenedor.value) contenedor.value.scrollTop = contenedor.value.scrollHeight
@@ -156,6 +173,8 @@ watch(() => props.mensajes.length, async () => {
 .hilo__nota { margin: 0; text-align: center; color: rgba(var(--v-theme-on-surface), 0.7); }
 .hilo__nota--error { color: rgb(var(--v-theme-error)); font-weight: 600; }
 .hilo__responder { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12); }
+.hilo__enviar { display: flex; align-items: center; gap: 8px; }
+.hilo__enviar-btn { flex: 1; }
 .hilo__modo { display: flex; flex-wrap: wrap; gap: 8px; }
 .hilo__campo {
   width: 100%; padding: 10px 12px; border-radius: 12px; resize: vertical;

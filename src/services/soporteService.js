@@ -12,6 +12,8 @@ import { logger } from '@/utils/logger'
 const COLUMNAS_CLIENTE =
   'id, mode, status, categoria, estado_ticket, ticket_numero, ultimo_mensaje_en, no_leidos_cliente, calificacion, resuelto_en, current_route_title, created_at, updated_at'
 
+const COLUMNAS_MENSAJE = 'id, role, content, interno, created_at, metadata, adjuntos'
+
 const falla = (e, texto) => {
   logger.error?.(texto, e)
   return { data: null, error: texto }
@@ -43,7 +45,7 @@ export async function listarMisConsultas(userId) {
  * El resumen vive en `metadata.resumen`: la RLS no deja que el cliente escriba mensajes
  * de rol "system", y el equipo lo ve al inicio del hilo.
  */
-export async function escribirAlEquipo({ conversationId, categoria, mensaje, resumen, routeTitle }) {
+export async function escribirAlEquipo({ conversationId, categoria, mensaje, resumen, routeTitle, adjuntos = [] }) {
   try {
     const { data, error } = await supabase
       .from('support_conversations')
@@ -60,7 +62,7 @@ export async function escribirAlEquipo({ conversationId, categoria, mensaje, res
 
     const { error: errMensaje } = await supabase
       .from('support_messages')
-      .insert([{ conversation_id: conversationId, role: 'user', content: mensaje, metadata: { tipo: 'ticket' } }])
+      .insert([{ conversation_id: conversationId, role: 'user', content: mensaje, metadata: { tipo: 'ticket' }, ...(adjuntos.length ? { adjuntos } : {}) }])
     if (errMensaje) throw errMensaje
     return { data, error: null }
   } catch (e) {
@@ -72,7 +74,7 @@ export async function cargarMensajes(conversationId) {
   try {
     const { data, error } = await supabase
       .from('support_messages')
-      .select('id, role, content, interno, created_at, metadata')
+      .select(COLUMNAS_MENSAJE)
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
     if (error) throw error
@@ -83,12 +85,12 @@ export async function cargarMensajes(conversationId) {
 }
 
 /** Respuesta del cliente dentro de un ticket. */
-export async function responderComoCliente(conversationId, texto) {
+export async function responderComoCliente(conversationId, texto, { adjuntos = [] } = {}) {
   try {
     const { data, error } = await supabase
       .from('support_messages')
-      .insert([{ conversation_id: conversationId, role: 'user', content: texto, metadata: { tipo: 'ticket' } }])
-      .select('id, role, content, interno, created_at, metadata')
+      .insert([{ conversation_id: conversationId, role: 'user', content: texto, metadata: { tipo: 'ticket' }, ...(adjuntos.length ? { adjuntos } : {}) }])
+      .select(COLUMNAS_MENSAJE)
       .single()
     if (error) throw error
     return { data, error: null }
@@ -210,12 +212,12 @@ export const cambiarPrioridad = (id, prioridad) => actualizarConsulta(id, { prio
 export const asignar = (id, userId) => actualizarConsulta(id, { asignado_a: userId }, 'No pudimos asignar la consulta.')
 
 /** Respuesta del equipo (role 'agent') o nota interna (interno=true). */
-export async function enviarComoEquipo(conversationId, texto, { interno = false } = {}) {
+export async function enviarComoEquipo(conversationId, texto, { interno = false, adjuntos = [] } = {}) {
   try {
     const { data, error } = await supabase
       .from('support_messages')
-      .insert([{ conversation_id: conversationId, role: 'agent', content: texto, interno, metadata: {} }])
-      .select('id, role, content, interno, created_at, metadata')
+      .insert([{ conversation_id: conversationId, role: 'agent', content: texto, interno, metadata: {}, ...(adjuntos.length ? { adjuntos } : {}) }])
+      .select(COLUMNAS_MENSAJE)
       .single()
     if (error) throw error
     return { data, error: null }

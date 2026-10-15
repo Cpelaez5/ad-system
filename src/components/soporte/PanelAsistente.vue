@@ -68,6 +68,7 @@ import MensajeSoporte from './MensajeSoporte.vue'
 import SugerenciasGuias from './SugerenciasGuias.vue'
 import OfertaEscalar from './OfertaEscalar.vue'
 import AvisoSinIa from './AvisoSinIa.vue'
+import { useSonidoMensaje } from '@/composables/useSonidoMensaje'
 
 const props = defineProps({
   usuario: { type: Object, default: () => ({}) },
@@ -121,6 +122,8 @@ async function asegurarConversacion() {
   return conversationId
 }
 
+const sonido = useSonidoMensaje()
+
 async function enviar() {
   const pregunta = texto.value.trim()
   if (!pregunta || escribiendo.value || iaApagada.value) return
@@ -146,6 +149,7 @@ async function enviar() {
     mensajes.value.push({ role: 'assistant', content: ev.texto, created_at: new Date().toISOString(), ofrecer: ev.ofrecer })
     historial.value.push({ role: 'assistant', content: ev.texto })
     if (ev.ofrecer) ofertaVigente.value = mensajes.value.length - 1
+    sonido.reproducir()
     chatService.saveMessage(id, 'assistant', ev.texto, { route: props.ruta.name })
   } catch (e) {
     aviso.value = avisoDeErrorIa(e)

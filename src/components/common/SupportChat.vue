@@ -24,6 +24,7 @@
       <div v-if="isChatOpen" class="chat-panel" :class="{ 'chat-panel--mobile': isMobile }" role="dialog" aria-label="Ayuda y soporte">
         <div class="chat-header">
           <h4 class="chat-header__title">Ayuda</h4>
+          <BotonSonido class="chat-header__sonido" :silenciado="sonido.silenciado.value" @alternar="sonido.alternar" />
           <v-btn icon="mdi-close" variant="text" aria-label="Cerrar la ayuda" class="chat-close-btn" @click="closeChat" />
         </div>
 
@@ -98,10 +99,18 @@ import PanelAsistente from '@/components/soporte/PanelAsistente.vue'
 import PasoEscribirEquipo from '@/components/soporte/PasoEscribirEquipo.vue'
 import ListaConsultas from '@/components/soporte/ListaConsultas.vue'
 import HiloConsulta from '@/components/soporte/HiloConsulta.vue'
+import BotonSonido from '@/components/soporte/BotonSonido.vue'
+import * as adjuntosServicio from '@/services/adjuntosSoporteService'
+import { useSonidoMensaje } from '@/composables/useSonidoMensaje'
 
 export default {
   name: 'SupportChat',
-  components: { PanelAsistente, PasoEscribirEquipo, ListaConsultas, HiloConsulta },
+  components: { PanelAsistente, PasoEscribirEquipo, ListaConsultas, HiloConsulta, BotonSonido },
+
+  setup() {
+    const sonido = useSonidoMensaje()
+    return { sonido }
+  },
 
   data() {
     return {
@@ -232,7 +241,7 @@ export default {
       this.escribirEquipo = false
       this.errorTicket = ''
     },
-    async enviarTicket({ categoria, mensaje }) {
+    async enviarTicket({ categoria, mensaje, archivos = [] }) {
       this.enviandoTicket = true
       this.errorTicket = ''
       try {
@@ -256,12 +265,22 @@ export default {
           pantalla: this.$route?.meta?.title || '',
           tema: textoTema(categoria),
         })
+        let adjuntos = []
+        if (archivos.length) {
+          const subida = await adjuntosServicio.subirAdjuntos(id, archivos)
+          if (subida.error) {
+            this.errorTicket = subida.error
+            return
+          }
+          adjuntos = subida.data
+        }
         const { data, error } = await soporte.escribirAlEquipo({
           conversationId: id,
           categoria,
           mensaje,
           resumen,
           routeTitle: this.$route?.meta?.title || '',
+          adjuntos,
         })
         if (error) {
           this.errorTicket = error
@@ -314,6 +333,8 @@ export default {
       if (!m || m.interno) return
       if (this.mensajesTicket.some((x) => x.id === m.id)) return
       this.mensajesTicket = [...this.mensajesTicket, m]
+      // Sonido solo para lo ajeno que llega en vivo (nunca lo que uno mismo escribe).
+      if (m.role === 'agent' || m.role === 'assistant') this.sonido.reproducir()
       if (m.role === 'agent' && this.ticketAbierto) this.marcarLeida(this.ticketAbierto.id)
     },
     async marcarLeida(id) {
@@ -326,9 +347,19 @@ export default {
       }
       if (this.ticketAbierto?.id === id) this.ticketAbierto.no_leidos_cliente = 0
     },
-    async responder(texto) {
+    async responder({ texto, archivos = [] }) {
       this.enviandoRespuesta = true
-      const { data, error } = await soporte.responderComoCliente(this.ticketAbierto.id, texto)
+      let adjuntos = []
+      if (archivos.length) {
+        const subida = await adjuntosServicio.subirAdjuntos(this.ticketAbierto.id, archivos)
+        if (subida.error) {
+          this.enviandoRespuesta = false
+          this.errorHilo = subida.error
+          return
+        }
+        adjuntos = subida.data
+      }
+      const { data, error } = await soporte.responderComoCliente(this.ticketAbierto.id, texto, adjuntos.length ? { adjuntos } : undefined)
       this.enviandoRespuesta = false
       if (error) {
         this.errorHilo = error
@@ -364,6 +395,9 @@ export default {
       if (!c || c.mode !== 'human') return
       const i = this.consultas.findIndex((x) => x.id === c.id)
       const abierta = this.ticketAbierto?.id === c.id
+      // El equipo respondió: subió el contador de no leídos (también con el chat cerrado).
+      const antes = i >= 0 ? this.consultas[i].no_leidos_cliente || 0 : 0
+      if ((c.no_leidos_cliente || 0) > antes) this.sonido.reproducir()
       const fusion = { ...(i >= 0 ? this.consultas[i] : {}), ...c }
       // Con el hilo a la vista, lo nuevo ya se está leyendo.
       if (abierta && this.isChatOpen) fusion.no_leidos_cliente = 0
@@ -439,7 +473,7 @@ export default {
   padding: 6px 8px 6px 18px;
   background: rgb(var(--v-theme-surface));
 }
-.chat-header__title { margin: 0; font-size: 1.25rem; font-weight: 700; }
+.chat-header__title { margin: 0; flex: 1; font-size: 1.25rem; font-weight: 700; }
 
 .chat-tabs {
   display: flex;
