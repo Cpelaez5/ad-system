@@ -8,8 +8,8 @@ describe('usoIaTexto', () => {
   it('frase según el porcentaje', () => {
     expect(fraseDeUso(0, '2026-11-01')).toBe('Te queda bastante')
     expect(fraseDeUso(49, '2026-11-01')).toBe('Te queda bastante')
-    expect(fraseDeUso(50, '2026-11-01')).toBe('Vas a mitad de mes de uso')
-    expect(fraseDeUso(79, '2026-11-01')).toBe('Vas a mitad de mes de uso')
+    expect(fraseDeUso(50, '2026-11-01')).toBe('Ya usaste más de la mitad')
+    expect(fraseDeUso(79, '2026-11-01')).toBe('Ya usaste más de la mitad')
     expect(fraseDeUso(80, '2026-11-01')).toBe('Te queda poco')
     expect(fraseDeUso(99, '2026-11-01')).toBe('Te queda poco')
     expect(fraseDeUso(100, '2026-11-01')).toBe('Se renueva el 1 de noviembre')

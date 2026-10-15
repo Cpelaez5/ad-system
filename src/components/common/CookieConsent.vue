@@ -2,7 +2,7 @@
   <v-snackbar
     v-model="showBanner"
     timeout="-1"
-    color="white"
+    color="surface"
     elevation="24"
     location="bottom center"
     rounded="xl"

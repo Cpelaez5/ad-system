@@ -70,7 +70,7 @@ describe('TuAsistente', () => {
     obtenerUsoIa.mockResolvedValue(USO(60))
     const w = montar({ variante: 'completa' })
     await flushPromises()
-    expect(w.text()).toContain('Vas a mitad de mes de uso')
+    expect(w.text()).toContain('Ya usaste más de la mitad')
     expect(w.text()).toContain('Mejoraste 3 fotos')
     expect(w.text()).toContain('Hiciste 18 preguntas al asistente')
     expect(w.find('[data-testid="tu-asistente-mejorar"]').exists()).toBe(false)

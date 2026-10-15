@@ -82,7 +82,7 @@
       </div>
 
       <!-- Tabs de Navegación -->
-      <v-tabs v-model="activeTab" color="primary" class="mb-6 bg-white rounded-lg elevation-1">
+      <v-tabs v-model="activeTab" color="primary" class="mb-6 bg-surface rounded-lg elevation-1">
         <v-tab value="dashboard" prepend-icon="mdi-view-dashboard">Tablero</v-tab>
         <v-tab value="products" prepend-icon="mdi-package-variant">Productos</v-tab>
         <v-tab value="movements" prepend-icon="mdi-history">Movimientos (Kardex)</v-tab>

@@ -41,7 +41,7 @@ export function fraseDeUso(porcentaje, renueva) {
   switch (nivelDeUso(porcentaje)) {
     case 'agotado': return textoRenovacion(renueva)
     case 'poco': return 'Te queda poco'
-    case 'medio': return 'Vas a mitad de mes de uso'
+    case 'medio': return 'Ya usaste más de la mitad'
     default: return 'Te queda bastante'
   }
 }

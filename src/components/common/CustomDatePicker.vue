@@ -35,7 +35,7 @@
           variant="outlined"
           density="comfortable"
           hide-details="auto"
-          class="bg-white"
+          class="bg-surface"
           @input="onInput"
           @keydown.enter="onEnter"
           @keydown.tab="onTab"

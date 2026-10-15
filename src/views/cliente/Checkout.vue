@@ -107,7 +107,7 @@
         </v-card>
 
         <!-- Switch Saldo a Favor -->
-        <v-card v-if="balance.saldoAFavor > 0 && selectedMethodType !== 'balance'" variant="outlined" color="success" class="pa-3 mb-6 bg-white" rounded="lg">
+        <v-card v-if="balance.saldoAFavor > 0 && selectedMethodType !== 'balance'" variant="outlined" color="success" class="pa-3 mb-6 bg-surface" rounded="lg">
           <v-switch
             v-model="useBalance"
             color="success"
@@ -129,7 +129,7 @@
         </v-alert>
 
         <!-- WhatsApp Contact for All Plans -->
-        <v-card variant="outlined" color="success" class="pa-4 bg-white" rounded="lg" style="border-width: 2px;">
+        <v-card variant="outlined" color="success" class="pa-4 bg-surface" rounded="lg" style="border-width: 2px;">
           <div class="d-flex align-start">
             <v-avatar color="success" variant="tonal" size="40" class="mr-3">
               <v-icon size="24" color="success">mdi-whatsapp</v-icon>
@@ -150,7 +150,7 @@
       </v-col>
 
       <!-- Columna Derecha: Métodos de Pago (Mobile: Abajo) -->
-      <v-col cols="12" md="7" lg="8" class="pa-4 pa-md-8 order-2 order-md-1 bg-white" style="border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.04);">
+      <v-col cols="12" md="7" lg="8" class="pa-4 pa-md-8 order-2 order-md-1 bg-surface" style="border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.04);">
         
         <h1 class="text-h4 font-weight-black text-secondary mb-2">Completar Pago</h1>
         <p class="text-body-1 text-medium-emphasis mb-8">Selecciona el método de pago que prefieras y reporta tu transacción.</p>

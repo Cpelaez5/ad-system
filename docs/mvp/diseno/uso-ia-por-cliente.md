@@ -33,7 +33,7 @@ Los créditos por función viven en una tabla (`ia_tarifas`) que edita el super 
 - Los créditos son solo la unidad **interna** (super admin, cálculos).
 - Al cliente se le habla de **"Tu asistente"**: una **barra** con el porcentaje del mes y una frase según cuánto queda:
   - menos del 50 %: "Te queda bastante";
-  - del 50 al 80 %: "Vas a mitad de mes de uso";
+  - del 50 al 80 %: "Ya usaste más de la mitad";
   - del 80 al 99 %: "Te queda poco";
   - 100 %: "Se renueva el 1 de noviembre".
 - El detalle se dice en **acciones**: "Leíste 12 facturas con foto · Mejoraste 3 fotos · Hiciste 18 preguntas". Nunca en números de créditos.
