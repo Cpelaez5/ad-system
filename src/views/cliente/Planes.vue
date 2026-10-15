@@ -34,6 +34,9 @@
       <p class="text-body-1 text-medium-emphasis mb-0">Todavía no tienes un plan. Elige el que mejor se ajuste a tu negocio.</p>
     </header>
 
+    <!-- Tu asistente: uso de IA del mes en lenguaje sencillo (no pinta nada si no hay datos) -->
+    <TuAsistente variante="completa" tarjeta class="mb-8 planes-page__asistente" />
+
     <PricingSection
       title="Compara los planes"
       subtitle="Cambia de plan cuando quieras."
@@ -62,13 +65,14 @@
 <script>
 import PricingSection from '@/components/common/PricingSection.vue';
 import PanelSiguientePaso from '@/components/ui/PanelSiguientePaso.vue';
+import TuAsistente from '@/components/cliente/TuAsistente.vue';
 import plansService from '@/services/plansService';
 import userService from '@/services/userService';
 import { parseFechaLocal, formatFechaLocal } from '@/utils/fechas.js';
 
 export default {
   name: 'Planes',
-  components: { PricingSection, PanelSiguientePaso },
+  components: { PricingSection, PanelSiguientePaso, TuAsistente },
   data() {
     return {
       processingPlan: null,

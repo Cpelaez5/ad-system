@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient'
+import { avisarIaUsada } from '@/utils/eventosIa'
 import { getCurrentOrganizationId, getCurrentClientId } from '@/utils/tenantHelpers'
 import { obtenerUrlFirmada } from '@/services/storageUrlService'
 
@@ -169,6 +170,7 @@ async function invocar(body, mensajeFallo) {
     const { data, error } = await supabase.functions.invoke('producto-ia', { body })
     if (error) return { data: null, error: mensajeFallo }
     if (data?.error) return { data: null, error: data.error.message || mensajeFallo }
+    avisarIaUsada()
     return { data, error: null }
   } catch {
     return { data: null, error: mensajeFallo }

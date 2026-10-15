@@ -8,15 +8,19 @@
     @update:model-value="cancelar"
   >
     <div class="cf" aria-live="polite">
-      <div class="cf__foto">
-        <img v-if="vistaPrevia" :src="vistaPrevia" alt="Tu foto" class="cf__img">
-        <v-progress-circular v-if="!error" indeterminate color="primary" size="56" class="cf__giro" />
-      </div>
       <template v-if="!error">
-        <p class="cf__mensaje">{{ mensaje }}</p>
+        <TrabajandoIA :mensaje="mensaje" class="cf__trabajando">
+          <div class="cf__foto">
+            <img v-if="vistaPrevia" :src="vistaPrevia" alt="Tu foto" class="cf__img">
+            <v-progress-circular indeterminate color="primary" size="56" class="cf__giro" />
+          </div>
+        </TrabajandoIA>
         <p class="cf__ayuda">Esto toma unos segundos.</p>
       </template>
       <template v-else>
+        <div class="cf__foto">
+          <img v-if="vistaPrevia" :src="vistaPrevia" alt="Tu foto" class="cf__img">
+        </div>
         <v-icon icon="mdi-alert-circle-outline" color="warning" size="36" aria-hidden="true" />
         <p class="cf__mensaje">{{ error }}</p>
       </template>
@@ -41,6 +45,7 @@
  */
 import { onBeforeUnmount, ref, watch } from 'vue'
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
+import TrabajandoIA from '@/components/ui/TrabajandoIA.vue'
 import { subirFoto, identificarProducto } from '@/services/productoFotoService'
 import { camposDe } from '@/constants/rubros'
 import { MENSAJES_ANALISIS, avisoDeIdentificacion } from '@/utils/fotoYListo'

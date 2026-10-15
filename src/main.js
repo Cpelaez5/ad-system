@@ -54,6 +54,7 @@ import './styles/vuetify-overrides.css'
 
 // Importar animaciones globales
 import './styles/animations.css'
+import './styles/ia.css'
 
 // Date Picker
 import VueDatePicker from '@vuepic/vue-datepicker'

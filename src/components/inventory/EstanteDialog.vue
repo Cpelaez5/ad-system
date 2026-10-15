@@ -10,11 +10,12 @@
   >
     <!-- ═══ Analizando ═══ -->
     <div v-if="paso === 'analizando'" class="es-espera" aria-live="polite">
-      <div class="es-espera__foto">
-        <img v-if="vistaPrevia" :src="vistaPrevia" alt="Tu foto del estante" class="es-espera__img">
-        <v-progress-circular indeterminate color="primary" size="56" class="es-espera__giro" />
-      </div>
-      <p class="es-espera__mensaje">{{ mensajeEspera }}</p>
+      <TrabajandoIA :mensaje="mensajeEspera">
+        <div class="es-espera__foto">
+          <img v-if="vistaPrevia" :src="vistaPrevia" alt="Tu foto del estante" class="es-espera__img">
+          <v-progress-circular indeterminate color="primary" size="56" class="es-espera__giro" />
+        </div>
+      </TrabajandoIA>
       <p class="es-espera__ayuda">Puede tardar unos segundos.</p>
     </div>
 
@@ -164,6 +165,7 @@
  */
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import DialogoAdaptable from '@/components/ui/DialogoAdaptable.vue'
+import TrabajandoIA from '@/components/ui/TrabajandoIA.vue'
 import inventoryService from '@/services/inventoryService'
 import {
   subirFoto, subirBlob, identificarEstante, recortarImagen, medirImagen, borrarFotos, unidadDelFormulario,

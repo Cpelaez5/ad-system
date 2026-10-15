@@ -88,6 +88,9 @@
       />
 
       <v-divider class="my-2" />
+      <div class="hoja-mas__asistente">
+        <TuAsistente variante="compacta" />
+      </div>
       <v-list-item
         prepend-icon="mdi-logout"
         title="Cerrar sesión"
@@ -98,6 +101,7 @@
 </template>
 
 <script>
+import TuAsistente from '@/components/cliente/TuAsistente.vue'
 import { formatTasa } from '@/utils/formatMoney.js'
 import { formatFechaCorta } from '@/utils/fechas.js'
 import { getMenuClienteMas } from './menuPorRol.js'
@@ -120,6 +124,8 @@ import { getMenuClienteMas } from './menuPorRol.js'
  */
 export default {
   name: 'HojaMas',
+
+  components: { TuAsistente },
 
   props: {
     isServicesCompany: { type: Boolean, default: false },
@@ -157,6 +163,7 @@ export default {
 </script>
 
 <style scoped>
+.hoja-mas__asistente { padding: 0 8px; }
 .hoja-mas__tasa-valor {
   font-family: 'Roboto Mono', monospace;
   font-weight: 700;
