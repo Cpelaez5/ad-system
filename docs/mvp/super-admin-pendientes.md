@@ -60,6 +60,8 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 
 - ✅ **Empresas (2026-10-16):** `/admin/empresas` lista los negocios (RPC `admin_listar_empresas`, solo super_admin) con buscador por nombre/RIF, filtros con cantidades (en prueba, al día, por cobrar, sin uso en 30 días) y detalle con plan, prueba, cobros, actividad, uso del asistente y contacto (WhatsApp, llamar, correo). Pendiente: contador asignado (cuando haya más de un despacho), extender la prueba y activar el plan desde el detalle.
 
+- **Seguridad antes del lanzamiento (2026-10-16):** `send-invoice-email` acepta cualquier `to` y cualquier URL de adjunto de un usuario con sesión: se puede usar para mandar correos a terceros desde avisos@adsystemapp.com y para que el servidor descargue URLs arbitrarias. Limitar `to` al correo del propio usuario / sus correos configurados (y a los super admin en `payment_report`), y los adjuntos al Storage de Supabase.
+
 ## 6. Pendientes del usuario fuera del sistema
 - Poner privado el repositorio de GitHub.
 - Quitar `VITE_DEEPSEEK_*` y `VITE_NVIDIA_*` de Netlify y del `.env`.
