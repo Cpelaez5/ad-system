@@ -63,6 +63,7 @@ export function getMenuPorRol({ role, isServicesCompany = false } = {}) {
 
   if (role === 'super_admin') {
     items.push(
+      { key: 'empresas', titulo: 'Empresas', icono: 'mdi-domain', to: { name: 'AdminEmpresas' } },
       { key: 'facturacion-sistema', titulo: 'Facturación', icono: 'mdi-receipt-text-outline', to: { name: 'FacturacionSistema' } },
       { key: 'ai-settings', titulo: 'Configuración IA', icono: 'mdi-robot-outline', to: { name: 'AiSettings' } },
       {

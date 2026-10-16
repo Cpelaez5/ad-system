@@ -58,7 +58,7 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 - Seguridad: la llave del proveedor de IA (`ai_provider_profiles.encrypted_api_key`) se guarda **sin cifrar**, aunque solo la lee el super admin (RLS) y ya no viaja al navegador. Pasarla a Supabase Vault y que las funciones la lean de ahí.
 - Seguridad: activar "Leaked password protection" en Supabase Auth (aviso del linter) y mover `pg_net` fuera del esquema `public`.
 
-- **Empresas (lista de negocios):** no existe una pantalla con la lista de negocios/organizaciones. Se quitó el ítem "Empresas" del menú del super admin (llevaba al dashboard viejo). Crear `/admin/empresas`: lista de negocios con plan, estado, último movimiento y contador asignado.
+- ✅ **Empresas (2026-10-16):** `/admin/empresas` lista los negocios (RPC `admin_listar_empresas`, solo super_admin) con buscador por nombre/RIF, filtros con cantidades (en prueba, al día, por cobrar, sin uso en 30 días) y detalle con plan, prueba, cobros, actividad, uso del asistente y contacto (WhatsApp, llamar, correo). Pendiente: contador asignado (cuando haya más de un despacho), extender la prueba y activar el plan desde el detalle.
 
 ## 6. Pendientes del usuario fuera del sistema
 - Poner privado el repositorio de GitHub.
