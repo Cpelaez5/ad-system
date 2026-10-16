@@ -12,15 +12,15 @@ test.use({ storageState: CLIENTE_STORAGE })
 const TIMEOUT_REDIRECCION = 25_000
 
 test.describe('Seguridad — cliente no puede ver pantallas de admin', () => {
-  test('/usuarios redirige al cliente a /cliente/inicio', async ({ page }) => {
+  test('/usuarios le muestra al cliente la pantalla Sin permiso', async ({ page }) => {
     await page.goto('/usuarios')
-    await expect(page).toHaveURL(/\/cliente\/inicio/, { timeout: TIMEOUT_REDIRECCION })
-    await expect(page.getByRole('heading', { name: /Hola,/ })).toBeVisible()
+    await expect(page).toHaveURL(/\/sin-permiso/, { timeout: TIMEOUT_REDIRECCION })
+    await expect(page.getByRole('heading', { name: 'Esta parte no es para tu cuenta' })).toBeVisible()
   })
 
-  test('/admin/ai-settings redirige al cliente a /cliente/inicio', async ({ page }) => {
+  test('/admin/ai-settings le muestra al cliente la pantalla Sin permiso', async ({ page }) => {
     await page.goto('/admin/ai-settings')
-    await expect(page).toHaveURL(/\/cliente\/inicio/, { timeout: TIMEOUT_REDIRECCION })
-    await expect(page.getByRole('heading', { name: /Hola,/ })).toBeVisible()
+    await expect(page).toHaveURL(/\/sin-permiso/, { timeout: TIMEOUT_REDIRECCION })
+    await expect(page.getByRole('heading', { name: 'Esta parte no es para tu cuenta' })).toBeVisible()
   })
 })

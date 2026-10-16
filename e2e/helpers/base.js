@@ -93,6 +93,8 @@ export const test = base.extend({
     // (su propio comportamiento se prueba aparte, sin este fixture).
     await page.addInitScript(() => {
       try { if (!localStorage.getItem('ad_cookie_consent')) localStorage.setItem('ad_cookie_consent', 'rejected') } catch { /* sin storage */ }
+      // La pregunta de avisos push se da por respondida ("Ahora no" recién): no tapa botones.
+      try { if (!localStorage.getItem('ad_push_pregunta')) localStorage.setItem('ad_push_pregunta', String(Date.now())) } catch { /* sin storage */ }
     })
     const originalGoto = page.goto.bind(page)
     page.goto = async (url, options) => {

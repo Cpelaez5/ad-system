@@ -28,24 +28,12 @@
 
               <!-- Camino principal: la IA lee la foto o el PDF y llena el formulario -->
               <div v-if="mostrarIA" class="papel-ia" data-testid="papel-ia">
-                <v-menu v-if="esTelefono" location="bottom start">
-                  <template #activator="{ props: menu }">
-                    <BotonIA
-                      v-bind="menu" icono="mdi-file-document-outline" color="primary" variant="elevated"
-                      size="large" block class="papel-ia__boton" data-testid="papel-llenar-ia"
-                    >Llenar desde la foto o PDF</BotonIA>
-                  </template>
-                  <v-list>
-                    <v-list-item prepend-icon="mdi-camera-outline" title="Tomar foto" @click="$refs.camaraIA?.click()" />
-                    <v-list-item prepend-icon="mdi-file-upload-outline" title="Elegir foto o PDF" @click="$refs.archivoIA?.click()" />
-                  </v-list>
-                </v-menu>
+                <!-- Un solo botón: en el teléfono el selector del sistema ya ofrece "Cámara". -->
                 <BotonIA
-                  v-else icono="mdi-file-document-outline" color="primary" variant="elevated" size="large"
-                  block class="papel-ia__boton" data-testid="papel-llenar-ia" @click="$refs.archivoIA?.click()"
+                  icono="mdi-file-document-outline" color="primary" variant="elevated" size="large"
+                  block class="papel-ia__boton" data-testid="papel-llenar-ia" @click="inputArchivoIA?.click()"
                 >Llenar desde la foto o PDF</BotonIA>
-                <input ref="camaraIA" type="file" accept="image/*" capture="environment" class="papel-ia__input" @change="elegidoIA">
-                <input ref="archivoIA" type="file" accept="image/*,application/pdf" class="papel-ia__input" data-testid="papel-input-ia" @change="elegidoIA">
+                <input ref="inputArchivoIA" type="file" accept="image/*,application/pdf" class="papel-ia__input" data-testid="papel-input-ia" @change="elegidoIA">
                 <p class="papel-ia__ayuda">La IA lee tu documento y llena los datos por ti. Tú solo los revisas.</p>
                 <v-btn variant="text" color="primary" class="text-none" data-testid="papel-escribir" @click="modo = 'manual'">
                   Escribirlo yo
@@ -361,9 +349,11 @@ const newFile = ref(null)
 const modo = ref('ia') // 'ia' = ofrece el botón de IA; 'manual' = subida clásica
 const leyendoIA = ref(false)
 const archivoIA = ref(null)
+// Ojo: el <input> NO puede llamarse ref="archivoIA": en <script setup> Vue escribiría el
+// elemento en esta variable y el bloque entraría en un ciclo infinito de actualizaciones.
+const inputArchivoIA = ref(null)
 const marcaIA = ref('')
 const avisoIA = ref('')
-const esTelefono = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 600px)').matches
 const mostrarIA = computed(() => !props.editingItem && modo.value === 'ia' && !archivoIA.value && !leyendoIA.value && !newFile.value)
 
 // OCR State
