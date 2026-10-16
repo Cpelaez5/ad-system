@@ -17,7 +17,7 @@
 
     <!-- Teléfono: hoja a pantalla casi completa -->
     <DialogoAdaptable v-if="esMovil" v-model="abierto" titulo="Avisos" icono="mdi-bell-outline">
-      <PanelNotificaciones v-bind="propsPanel" v-on="eventosPanel" class="campana__panel-movil" />
+      <PanelNotificaciones v-bind="propsPanel" sin-titulo v-on="eventosPanel" class="campana__panel-movil" />
     </DialogoAdaptable>
 
     <!-- Escritorio: panel desplegable de 400 px -->

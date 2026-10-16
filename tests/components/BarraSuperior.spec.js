@@ -11,6 +11,8 @@ const globalConfig = {
   stubs: {
     ChipTasa: { template: '<span class="chip-tasa-stub" />', props: ['currency', 'rateValue', 'loading', 'error'] },
     MenuUsuario: true,
+    // La campanita tiene su propio spec y usa useDisplay (Vuetify), que aquí no está instalado.
+    CampanaNotificaciones: { template: '<span class="campana-stub" />' },
     TasaRapida: { template: '<div class="tasa-rapida-stub" />' },
     // v-menu: renderiza el activador (los chips) y el contenido solo si está abierto.
     VMenu: {

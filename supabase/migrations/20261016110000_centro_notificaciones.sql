@@ -333,6 +333,12 @@ select cron.schedule(
     ),
     body := '{"modo":"correos_pendientes"}'::jsonb,
     timeout_milliseconds := 20000
+  )
+  -- Solo llama a la función si hay correos de soporte esperando (no 1.440 llamadas vacías al día).
+  where exists (
+    select 1 from public.notificaciones
+     where tipo like 'soporte\_%' and correo_enviado_en is null and correo_omitido is null
+       and created_at < now() - interval '2 minutes'
   );
   $$
 );

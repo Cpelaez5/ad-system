@@ -4,7 +4,7 @@
  * (supabase/migrations/20261016110000_centro_notificaciones.sql). La RLS deja a cada persona
  * ver y marcar solo lo suyo. Devuelve { data, error } (error = texto en español o null); no lanza.
  */
-import { supabase } from '@/lib/supabaseClient'
+import { supabase, canalConSesion } from '@/lib/supabaseClient'
 import { logger } from '@/utils/logger'
 
 export const TAMANO_PAGINA = 30
@@ -51,12 +51,10 @@ export async function contarNoLeidas() {
  */
 export function suscribir(userId, alCambiar) {
   if (!userId) return () => {}
-  const canal = supabase
-    .channel(`notificaciones-${userId}`)
+  // canalConSesion: si el canal se une sin la sesión, RLS filtra todos los avisos.
+  return canalConSesion(`notificaciones-${userId}`, (canal) => canal
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notificaciones', filter: `user_id=eq.${userId}` },
-      (payload) => alCambiar({ tipo: payload.eventType, fila: payload.new, anterior: payload.old }))
-    .subscribe()
-  return () => { supabase.removeChannel(canal) }
+      (payload) => alCambiar({ tipo: payload.eventType, fila: payload.new, anterior: payload.old })))
 }
 
 async function marcar(params) {

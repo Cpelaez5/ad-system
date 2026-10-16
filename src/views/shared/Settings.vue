@@ -151,10 +151,14 @@
         <v-card class="settings-card h-100" rounded="xl" elevation="0">
           <div class="settings-card-header">
             <v-icon color="white" class="mr-2">mdi-email-outline</v-icon>
-            <span>Notificaciones por Correo</span>
+            <span>Copia de tus registros por correo</span>
           </div>
 
           <v-card-text class="pa-6">
+            <p class="text-body-2 text-medium-emphasis mb-4">
+              Cada vez que registras una venta, compra o gasto, te mandamos una copia a estos correos.
+              Los avisos (respuestas del equipo, vencimientos) se eligen más abajo, en "Qué avisos te llegan".
+            </p>
 
             <!-- ── Correo principal (configurable) ── -->
             <p class="text-caption font-weight-bold text-uppercase text-grey-darken-1 mb-2">
@@ -766,17 +770,19 @@ export default {
   box-shadow: 0 4px 14px rgba(168, 28, 34, 0.3);
 }
 
-.settings-card {
-  border: 1px solid #e8ecf0;
+/* :deep para que las tarjetas de los componentes hijos (Avisos) se vean igual. */
+.settings-page :deep(.settings-card) {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   overflow: hidden;
   transition: box-shadow 0.2s ease;
 }
-.settings-card:hover {
+.settings-page :deep(.settings-card:hover) {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
 }
 
-.settings-card-header {
-  background: linear-gradient(135deg, #2A2A2E, #2d4a7a);
+.settings-page :deep(.settings-card-header) {
+  /* Carbón de la marca (antes un degradado a azul marino, que no es de AD System). */
+  background: #2A2A2E;
   padding: 16px 24px;
   display: flex;
   align-items: center;

@@ -1,7 +1,8 @@
 <template>
   <div class="panel-avisos" data-testid="panel-avisos">
-    <div class="panel-avisos__encabezado">
-      <h2 class="panel-avisos__titulo">Avisos</h2>
+    <!-- En el teléfono la hoja ya dice "Avisos": aquí no se repite el título (sinTitulo). -->
+    <div v-if="!sinTitulo || noLeidas > 0" class="panel-avisos__encabezado">
+      <h2 v-if="!sinTitulo" class="panel-avisos__titulo">Avisos</h2>
       <v-btn
         v-if="noLeidas > 0"
         variant="text"
@@ -77,6 +78,8 @@ defineProps({
   cargando: { type: Boolean, default: false },
   hayMas: { type: Boolean, default: false },
   ahora: { type: Date, default: () => new Date() },
+  /** Sin el título "Avisos" (cuando el contenedor ya lo muestra, p. ej. la hoja del teléfono). */
+  sinTitulo: { type: Boolean, default: false },
 })
 defineEmits(['abrir', 'marcar-todas', 'ver-mas', 'preferencias'])
 </script>
