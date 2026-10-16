@@ -187,3 +187,10 @@ app.config.errorHandler = (err, instance, info) => {
 
 // Montar la aplicación
 app.mount('#app')
+
+// Service worker de avisos push (solo producción o localhost)
+if ('serviceWorker' in navigator && (import.meta.env.PROD || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((e) => logger.warn('No se registró el service worker', e))
+  })
+}

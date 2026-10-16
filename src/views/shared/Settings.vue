@@ -345,6 +345,10 @@
 
     </v-row>
 
+    <v-row class="mt-2">
+      <v-col cols="12"><AvisosDispositivo /></v-col>
+    </v-row>
+
     <!-- ─── Notificaciones del Sistema (Solo Super Admin) ────────────── -->
     <v-row v-if="isSuperAdmin" class="mt-2">
       <v-col cols="12">
@@ -502,12 +506,14 @@
 </template>
 
 <script>
+import AvisosDispositivo from '@/components/layout/AvisosDispositivo.vue'
 import userSettingsService from '@/services/user-settings-service.js'
 import { supabase } from '@/lib/supabaseClient'
 import userService from '@/services/userService'
 
 export default {
   name: 'SettingsView',
+  components: { AvisosDispositivo },
 
   data() {
     // Carga síncrona desde cache local (instantánea)

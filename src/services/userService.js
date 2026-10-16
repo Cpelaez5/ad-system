@@ -632,6 +632,12 @@ const userService = {
         console.log('🔄 Cerrando sesión...');
 
         // Cerrar sesión en Supabase
+        // Quitar los avisos de ESTE dispositivo (necesita la sesión: va antes de cerrarla)
+        try {
+          const { desactivarPush } = await import('@/services/pushService.js');
+          await desactivarPush();
+        } catch (e) { /* no debe impedir cerrar sesión */ }
+
         const { error } = await supabase.auth.signOut();
 
         if (error) {

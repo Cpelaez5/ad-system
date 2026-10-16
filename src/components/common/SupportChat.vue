@@ -171,6 +171,9 @@ export default {
     'currentUser.id'() {
       this.suscribirConsultas()
     },
+    '$route.query.soporte'() {
+      this.abrirDesdeUrl()
+    },
   },
 
   mounted() {
@@ -180,6 +183,7 @@ export default {
     window.addEventListener('userUpdated', this.loadUser)
     window.addEventListener('ad-open-support-chat', this.openChat)
     this.suscribirConsultas()
+    this.abrirDesdeUrl()
   },
 
   beforeUnmount() {
@@ -205,6 +209,17 @@ export default {
     },
 
     // ─── Abrir y cerrar ───
+    // Aviso push: /cliente/inicio?soporte=<id> abre esa consulta.
+    async abrirDesdeUrl() {
+      const id = this.$route?.query?.soporte
+      if (!id || !this.currentUser?.id) return
+      await this.openChat()
+      const consulta = this.consultas.find((c) => c.id === id)
+      this.irAConsultas()
+      if (consulta) this.abrirTicket(consulta)
+      const { soporte: _quitar, ...resto } = this.$route.query
+      this.$router.replace({ query: resto })
+    },
     async openChat() {
       this.isChatOpen = true
       this.refreshLimits()
