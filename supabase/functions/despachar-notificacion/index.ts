@@ -16,6 +16,9 @@ const VIGENCIA_CORREO_SOPORTE_MS = 24 * 60 * 60 * 1000;
 // <<PURE — esta zona se prueba en tests/functions/despacharNotificacion.test.js (se transpila con esbuild).
 // Solo funciones puras: sin Deno, sin red, sin variables de fuera salvo las que se declaran aquí.
 
+// Imagotipo oficial en PNG (los correos no muestran SVG), versión liviana de 480 px sobre blanco.
+const LOGO_CORREO = 'https://adsystemapp.com/ADSystem/png/logo-correo.png';
+
 function escaparHtml(texto: unknown): string {
   return String(texto ?? '')
     .replace(/&/g, '&amp;')
@@ -60,7 +63,7 @@ function etiquetaBoton(tipo: string): string {
 }
 
 /** Correo simple y accesible: colores explícitos (sirve en modo oscuro de los clientes de correo). */
-function construirCorreoHtml(p: { titulo: string; lineas: string[]; extra?: string; urlBoton: string; boton: string; nombreEvento: string; urlPreferencias: string }): string {
+function construirCorreoHtml(p: { titulo: string; lineas: string[]; extra?: string; urlBoton: string; boton: string; nombreEvento: string; urlPreferencias: string; urlLogo?: string; urlApp?: string }): string {
   const GRANATE = '#8E1818';
   const parrafos = (p.lineas || [])
     .map((l) => `<p style="margin:0 0 12px;font-size:16px;line-height:1.55;color:#2A2A2E;">${textoAHtml(l)}</p>`)
@@ -73,8 +76,8 @@ function construirCorreoHtml(p: { titulo: string; lineas: string[]; extra?: stri
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F4F5;padding:20px 12px;">
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#FFFFFF;border-radius:12px;overflow:hidden;">
-  <tr><td style="padding:20px 24px;border-bottom:4px solid ${GRANATE};">
-    <span style="font-size:22px;font-weight:800;color:#2A2A2E;letter-spacing:0.5px;">AD <span style="color:${GRANATE};">System</span></span>
+  <tr><td style="padding:20px 24px;background-color:#FFFFFF;border-bottom:4px solid ${GRANATE};">
+    <a href="${escaparHtml(p.urlApp || p.urlBoton)}" style="text-decoration:none;"><img src="${escaparHtml(p.urlLogo || LOGO_CORREO)}" alt="AD System" width="168" height="36" style="display:block;width:168px;height:36px;border:0;outline:none;"></a>
   </td></tr>
   <tr><td style="padding:24px 24px 8px;">
     <h1 style="margin:0 0 16px;font-size:20px;line-height:1.35;color:#2A2A2E;">${escaparHtml(p.titulo)}</h1>

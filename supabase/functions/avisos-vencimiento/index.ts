@@ -68,10 +68,10 @@ function buildAvisoHtml(payload: {
 
   // Colores de marca AD System (docs/mvp/diseno/sistema-diseno.md §2.4)
   const PRIMARY = "#8E1818"; // granate AD System
-  const SECONDARY = "#1F355C"; // azul de apoyo
-  const ACCENT = "#E0B04F"; // dorado de apoyo
+  const SECONDARY = "#2A2A2E"; // carbón AD System (antes azul marino de AD Business Group)
+  const ACCENT = "#8E1818"; // granate AD System (antes dorado de AD Business Group)
   const BG = "#EFEFEF";
-  const LOGO_URL = "https://adsystemapp.com/ADSystem/png/logo.png"; // imagotipo oficial AD System (PNG: los correos no muestran SVG)
+  const LOGO_URL = "https://adsystemapp.com/ADSystem/png/logo-correo.png"; // imagotipo oficial AD System (PNG: los correos no muestran SVG)
 
   const items = mensajes
     .map(
@@ -94,7 +94,7 @@ function buildAvisoHtml(payload: {
 
   <tr>
     <td style="background:#ffffff;padding:22px 24px;text-align:center;border-bottom:4px solid ${PRIMARY};">
-      <img src="${LOGO_URL}" alt="AD System" height="36" style="display:inline-block;">
+      <img src="${LOGO_URL}" alt="AD System" width="168" height="36" style="display:inline-block;width:168px;height:36px;border:0;">
     </td>
   </tr>
 

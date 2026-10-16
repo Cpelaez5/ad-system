@@ -36,7 +36,8 @@ describe('despachar-notificacion · correo', () => {
       titulo: 'Te respondió el equipo', lineas: ['Hola'], urlBoton: 'https://adsystemapp.com/cliente/inicio?soporte=1',
       boton: 'Ver respuesta', nombreEvento: 'El equipo respondió tu consulta', urlPreferencias: 'https://adsystemapp.com/settings?seccion=avisos',
     })
-    expect(html).toContain('AD <span')
+    // El logo oficial (imagen), no el nombre escrito en texto.
+    expect(html).toContain('<img src="https://adsystemapp.com/ADSystem/png/logo-correo.png" alt="AD System"')
     expect(html).toContain('Ver respuesta')
     expect(html).toContain('#8E1818')
     expect(html).toContain('Recibes este correo porque tienes activados los avisos de <strong>El equipo respondió tu consulta</strong>')

@@ -70,10 +70,10 @@ function buildEmailHtml(payload: {
 
   // Colores corporativos
   const PRIMARY = "#A81C22";
-  const SECONDARY = "#1F355C";
-  const ACCENT = "#E0B04F";
+  const SECONDARY = "#2A2A2E"; // carbón AD System (antes azul marino de AD Business Group)
+  const ACCENT = "#8E1818"; // granate AD System (antes dorado de AD Business Group)
   const BG = "#f7f7f7";
-  const LOGO_URL = "https://adsystemapp.com/icon-adaptableV2.svg";
+  const LOGO_URL = "https://adsystemapp.com/ADSystem/png/logo-correo.png"; // PNG: los correos no muestran SVG
 
   // Filas de ítems
   const itemRows = items
@@ -98,13 +98,12 @@ function buildEmailHtml(payload: {
 
   <!-- Header -->
   <tr>
-    <td style="background:${SECONDARY};padding:28px 32px;text-align:center;">
-      <img src="${LOGO_URL}" alt="AD System" height="48" style="display:inline-block;vertical-align:middle;margin-right:12px;">
-      <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:1px;">AD System</span>
+    <td style="background:#ffffff;padding:24px 32px;text-align:center;">
+      <img src="${LOGO_URL}" alt="AD System" width="168" height="36" style="display:inline-block;width:168px;height:36px;border:0;">
     </td>
   </tr>
 
-  <!-- Línea decorativa dorada -->
+  <!-- Línea granate de la marca -->
   <tr><td style="background:${ACCENT};height:4px;"></td></tr>
 
   <!-- Saludo -->
@@ -239,10 +238,10 @@ function buildPaymentStatusHtml(payload: {
     new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 
   const PRIMARY = "#A81C22";
-  const SECONDARY = "#1F355C";
-  const ACCENT = "#E0B04F";
+  const SECONDARY = "#2A2A2E"; // carbón AD System (antes azul marino de AD Business Group)
+  const ACCENT = "#8E1818"; // granate AD System (antes dorado de AD Business Group)
   const BG = "#f7f7f7";
-  const LOGO_URL = "https://adsystemapp.com/icon-adaptableV2.svg";
+  const LOGO_URL = "https://adsystemapp.com/ADSystem/png/logo-correo.png"; // PNG: los correos no muestran SVG
 
   const isApproved = status === 'approved';
   const statusColor = isApproved ? "#4CAF50" : PRIMARY;
@@ -261,12 +260,11 @@ function buildPaymentStatusHtml(payload: {
   
   <!-- Header -->
   <tr>
-    <td style="background:${SECONDARY};padding:28px 32px;text-align:center;">
-      <img src="${LOGO_URL}" alt="AD System" height="48" style="display:inline-block;vertical-align:middle;margin-right:12px;">
-      <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:1px;">AD System</span>
+    <td style="background:#ffffff;padding:24px 32px;text-align:center;">
+      <img src="${LOGO_URL}" alt="AD System" width="168" height="36" style="display:inline-block;width:168px;height:36px;border:0;">
     </td>
   </tr>
-  <!-- Línea decorativa dorada -->
+  <!-- Línea granate de la marca -->
   <tr><td style="background:${ACCENT};height:4px;"></td></tr>
 
   <!-- Contenido -->
@@ -342,10 +340,10 @@ function buildPaymentReportHtml(payload: {
     new Intl.NumberFormat("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 
   const PRIMARY = "#A81C22";
-  const SECONDARY = "#1F355C";
-  const ACCENT = "#E0B04F";
+  const SECONDARY = "#2A2A2E"; // carbón AD System (antes azul marino de AD Business Group)
+  const ACCENT = "#8E1818"; // granate AD System (antes dorado de AD Business Group)
   const BG = "#f7f7f7";
-  const LOGO_URL = "https://adsystemapp.com/icon-adaptableV2.svg";
+  const LOGO_URL = "https://adsystemapp.com/ADSystem/png/logo-correo.png"; // PNG: los correos no muestran SVG
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -357,12 +355,11 @@ function buildPaymentReportHtml(payload: {
   
   <!-- Header -->
   <tr>
-    <td style="background:${SECONDARY};padding:28px 32px;text-align:center;">
-      <img src="${LOGO_URL}" alt="AD System" height="48" style="display:inline-block;vertical-align:middle;margin-right:12px;">
-      <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:1px;">AD System</span>
+    <td style="background:#ffffff;padding:24px 32px;text-align:center;">
+      <img src="${LOGO_URL}" alt="AD System" width="168" height="36" style="display:inline-block;width:168px;height:36px;border:0;">
     </td>
   </tr>
-  <!-- Línea decorativa dorada -->
+  <!-- Línea granate de la marca -->
   <tr><td style="background:${ACCENT};height:4px;"></td></tr>
 
   <!-- Contenido -->
