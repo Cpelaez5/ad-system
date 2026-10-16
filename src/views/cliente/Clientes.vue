@@ -516,7 +516,9 @@ export default {
       this.exportando = true
       try {
         const ExcelJS = await import('exceljs')
+        const { estilizarFilaEncabezado, FORMATO_USD } = await import('@/utils/estiloExcel.js')
         const wb = new ExcelJS.Workbook()
+        wb.creator = 'AD System'
         const ws = wb.addWorksheet('Mis clientes')
         ws.columns = [
           { header: 'Nombre', key: 'nombre', width: 34 },
@@ -527,7 +529,11 @@ export default {
           { header: 'Comprado este año (USD)', key: 'anio', width: 24 },
           { header: 'Te debe (USD)', key: 'debe', width: 16 }
         ]
-        ws.getRow(1).font = { bold: true }
+        estilizarFilaEncabezado(ws.getRow(1))
+        ws.views = [{ state: 'frozen', ySplit: 1 }]
+        ws.getColumn('c90').numFmt = FORMATO_USD
+        ws.getColumn('anio').numFmt = FORMATO_USD
+        ws.getColumn('debe').numFmt = FORMATO_USD
         this.filtrados.forEach((c) => ws.addRow({
           nombre: c.nombre, rif: c.rif || '', telefono: c.telefono || '', correo: c.correo || '',
           c90: Number(c.totales.comprado90.toFixed(2)), anio: Number(c.totales.compradoAnio.toFixed(2)),

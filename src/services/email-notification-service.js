@@ -56,13 +56,16 @@ class EmailNotificationService {
       invoiceNumber: invoiceData.invoiceNumber || '',
       controlNumber: invoiceData.controlNumber || '',
       flow: invoiceData.flow || 'VENTA',
-      issueDate: invoiceData.issueDate || new Date().toISOString(),
+      issueDate: invoiceData.issueDate || null,
       dueDate: invoiceData.dueDate || null,
       status: invoiceData.status || 'EMITIDA',
       currency: invoiceData.financial?.currency || 'VES',
       totalAmount: invoiceData.financial?.totalSales || invoiceData.financial?.total || 0,
-      subtotal: invoiceData.financial?.subtotal || 0,
-      taxAmount: invoiceData.financial?.taxAmount || 0,
+      // El formulario guarda taxableSales / exemptSales / taxDebit (no subtotal ni taxAmount):
+      // antes el correo mostraba Subtotal 0,00 e IVA 0,00 con un total distinto de cero.
+      subtotal: invoiceData.financial?.subtotal
+        ?? ((Number(invoiceData.financial?.taxableSales) || 0) + (Number(invoiceData.financial?.exemptSales ?? invoiceData.financial?.nonTaxableSales) || 0)),
+      taxAmount: invoiceData.financial?.taxAmount ?? (Number(invoiceData.financial?.taxDebit) || 0),
       items: (invoiceData.items || []).map(item => ({
         description: item.description || '',
         quantity: item.quantity || 0,

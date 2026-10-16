@@ -93,7 +93,7 @@ export async function generarPlantilla(rubro = 'otro') {
   hoja.columns = cols.map((c) => ({ header: c.titulo, key: c.clave, width: c.ancho }))
   const cabecera = hoja.getRow(1)
   cabecera.font = { bold: true, color: { argb: 'FFFFFFFF' } }
-  cabecera.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7A1F2B' } }
+  cabecera.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF8E1818' } }
   cabecera.alignment = { vertical: 'middle', wrapText: true }
   cabecera.height = 30
   hoja.views = [{ state: 'frozen', ySplit: 1 }]

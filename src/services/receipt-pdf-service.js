@@ -11,6 +11,8 @@
 
 import { jsPDF } from 'jspdf'
 import systemLogo from '/ADSystem/logo.png'
+import { formatMoney } from '@/utils/formatMoney'
+import { formatFechaCorta } from '@/utils/fechas'
 
 // ══════════════════════════════════════════════════════
 // Constantes de diseño corporativo
@@ -70,18 +72,15 @@ function checkPage(doc, y, threshold = 268) {
   return y
 }
 
-/** Formatea un número como moneda */
-function fmtCurrency(value, currency = 'VES') {
-  const num = parseFloat(value) || 0
-  const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'Bs.'
-  return `${symbol} ${num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+/** Formatea un monto: Bs 104.036,77 · $ 1.234,56 · € 10,00 (siempre punto de miles y coma decimal) */
+export function fmtCurrency(value, currency = 'VES') {
+  const num = Number.isFinite(Number(value)) ? Number(value) : 0
+  return formatMoney(num, currency)
 }
 
-/** Formatea una fecha ISO a formato legible */
-function fmtDate(dateStr) {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+/** Fecha dd/mm/aaaa en hora local (sin el desfase de un día de las fechas ISO) */
+export function fmtDate(dateStr) {
+  return formatFechaCorta(dateStr) || '—'
 }
 
 /** Obtiene el color asociado al estado de la factura */
@@ -115,21 +114,9 @@ async function drawHeader(doc, pageWidth) {
   // Logo
   try {
     const logoInfo = await getBase64ImageFromURL(systemLogo)
-    const pdfHeight = 16
+    const pdfHeight = 12
     const ratio = logoInfo.width / logoInfo.height
-    const pdfWidth = pdfHeight * ratio
-    doc.addImage(logoInfo.dataURL, 'PNG', MARGIN, y - 6, pdfWidth, pdfHeight)
-
-    // Nombre del sistema al lado del logo
-    doc.setFontSize(18)
-    doc.setTextColor(...COLORS.secondary)
-    doc.setFont('helvetica', 'bold')
-    doc.text('AD System', MARGIN + pdfWidth + 5, y + 1)
-
-    doc.setFontSize(8)
-    doc.setTextColor(...COLORS.grey)
-    doc.setFont('helvetica', 'normal')
-    doc.text('Sistema de Gestion Contable', MARGIN + pdfWidth + 5, y + 6)
+    doc.addImage(logoInfo.dataURL, 'PNG', MARGIN, y - 6, pdfHeight * ratio, pdfHeight)
   } catch (e) {
     // Fallback sin logo
     doc.setFontSize(18)
@@ -139,7 +126,7 @@ async function drawHeader(doc, pageWidth) {
   }
 
   // Línea decorativa gruesa con gradiente simulado (doble línea)
-  y += 16
+  y += 12
   doc.setDrawColor(...COLORS.primary)
   doc.setLineWidth(1.2)
   doc.line(MARGIN, y, pageWidth - MARGIN, y)
@@ -310,7 +297,7 @@ function drawDates(doc, invoice, pageWidth, y) {
 
   // Fecha emisión
   doc.setFont('helvetica', 'bold')
-  doc.text('Emision:', MARGIN + 5, y + 2)
+  doc.text('Emisión:', MARGIN + 5, y + 2)
   doc.setFont('helvetica', 'normal')
   doc.text(fmtDate(invoice.issueDate), MARGIN + 25, y + 2)
 
@@ -321,7 +308,7 @@ function drawDates(doc, invoice, pageWidth, y) {
   doc.text(fmtDate(invoice.dueDate), MARGIN + thirdWidth + 32, y + 2)
 
   // Moneda (nombre legible)
-  const currencyLabels = { VES: 'Bolivares (VES)', USD: 'Dolar (USD)', EUR: 'Euro (EUR)' }
+  const currencyLabels = { VES: 'Bolívares (VES)', USD: 'Dólar (USD)', EUR: 'Euro (EUR)' }
   doc.setFont('helvetica', 'bold')
   doc.text('Moneda:', MARGIN + thirdWidth * 2 + 5, y + 2)
   doc.setFont('helvetica', 'normal')
@@ -358,14 +345,14 @@ function drawItemsTable(doc, invoice, pageWidth, y) {
   doc.setFillColor(...COLORS.tableHead)
   doc.roundedRect(MARGIN, y, tableWidth, 9, 1.5, 1.5, 'F')
 
-  doc.setFontSize(8)
+  doc.setFontSize(9)
   doc.setTextColor(...COLORS.white)
   doc.setFont('helvetica', 'bold')
 
   let xPos = MARGIN + 4
   doc.text('#', xPos, y + 6)
   xPos += colWidths.num
-  doc.text('Descripcion', xPos, y + 6)
+  doc.text('Descripción', xPos, y + 6)
   xPos += colWidths.desc
   doc.text('Cant.', xPos, y + 6)
   xPos += colWidths.qty
@@ -373,54 +360,42 @@ function drawItemsTable(doc, invoice, pageWidth, y) {
   xPos += colWidths.price
   doc.text('Total', xPos, y + 6)
 
-  y += 12
+  y += 16
 
   // Filas de ítems con mejor espaciado vertical
-  doc.setFontSize(8.5)
+  doc.setFontSize(9.5)
   doc.setFont('helvetica', 'normal')
 
-  const rowHeight = 8
-
   items.forEach((item, idx) => {
-    y = checkPage(doc, y, 255)
+    const descLines = doc.splitTextToSize(item.description || '—', colWidths.desc - 6)
+    const rowHeight = Math.max(8, descLines.length * 4.6 + 3.4)
+    y = checkPage(doc, y, 255 - rowHeight)
 
-    // Fondo alterno
+    // Fondo alterno (cubre todas las líneas de la fila)
     if (idx % 2 === 0) {
       doc.setFillColor(...COLORS.tableAlt)
       doc.rect(MARGIN, y - 5, tableWidth, rowHeight, 'F')
     }
 
+    doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.black)
     xPos = MARGIN + 4
     doc.text(`${idx + 1}`, xPos, y)
     xPos += colWidths.num
 
-    // Descripción (con wrap si es muy larga)
-    const descLines = doc.splitTextToSize(item.description || '—', colWidths.desc - 6)
-    doc.text(descLines[0], xPos, y)
+    descLines.forEach((linea, i) => doc.text(linea, xPos, y + i * 4.6))
     xPos += colWidths.desc
 
     const qty = parseFloat(item.quantity) || 0
-    doc.text(qty.toString(), xPos, y)
+    doc.text(String(qty).replace('.', ','), xPos, y)
     xPos += colWidths.qty
 
-    const unitPrice = parseFloat(item.unitPrice) || 0
-    doc.text(fmtCurrency(unitPrice, currency), xPos, y)
+    doc.text(fmtCurrency(parseFloat(item.unitPrice) || 0, currency), xPos, y)
     xPos += colWidths.price
 
-    const total = parseFloat(item.total) || 0
     doc.setFont('helvetica', 'bold')
-    doc.text(fmtCurrency(total, currency), xPos, y)
+    doc.text(fmtCurrency(parseFloat(item.total) || 0, currency), xPos, y)
     doc.setFont('helvetica', 'normal')
-
-    // Si hay más líneas de descripción, agregarlas debajo
-    if (descLines.length > 1) {
-      for (let i = 1; i < descLines.length; i++) {
-        y += 4.5
-        doc.setTextColor(...COLORS.grey)
-        doc.text(descLines[i], MARGIN + 4 + colWidths.num, y)
-      }
-    }
 
     y += rowHeight
   })
@@ -477,22 +452,22 @@ function drawFinancialSummary(doc, invoice, pageWidth, y) {
 
   // IVA / Débito fiscal
   if (fin.taxDebit != null && parseFloat(fin.taxDebit) > 0) {
-    addLine('IVA (Debito Fiscal):', fin.taxDebit)
+    addLine('IVA (Débito Fiscal):', fin.taxDebit)
   }
 
   // Retención IVA
   if (fin.ivaRetention != null && parseFloat(fin.ivaRetention) > 0) {
-    addLine('Retencion IVA:', `-${parseFloat(fin.ivaRetention)}`, false, COLORS.error)
+    addLine('Retención IVA:', -parseFloat(fin.ivaRetention), false, COLORS.error)
   }
 
   // Retención ISLR
   if (fin.islrRetention != null && parseFloat(fin.islrRetention) > 0) {
-    addLine('Retencion ISLR:', `-${parseFloat(fin.islrRetention)}`, false, COLORS.error)
+    addLine('Retención ISLR:', -parseFloat(fin.islrRetention), false, COLORS.error)
   }
 
   // Retención Municipal
   if (fin.municipalRetention != null && parseFloat(fin.municipalRetention) > 0) {
-    addLine('Retencion Municipal:', `-${parseFloat(fin.municipalRetention)}`, false, COLORS.error)
+    addLine('Retención Municipal:', -parseFloat(fin.municipalRetention), false, COLORS.error)
   }
 
   // IGTF
@@ -506,6 +481,13 @@ function drawFinancialSummary(doc, invoice, pageWidth, y) {
   doc.setLineWidth(0.8)
   doc.line(labelX, y, rightCol, y)
   y += 8
+
+  // Neto a pagar = total − retenciones (solo si hubo retenciones; el total de la factura no cambia)
+  const retencionesTotal = ['ivaRetention', 'islrRetention', 'municipalRetention'].reduce((a, k) => a + (Number(fin[k]) || 0), 0)
+  if (retencionesTotal > 0) {
+    addLine('Neto a pagar (tras retenciones):', (Number(fin.totalSales) || 0) - retencionesTotal, true)
+    y += 4
+  }
 
   // TOTAL con fondo destacado y más prominente
   const totalVal = fin.totalSales || 0
@@ -635,20 +617,17 @@ function drawFooter(doc, pageWidth, pageNum, totalPages) {
   doc.setLineWidth(0.3)
   doc.line(MARGIN, y - 4, pageWidth - MARGIN, y - 4)
 
-  doc.setFontSize(7)
+  doc.setFontSize(8)
   doc.setTextColor(...COLORS.grey)
   doc.setFont('helvetica', 'normal')
 
   const now = new Date()
-  const dateStr = now.toLocaleDateString('es-VE', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  })
+  const dateStr = `${fmtDate(now)}, ${now.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}`
   doc.text(`Generado por AD System  |  ${dateStr}`, MARGIN, y)
 
   // Número de página + URL
   const rightText = totalPages > 1
-    ? `Pag. ${pageNum}/${totalPages}  |  adsystemapp.com`
+    ? `Pág. ${pageNum}/${totalPages}  |  adsystemapp.com`
     : 'adsystemapp.com'
   doc.text(rightText, pageWidth - MARGIN, y, { align: 'right' })
 }

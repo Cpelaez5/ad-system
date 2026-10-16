@@ -3,6 +3,9 @@ import { saveAs } from 'file-saver';
 import dayjs from 'dayjs';
 import retentionPdfService from '@/services/retention-pdf-service.js';
 import venezuelaLocationsService from '@/services/venezuelaLocationsService.js';
+import { formatFechaCorta } from '@/utils/fechas';
+import { parseMontoVenezolano } from '@/utils/formatMoney';
+import { estilizarEncabezado, estilizarFilaEncabezado, estilizarTotales, congelarEncabezado, FORMATO_NUMERO, FORMATO_USD, textoSeguro } from '@/utils/estiloExcel';
 
 class ExportService {
   constructor() {
@@ -12,15 +15,15 @@ class ExportService {
   formatCurrency(amount) {
     if (amount === undefined || amount === null) return 0;
     if (typeof amount === 'string') {
-      const cleanString = amount.replace(/,/g, '');
-      return Number(cleanString) || 0;
+      const n = parseMontoVenezolano(amount);
+      return Number.isFinite(n) ? n : 0;
     }
     return Number(amount) || 0;
   }
 
   formatDate(dateString) {
-    if (!dateString) return '';
-    return dayjs(dateString).format(this.dateFormat);
+    // dd/mm/aaaa en hora local (una fecha 'AAAA-MM-DD' no se corre de día)
+    return formatFechaCorta(dateString);
   }
 
   // Método principal para exportar tablas
@@ -42,8 +45,8 @@ class ExportService {
       // Datos de la empresa
       // Si viene userCompanyInfo, usarlo. Si no, intentar inferir (fallback)
       const companyInfo = userCompanyInfo || {
-        name: invoices[0]?.issuer?.companyName || 'EMPRESA DEMO C.A.',
-        rif: invoices[0]?.issuer?.rif || 'J-00000000-0',
+        name: invoices[0]?.issuer?.companyName || '',
+        rif: invoices[0]?.issuer?.rif || '',
         period: dayjs().format('MMM YY').toLowerCase() // e.g., nov 25
       };
 
@@ -115,18 +118,17 @@ class ExportService {
     // HEADER EMPRESA (Filas 1-4)
     // ==========================================
     const headerStyle = { font: { bold: true } };
-    const yellowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
 
     // Fila 1: Contribuyente
     worksheet.getCell('A1').value = 'Contribuyente:';
     worksheet.mergeCells('B1:E1');
-    worksheet.getCell('B1').value = companyInfo.name || 'EMPRESA';
+    worksheet.getCell('B1').value = companyInfo.name || '';
     worksheet.getCell('B1').font = { bold: true };
 
     // Fila 2: RIF
     worksheet.getCell('A2').value = 'RIF';
     worksheet.mergeCells('B2:E2');
-    worksheet.getCell('B2').value = companyInfo.rif || 'J-00000000-0';
+    worksheet.getCell('B2').value = companyInfo.rif || '';
     worksheet.getCell('B2').font = { bold: true };
 
     // Fila 3: Tipo de contribuyente (configurable)
@@ -154,12 +156,10 @@ class ExportService {
     headers.forEach((header, idx) => {
       const cell = hRow.getCell(idx + 1);
       cell.value = header;
-      cell.font = { bold: true, size: 9 };
-      cell.fill = yellowFill;
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      this.addBorders(cell);
+      estilizarEncabezado(cell, { tamano: 9 });
     });
     hRow.height = 30;
+    congelarEncabezado(worksheet, headerRow);
 
     // ==========================================
     // DATOS (Fila 7+)
@@ -219,6 +219,7 @@ class ExportService {
       // Aplicar bordes a todas las celdas
       for (let col = 1; col <= 15; col++) {
         this.addBorders(row.getCell(col));
+        if (col >= 8) row.getCell(col).numFmt = FORMATO_NUMERO;
       }
 
       currentRow++;
@@ -233,7 +234,9 @@ class ExportService {
 
     // Solo calcular totales si hay datos
     if (fiscalInvoices.length > 0) {
-      totalRow.getCell(1).value = ''; // N°
+      totalRow.getCell(7).value = 'TOTALES';
+      totalRow.getCell(7).alignment = { horizontal: 'right' };
+      estilizarTotales(totalRow.getCell(7));
       totalRow.getCell(8).value = sumTotalSales;
       totalRow.getCell(9).value = sumExemptSales;
       totalRow.getCell(10).value = sumTaxableSales;
@@ -244,7 +247,8 @@ class ExportService {
       totalRow.getCell(15).value = sumIgtf;
 
       for (let col = 8; col <= 15; col++) {
-        totalRow.getCell(col).font = { bold: true };
+        estilizarTotales(totalRow.getCell(col));
+        totalRow.getCell(col).numFmt = FORMATO_NUMERO;
         this.addBorders(totalRow.getCell(col));
       }
     }
@@ -267,7 +271,7 @@ class ExportService {
     this.addBorders(worksheet.getCell(`F${summaryStartRow}`));
 
     const summaryItems = [
-      { label: 'Total: Compras Excentas y/o sin Derecho a Crédito Fiscal', row: 30, baseFormula: null, creditFormula: null },
+      { label: 'Total: Compras Exentas y/o sin Derecho a Crédito Fiscal', row: 30, baseFormula: `I${dataEndRow + 1}`, creditFormula: null },
       { label: 'Σ de las Compras Importación Afectas solo Alícuota General', row: 31, baseFormula: null, creditFormula: null },
       { label: 'Σ de las Compras Importación Afectas en Alícuota General + Adicional', row: 312, baseFormula: null, creditFormula: null },
       { label: 'Σ de las Compras Importación Afectas en Alícuota Reducida', row: 313, baseFormula: null, creditFormula: null },
@@ -300,6 +304,7 @@ class ExportService {
     this.addBorders(worksheet.getCell(`E${totalSummaryRow}`));
     this.addBorders(worksheet.getCell(`F${totalSummaryRow}`));
 
+    for (let r = summaryStartRow + 1; r <= totalSummaryRow; r++) for (const c of [5, 6]) worksheet.getRow(r).getCell(c).numFmt = FORMATO_NUMERO;
     console.log(`✅ Libro de Compras generado con ${fiscalInvoices.length} registros`);
   }
 
@@ -350,18 +355,17 @@ class ExportService {
     // ==========================================
     // HEADER EMPRESA (Filas 1-5)
     // ==========================================
-    const yellowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
 
     // Fila 1: Contribuyente
     worksheet.getCell('A1').value = 'Contribuyente:';
     worksheet.mergeCells('B1:E1');
-    worksheet.getCell('B1').value = companyInfo.name || 'EMPRESA';
+    worksheet.getCell('B1').value = companyInfo.name || '';
     worksheet.getCell('B1').font = { bold: true };
 
     // Fila 2: RIF
     worksheet.getCell('A2').value = 'RIF';
     worksheet.mergeCells('B2:E2');
-    worksheet.getCell('B2').value = companyInfo.rif || 'J-00000000-0';
+    worksheet.getCell('B2').value = companyInfo.rif || '';
     worksheet.getCell('B2').font = { bold: true };
 
     // Fila 3: Tipo de contribuyente (configurable)
@@ -395,12 +399,10 @@ class ExportService {
     headers.forEach((header, idx) => {
       const cell = hRow.getCell(idx + 1);
       cell.value = header;
-      cell.font = { bold: true, size: 9 };
-      cell.fill = yellowFill;
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      this.addBorders(cell);
+      estilizarEncabezado(cell, { tamano: 9 });
     });
     hRow.height = 35;
+    congelarEncabezado(worksheet, headerRow);
 
     // ==========================================
     // DATOS (Fila 8+)
@@ -459,6 +461,7 @@ class ExportService {
       // Aplicar bordes a todas las celdas
       for (let col = 1; col <= 16; col++) {
         this.addBorders(row.getCell(col));
+        if (col >= 8 && col !== 13) row.getCell(col).numFmt = FORMATO_NUMERO;
       }
 
       currentRow++;
@@ -473,7 +476,9 @@ class ExportService {
 
     // Solo calcular totales si hay datos
     if (fiscalInvoices.length > 0) {
-      totalRow.getCell(1).value = ''; // N°
+      totalRow.getCell(7).value = 'TOTALES';
+      totalRow.getCell(7).alignment = { horizontal: 'right' };
+      estilizarTotales(totalRow.getCell(7));
       totalRow.getCell(8).value = sumTotalSales;
       totalRow.getCell(9).value = sumExemptSales;
       totalRow.getCell(10).value = sumTaxableSales;
@@ -485,7 +490,8 @@ class ExportService {
       totalRow.getCell(16).value = sumIgtf;
 
       for (let col = 8; col <= 16; col++) {
-        totalRow.getCell(col).font = { bold: true };
+        estilizarTotales(totalRow.getCell(col));
+        totalRow.getCell(col).numFmt = FORMATO_NUMERO;
         this.addBorders(totalRow.getCell(col));
       }
     }
@@ -547,70 +553,77 @@ class ExportService {
     this.addBorders(worksheet.getCell(`F${totalSummaryRow}`));
     this.addBorders(worksheet.getCell(`G${totalSummaryRow}`));
 
+    for (let r = summaryStartRow + 1; r <= totalSummaryRow; r++) for (const c of [5, 6, 7]) worksheet.getRow(r).getCell(c).numFmt = FORMATO_NUMERO;
     console.log(`✅ Libro de Ventas generado con ${fiscalInvoices.length} registros`);
   }
 
-  // Construir Reporte General (Sin cambios mayores)
+  // Construir Reporte General
   buildGeneralReport(worksheet, invoices) {
     worksheet.columns = [
       { header: 'Fecha', key: 'date', width: 12 },
-      { header: 'Nro', key: 'number', width: 15 },
-      { header: 'Cliente/Proveedor', key: 'client', width: 30 },
-      { header: 'Categoría', key: 'category', width: 15 },
-      { header: 'Estado', key: 'status', width: 12 },
-      { header: 'Total', key: 'total', width: 15 },
+      { header: 'N° de documento', key: 'number', width: 18 },
+      { header: 'Cliente / Proveedor', key: 'client', width: 40 },
+      { header: 'Tipo', key: 'category', width: 16 },
+      { header: 'Estado', key: 'status', width: 14 },
+      { header: 'Moneda', key: 'currency', width: 10 },
+      { header: 'Total', key: 'total', width: 18 },
     ];
 
-    const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true };
-    headerRow.border = { bottom: { style: 'medium' } };
+    estilizarFilaEncabezado(worksheet.getRow(1));
+    congelarEncabezado(worksheet, 1);
 
     invoices.forEach(inv => {
-      worksheet.addRow({
+      const row = worksheet.addRow({
         date: this.formatDate(inv.issueDate),
-        number: inv.invoiceNumber,
+        number: textoSeguro(inv.invoiceNumber, '—'),
         client: inv.flow === 'VENTA' ? (inv.client?.companyName || 'Cliente General') : (inv.issuer?.companyName || 'Proveedor'),
-        category: inv.documentType || 'N/A',
-        status: inv.status,
+        category: textoSeguro(inv.documentType, '—'),
+        status: textoSeguro(inv.status, '—'),
+        currency: inv.financial?.currency || 'VES',
         total: this.formatCurrency(inv.financial?.totalSales)
       });
+      row.getCell('total').numFmt = FORMATO_NUMERO;
     });
   }
 
   // Exportar factura individual
-  async exportInvoice(invoice, format = 'xlsx') {
-    // ... (Misma implementación anterior)
-    const filename = `Factura_${invoice.number || 'borrador'}.xlsx`;
+  async exportInvoice(invoice) {
+    const filename = `Factura_${textoSeguro(invoice.invoiceNumber || invoice.number, 'borrador')}.xlsx`;
+    const moneda = invoice.financial?.currency || 'VES';
     const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'AD System';
     const worksheet = workbook.addWorksheet('Factura');
-    // ... (Simplificado para no repetir todo el código anterior si no cambió)
-    // Asumiendo que se mantiene igual que la versión anterior aprobada
+    worksheet.columns = [{ width: 52 }, { width: 12 }, { width: 18 }, { width: 18 }];
 
-    // Re-implementing simplified version for completeness
-    worksheet.mergeCells('A1:E1');
-    worksheet.getCell('A1').value = `FACTURA ${invoice.invoiceNumber}`;
-    worksheet.getCell('A1').font = { size: 20, bold: true };
-    worksheet.getCell('A1').alignment = { horizontal: 'center' };
+    worksheet.mergeCells('A1:D1');
+    worksheet.getCell('A1').value = `FACTURA ${textoSeguro(invoice.invoiceNumber, 'sin número')}`;
+    worksheet.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FF8E1818' } };
+    worksheet.getCell('A1').alignment = { horizontal: 'left' };
 
     worksheet.getCell('A3').value = 'Cliente:';
     worksheet.getCell('B3').value = invoice.client?.companyName || 'Cliente General';
     worksheet.getCell('A4').value = 'Fecha:';
     worksheet.getCell('B4').value = this.formatDate(invoice.issueDate);
+    worksheet.getCell('A3').font = { bold: true };
+    worksheet.getCell('A4').font = { bold: true };
 
     worksheet.getRow(6).values = ['Descripción', 'Cantidad', 'Precio', 'Total'];
-    worksheet.getRow(6).font = { bold: true };
+    estilizarFilaEncabezado(worksheet.getRow(6));
+    congelarEncabezado(worksheet, 6);
 
-    if (invoice.items) {
-      invoice.items.forEach((item, idx) => {
-        const rowIdx = 7 + idx;
-        worksheet.getRow(rowIdx).values = [
-          item.description,
-          item.quantity,
-          item.unit_price,
-          item.total
-        ];
-      });
-    }
+    const formato = moneda === 'USD' ? FORMATO_USD : FORMATO_NUMERO;
+    (invoice.items || []).forEach((item, idx) => {
+      const row = worksheet.getRow(7 + idx);
+      row.values = [
+        textoSeguro(item.description, '—'),
+        this.formatCurrency(item.quantity),
+        this.formatCurrency(item.unitPrice ?? item.unit_price),
+        this.formatCurrency(item.total)
+      ];
+      row.getCell(3).numFmt = formato;
+      row.getCell(4).numFmt = formato;
+      row.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+    });
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

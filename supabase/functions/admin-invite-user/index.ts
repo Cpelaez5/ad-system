@@ -26,45 +26,59 @@ function formatRoleName(role: string): string {
     return roleMap[role] || role
 }
 
+function escHtml(t: unknown): string {
+    return String(t ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+}
+
 /**
- * Genera el HTML del correo de invitación con branding de AD System.
+ * Genera el HTML del correo de invitación con la marca de AD System
+ * (mismo estilo que despachar-notificacion: logo PNG, granate #8E1818, carbón #2A2A2E).
  */
 function buildInvitationEmailHtml(firstName: string, role: string, actionLink: string): string {
-    const roleName = formatRoleName(role)
-    const currentYear = new Date().getFullYear()
-    return `
-    <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1F355C; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-        <div style="text-align: center; padding: 36px 20px 24px; background: linear-gradient(135deg, #1F355C 0%, #162846 100%);">
-            <h1 style="color: #ffffff; margin: 0 0 6px 0; font-size: 30px; letter-spacing: 2px; font-weight: 800;">AD SYSTEM</h1>
-            <p style="color: #E0B04F; font-weight: 600; margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Gestión Contable y Administrativa</p>
-        </div>
-        
-        <div style="padding: 36px 28px; border: 1px solid #e5e7eb; border-top: none;">
-            <h2 style="font-size: 22px; color: #1F355C; margin-top: 0; font-weight: 700;">¡Hola, ${firstName}!</h2>
-            <p style="font-size: 15px; line-height: 1.6; color: #374151;">Has sido invitado a formar parte de <strong>AD System</strong> como <strong>${roleName}</strong>.</p>
-            <p style="font-size: 15px; line-height: 1.6; color: #374151;">Para comenzar, solo necesitas activar tu cuenta y configurar tu contraseña de acceso personal:</p>
-            
-            <div style="text-align: center; margin: 34px 0;">
-                <a href="${actionLink}" style="background-color: #A81C22; color: #ffffff; padding: 15px 36px; text-decoration: none; border-radius: 8px; font-weight: 700; display: inline-block; font-size: 16px; box-shadow: 0 4px 10px rgba(168, 28, 34, 0.3);">Aceptar Invitación y Crear Contraseña</a>
-            </div>
-            
-            <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin-top: 24px; border-left: 4px solid #E0B04F;">
-                <p style="font-size: 13px; color: #475569; margin: 0; line-height: 1.5;">
-                    <strong>ℹ️ Nota de seguridad:</strong> Este enlace es personal e intransferible, y vencerá en 24 horas.
-                </p>
-            </div>
-
-            <div style="margin-top: 24px; font-size: 12px; color: #64748b; line-height: 1.5; word-break: break-all;">
-                Si el botón no funciona en tu correo, copia y pega el siguiente enlace directo en tu navegador web:<br>
-                <a href="${actionLink}" style="color: #1F355C; text-decoration: underline;">${actionLink}</a>
-            </div>
-            
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;" />
-            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 4px;">Si no esperabas esta invitación, puedes desestimar este mensaje con total tranquilidad.</p>
-            <p style="font-size: 11px; color: #cbd5e1; text-align: center; margin: 0;">© ${currentYear} AD System. Todos los derechos reservados.</p>
-        </div>
-    </div>
-    `
+    const GRANATE = '#8E1818'
+    const CARBON = '#2A2A2E'
+    const LOGO_URL = 'https://adsystemapp.com/ADSystem/png/logo-correo.png' // PNG 480x103: los correos no muestran SVG
+    const roleName = escHtml(formatRoleName(role))
+    const nombre = escHtml(firstName)
+    const enlace = escHtml(actionLink)
+    return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></head>
+<body style="margin:0;padding:0;background-color:#F4F4F5;font-family:Montserrat,'Segoe UI',Roboto,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F4F5;padding:20px 12px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#FFFFFF;border-radius:12px;overflow:hidden;">
+  <tr><td style="padding:20px 24px;background-color:#FFFFFF;border-bottom:4px solid ${GRANATE};">
+    <a href="https://adsystemapp.com" style="text-decoration:none;"><img src="${LOGO_URL}" alt="AD System" width="168" height="36" style="display:block;width:168px;height:36px;border:0;outline:none;"></a>
+  </td></tr>
+  <tr><td style="padding:24px 24px 8px;">
+    <h1 style="margin:0 0 16px;font-size:20px;line-height:1.35;color:${CARBON};">¡Hola, ${nombre}!</h1>
+    <p style="margin:0 0 12px;font-size:16px;line-height:1.55;color:${CARBON};">Te invitaron a formar parte de <strong>AD System</strong> como <strong>${roleName}</strong>.</p>
+    <p style="margin:0 0 12px;font-size:16px;line-height:1.55;color:${CARBON};">Para empezar, activa tu cuenta y crea tu contraseña:</p>
+  </td></tr>
+  <tr><td style="padding:8px 24px 20px;" align="center">
+    <a href="${enlace}" style="display:inline-block;background-color:${GRANATE};color:#FFFFFF;padding:14px 28px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:700;">Aceptar invitación y crear contraseña</a>
+  </td></tr>
+  <tr><td style="padding:0 24px 16px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F4F5;border-radius:8px;border-left:4px solid ${GRANATE};">
+      <tr><td style="padding:12px 16px;font-size:14px;line-height:1.5;color:${CARBON};"><strong>Por tu seguridad:</strong> este enlace es personal y vence en 24 horas.</td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="padding:0 24px 20px;">
+    <p style="margin:0;font-size:13px;line-height:1.5;color:#52525B;word-break:break-all;">Si el botón no funciona, copia este enlace en tu navegador:<br><a href="${enlace}" style="color:${GRANATE};">${enlace}</a></p>
+  </td></tr>
+  <tr><td style="padding:16px 24px;background-color:#F4F4F5;border-top:1px solid #E4E4E7;">
+    <p style="margin:0;font-size:12px;line-height:1.5;color:#52525B;">Si no esperabas esta invitación, puedes ignorar este mensaje. © ${new Date().getFullYear()} AD System.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body>
+</html>`
 }
 
 serve(async (req) => {

@@ -546,7 +546,7 @@ class RetentionPdfService {
     doc.setTextColor(...COLORS.darkGrey)
     const legalText = 'Ley de IVA Art. 11. "La Administración Tributaria podrá designar como responsables del pago del impuesto, en calidad de agentes de retención, a quienes por sus funciones públicas o por razón de sus actividades privadas intervengan en operaciones gravadas con el impuesto establecido en este Decreto con Rango, Valor y Fuerza de Ley"'
     const splitLegal = doc.splitTextToSize(legalText, contentWidth - 20)
-    doc.text(splitLegal, pageWidth / 2, y, { align: 'center' })
+    doc.text(splitLegal, pageWidth / 2, y + 2, { align: 'center' })
     y += splitLegal.length * 3.3 + 3
 
     // 6. Cajas de Número de Comprobante, Fecha y Período Fiscal
@@ -580,7 +580,7 @@ class RetentionPdfService {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10.5)
     doc.setTextColor(...COLORS.primary)
-    doc.text(numComprobante, margin + 42, boxY + 8.2)
+    doc.text(numComprobante, margin + 52, boxY + 8.2)
 
     // Caja 2: Fecha
     const fechaX = margin + compBoxWidth + 3
@@ -714,7 +714,7 @@ class RetentionPdfService {
     doc.setLineWidth(0.2)
     doc.setDrawColor(...COLORS.tableBorder)
     doc.rect(margin, y, contentWidth, dataRowHeight, 'S')
-    drawTableRow(doc, columns, rowData, margin, y, dataRowHeight, { fontSize: 6, highlightLastCol: true })
+    drawTableRow(doc, columns, rowData, margin, y, dataRowHeight, { fontSize: 9, highlightLastCol: true })
 
     y += dataRowHeight
 
@@ -726,7 +726,7 @@ class RetentionPdfService {
         doc.line(curX, y, curX, y + 6)
         curX += col.width
       })
-      y += 5
+      y += 6
     }
 
     // Fila de TOTALES
@@ -764,7 +764,7 @@ class RetentionPdfService {
         } else {
           doc.setTextColor(...COLORS.black)
         }
-        doc.setFontSize(7.5)
+        doc.setFontSize(9)
         doc.text(val, totalX + col.width - 1.5, y + 6, { align: 'right' })
       }
       totalX += col.width
@@ -797,7 +797,7 @@ class RetentionPdfService {
     })
 
     // 10. Área de Sello y Firmas
-    const signAreaY = pageHeight - 35
+    const signAreaY = pageHeight - 27
     const signWidth = 75
 
     // Sello Digital del Agente si está configurado (aislado por cliente)
@@ -903,7 +903,7 @@ class RetentionPdfService {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10.5)
     doc.setTextColor(...COLORS.primary)
-    doc.text(numComprobante, margin + 45, boxY + 8.2)
+    doc.text(numComprobante, margin + 68, boxY + 8.2)
 
     // Caja 2: Fecha del Comprobante
     const fechaX = margin + compBoxWidth + 3
@@ -1041,7 +1041,7 @@ class RetentionPdfService {
     doc.setLineWidth(0.2)
     doc.setDrawColor(...COLORS.tableBorder)
     doc.rect(margin, y, contentWidth, dataRowHeight, 'S')
-    drawTableRow(doc, islrColumns, islrRowData, margin, y, dataRowHeight, { fontSize: 6, highlightLastCol: true })
+    drawTableRow(doc, islrColumns, islrRowData, margin, y, dataRowHeight, { fontSize: 9, highlightLastCol: true })
 
     y += dataRowHeight
 
@@ -1053,7 +1053,7 @@ class RetentionPdfService {
         doc.line(curXEmpty, y, curXEmpty, y + 6)
         curXEmpty += col.width
       })
-      y += 5
+      y += 6
     }
 
     // Fila de TOTALES
@@ -1088,7 +1088,7 @@ class RetentionPdfService {
         } else {
           doc.setTextColor(...COLORS.black)
         }
-        doc.setFontSize(7.5)
+        doc.setFontSize(9)
         doc.text(val, islrTotalX + col.width - 1.5, y + 6, { align: 'right' })
       }
       islrTotalX += col.width
@@ -1135,7 +1135,7 @@ class RetentionPdfService {
     })
 
     // 9. Sello Digital y Firmas (aislado por cliente)
-    const signAreaY = pageHeight - 35
+    const signAreaY = pageHeight - 27
     const signWidth = 75
 
     const effectiveClientId = retData?.client_id || invoice?.clientId || invoice?.client_id || null
@@ -1278,7 +1278,7 @@ class RetentionPdfService {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10.5)
     doc.setTextColor(...COLORS.primary)
-    doc.text(numComprobante, margin + 45, boxY + 8.2)
+    doc.text(numComprobante, margin + 68, boxY + 8.2)
 
     // Caja 2: Fecha del Comprobante
     const fechaX = margin + compBoxWidth + 3
@@ -1452,7 +1452,7 @@ class RetentionPdfService {
     doc.setLineWidth(0.2)
     doc.setDrawColor(...COLORS.tableBorder)
     doc.rect(margin, y, contentWidth, dataRowHeight, 'S')
-    drawTableRow(doc, munColumns, munRowData, margin, y, dataRowHeight, { fontSize: 6, highlightLastCol: true })
+    drawTableRow(doc, munColumns, munRowData, margin, y, dataRowHeight, { fontSize: 9, highlightLastCol: true })
 
     y += dataRowHeight
 
@@ -1464,7 +1464,7 @@ class RetentionPdfService {
         doc.line(curXEmpty, y, curXEmpty, y + 6)
         curXEmpty += col.width
       })
-      y += 5
+      y += 6
     }
 
     // Fila de TOTALES
@@ -1498,7 +1498,7 @@ class RetentionPdfService {
         } else {
           doc.setTextColor(...COLORS.black)
         }
-        doc.setFontSize(7.5)
+        doc.setFontSize(9)
         doc.text(val, munTotalX + col.width - 1.5, y + 6, { align: 'right' })
       }
       munTotalX += col.width
@@ -1531,7 +1531,7 @@ class RetentionPdfService {
     })
 
     // 9. Sello Digital y Firmas (aislado por cliente)
-    const signAreaY = pageHeight - 35
+    const signAreaY = pageHeight - 21
     const signWidth = 75
 
     const effectiveClientId = retData?.client_id || invoice?.clientId || invoice?.client_id || null

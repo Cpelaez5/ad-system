@@ -397,7 +397,9 @@ export default {
       this.exporting = true
       try {
         const ExcelJS = await import('exceljs')
+        const { estilizarFilaEncabezado, FORMATO_NUMERO } = await import('@/utils/estiloExcel.js')
         const workbook = new ExcelJS.Workbook()
+        workbook.creator = 'AD System'
         const worksheet = workbook.addWorksheet('Directorio de Proveedores')
 
         worksheet.columns = [
@@ -414,8 +416,10 @@ export default {
           { header: 'Total Retenido (Bs)', key: 'total_retenido', width: 22 }
         ]
 
-        worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
-        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2A2A2E' } }
+        estilizarFilaEncabezado(worksheet.getRow(1))
+        worksheet.views = [{ state: 'frozen', ySplit: 1 }]
+        worksheet.getColumn('total_compras').numFmt = FORMATO_NUMERO
+        worksheet.getColumn('total_retenido').numFmt = FORMATO_NUMERO
 
         this.filteredProveedores.forEach(p => {
           worksheet.addRow({

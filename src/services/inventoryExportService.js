@@ -1,5 +1,7 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import { formatFechaCorta } from '@/utils/fechas';
+import { estilizarFilaEncabezado, congelarEncabezado, FORMATO_NUMERO, textoSeguro } from '@/utils/estiloExcel';
 
 class InventoryExportService {
 
@@ -14,8 +16,7 @@ class InventoryExportService {
 
         // Estilos
         const titleStyle = { font: { bold: true, size: 16 } };
-        const headerStyle = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2A2A2E' } } };
-        const currencyFormat = '"Bs" #,##0.00';
+        const currencyFormat = FORMATO_NUMERO;
 
         // Títulos
         worksheet.mergeCells('A1:G1');
@@ -23,16 +24,14 @@ class InventoryExportService {
         worksheet.getCell('A1').font = { size: 12 };
 
         worksheet.mergeCells('A2:G2');
-        worksheet.getCell('A2').value = 'INVENTARIO VALORIZADO AL ' + new Date().toLocaleDateString();
+        worksheet.getCell('A2').value = 'INVENTARIO VALORIZADO AL ' + formatFechaCorta(new Date());
         worksheet.getCell('A2').style = titleStyle;
         worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
         // Encabezados
         worksheet.getRow(4).values = ['Código', 'Producto', 'Unidad', 'Stock Actual', 'Costo Unit.', 'Val. Costo Total', 'Val. Venta Total'];
-        worksheet.getRow(4).eachCell((cell) => {
-            cell.style = headerStyle;
-            cell.alignment = { horizontal: 'center' };
-        });
+        estilizarFilaEncabezado(worksheet.getRow(4));
+        congelarEncabezado(worksheet, 4);
 
         // Datos
         let totalCost = 0;
@@ -51,9 +50,9 @@ class InventoryExportService {
 
             const row = worksheet.getRow(rowIdx);
             row.values = [
-                p.code,
-                p.name,
-                p.unit,
+                textoSeguro(p.code, '—'),
+                textoSeguro(p.name, 'Producto sin nombre'),
+                textoSeguro(p.unit, 'UND'),
                 stock,
                 cost,
                 totalC,
@@ -70,6 +69,7 @@ class InventoryExportService {
         const lastRow = 5 + products.length;
         worksheet.getRow(lastRow).values = ['', '', '', 'TOTALES:', '', totalCost, totalSale];
         worksheet.getRow(lastRow).font = { bold: true };
+        worksheet.getRow(lastRow).getCell(4).alignment = { horizontal: 'right' };
         worksheet.getRow(lastRow).getCell(6).numFmt = currencyFormat;
         worksheet.getRow(lastRow).getCell(7).numFmt = currencyFormat;
 
@@ -107,19 +107,19 @@ class InventoryExportService {
             { header: 'Usuario', key: 'user', width: 20 }
         ];
 
-        // Style headers
-        worksheet.getRow(1).font = { bold: true };
+        estilizarFilaEncabezado(worksheet.getRow(1));
+        congelarEncabezado(worksheet, 1);
 
         movements.forEach(m => {
             const isIn = m.quantity > 0;
             worksheet.addRow({
-                date: new Date(m.created_at).toLocaleString(),
+                date: `${formatFechaCorta(m.created_at)} ${new Date(m.created_at).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}`,
                 type: m.movement_type,
-                product: m.products?.name || 'Unknown',
+                product: m.products?.name || 'Producto sin nombre',
                 in: isIn ? m.quantity : '',
                 out: !isIn ? Math.abs(m.quantity) : '',
-                ref: m.description,
-                user: 'Sistema' // TODO: Add user info if available
+                ref: textoSeguro(m.description, '—'),
+                user: 'Sistema'
             });
         });
 
@@ -133,7 +133,9 @@ class InventoryExportService {
 
         // Headers
         ws.addRow(['Código', 'Producto', 'Stock Inicial', 'Entradas', 'Salidas', 'Autoconsumo', 'Stock Final']);
-        ws.getRow(1).font = { bold: true };
+        estilizarFilaEncabezado(ws.getRow(1));
+        congelarEncabezado(ws, 1);
+        ws.columns = [{ width: 14 }, { width: 40 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 14 }];
 
         const summary = {};
         products.forEach(p => summary[p.id] = { p, init: 0, in: 0, out: 0, self: 0 });

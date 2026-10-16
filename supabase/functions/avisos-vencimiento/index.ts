@@ -1,9 +1,11 @@
 // NOTA (centro de notificaciones): papel_por_vencer ahora también crea avisos en la campanita vía
 // notificar() (datos.correo_externo=true para que despachar-notificacion no duplique el correo) y respeta
 // preferencias_notificacion.correo. Al desplegar: SIEMPRE un solo archivo (sin imports relativos).
-// NOTA: en Supabase está desplegada una versión de UN solo archivo (el deploy con import de
-// ./logica.js falla). Al cambiar logica.js o este archivo, re-desplegar copiando la lógica
-// dentro de index.ts (ver versión 4 en el panel de Supabase).
+// DESPLIEGUE: el deploy por herramienta solo acepta UN archivo y este index.ts importa ./logica.js.
+// Por eso NO se despliega este archivo: se genera el paquete de un solo archivo con
+//     node scripts/empaquetar-funcion.mjs avisos-vencimiento
+// y se despliega supabase/functions/avisos-vencimiento/dist/index.ts (versionado en git).
+// Cada vez que cambies index.ts o logica.js, vuelve a correr ese comando antes de desplegar.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -58,7 +60,7 @@ function escaparHtml(texto: string) {
     .replace(/'/g, "&#39;");
 }
 
-// ─── Plantilla HTML corta, móvil primero, colores de marca AD System ─────────
+// ─── Plantilla HTML corta, móvil primero, mismo estilo que despachar-notificacion ─────────
 function buildAvisoHtml(payload: {
   nombreCliente: string;
   mensajes: string[];
@@ -66,18 +68,15 @@ function buildAvisoHtml(payload: {
 }) {
   const { nombreCliente, mensajes, appUrl } = payload;
 
-  // Colores de marca AD System (docs/mvp/diseno/sistema-diseno.md §2.4)
-  const PRIMARY = "#8E1818"; // granate AD System
-  const SECONDARY = "#2A2A2E"; // carbón AD System (antes azul marino de AD Business Group)
-  const ACCENT = "#8E1818"; // granate AD System (antes dorado de AD Business Group)
-  const BG = "#EFEFEF";
-  const LOGO_URL = "https://adsystemapp.com/ADSystem/png/logo-correo.png"; // imagotipo oficial AD System (PNG: los correos no muestran SVG)
+  const GRANATE = "#8E1818"; // granate AD System
+  const CARBON = "#2A2A2E"; // carbón AD System
+  const LOGO_URL = "https://adsystemapp.com/ADSystem/png/logo-correo.png"; // PNG 480x103 (los correos no muestran SVG)
 
-  const items = mensajes
+  const items = (mensajes || [])
     .map(
       (m) => `
     <tr>
-      <td style="padding:12px 16px;border-bottom:1px solid #eee;font-size:15px;color:#333;line-height:1.5;">
+      <td style="padding:12px 16px;border-bottom:1px solid #E4E4E7;font-size:16px;color:${CARBON};line-height:1.5;">
         ${escaparHtml(m)}
       </td>
     </tr>`
@@ -86,46 +85,29 @@ function buildAvisoHtml(payload: {
 
   return `<!DOCTYPE html>
 <html lang="es">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:${BG};font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:${BG};padding:20px 0;">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></head>
+<body style="margin:0;padding:0;background-color:#F4F4F5;font-family:Montserrat,'Segoe UI',Roboto,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F4F5;padding:20px 12px;">
 <tr><td align="center">
-<table width="100%" style="max-width:480px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
-
-  <tr>
-    <td style="background:#ffffff;padding:22px 24px;text-align:center;border-bottom:4px solid ${PRIMARY};">
-      <img src="${LOGO_URL}" alt="AD System" width="168" height="36" style="display:inline-block;width:168px;height:36px;border:0;">
-    </td>
-  </tr>
-
-
-  <tr>
-    <td style="padding:24px 24px 8px;">
-      <p style="margin:0;font-size:15px;color:#333;">Hola <strong>${escaparHtml(nombreCliente)}</strong>,</p>
-      <p style="margin:8px 0 0;font-size:14px;color:#555;">Tienes pendientes de atender:</p>
-    </td>
-  </tr>
-
-  <tr>
-    <td style="padding:8px 24px 16px;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f7f7;border-radius:8px;overflow:hidden;">
-        ${items}
-      </table>
-    </td>
-  </tr>
-
-  <tr>
-    <td style="padding:0 24px 28px;text-align:center;">
-      <a href="${appUrl}" style="display:inline-block;background:${PRIMARY};color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600;">Ver mis papeles</a>
-    </td>
-  </tr>
-
-  <tr>
-    <td style="background:${SECONDARY};padding:16px 24px;text-align:center;">
-      <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.6);">Aviso automático de <strong style="color:${ACCENT};">AD System</strong>.</p>
-    </td>
-  </tr>
-
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#FFFFFF;border-radius:12px;overflow:hidden;">
+  <tr><td style="padding:20px 24px;background-color:#FFFFFF;border-bottom:4px solid ${GRANATE};">
+    <a href="${escaparHtml(appUrl)}" style="text-decoration:none;"><img src="${LOGO_URL}" alt="AD System" width="168" height="36" style="display:block;width:168px;height:36px;border:0;outline:none;"></a>
+  </td></tr>
+  <tr><td style="padding:24px 24px 8px;">
+    <p style="margin:0 0 8px;font-size:16px;line-height:1.55;color:${CARBON};">Hola <strong>${escaparHtml(nombreCliente)}</strong>,</p>
+    <p style="margin:0;font-size:16px;line-height:1.55;color:${CARBON};">Tienes pendientes de atender:</p>
+  </td></tr>
+  <tr><td style="padding:8px 24px 16px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F4F5;border-radius:8px;">
+      ${items}
+    </table>
+  </td></tr>
+  <tr><td style="padding:8px 24px 28px;" align="center">
+    <a href="${escaparHtml(appUrl)}" style="display:inline-block;background-color:${GRANATE};color:#FFFFFF;padding:14px 28px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:700;">Ver mis papeles</a>
+  </td></tr>
+  <tr><td style="padding:16px 24px;background-color:#F4F4F5;border-top:1px solid #E4E4E7;">
+    <p style="margin:0;font-size:12px;line-height:1.5;color:#52525B;">Aviso automático de <strong>AD System</strong>. Puedes cambiar estos avisos en Configuración → Avisos.</p>
+  </td></tr>
 </table>
 </td></tr></table>
 </body>

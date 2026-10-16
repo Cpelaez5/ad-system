@@ -49,7 +49,7 @@ export const factura = {
   },
   items: [
     { description: 'Harina de maíz precocida 1 kg (caja de 20 unidades)', quantity: 10, unitPrice: 5200.5, total: 52005 },
-    { description: 'Aceite vegetal 900 ml', quantity: 24, unitPrice: 2166.78, total: 52002.72 },
+    { description: 'Aceite vegetal 900 ml (24 unidades)', quantity: 1, unitPrice: 52031.77, total: 52031.77 },
     { description: 'Servicio de flete y entrega a domicilio dentro del área metropolitana de Caracas', quantity: 1, unitPrice: 1500.5, total: 1500.5 },
   ],
 }
