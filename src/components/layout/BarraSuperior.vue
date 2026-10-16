@@ -92,6 +92,8 @@
       <TasaRapida v-if="menuTasa" :moneda="monedaTasa" @cerrar="menuTasa = false" />
     </v-menu>
 
+    <CampanaNotificaciones :user-id="currentUser?.id || null" />
+
     <MenuUsuario
       :current-user="currentUser"
       :user-plan="userPlan"
@@ -105,6 +107,7 @@ import ChipTasa from '@/components/ui/ChipTasa.vue'
 import TasaRapida from '@/components/cliente/TasaRapida.vue'
 import { necesitaRecordatorio } from '@/services/tasaService.js'
 import MenuUsuario from './MenuUsuario.vue'
+import CampanaNotificaciones from './CampanaNotificaciones.vue'
 import { formatFechaCorta } from '@/utils/fechas.js'
 
 /**
@@ -117,7 +120,7 @@ import { formatFechaCorta } from '@/utils/fechas.js'
 export default {
   name: 'BarraSuperior',
 
-  components: { ChipTasa, MenuUsuario, TasaRapida },
+  components: { ChipTasa, MenuUsuario, TasaRapida, CampanaNotificaciones },
 
   data() {
     return { menuTasa: false, monedaTasa: null }

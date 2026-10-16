@@ -345,8 +345,10 @@
 
     </v-row>
 
-    <v-row class="mt-2">
+    <!-- ─── Avisos (campanita, correo y este dispositivo) ─────────────── -->
+    <v-row id="avisos" ref="seccionAvisos" class="mt-2" data-testid="seccion-avisos">
       <v-col cols="12"><AvisosDispositivo /></v-col>
+      <v-col cols="12"><PreferenciasAvisos /></v-col>
     </v-row>
 
     <!-- ─── Notificaciones del Sistema (Solo Super Admin) ────────────── -->
@@ -507,13 +509,19 @@
 
 <script>
 import AvisosDispositivo from '@/components/layout/AvisosDispositivo.vue'
+import PreferenciasAvisos from '@/components/layout/PreferenciasAvisos.vue'
 import userSettingsService from '@/services/user-settings-service.js'
 import { supabase } from '@/lib/supabaseClient'
 import userService from '@/services/userService'
 
 export default {
   name: 'SettingsView',
-  components: { AvisosDispositivo },
+  components: { AvisosDispositivo, PreferenciasAvisos },
+
+  watch: {
+    // /settings?seccion=avisos baja hasta los avisos (también si ya estaba en Configuración).
+    '$route.query.seccion'() { this.irASeccion() },
+  },
 
   data() {
     // Carga síncrona desde cache local (instantánea)
@@ -562,6 +570,7 @@ export default {
   },
 
   async mounted() {
+    this.irASeccion()
     try {
       // Obtener email del usuario autenticado
       const currentUser = await userService.getCurrentUser()
@@ -600,6 +609,14 @@ export default {
   },
 
   methods: {
+    irASeccion() {
+      if (this.$route?.query?.seccion !== 'avisos') return
+      this.$nextTick(() => {
+        // Las tarjetas de arriba y la carga remota mueven el layout: se espera un instante.
+        setTimeout(() => document.getElementById('avisos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250)
+      })
+    },
+
     /** Alterna un flujo (notifyOnVenta/Compra/Gasto) de un correo existente */
     toggleFlow(index, field) {
       // Crear una copia del array para que Vue detecte el cambio

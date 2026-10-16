@@ -49,6 +49,8 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 ## 5. Operación
 - ✅ **Tasas globales:** `/admin/tasas` muestra los últimos 60 días hábiles (USD, EUR, CNY, TRY, RUB) con su fuente, marca los días sin tasa y permite corregir o agregar una (fuente `MANUAL-SUPERADMIN`).
 - ✅ **Portada de Operación:** `/admin/operacion` resume lo por verificar, los errores de IA de la semana y los días sin tasa.
+- **Centro de notificaciones — catálogo y plantillas:** hoy se editan por SQL en `notificacion_tipos` (nombre, descripción, defaults de correo/push, `activo`). A futuro: pantalla en el panel para editarlos y para activar los eventos "Pronto" (pagos, SENIAT, tasa, uso de IA), y para editar la plantilla del correo.
+- **Verificar el dominio y remitente en Resend** (`RESEND_FROM_EMAIL`, `RESEND_API_KEY` en los secrets de las funciones): sin ellos el despachador marca `correo_omitido = sin_configuracion`. Probar con "Enviarme un correo de prueba" en Configuración → Avisos.
 - Activar el **cron de avisos de vencimiento** (`avisos-vencimiento`) al lanzar.
 - Vigilar las **llaves de API** (uso, abusos, revocar). Hoy en `api_keys`. A futuro: vista de llaves por negocio con último uso y volumen, y un botón Revocar.
 - Revisar el historial de **importaciones** (`importaciones_productos`) cuando un cliente reporte un problema. A futuro: vista por negocio con "Deshacer" asistido.

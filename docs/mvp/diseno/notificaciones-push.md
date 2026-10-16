@@ -7,7 +7,7 @@ Avisos al teléfono o computador aunque la app esté cerrada (Web Push, todos lo
 2. "Sí, avísame" pide el permiso, suscribe el dispositivo (clave pública VAPID) y guarda la fila en `push_suscripciones` (RLS: cada quien ve solo las suyas).
 3. Configuración tiene "Avisos en este dispositivo" (`AvisosDispositivo.vue`): interruptor, estado y explicación si está bloqueado. En iPhone solo funciona con la app agregada a la pantalla de inicio; se explica con palabras simples.
 4. Al cerrar sesión se borra la suscripción de ese dispositivo (otra persona en el mismo equipo no recibe los avisos).
-5. Envío: trigger `support_messages_push` -> `push_enviar()` (pg_net, secretos de Vault) -> Edge Function `enviar-push` (web-push, clave privada de Vault `vapid_privada`). Suscripciones 404/410 se borran solas.
+5. Envío: `notificar()` inserta en `notificaciones` -> trigger -> Edge Function `despachar-notificacion` (web-push, clave privada de Vault `vapid_privada`). Suscripciones 404/410 se borran solas.
 6. `public/sw.js` muestra la notificación y al tocarla abre o enfoca la app en la URL indicada.
 
 ## Avisos activos

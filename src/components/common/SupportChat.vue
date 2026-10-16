@@ -102,6 +102,7 @@ import HiloConsulta from '@/components/soporte/HiloConsulta.vue'
 import BotonSonido from '@/components/soporte/BotonSonido.vue'
 import * as adjuntosServicio from '@/services/adjuntosSoporteService'
 import { useSonidoMensaje } from '@/composables/useSonidoMensaje'
+import * as notificaciones from '@/services/notificacionesService'
 
 export default {
   name: 'SupportChat',
@@ -192,6 +193,7 @@ export default {
     window.removeEventListener('ad-open-support-chat', this.openChat)
     this.cancelarConsultas?.()
     this.cancelarMensajes?.()
+    this.avisarConversacionAbierta(null)
   },
 
   methods: {
@@ -232,6 +234,7 @@ export default {
       this.cancelarMensajes?.()
       this.cancelarMensajes = null
       this.ticketAbierto = null
+      this.avisarConversacionAbierta(null)
     },
     async refreshLimits() {
       if (!this.currentUser?.id) return
@@ -332,6 +335,9 @@ export default {
       this.cargandoHilo = true
       this.cancelarMensajes?.()
       this.cancelarMensajes = soporte.suscribirMensajes(consulta.id, (m) => this.alLlegarMensaje(m))
+      // Lectura sincronizada: los avisos de la campanita de esta consulta quedan leídos.
+      this.avisarConversacionAbierta(consulta.id)
+      notificaciones.marcarLeidasDeSoporte(consulta.id)
       const { data, error } = await soporte.cargarMensajes(consulta.id)
       this.mensajesTicket = data
       this.errorHilo = error || ''
@@ -342,6 +348,11 @@ export default {
       this.cancelarMensajes?.()
       this.cancelarMensajes = null
       this.ticketAbierto = null
+      this.avisarConversacionAbierta(null)
+    },
+    /** La campanita lo usa para no avisar de lo que ya se está viendo y para dejar leídos sus avisos. */
+    avisarConversacionAbierta(id) {
+      window.dispatchEvent(new CustomEvent('ad-soporte-conversacion-abierta', { detail: { id } }))
     },
     /** El equipo respondió con el hilo abierto: se agrega al instante y queda leído. */
     alLlegarMensaje(m) {

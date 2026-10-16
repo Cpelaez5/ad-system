@@ -1,3 +1,6 @@
+// NOTA (centro de notificaciones): papel_por_vencer ahora también crea avisos en la campanita vía
+// notificar() (datos.correo_externo=true para que despachar-notificacion no duplique el correo) y respeta
+// preferencias_notificacion.correo. Al desplegar: SIEMPRE un solo archivo (sin imports relativos).
 // NOTA: en Supabase está desplegada una versión de UN solo archivo (el deploy con import de
 // ./logica.js falla). Al cambiar logica.js o este archivo, re-desplegar copiando la lógica
 // dentro de index.ts (ver versión 4 en el panel de Supabase).
@@ -346,7 +349,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: usuariosCliente, error: errUsuarios } = await supabaseAdmin
       .from("users")
-      .select("client_id, email")
+      .select("id, client_id, email")
       .eq("role", "cliente")
       .in("client_id", clientIds)
       .eq("is_active", true);
@@ -358,7 +361,11 @@ Deno.serve(async (req: Request) => {
 
     const clientePorId = new Map((clientes ?? []).map((c) => [c.id, c]));
     const emailUsuarioPorCliente = new Map<string, string>();
+    const idUsuarioPorCliente = new Map<string, string>();
+    const idsUsuariosPorCliente = new Map<string, string[]>();
     for (const u of usuariosCliente ?? []) {
+      if (u.client_id) idsUsuariosPorCliente.set(u.client_id, [...(idsUsuariosPorCliente.get(u.client_id) ?? []), u.id]);
+      if (u.client_id && u.email && !idUsuarioPorCliente.has(u.client_id)) idUsuarioPorCliente.set(u.client_id, u.id);
       // Si hay más de un usuario cliente activo, se usa el primero encontrado.
       if (u.client_id && u.email && !emailUsuarioPorCliente.has(u.client_id)) {
         emailUsuarioPorCliente.set(u.client_id, u.email);
@@ -366,6 +373,20 @@ Deno.serve(async (req: Request) => {
     }
 
     const appUrlFiscal = `${APP_URL.replace(/\/$/, "")}/cliente/fiscal-360`;
+
+    // Preferencia "papel_por_vencer": quien apagó el correo en Configuración → Avisos no lo recibe.
+    // La campanita (notificaciones) sí se crea siempre.
+    const todosLosUsuarios = Array.from(idsUsuariosPorCliente.values()).flat();
+    const sinCorreo = new Set<string>();
+    if (todosLosUsuarios.length > 0) {
+      const { data: prefs } = await supabaseAdmin
+        .from("preferencias_notificacion")
+        .select("user_id")
+        .eq("tipo", "papel_por_vencer")
+        .eq("correo", false)
+        .in("user_id", todosLosUsuarios);
+      for (const p of prefs ?? []) sinCorreo.add(p.user_id);
+    }
 
     // ─── 6. Enviar un correo por cliente con todos sus ítems ───────────────
     for (const [clientId, items] of grupos) {
@@ -393,6 +414,31 @@ Deno.serve(async (req: Request) => {
         appUrl: appUrlFiscal,
       });
       const subject = construirAsunto(items);
+
+      // Campanita: solo papeles (fiscal). datos.correo_externo = true evita que el despachador
+      // mande un segundo correo (este correo lo envía esta función). Un fallo aquí nunca frena el correo.
+      const mensajesPapeles = items
+        .filter((i) => i.tipo === "fiscal")
+        .map((i) => mensajeDocumentoFiscal(nombreCliente, i));
+      const idsCampanita = idsUsuariosPorCliente.get(clientId) ?? [];
+      if (mensajesPapeles.length > 0 && idsCampanita.length > 0) {
+        try {
+          await supabaseAdmin.rpc("notificar", {
+            p_user_ids: idsCampanita,
+            p_tipo: "papel_por_vencer",
+            p_titulo: mensajesPapeles.length === 1 ? mensajesPapeles[0] : `Tienes ${mensajesPapeles.length} papeles por atender`,
+            p_cuerpo: mensajesPapeles.join(" "),
+            p_url: "/cliente/fiscal-360",
+            p_datos: { correo_externo: true },
+            p_agrupar: null,
+          });
+        } catch (err) {
+          console.error("No se pudo crear la notificación de papeles:", (err as Error).message);
+        }
+      }
+
+      const usuarioDestino = idUsuarioPorCliente.get(clientId);
+      if (usuarioDestino && sinCorreo.has(usuarioDestino)) continue; // apagó el correo de este aviso
 
       try {
         const resendResponse = await fetch("https://api.resend.com/emails", {
