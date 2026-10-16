@@ -17,6 +17,7 @@ const RETENCION = (inv) =>
  * @param {Array} s.todasVentas     todas las ventas (para cuentas por cobrar)
  * @param {number} s.papelesSubidos documentos fiscales subidos (sin papelera)
  * @param {number} s.diaDelMes      1..31 (inyectado para poder probar)
+ * @param {{titulo:string, detalle:string}|null} [s.seniatPendiente] declaración de retenciones por hacer (utils/seniat/tarjetas)
  * @param {(n:number)=>number} [s.aUSD] convierte el monto de una factura a USD
  * @param {string[]} [s.descartadas] claves que la persona ocultó
  * @param {number} [s.maximo]       cuántas devolver (por defecto 4)
@@ -27,6 +28,7 @@ export function sugerenciasInicio({
   todasVentas = [],
   papelesSubidos = 0,
   diaDelMes = 1,
+  seniatPendiente = null,
   aUSD = (inv) => Number(inv?.financial?.totalSales || 0),
   descartadas = [],
   maximo = 4,
@@ -57,6 +59,18 @@ export function sugerenciasInicio({
       textoBoton: 'Ver ventas',
       accion: { ruta: '/cliente/facturacion?tab=ventas' },
       prioridad: 10,
+    })
+  }
+
+  if (seniatPendiente) {
+    lista.push({
+      clave: 'seniat',
+      icono: 'mdi-file-send-outline',
+      titulo: seniatPendiente.titulo,
+      detalle: seniatPendiente.detalle,
+      textoBoton: 'Ver SENIAT del mes',
+      accion: { ruta: '/cliente/seniat' },
+      prioridad: 12,
     })
   }
 

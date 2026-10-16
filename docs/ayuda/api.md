@@ -2,7 +2,7 @@
 titulo: API de productos
 resumen: Para programadores. Carga y consulta los productos de tu empresa desde tu tienda en línea u otro sistema.
 palabras: api, programadores, productos, x-api-key, llave, curl, javascript, fetch, json, integración, tienda en línea, catálogo, post, get, lote, errores, codigo, codigo_barras
-orden: 13
+orden: 14
 ---
 
 # API de productos

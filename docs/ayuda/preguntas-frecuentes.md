@@ -2,7 +2,7 @@
 titulo: Preguntas frecuentes
 resumen: Respuestas rápidas a las dudas más comunes y a dónde ir para cada una.
 palabras: preguntas, dudas, ayuda, problema, error, no puedo, cómo, por qué, contraseña, rif, papelera, tasa, mercancía, soporte, chat
-orden: 12
+orden: 13
 ---
 
 # Preguntas frecuentes

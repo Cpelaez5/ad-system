@@ -32,6 +32,7 @@ vi.mock('@/services/bcvService', () => ({
 vi.mock('@/services/seal-service', () => ({
   default: { getSealConfig: () => Promise.resolve({ sealUrl: null, signatureUrl: null }) },
 }))
+vi.mock('@/services/seniatService.js', () => ({ cargarMes: () => Promise.resolve({ cliente: null }) }))
 vi.mock('@/services/registroService', () => ({
   guardarRegistro: (...args) => mockGuardarRegistro(...args),
 }))

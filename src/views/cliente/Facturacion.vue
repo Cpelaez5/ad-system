@@ -73,6 +73,12 @@
               :disabled="invoices.length === 0"
               @click="exportFiscal('VENTA')"
             />
+            <v-list-item
+              prepend-icon="mdi-file-send-outline"
+              title="Ver todo en SENIAT del mes"
+              subtitle="Libros, retenciones de IVA y de ISLR"
+              :to="{ name: 'ClienteSeniat' }"
+            />
             <v-divider class="my-2" />
             <v-list-subheader>Reportes generales en Excel</v-list-subheader>
             <v-list-item

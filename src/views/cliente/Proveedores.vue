@@ -301,12 +301,23 @@ export default {
       try {
         const list = await proveedorService.getProveedores({ onlyActive: true })
         this.proveedores = list || []
+        this.abrirEdicionPorQuery()
       } catch (e) {
         console.error('Error cargando proveedores:', e)
         this.$root?.showSnackbar?.('Error al cargar la lista de proveedores', 'error')
       } finally {
         this.loading = false
       }
+    },
+    /** ?editar=<id> (viene de "Arreglar" en SENIAT del mes): abre la edición de ese proveedor una vez. */
+    abrirEdicionPorQuery() {
+      const id = this.$route?.query?.editar
+      if (!id) return
+      const prov = this.proveedores.find((p) => p.id === id)
+      const { editar, ...resto } = this.$route.query
+      this.$router.replace({ query: resto })
+      if (prov) this.openEditModal(prov)
+      else this.$root?.showSnackbar?.('No encontramos ese proveedor.', 'warning')
     },
     handleProviderChange() {
       this.loadData()
