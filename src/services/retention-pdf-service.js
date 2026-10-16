@@ -19,7 +19,9 @@ import { supabase } from '@/lib/supabaseClient'
 import venezuelaLocationsService from '@/services/venezuelaLocationsService.js'
 import systemLogo from '/ADSystem/logo.png'
 import watermarkLogo from '/ADSystem/png/svg_logo_ADADAD_3000x3000.png'
-import { formatFechaCorta } from '@/utils/fechas'
+import { formatFechaCorta, parseFechaLocal } from '@/utils/fechas'
+import { normalizarRif } from '@/utils/rif'
+import { parseMontoVenezolano } from '@/utils/formatMoney'
 
 // ══════════════════════════════════════════════════════
 // Constantes de diseño corporativo AD SYSTEM
@@ -71,15 +73,15 @@ function getBase64ImageFromURL(url) {
 }
 
 /** Formateador de moneda venezolano con separadores estándar */
-function formatNumber(value, decimals = 2) {
+export function formatNumber(value, decimals = 2) {
   if (value === null || value === undefined || value === '') return '0,00'
-  const num = typeof value === 'number' ? value : parseFloat(String(value).replace(/\./g, '').replace(',', '.'))
-  if (isNaN(num)) return '0,00'
-  
-  return num.toLocaleString('de-DE', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
-  })
+  const num = typeof value === 'number' ? value : parseMontoVenezolano(value)
+  if (!Number.isFinite(num)) return '0,00'
+  // Sin depender del idioma del navegador: 1.234.567,89 siempre
+  const [entero, decimal] = Math.abs(num).toFixed(decimals).split('.')
+  const miles = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  const esCero = Number(Math.abs(num).toFixed(decimals)) === 0
+  return `${num < 0 && !esCero ? '-' : ''}${miles}${decimal ? `,${decimal}` : ''}`
 }
 
 /** Formateador de fechas DD/MM/YYYY */
@@ -89,11 +91,11 @@ function formatDate(dateStr) {
   return formatFechaCorta(dateStr) || String(dateStr)
 }
 
-/** Extrae año y mes de una fecha */
-function getYearMonth(dateStr) {
-  const d = dateStr ? new Date(dateStr) : new Date()
-  const year = isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear()
-  const monthNum = isNaN(d.getTime()) ? (new Date().getMonth() + 1) : (d.getMonth() + 1)
+/** Extrae año y mes de una fecha (en hora local: '2026-10-01' es octubre, no septiembre) */
+export function getYearMonth(dateStr) {
+  const d = parseFechaLocal(dateStr) || new Date()
+  const year = d.getFullYear()
+  const monthNum = d.getMonth() + 1
   const month = String(monthNum).padStart(2, '0')
   const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
   return {
@@ -193,14 +195,67 @@ async function drawWatermark(doc, pageWidth, pageHeight) {
   }
 }
 
-/** Dibuja la franja superior decorativa institucional AD SYSTEM */
+/** Dibuja la franja superior de marca AD System: carbón y granate */
 function drawCorporateHeaderBand(doc, pageWidth) {
-  doc.setFillColor(...COLORS.secondary) // Azul institucional
+  doc.setFillColor(...COLORS.secondary)
   doc.rect(0, 0, pageWidth, 3.5, 'F')
-  doc.setFillColor(...COLORS.primary)   // Rojo corporativo
+  doc.setFillColor(...COLORS.primary)
   doc.rect(0, 3.5, pageWidth, 1.8, 'F')
-  doc.setFillColor(...COLORS.accent)    // Línea dorada sutil
-  doc.rect(0, 5.3, pageWidth, 0.6, 'F')
+}
+
+/** Logo oficial arriba a la izquierda, con su proporción real (no se estira). Devuelve el ancho usado. */
+async function drawLogoCabecera(doc, x, y, alto = 10) {
+  try {
+    const logoInfo = await getBase64ImageFromURL(systemLogo)
+    if (logoInfo && logoInfo.dataURL) {
+      const ancho = alto * (logoInfo.width / logoInfo.height)
+      doc.addImage(logoInfo.dataURL, 'PNG', x, y, ancho, alto)
+      return ancho
+    }
+  } catch (e) {
+    // sin logo: el documento sigue siendo válido
+  }
+  return 0
+}
+
+/**
+ * Fila "nombre o razón social + RIF" de una de las partes. El nombre se ajusta a varias líneas
+ * (antes se cortaba a 70 letras: "…CONSUMO MASIVO, C." sin la "A."). Devuelve la altura usada.
+ */
+function drawFilaParte(doc, x, y, col1Width, col2Width, etiquetaNombre, nombre, etiquetaRif, rif) {
+  const texto = String(nombre || 'NO REGISTRADO').toUpperCase().replace(/\s+/g, ' ').trim()
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  const lineas = doc.splitTextToSize(texto, col1Width - 6).slice(0, 3)
+  const alto = Math.max(11.5, 6 + lineas.length * 4.2)
+
+  drawBox(doc, x, y, col1Width, alto)
+  doc.setFontSize(7.5)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(...COLORS.darkGrey)
+  doc.text(etiquetaNombre, x + 3, y + 4)
+  doc.setFontSize(9.5)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...COLORS.secondary)
+  lineas.forEach((l, i) => doc.text(l, x + 3, y + 8.6 + i * 4.2))
+
+  drawBox(doc, x + col1Width, y, col2Width, alto)
+  doc.setFontSize(7.5)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(...COLORS.darkGrey)
+  doc.text(etiquetaRif, x + col1Width + 3, y + 4)
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...COLORS.primary)
+  doc.text(formatearRif(rif) || 'NO REGISTRADO', x + col1Width + 3, y + 8.6)
+  return alto
+}
+
+/** RIF como L-NNNNNNNN-N cuando es válido; si no, tal como viene (en mayúsculas). */
+function formatearRif(rif) {
+  const crudo = String(rif || '').trim()
+  if (!crudo) return ''
+  return normalizarRif(crudo) || crudo.toUpperCase()
 }
 
 /**
@@ -218,41 +273,21 @@ function drawAddressBox(doc, x, y, width, label, addressText) {
     .trim()
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(6.5)
-  const maxTextWidth = width - 6
-  const lines = doc.splitTextToSize(clean, maxTextWidth)
+  doc.setFontSize(9)
+  const lines = doc.splitTextToSize(clean, width - 6).slice(0, 3)
+  const boxHeight = 7.5 + lines.length * 4.1
 
-  // Manejar hasta 2 líneas de dirección
-  const displayLines = lines.slice(0, 2)
-  if (lines.length > 2) {
-    let last = displayLines[1]
-    if (last.length > 3) last = last.substring(0, last.length - 3) + '...'
-    displayLines[1] = last
-  }
-
-  const isMultiLine = displayLines.length > 1
-  const boxHeight = isMultiLine ? 10.5 : 7.5
-
-  // 1. Dibujar el recuadro contenedor
   drawBox(doc, x, y, width, boxHeight)
 
-  // 2. Label superior pequeño
-  doc.setFontSize(6)
+  doc.setFontSize(7.5)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...COLORS.darkGrey)
-  doc.text(label, x + 3, y + 2.8)
+  doc.text(label, x + 3, y + 4)
 
-  // 3. Texto de la dirección
-  doc.setFontSize(6.5)
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...COLORS.black)
-
-  if (!isMultiLine) {
-    doc.text(displayLines[0], x + 3, y + 6)
-  } else {
-    doc.text(displayLines[0], x + 3, y + 5.8)
-    doc.text(displayLines[1], x + 3, y + 9.0)
-  }
+  lines.forEach((l, i) => doc.text(l, x + 3, y + 8.3 + i * 4.1))
 
   return boxHeight
 }
@@ -260,7 +295,7 @@ function drawAddressBox(doc, x, y, width, label, addressText) {
 /** Resuelve la información del Agente y Sujeto según el flujo (COMPRA o VENTA) */
 async function resolveParties(invoice, companyInfo = {}, retData = null) {
   const tenantName = companyInfo?.name || companyInfo?.companyName || invoice.organization?.name || 'EMPRESA AGENTE'
-  const tenantRif = companyInfo?.rif || invoice.organization?.rif || 'J-00000000-0'
+  const tenantRif = companyInfo?.rif || invoice.organization?.rif || ''
   const tenantDir = companyInfo?.address || companyInfo?.direccion || invoice.organization?.address || 'DIRECCIÓN FISCAL NO REGISTRADA'
   const tenantPhone = companyInfo?.phone || invoice.organization?.phone || ''
   const tenantLicencia = companyInfo?.licencia_actividad_economica || companyInfo?.licencia || invoice.client?.licencia_actividad_economica || ''
@@ -283,7 +318,7 @@ async function resolveParties(invoice, companyInfo = {}, retData = null) {
     const rawSujetoMun = invoice.issuer?.municipio_id || invoice.issuer?.municipio || retData?.municipio_id || ''
     sujeto = {
       name: invoice.issuer?.razon_social || invoice.issuer?.nombre || invoice.issuer?.companyName || retData?.proveedor_nombre || 'PROVEEDOR NO REGISTRADO',
-      rif: invoice.issuer?.rif || retData?.proveedor_rif || 'J-00000000-0',
+      rif: invoice.issuer?.rif || retData?.proveedor_rif || '',
       address: invoice.issuer?.direccion || invoice.issuer?.address || 'DIRECCIÓN FISCAL NO REGISTRADA',
       phone: invoice.issuer?.telefono || invoice.issuer?.phone || '',
       licencia: invoice.issuer?.licencia_actividad_economica || invoice.issuer?.licencia || retData?.licencia_actividad || '',
@@ -293,7 +328,7 @@ async function resolveParties(invoice, companyInfo = {}, retData = null) {
     // Consultar tabla 'proveedores' para reflejar siempre los datos fiscales más recientes (dirección, licencia, municipio)
     try {
       const provId = invoice.issuer?.id || invoice.issuer_id || invoice.provider_id
-      const provRif = sujeto.rif && sujeto.rif !== 'J-00000000-0' ? sujeto.rif : (invoice.issuer?.rif || retData?.proveedor_rif)
+      const provRif = sujeto.rif && sujeto.rif !== '' ? sujeto.rif : (invoice.issuer?.rif || retData?.proveedor_rif)
       
       let provData = null
       if (provId) {
@@ -307,7 +342,7 @@ async function resolveParties(invoice, companyInfo = {}, retData = null) {
 
       if (provData) {
         if (!sujeto.name || sujeto.name === 'PROVEEDOR NO REGISTRADO') sujeto.name = provData.nombre || provData.razon_social || sujeto.name
-        if (!sujeto.rif || sujeto.rif === 'J-00000000-0') sujeto.rif = provData.rif || sujeto.rif
+        if (!sujeto.rif || sujeto.rif === '') sujeto.rif = provData.rif || sujeto.rif
         if (provData.direccion || provData.address) sujeto.address = provData.direccion || provData.address
         if (provData.telefono || provData.phone) sujeto.phone = provData.telefono || provData.phone
         if (provData.licencia_actividad_economica || provData.licencia) sujeto.licencia = provData.licencia_actividad_economica || provData.licencia
@@ -323,7 +358,7 @@ async function resolveParties(invoice, companyInfo = {}, retData = null) {
     const rawClienteMun = invoice.client?.municipio_id || invoice.client?.municipio || ''
     agente = {
       name: invoice.client?.razon_social || invoice.client?.nombre || invoice.client?.companyName || 'CLIENTE AGENTE',
-      rif: invoice.client?.rif || 'J-00000000-0',
+      rif: invoice.client?.rif || '',
       address: invoice.client?.direccion || invoice.client?.address || 'DIRECCIÓN FISCAL NO REGISTRADA',
       phone: invoice.client?.telefono || invoice.client?.phone || '',
       licencia: invoice.client?.licencia_actividad_economica || '',
@@ -347,7 +382,7 @@ async function resolveParties(invoice, companyInfo = {}, retData = null) {
           const { data: cliData } = await supabase.from('clients').select('*').eq('id', cliId).maybeSingle()
           if (cliData) {
             if (!agente.name || agente.name === 'CLIENTE AGENTE') agente.name = cliData.company_name || cliData.name || agente.name
-            if (!agente.rif || agente.rif === 'J-00000000-0') agente.rif = cliData.rif || agente.rif
+            if (!agente.rif || agente.rif === '') agente.rif = cliData.rif || agente.rif
             if (!agente.address || agente.address === 'DIRECCIÓN FISCAL NO REGISTRADA') agente.address = cliData.address || 'DIRECCIÓN FISCAL NO REGISTRADA'
             if (!agente.phone) agente.phone = cliData.phone || ''
             if (!agente.licencia) agente.licencia = cliData.licencia_actividad_economica || ''
@@ -449,14 +484,14 @@ function drawTableRow(doc, columns, rowData, x, y, rowHeight, options = {}) {
     const maxTextWidth = col.width - 2
     let textWidth = doc.getTextWidth(val)
 
-    // Si el texto es largo, reducir dinámicamente la fuente (hasta 4.5pt) para que se lea completo
-    while (textWidth > maxTextWidth && currentFontSize > 4.2) {
+    // Si el texto es largo, reducir la fuente (hasta 6 pt) para que se lea completo
+    while (textWidth > maxTextWidth && currentFontSize > 6) {
       currentFontSize -= 0.3
       doc.setFontSize(currentFontSize)
       textWidth = doc.getTextWidth(val)
     }
 
-    // Solo si aún con 4.2pt sobrepasa el ancho, truncar con seguridad
+    // Solo si aún con 6 pt sobrepasa el ancho, truncar con seguridad
     const displayVal = textWidth > maxTextWidth ? truncateText(doc, val, maxTextWidth) : val
 
     if (col.align === 'center') {
@@ -495,35 +530,24 @@ class RetentionPdfService {
     // 2. Franja superior institucional
     drawCorporateHeaderBand(doc, pageWidth)
 
-    let y = 10
+    let y = 15
 
-    // 3. Logo corporativo pequeño
-    try {
-      const logoInfo = await getBase64ImageFromURL(systemLogo)
-      if (logoInfo && logoInfo.dataURL) {
-        const logoHeight = 6
-        const ratio = logoInfo.width / logoInfo.height
-        doc.addImage(logoInfo.dataURL, 'PNG', margin, y - 2, logoHeight * ratio, logoHeight)
-      }
-    } catch (e) {
-      // continuar sin logo
-    }
-
-    // 4. Texto legal reglamentario
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(5.5)
-    doc.setTextColor(...COLORS.darkGrey)
-    const legalText = 'Ley de IVA Art. 11. "La Administracion Tributaria podra designar como responsables del pago del impuesto, en calidad de agentes de retencion, a quienes por sus funciones publicas o por razon de sus actividades privadas intervengan en operaciones gravadas con el impuesto establecido en este Decreto con Rango, Valor y Fuerza de Ley"'
-    const splitLegal = doc.splitTextToSize(legalText, contentWidth - 40)
-    doc.text(splitLegal, pageWidth / 2, y, { align: 'center' })
-    y += 7
-
-    // 5. Título Principal
+    // 3. Logo oficial (proporción real) y título
+    await drawLogoCabecera(doc, margin, 8.5, 10)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
+    doc.setFontSize(15)
     doc.setTextColor(...COLORS.secondary)
     doc.text('COMPROBANTE DE RETENCIÓN DE I.V.A.', pageWidth / 2, y, { align: 'center' })
-    y += 5
+    y += 5.5
+
+    // Texto legal reglamentario
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(...COLORS.darkGrey)
+    const legalText = 'Ley de IVA Art. 11. "La Administración Tributaria podrá designar como responsables del pago del impuesto, en calidad de agentes de retención, a quienes por sus funciones públicas o por razón de sus actividades privadas intervengan en operaciones gravadas con el impuesto establecido en este Decreto con Rango, Valor y Fuerza de Ley"'
+    const splitLegal = doc.splitTextToSize(legalText, contentWidth - 20)
+    doc.text(splitLegal, pageWidth / 2, y, { align: 'center' })
+    y += splitLegal.length * 3.3 + 3
 
     // 6. Cajas de Número de Comprobante, Fecha y Período Fiscal
     const retentionDate = retData?.fecha_comprobante || invoice.retention_date || invoice.retentionDate || invoice.issueDate
@@ -544,41 +568,41 @@ class RetentionPdfService {
 
     const boxY = y
     const compBoxWidth = 130
-    const compBoxHeight = 10
+    const compBoxHeight = 12.5
     const rightBoxWidth = (contentWidth - compBoxWidth - 6) / 2
 
     // Caja 1: No. Comprobante
     drawBox(doc, margin, boxY, compBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
-    doc.setFontSize(7.5)
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.black)
-    doc.text('No. DE COMPROBANTE:', margin + 3, boxY + 6.5)
+    doc.text('No. DE COMPROBANTE:', margin + 3, boxY + 8.2)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
+    doc.setFontSize(10.5)
     doc.setTextColor(...COLORS.primary)
-    doc.text(numComprobante, margin + 42, boxY + 6.5)
+    doc.text(numComprobante, margin + 42, boxY + 8.2)
 
     // Caja 2: Fecha
     const fechaX = margin + compBoxWidth + 3
     drawBox(doc, fechaX, boxY, rightBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
-    doc.text('FECHA', fechaX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
-    doc.setFontSize(8)
+    doc.text('FECHA', fechaX + (rightBoxWidth / 2), boxY + 4.6, { align: 'center' })
+    doc.setFontSize(9.5)
     doc.setTextColor(...COLORS.secondary)
-    doc.text(formattedRetentionDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+    doc.text(formattedRetentionDate, fechaX + (rightBoxWidth / 2), boxY + 9.6, { align: 'center' })
 
     // Caja 3: Período Fiscal
     const periodX = fechaX + rightBoxWidth + 3
     drawBox(doc, periodX, boxY, rightBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
-    doc.text('PERIODO FISCAL', periodX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
+    doc.text('PERIODO FISCAL', periodX + (rightBoxWidth / 2), boxY + 4.6, { align: 'center' })
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.text(`AÑO: ${year}   MES: ${month}`, periodX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+    doc.setFontSize(8.5)
+    doc.text(`AÑO: ${year}   MES: ${month}`, periodX + (rightBoxWidth / 2), boxY + 9.6, { align: 'center' })
 
     y += compBoxHeight + 3
 
@@ -587,59 +611,17 @@ class RetentionPdfService {
 
     const col1Width = contentWidth * 0.65
     const col2Width = contentWidth * 0.35
-    const partyRowHeight = 9
+    const partyRowHeight = 11.5
 
     // Agente - Nombre
-    drawBox(doc, margin, y, col1Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('NOMBRE O RAZON SOCIAL DEL AGENTE DE RETENCION:', margin + 3, y + 3)
-    doc.setFontSize(7.5)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.secondary)
-    doc.text(String(agente.name || '').toUpperCase().substring(0, 70), margin + 3, y + 7)
-
-    // Agente - RIF
-    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('REGISTRO DE INFORMACION FISCAL (RIF):', margin + col1Width + 3, y + 3)
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.primary)
-    doc.text(String(agente.rif || '').toUpperCase(), margin + col1Width + 3, y + 7)
-
-    y += partyRowHeight
+    y += drawFilaParte(doc, margin, y, col1Width, col2Width, 'NOMBRE O RAZON SOCIAL DEL AGENTE DE RETENCION:', agente.name, 'REGISTRO DE INFORMACION FISCAL (RIF):', agente.rif)
 
     // Fila 2: Dirección Fiscal del Agente
     const agenteDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL AGENTE DE RETENCION:', agente.address)
     y += agenteDirHeight + 2
 
     // Fila 3: Sujeto Retenido (Proveedor / Beneficiario)
-    drawBox(doc, margin, y, col1Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('NOMBRE O RAZON SOCIAL DEL SUJETO A RETENCION:', margin + 3, y + 3)
-    doc.setFontSize(7.5)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.secondary)
-    doc.text(String(sujeto.name || '').toUpperCase().substring(0, 70), margin + 3, y + 7)
-
-    // Sujeto - RIF
-    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('REGISTRO DE INFORMACION FISCAL (RIF):', margin + col1Width + 3, y + 3)
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.primary)
-    doc.text(String(sujeto.rif || '').toUpperCase(), margin + col1Width + 3, y + 7)
-
-    y += partyRowHeight
+    y += drawFilaParte(doc, margin, y, col1Width, col2Width, 'NOMBRE O RAZON SOCIAL DEL SUJETO A RETENCION:', sujeto.name, 'REGISTRO DE INFORMACION FISCAL (RIF):', sujeto.rif)
 
     // Fila 4: Dirección Fiscal del Sujeto Retenido
     const sujetoDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL SUJETO A RETENCION:', sujeto.address)
@@ -665,7 +647,7 @@ class RetentionPdfService {
 
     // Dibujar Headers de la tabla
     const tableHeaderY = y
-    const tableHeaderHeight = 9
+    const tableHeaderHeight = 11
     let curX = margin
 
     doc.setFillColor(...COLORS.tableHeaderBg)
@@ -674,7 +656,7 @@ class RetentionPdfService {
     doc.setDrawColor(...COLORS.tableBorder)
     doc.rect(margin, tableHeaderY, contentWidth, tableHeaderHeight, 'S')
 
-    doc.setFontSize(5.5)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
 
@@ -682,9 +664,9 @@ class RetentionPdfService {
       doc.line(curX, tableHeaderY, curX, tableHeaderY + tableHeaderHeight)
       
       const lines = col.label.split('\n')
-      const textY = lines.length > 1 ? tableHeaderY + 3.5 : tableHeaderY + 5.5
+      const textY = lines.length > 1 ? tableHeaderY + 4.7 : tableHeaderY + 6.6
       lines.forEach((line, lIdx) => {
-        const lineY = textY + (lIdx * 2.8)
+        const lineY = textY + (lIdx * 3.5)
         if (col.align === 'center') {
           doc.text(line, curX + (col.width / 2), lineY, { align: 'center' })
         } else if (col.align === 'right') {
@@ -728,7 +710,7 @@ class RetentionPdfService {
     ]
 
     // Dibujar Fila de Datos
-    const dataRowHeight = 7
+    const dataRowHeight = 9
     doc.setLineWidth(0.2)
     doc.setDrawColor(...COLORS.tableBorder)
     doc.rect(margin, y, contentWidth, dataRowHeight, 'S')
@@ -739,16 +721,16 @@ class RetentionPdfService {
     // Filas vacías adicionales de presentación reglamentaria
     for (let r = 0; r < 3; r++) {
       curX = margin
-      doc.rect(margin, y, contentWidth, 5, 'S')
+      doc.rect(margin, y, contentWidth, 6, 'S')
       columns.forEach(col => {
-        doc.line(curX, y, curX, y + 5)
+        doc.line(curX, y, curX, y + 6)
         curX += col.width
       })
       y += 5
     }
 
     // Fila de TOTALES
-    const totalRowHeight = 7
+    const totalRowHeight = 9
     doc.setFillColor(...COLORS.totalBg)
     doc.rect(margin, y, contentWidth, totalRowHeight, 'F')
     doc.setLineWidth(0.3)
@@ -758,9 +740,9 @@ class RetentionPdfService {
     // Texto TOTALES en columnas de la izquierda
     const leftColsWidth = columns.slice(0, 8).reduce((acc, c) => acc + c.width, 0)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setTextColor(...COLORS.black)
-    doc.text('TOTALES', margin + leftColsWidth - 4, y + 4.5, { align: 'right' })
+    doc.text('TOTALES', margin + leftColsWidth - 4, y + 6, { align: 'right' })
 
     // Montos totales por columna
     let totalX = margin + leftColsWidth
@@ -782,8 +764,8 @@ class RetentionPdfService {
         } else {
           doc.setTextColor(...COLORS.black)
         }
-        doc.setFontSize(6)
-        doc.text(val, totalX + col.width - 1.5, y + 4.5, { align: 'right' })
+        doc.setFontSize(7.5)
+        doc.text(val, totalX + col.width - 1.5, y + 6, { align: 'right' })
       }
       totalX += col.width
     })
@@ -792,7 +774,7 @@ class RetentionPdfService {
 
     // 9. Resumen Financiero Lateral Derecho
     const summaryX = pageWidth - margin - 80
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
     
@@ -805,7 +787,7 @@ class RetentionPdfService {
     ]
 
     summaryLines.forEach((sLine, sIdx) => {
-      const lineY = y + (sIdx * 4.5)
+      const lineY = y + (sIdx * 5.6)
       doc.setFont('helvetica', sLine.isBold ? 'bold' : 'normal')
       doc.setTextColor(...COLORS.black)
       doc.text(sLine.label, summaryX, lineY)
@@ -827,7 +809,7 @@ class RetentionPdfService {
     doc.setLineWidth(0.4)
     doc.setDrawColor(...COLORS.black)
     doc.line(margin + 5, signAreaY, margin + 5 + signWidth, signAreaY)
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
     doc.text('Firma y Sello del Agente de Retención', margin + 5 + (signWidth / 2), signAreaY + 4, { align: 'center' })
@@ -838,7 +820,7 @@ class RetentionPdfService {
     doc.text('Firma y Sello del Sujeto a Retención', rightSignX + (signWidth / 2), signAreaY + 4, { align: 'center' })
 
     // 11. Footer Institucional
-    doc.setFontSize(5.5)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.grey)
     doc.text('AD System • Comprobante Fiscal Digital emitido según Providencia Administrativa SENIAT vigente', pageWidth / 2, pageHeight - 5, { align: 'center' })
@@ -873,31 +855,22 @@ class RetentionPdfService {
     // 2. Franja superior institucional
     drawCorporateHeaderBand(doc, pageWidth)
 
-    let y = 11
+    let y = 15
 
-    // 3. Logo corporativo
-    try {
-      const logoInfo = await getBase64ImageFromURL(systemLogo)
-      if (logoInfo && logoInfo.dataURL) {
-        const logoHeight = 6.5
-        const ratio = logoInfo.width / logoInfo.height
-        doc.addImage(logoInfo.dataURL, 'PNG', margin, y - 2, logoHeight * ratio, logoHeight)
-      }
-    } catch (e) {}
-
-    // 4. Título Principal
+    // 3. Logo oficial (proporción real) y título
+    await drawLogoCabecera(doc, margin, 8.5, 10)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
+    doc.setFontSize(15)
     doc.setTextColor(...COLORS.secondary)
     doc.text('COMPROBANTE DE RETENCIÓN DE I.S.L.R.', pageWidth / 2, y, { align: 'center' })
-    y += 4.5
+    y += 5.5
 
     // Subtítulo legal
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(6.5)
+    doc.setFontSize(8.5)
     doc.setTextColor(...COLORS.darkGrey)
     doc.text('(Excepto sueldos, salarios y demás remuneraciones similares a personas naturales residentes / Decreto 1.808)', pageWidth / 2, y, { align: 'center' })
-    y += 5.5
+    y += 7
 
     // 5. Metadatos de Comprobante (Cajas superiores)
     const retentionDate = retData?.fecha_comprobante || invoice.retention_date || invoice.retentionDate || invoice.issueDate
@@ -918,41 +891,41 @@ class RetentionPdfService {
 
     const boxY = y
     const compBoxWidth = 130
-    const compBoxHeight = 10
+    const compBoxHeight = 12.5
     const rightBoxWidth = (contentWidth - compBoxWidth - 6) / 2
 
     // Caja 1: Número de Comprobante
     drawBox(doc, margin, boxY, compBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.black)
-    doc.text('NÚMERO DE COMPROBANTE:', margin + 3, boxY + 6.5)
+    doc.text('NÚMERO DE COMPROBANTE:', margin + 3, boxY + 8.2)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
+    doc.setFontSize(10.5)
     doc.setTextColor(...COLORS.primary)
-    doc.text(numComprobante, margin + 45, boxY + 6.5)
+    doc.text(numComprobante, margin + 45, boxY + 8.2)
 
     // Caja 2: Fecha del Comprobante
     const fechaX = margin + compBoxWidth + 3
     drawBox(doc, fechaX, boxY, rightBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
-    doc.setFontSize(6.5)
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
-    doc.text('FECHA COMPROBANTE', fechaX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
-    doc.setFontSize(8)
+    doc.text('FECHA COMPROBANTE', fechaX + (rightBoxWidth / 2), boxY + 4.6, { align: 'center' })
+    doc.setFontSize(9.5)
     doc.setTextColor(...COLORS.secondary)
-    doc.text(formattedRetentionDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+    doc.text(formattedRetentionDate, fechaX + (rightBoxWidth / 2), boxY + 9.6, { align: 'center' })
 
     // Caja 3: Período Fiscal
     const periodX = fechaX + rightBoxWidth + 3
     drawBox(doc, periodX, boxY, rightBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
-    doc.setFontSize(6.5)
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
-    doc.text('PERIODO FISCAL', periodX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
+    doc.text('PERIODO FISCAL', periodX + (rightBoxWidth / 2), boxY + 4.6, { align: 'center' })
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.text(`AÑO: ${year}   MES: ${month}`, periodX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+    doc.setFontSize(8.5)
+    doc.text(`AÑO: ${year}   MES: ${month}`, periodX + (rightBoxWidth / 2), boxY + 9.6, { align: 'center' })
 
     y += compBoxHeight + 3.5
 
@@ -960,59 +933,17 @@ class RetentionPdfService {
     const { agente, sujeto } = await resolveParties(invoice, companyInfo, retData)
     const col1Width = contentWidth * 0.65
     const col2Width = contentWidth * 0.35
-    const partyRowHeight = 9
+    const partyRowHeight = 11.5
 
     // Agente - Nombre
-    drawBox(doc, margin, y, col1Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('NOMBRE O RAZON SOCIAL DEL AGENTE DE RETENCION:', margin + 3, y + 3)
-    doc.setFontSize(7.5)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.secondary)
-    doc.text(String(agente.name || '').toUpperCase().substring(0, 70), margin + 3, y + 7)
-
-    // Agente - RIF
-    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('N° DE R.I.F.:', margin + col1Width + 3, y + 3)
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.primary)
-    doc.text(String(agente.rif || '').toUpperCase(), margin + col1Width + 3, y + 7)
-
-    y += partyRowHeight
+    y += drawFilaParte(doc, margin, y, col1Width, col2Width, 'NOMBRE O RAZON SOCIAL DEL AGENTE DE RETENCION:', agente.name, 'N° DE R.I.F.:', agente.rif)
 
     // Agente - Dirección
     const agenteDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL AGENTE DE RETENCION:', agente.address)
     y += agenteDirHeight + 2
 
     // Sujeto Retenido - Nombre
-    drawBox(doc, margin, y, col1Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('NOMBRE O RAZON SOCIAL DEL SUJETO RETENIDO / BENEFICIARIO:', margin + 3, y + 3)
-    doc.setFontSize(7.5)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.secondary)
-    doc.text(String(sujeto.name || '').toUpperCase().substring(0, 70), margin + 3, y + 7)
-
-    // Sujeto Retenido - RIF
-    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('N° DE R.I.F.:', margin + col1Width + 3, y + 3)
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.primary)
-    doc.text(String(sujeto.rif || '').toUpperCase(), margin + col1Width + 3, y + 7)
-
-    y += partyRowHeight
+    y += drawFilaParte(doc, margin, y, col1Width, col2Width, 'NOMBRE O RAZON SOCIAL DEL SUJETO RETENIDO / BENEFICIARIO:', sujeto.name, 'N° DE R.I.F.:', sujeto.rif)
 
     // Sujeto Retenido - Dirección
     const sujetoDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL PROVEEDOR / BENEFICIARIO:', sujeto.address)
@@ -1035,7 +966,7 @@ class RetentionPdfService {
 
     // Dibujar Headers de la tabla
     const tableHeaderY = y
-    const tableHeaderHeight = 9
+    const tableHeaderHeight = 11
     let curX2 = margin
 
     doc.setFillColor(...COLORS.tableHeaderBg)
@@ -1044,16 +975,16 @@ class RetentionPdfService {
     doc.setDrawColor(...COLORS.tableBorder)
     doc.rect(margin, tableHeaderY, contentWidth, tableHeaderHeight, 'S')
 
-    doc.setFontSize(5.5)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
 
     islrColumns.forEach(col => {
       doc.line(curX2, tableHeaderY, curX2, tableHeaderY + tableHeaderHeight)
       const lines = col.label.split('\n')
-      const textY = lines.length > 1 ? tableHeaderY + 3.5 : tableHeaderY + 5.5
+      const textY = lines.length > 1 ? tableHeaderY + 4.7 : tableHeaderY + 6.6
       lines.forEach((line, lIdx) => {
-        const lineY = textY + (lIdx * 2.8)
+        const lineY = textY + (lIdx * 3.5)
         if (col.align === 'center') {
           doc.text(line, curX2 + (col.width / 2), lineY, { align: 'center' })
         } else if (col.align === 'right') {
@@ -1106,7 +1037,7 @@ class RetentionPdfService {
     ]
 
     // Dibujar Fila de Datos
-    const dataRowHeight = 7
+    const dataRowHeight = 9
     doc.setLineWidth(0.2)
     doc.setDrawColor(...COLORS.tableBorder)
     doc.rect(margin, y, contentWidth, dataRowHeight, 'S')
@@ -1117,16 +1048,16 @@ class RetentionPdfService {
     // Filas vacías adicionales
     for (let r = 0; r < 3; r++) {
       let curXEmpty = margin
-      doc.rect(margin, y, contentWidth, 5, 'S')
+      doc.rect(margin, y, contentWidth, 6, 'S')
       islrColumns.forEach(col => {
-        doc.line(curXEmpty, y, curXEmpty, y + 5)
+        doc.line(curXEmpty, y, curXEmpty, y + 6)
         curXEmpty += col.width
       })
       y += 5
     }
 
     // Fila de TOTALES
-    const totalRowHeight = 7
+    const totalRowHeight = 9
     doc.setFillColor(...COLORS.totalBg)
     doc.rect(margin, y, contentWidth, totalRowHeight, 'F')
     doc.setLineWidth(0.3)
@@ -1135,9 +1066,9 @@ class RetentionPdfService {
 
     const islrLeftColsWidth = islrColumns.slice(0, 6).reduce((acc, c) => acc + c.width, 0)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setTextColor(...COLORS.black)
-    doc.text('TOTALES', margin + islrLeftColsWidth - 4, y + 4.5, { align: 'right' })
+    doc.text('TOTALES', margin + islrLeftColsWidth - 4, y + 6, { align: 'right' })
 
     let islrTotalX = margin + islrLeftColsWidth
     const islrTotalsValues = [
@@ -1157,8 +1088,8 @@ class RetentionPdfService {
         } else {
           doc.setTextColor(...COLORS.black)
         }
-        doc.setFontSize(6)
-        doc.text(val, islrTotalX + col.width - 1.5, y + 4.5, { align: 'right' })
+        doc.setFontSize(7.5)
+        doc.text(val, islrTotalX + col.width - 1.5, y + 6, { align: 'right' })
       }
       islrTotalX += col.width
     })
@@ -1168,14 +1099,14 @@ class RetentionPdfService {
     // 8. Resumen Financiero
     const total2 = parseFloat(fin2.totalSales || base2)
     const islrSummaryX = pageWidth - margin - 85
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
 
     // Mostrar info del concepto ISLR si está disponible
     const conceptoNombre = retData?.concepto_islr_nombre || retData?.concepto_islr?.nombre || ''
     if (conceptoNombre) {
-      doc.setFontSize(6.5)
+      doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(...COLORS.darkGrey)
       doc.text(`Concepto: ${conceptoNombre}`, margin, y)
@@ -1194,7 +1125,7 @@ class RetentionPdfService {
     ]
 
     islrSummaryLines.forEach((sLine, sIdx) => {
-      const lineY = y + (sIdx * 4.5)
+      const lineY = y + (sIdx * 5.6)
       doc.setFont('helvetica', sLine.isBold ? 'bold' : 'normal')
       doc.setTextColor(...COLORS.black)
       doc.text(sLine.label, islrSummaryX, lineY)
@@ -1215,7 +1146,7 @@ class RetentionPdfService {
     doc.setLineWidth(0.4)
     doc.setDrawColor(...COLORS.black)
     doc.line(margin + 5, signAreaY, margin + 5 + signWidth, signAreaY)
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
     doc.text('Firma y Sello del Agente de Retención', margin + 5 + (signWidth / 2), signAreaY + 4, { align: 'center' })
@@ -1226,7 +1157,7 @@ class RetentionPdfService {
     doc.text('Firma y Sello del Sujeto Retenido / Beneficiario', rightSignX + (signWidth / 2), signAreaY + 4, { align: 'center' })
 
     // 10. Footer Institucional
-    doc.setFontSize(5.5)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.grey)
     doc.text('AD System • Comprobante Fiscal de ISLR emitido según Decreto 1.808 G.O. N° 36.203', pageWidth / 2, pageHeight - 5, { align: 'center' })
@@ -1299,31 +1230,22 @@ class RetentionPdfService {
     // 2. Franja superior institucional
     drawCorporateHeaderBand(doc, pageWidth)
 
-    let y = 11
+    let y = 15
 
-    // 3. Logo corporativo
-    try {
-      const logoInfo = await getBase64ImageFromURL(systemLogo)
-      if (logoInfo && logoInfo.dataURL) {
-        const logoHeight = 6.5
-        const ratio = logoInfo.width / logoInfo.height
-        doc.addImage(logoInfo.dataURL, 'PNG', margin, y - 2, logoHeight * ratio, logoHeight)
-      }
-    } catch (e) {}
-
-    // 4. Título Principal
+    // 3. Logo oficial (proporción real) y título
+    await drawLogoCabecera(doc, margin, 8.5, 10)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
+    doc.setFontSize(15)
     doc.setTextColor(...COLORS.secondary)
     doc.text('COMPROBANTE DE RETENCIÓN DEL IMPUESTO MUNICIPAL', pageWidth / 2, y, { align: 'center' })
-    y += 4.5
+    y += 5.5
 
     // Subtítulo legal
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(6.5)
+    doc.setFontSize(8.5)
     doc.setTextColor(...COLORS.darkGrey)
     doc.text('(Excepto sueldos, salarios y demás remuneraciones similares a personas naturales residentes / Ordenanzas Municipales)', pageWidth / 2, y, { align: 'center' })
-    y += 5.5
+    y += 7
 
     // 5. Metadatos de Comprobante (Cajas superiores)
     const retentionDate = retData?.fecha_comprobante || invoice.retention_date || invoice.retentionDate || invoice.issueDate
@@ -1344,41 +1266,41 @@ class RetentionPdfService {
 
     const boxY = y
     const compBoxWidth = 130
-    const compBoxHeight = 10
+    const compBoxHeight = 12.5
     const rightBoxWidth = (contentWidth - compBoxWidth - 6) / 2
 
     // Caja 1: Número de Comprobante
     drawBox(doc, margin, boxY, compBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.black)
-    doc.text('NÚMERO DE COMPROBANTE:', margin + 3, boxY + 6.5)
+    doc.text('NÚMERO DE COMPROBANTE:', margin + 3, boxY + 8.2)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
+    doc.setFontSize(10.5)
     doc.setTextColor(...COLORS.primary)
-    doc.text(numComprobante, margin + 45, boxY + 6.5)
+    doc.text(numComprobante, margin + 45, boxY + 8.2)
 
     // Caja 2: Fecha del Comprobante
     const fechaX = margin + compBoxWidth + 3
     drawBox(doc, fechaX, boxY, rightBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
-    doc.setFontSize(6.5)
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
-    doc.text('FECHA COMPROBANTE', fechaX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
-    doc.setFontSize(8)
+    doc.text('FECHA COMPROBANTE', fechaX + (rightBoxWidth / 2), boxY + 4.6, { align: 'center' })
+    doc.setFontSize(9.5)
     doc.setTextColor(...COLORS.secondary)
-    doc.text(formattedRetentionDate, fechaX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+    doc.text(formattedRetentionDate, fechaX + (rightBoxWidth / 2), boxY + 9.6, { align: 'center' })
 
     // Caja 3: Período Fiscal
     const periodX = fechaX + rightBoxWidth + 3
     drawBox(doc, periodX, boxY, rightBoxWidth, compBoxHeight, COLORS.tableHeaderBg)
-    doc.setFontSize(6.5)
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
-    doc.text('PERIODO FISCAL', periodX + (rightBoxWidth / 2), boxY + 3.5, { align: 'center' })
+    doc.text('PERIODO FISCAL', periodX + (rightBoxWidth / 2), boxY + 4.6, { align: 'center' })
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    doc.text(`AÑO: ${year}   MES: ${month}`, periodX + (rightBoxWidth / 2), boxY + 7.5, { align: 'center' })
+    doc.setFontSize(8.5)
+    doc.text(`AÑO: ${year}   MES: ${month}`, periodX + (rightBoxWidth / 2), boxY + 9.6, { align: 'center' })
 
     y += compBoxHeight + 3.5
 
@@ -1386,31 +1308,11 @@ class RetentionPdfService {
     const { agente, sujeto } = await resolveParties(invoice, companyInfo, retData)
     const col1Width = contentWidth * 0.65
     const col2Width = contentWidth * 0.35
-    const partyRowHeight = 8.5
+    const partyRowHeight = 11.5
 
     // ── AGENTE DE RETENCIÓN ──
     // Fila 1: Agente - Nombre y RIF
-    drawBox(doc, margin, y, col1Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('NOMBRE O RAZON SOCIAL DEL AGENTE DE RETENCION:', margin + 3, y + 3)
-    doc.setFontSize(7.5)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.secondary)
-    doc.text(String(agente.name || '').toUpperCase().substring(0, 70), margin + 3, y + 7)
-
-    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('N° DE R.I.F.:', margin + col1Width + 3, y + 3)
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.primary)
-    doc.text(String(agente.rif || '').toUpperCase(), margin + col1Width + 3, y + 7)
-
-    y += partyRowHeight
+    y += drawFilaParte(doc, margin, y, col1Width, col2Width, 'NOMBRE O RAZON SOCIAL DEL AGENTE DE RETENCION:', agente.name, 'N° DE R.I.F.:', agente.rif)
 
     // Fila 2: Agente - Dirección Fiscal
     const agenteDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL AGENTE DE RETENCION:', agente.address)
@@ -1418,50 +1320,30 @@ class RetentionPdfService {
 
     // Fila 3: Agente - Licencia y Municipio
     drawBox(doc, margin, y, col1Width, partyRowHeight - 1.5)
-    doc.setFontSize(6)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.darkGrey)
-    doc.text('LICENCIA DE ACTIVIDAD ECONÓMICA DEL AGENTE:', margin + 3, y + 2.8)
-    doc.setFontSize(6.5)
+    doc.text('LICENCIA DE ACTIVIDAD ECONÓMICA DEL AGENTE:', margin + 3, y + 4)
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
-    doc.text(String(agente.licencia || 'NO REGISTRADA').toUpperCase(), margin + 3, y + 6)
+    doc.text(String(agente.licencia || 'NO REGISTRADA').toUpperCase(), margin + 3, y + 8.2)
 
     drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight - 1.5)
-    doc.setFontSize(6)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.darkGrey)
-    doc.text('MUNICIPIO DEL AGENTE:', margin + col1Width + 3, y + 2.8)
-    doc.setFontSize(6.5)
+    doc.text('MUNICIPIO DEL AGENTE:', margin + col1Width + 3, y + 4)
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
-    doc.text(String(agente.municipio || 'NO REGISTRADO').toUpperCase(), margin + col1Width + 3, y + 6)
+    doc.text(String(agente.municipio || 'NO REGISTRADO').toUpperCase(), margin + col1Width + 3, y + 8.2)
 
     y += partyRowHeight - 1.5 + 2
 
     // ── SUJETO RETENIDO ──
     // Fila 4: Sujeto Retenido - Nombre y RIF
-    drawBox(doc, margin, y, col1Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('NOMBRE O RAZON SOCIAL DEL SUJETO RETENIDO / BENEFICIARIO:', margin + 3, y + 3)
-    doc.setFontSize(7.5)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.secondary)
-    doc.text(String(sujeto.name || '').toUpperCase().substring(0, 70), margin + 3, y + 7)
-
-    drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight)
-    doc.setFontSize(6)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...COLORS.darkGrey)
-    doc.text('N° DE R.I.F.:', margin + col1Width + 3, y + 3)
-    doc.setFontSize(8)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...COLORS.primary)
-    doc.text(String(sujeto.rif || '').toUpperCase(), margin + col1Width + 3, y + 7)
-
-    y += partyRowHeight
+    y += drawFilaParte(doc, margin, y, col1Width, col2Width, 'NOMBRE O RAZON SOCIAL DEL SUJETO RETENIDO / BENEFICIARIO:', sujeto.name, 'N° DE R.I.F.:', sujeto.rif)
 
     // Fila 5: Sujeto Retenido - Dirección
     const sujetoDirHeight = drawAddressBox(doc, margin, y, contentWidth, 'DIRECCION FISCAL DEL SUJETO RETENIDO / BENEFICIARIO:', sujeto.address)
@@ -1469,28 +1351,28 @@ class RetentionPdfService {
 
     // Fila 6: Sujeto Retenido - Licencia y Municipio
     drawBox(doc, margin, y, col1Width, partyRowHeight - 1.5)
-    doc.setFontSize(6)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.darkGrey)
-    doc.text('LICENCIA DE ACTIVIDAD ECONÓMICA DEL SUJETO:', margin + 3, y + 2.8)
-    doc.setFontSize(6.5)
+    doc.text('LICENCIA DE ACTIVIDAD ECONÓMICA DEL SUJETO:', margin + 3, y + 4)
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
     const sujetoLicencia = sujeto.licencia || retData?.licencia_actividad || 'NO REGISTRADA'
-    doc.text(String(sujetoLicencia).toUpperCase(), margin + 3, y + 6)
+    doc.text(String(sujetoLicencia).toUpperCase(), margin + 3, y + 8.2)
 
     drawBox(doc, margin + col1Width, y, col2Width, partyRowHeight - 1.5)
-    doc.setFontSize(6)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.darkGrey)
-    doc.text('MUNICIPIO DEL SUJETO:', margin + col1Width + 3, y + 2.8)
-    doc.setFontSize(6.5)
+    doc.text('MUNICIPIO DEL SUJETO:', margin + col1Width + 3, y + 4)
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
     const sujetoMunicipio = sujeto.municipio && sujeto.municipio !== 'NO REGISTRADO'
       ? sujeto.municipio
       : venezuelaLocationsService.getCleanMunicipalityName(retData?.municipio_id || sujeto.municipio)
-    doc.text(String(sujetoMunicipio || 'NO REGISTRADO').toUpperCase(), margin + col1Width + 3, y + 6)
+    doc.text(String(sujetoMunicipio || 'NO REGISTRADO').toUpperCase(), margin + col1Width + 3, y + 8.2)
     
     y += partyRowHeight - 1.5 + 3
 
@@ -1510,7 +1392,7 @@ class RetentionPdfService {
 
     // Dibujar Headers de la tabla
     const tableHeaderY = y
-    const tableHeaderHeight = 9
+    const tableHeaderHeight = 11
     let curX2 = margin
 
     doc.setFillColor(...COLORS.tableHeaderBg)
@@ -1519,16 +1401,16 @@ class RetentionPdfService {
     doc.setDrawColor(...COLORS.tableBorder)
     doc.rect(margin, tableHeaderY, contentWidth, tableHeaderHeight, 'S')
 
-    doc.setFontSize(5.5)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
 
     munColumns.forEach(col => {
       doc.line(curX2, tableHeaderY, curX2, tableHeaderY + tableHeaderHeight)
       const lines = col.label.split('\n')
-      const textY = lines.length > 1 ? tableHeaderY + 3.5 : tableHeaderY + 5.5
+      const textY = lines.length > 1 ? tableHeaderY + 4.7 : tableHeaderY + 6.6
       lines.forEach((line, lIdx) => {
-        const lineY = textY + (lIdx * 2.8)
+        const lineY = textY + (lIdx * 3.5)
         if (col.align === 'center') {
           doc.text(line, curX2 + (col.width / 2), lineY, { align: 'center' })
         } else if (col.align === 'right') {
@@ -1566,7 +1448,7 @@ class RetentionPdfService {
     ]
 
     // Dibujar Fila de Datos
-    const dataRowHeight = 7
+    const dataRowHeight = 9
     doc.setLineWidth(0.2)
     doc.setDrawColor(...COLORS.tableBorder)
     doc.rect(margin, y, contentWidth, dataRowHeight, 'S')
@@ -1577,16 +1459,16 @@ class RetentionPdfService {
     // Filas vacías adicionales para estética de formulario
     for (let r = 0; r < 2; r++) {
       let curXEmpty = margin
-      doc.rect(margin, y, contentWidth, 5, 'S')
+      doc.rect(margin, y, contentWidth, 6, 'S')
       munColumns.forEach(col => {
-        doc.line(curXEmpty, y, curXEmpty, y + 5)
+        doc.line(curXEmpty, y, curXEmpty, y + 6)
         curXEmpty += col.width
       })
       y += 5
     }
 
     // Fila de TOTALES
-    const totalRowHeight = 7
+    const totalRowHeight = 9
     doc.setFillColor(...COLORS.totalBg)
     doc.rect(margin, y, contentWidth, totalRowHeight, 'F')
     doc.setLineWidth(0.3)
@@ -1595,9 +1477,9 @@ class RetentionPdfService {
 
     const munLeftColsWidth = munColumns.slice(0, 6).reduce((acc, c) => acc + c.width, 0)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setTextColor(...COLORS.black)
-    doc.text('TOTALES', margin + munLeftColsWidth - 4, y + 4.5, { align: 'right' })
+    doc.text('TOTALES', margin + munLeftColsWidth - 4, y + 6, { align: 'right' })
 
     let munTotalX = margin + munLeftColsWidth
     const munTotalsValues = [
@@ -1616,8 +1498,8 @@ class RetentionPdfService {
         } else {
           doc.setTextColor(...COLORS.black)
         }
-        doc.setFontSize(6)
-        doc.text(val, munTotalX + col.width - 1.5, y + 4.5, { align: 'right' })
+        doc.setFontSize(7.5)
+        doc.text(val, munTotalX + col.width - 1.5, y + 6, { align: 'right' })
       }
       munTotalX += col.width
     })
@@ -1626,7 +1508,7 @@ class RetentionPdfService {
 
     // 8. Resumen Financiero
     const munSummaryX = pageWidth - margin - 95
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
 
@@ -1639,7 +1521,7 @@ class RetentionPdfService {
     ]
 
     munSummaryLines.forEach((sLine, sIdx) => {
-      const lineY = y + (sIdx * 4.2)
+      const lineY = y + (sIdx * 5.6)
       doc.setFont('helvetica', sLine.isBold ? 'bold' : 'normal')
       doc.setTextColor(...COLORS.black)
       doc.text(sLine.label, munSummaryX, lineY)
@@ -1660,7 +1542,7 @@ class RetentionPdfService {
     doc.setLineWidth(0.4)
     doc.setDrawColor(...COLORS.black)
     doc.line(margin + 5, signAreaY, margin + 5 + signWidth, signAreaY)
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...COLORS.black)
     doc.text('Firma y Sello del Agente de Retención', margin + 5 + (signWidth / 2), signAreaY + 4, { align: 'center' })
@@ -1671,7 +1553,7 @@ class RetentionPdfService {
     doc.text('Firma y Sello del Sujeto Retenido / Beneficiario', rightSignX + (signWidth / 2), signAreaY + 4, { align: 'center' })
 
     // 10. Footer Institucional
-    doc.setFontSize(5.5)
+    doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...COLORS.grey)
     doc.text('AD System • Comprobante Fiscal de Retención del Impuesto sobre Actividades Económicas emitido según Ordenanza Municipal', pageWidth / 2, pageHeight - 5, { align: 'center' })
@@ -1691,14 +1573,15 @@ class RetentionPdfService {
     const pageHeight = doc.internal.pageSize.getHeight()
     const margin = 10
     drawCorporateHeaderBand(doc, pageWidth)
+    await drawLogoCabecera(doc, margin, 9, 10)
     doc.setTextColor(...COLORS.black)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(13)
-    doc.text('COMPROBANTE DE RETENCIÓN DEL IVA — EJEMPLO', pageWidth / 2, 30, { align: 'center' })
+    doc.text('COMPROBANTE DE RETENCIÓN DEL IVA — EJEMPLO', pageWidth / 2, 34, { align: 'center' })
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
-    doc.text('Documento de muestra para ver cómo quedan tu sello y tu firma. No tiene validez fiscal.', pageWidth / 2, 37, { align: 'center' })
-    for (let i = 0; i < 6; i++) drawBox(doc, margin, 48 + i * 14, pageWidth - margin * 2, 10, i === 0 ? COLORS.tableHeaderBg : null)
+    doc.text('Documento de muestra para ver cómo quedan tu sello y tu firma. No tiene validez fiscal.', pageWidth / 2, 41, { align: 'center' })
+    for (let i = 0; i < 6; i++) drawBox(doc, margin, 52 + i * 14, pageWidth - margin * 2, 10, i === 0 ? COLORS.tableHeaderBg : null)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(48)
     doc.setTextColor(220, 220, 220)
@@ -1710,7 +1593,7 @@ class RetentionPdfService {
     doc.setLineWidth(0.4)
     doc.setDrawColor(...COLORS.black)
     doc.line(margin + 5, signAreaY, margin + 5 + signWidth, signAreaY)
-    doc.setFontSize(7)
+    doc.setFontSize(8.5)
     doc.text('Firma y Sello del Agente de Retención', margin + 5 + (signWidth / 2), signAreaY + 4, { align: 'center' })
     const rightSignX = pageWidth - margin - signWidth - 5
     doc.line(rightSignX, signAreaY, rightSignX + signWidth, signAreaY)

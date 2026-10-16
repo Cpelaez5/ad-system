@@ -15,3 +15,6 @@ test-results/
 # Worktrees de otros agentes anidados en esta carpeta (ver manual
 # 00-REGLAS-COMUNES.md §5.0) — no son código propio de esta rama.
 .claude/worktrees/
+
+# Muestras de documentos (scripts/muestras-documentos.mjs)
+.muestras/
