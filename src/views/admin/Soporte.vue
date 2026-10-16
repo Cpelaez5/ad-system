@@ -67,6 +67,7 @@
  * Las respuestas guardadas viven en localStorage de este navegador (fase 3 pendiente: pasarlas a la BD).
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import EncabezadoPagina from '@/components/ui/EncabezadoPagina.vue'
 import FiltroChips from '@/components/ui/FiltroChips.vue'
 import EstadoVacio from '@/components/ui/EstadoVacio.vue'
@@ -189,8 +190,13 @@ function alCambiar({ tabla, payload }) {
   temporizador = setTimeout(cargar, 400)
 }
 
+const route = useRoute()
 onMounted(() => {
-  cargar()
+  cargar().then(() => {
+    // Aviso push: /admin/soporte?c=<id> abre esa consulta.
+    const c = consultas.value.find((x) => x.id === route.query.c)
+    if (c) abrir(c)
+  })
   cancelar = soporte.suscribirBandeja(alCambiar)
   reloj = setInterval(() => { ahora.value = Date.now() }, 60_000)
 })

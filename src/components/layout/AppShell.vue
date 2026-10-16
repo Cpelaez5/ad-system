@@ -55,6 +55,9 @@
     :show-rub-rate="showRubRate"
   />
 
+  <!-- Pregunta amable para activar avisos (solo con sesión) -->
+  <SolicitudPush v-if="currentUser?.email" />
+
   <!-- Bloqueo por inactividad: una sola vez para todos los roles (solo con sesión). -->
   <BloqueoInactividad
     v-if="currentUser?.email"
@@ -75,6 +78,7 @@ import MenuLateral from './MenuLateral.vue';
 import ClienteBottomNav from './ClienteBottomNav.vue';
 import TrialBanner from './TrialBanner.vue';
 import BloqueoInactividad from './BloqueoInactividad.vue';
+import SolicitudPush from './SolicitudPush.vue';
 
 const MENU_MODO_KEY = 'ad_system_menu_modo';
 // Clave anterior (rail sí/no): se respeta al migrar para no cambiarle el menú a nadie.
@@ -98,7 +102,7 @@ const RAIL_STORAGE_KEY_ANTERIOR = 'ad_system_sidebar_rail_collapsed';
 export default {
   name: 'AppShell',
 
-  components: { BarraSuperior, MenuLateral, ClienteBottomNav, TrialBanner, BloqueoInactividad },
+  components: { BarraSuperior, MenuLateral, ClienteBottomNav, TrialBanner, BloqueoInactividad, SolicitudPush },
 
   emits: ['banner-visibility-change'],
 
