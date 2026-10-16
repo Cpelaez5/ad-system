@@ -31,7 +31,7 @@ async function login(page, usuario, password, attempt = 1) {
     await page.getByLabel('Usuario o Email').fill(usuario)
     await page.getByLabel('Contraseña').fill(password)
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await page.waitForURL(/\/(cliente\/inicio|dashboard|cliente\/mi-area|welcome)/, { timeout: 20_000 })
+    await page.waitForURL(/\/(cliente\/inicio|dashboard|admin\/inicio|cliente\/mi-area|welcome)/, { timeout: 20_000 })
   } catch (err) {
     if (attempt >= MAX_LOGIN_ATTEMPTS) throw err
     await page.waitForTimeout(2000 * attempt)
