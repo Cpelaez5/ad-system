@@ -43,6 +43,8 @@ Cada tarea dice qué hay que hacer, dónde vive hoy (BD, función, archivo) y qu
 | Revisar **proveedores con RIF inventado** (`PROV-…`) creados por la sincronización antigua | SQL | Lista de proveedores con datos dudosos, con Fusionar / Corregir |
 | Revisar clientes duplicados de la migración (mismo cliente con y sin RIF) | `clientes_negocio`, SQL | Fusionar clientes |
 | Mover empresas autorregistradas cuando haya más de un despacho | Pendiente desde el 2026-10-13 | Transferir empresa entre despachos, con consentimiento |
+| **Verificar/editar códigos SENIAT de conceptos ISLR** (`conceptos_islr.codigo_seniat`). Hoy todos están en NULL: sin código, la revisión de "SENIAT del mes" bloquea el XML de ISLR. La contadora confirma la tabla oficial del XML | SQL (`update conceptos_islr set codigo_seniat = ...`) | Lista de conceptos con el código SENIAT editable y un aviso de los que faltan |
+| **Calendario de vencimientos por terminal de RIF** (fechas oficiales anuales de IVA e ISLR) | No existe | Calendario cargado por el super admin; "SENIAT del mes" mostraría "vence el…" en cada tarjeta |
 
 ## 5. Operación
 - ✅ **Tasas globales:** `/admin/tasas` muestra los últimos 60 días hábiles (USD, EUR, CNY, TRY, RUB) con su fuente, marca los días sin tasa y permite corregir o agregar una (fuente `MANUAL-SUPERADMIN`).

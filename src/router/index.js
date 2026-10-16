@@ -228,6 +228,12 @@ const routes = [
     meta: { requiresAuth: true, title: 'Completar Pago', roles: ['cliente'] }
   },
   {
+    path: '/cliente/seniat',
+    name: 'ClienteSeniat',
+    component: () => import('@/views/cliente/SeniatDelMes.vue'),
+    meta: { requiresAuth: true, title: 'SENIAT del mes', roles: ['cliente'] }
+  },
+  {
     path: '/cliente/fiscal-360',
     name: 'ClienteFiscal360',
     component: () => import('@/views/cliente/Fiscal360.vue'),

@@ -15,7 +15,7 @@ const slugs = new Set(articulos.map((a) => a.slug))
 describe('docs/ayuda', () => {
   it('trae los artículos pedidos', () => {
     for (const s of ['primeros-pasos', 'registrar', 'mis-movimientos', 'como-voy', 'mis-papeles', 'mi-mercancia',
-      'mis-proveedores', 'mis-clientes', 'mi-negocio', 'retenciones', 'mi-plan-y-pagos', SLUG_FAQ, 'api']) {
+      'mis-proveedores', 'mis-clientes', 'mi-negocio', 'retenciones', 'seniat-retenciones', 'mi-plan-y-pagos', SLUG_FAQ, 'api']) {
       expect(slugs.has(s), s).toBe(true)
     }
   })

@@ -211,6 +211,9 @@ import ListaPasos from '@/components/ui/ListaPasos.vue'
 import SeccionLista from '@/components/ui/SeccionLista.vue'
 import sealService from '@/services/seal-service'
 import { sugerenciasInicio } from '@/utils/sugerenciasInicio'
+import { cargarMes as cargarMesSeniat } from '@/services/seniatService.js'
+import { periodoPorDefecto } from '@/utils/seniat/periodos.js'
+import { pendienteParaInicio } from '@/utils/seniat/tarjetas.js'
 
 // Marca de "ya visitó ¿Cómo voy?" (la pone Dashboard.vue al abrirse).
 export const CLAVE_VISTO_COMO_VOY = 'ad_visto_como_voy'
@@ -257,6 +260,7 @@ export default {
       clientId: null,
 
       ventasMes: [],
+      seniatPendiente: null,
       comprasMes: [],
       tasasHoy: {},
 
@@ -375,6 +379,7 @@ export default {
         todasVentas: this.todasVentas,
         papelesSubidos: this.papelesSubidos,
         diaDelMes: hoy.getDate(),
+        seniatPendiente: this.seniatPendiente,
         aUSD: (inv) => this.sumarMontosUSD([inv]),
         descartadas,
       })
@@ -431,6 +436,18 @@ export default {
     // ═══════════════════════════════════════════
     // CARGA DE DATOS
     // ═══════════════════════════════════════════
+
+    /** Barato y sin bloquear: 3 consultas del mes que toca declarar; si falla, no se muestra nada. */
+    async cargarSeniatPendiente() {
+      try {
+        const periodo = periodoPorDefecto()
+        const datos = await cargarMesSeniat(periodo)
+        if (!datos.cliente) return
+        this.seniatPendiente = pendienteParaInicio({ ...datos, periodo })
+      } catch (e) {
+        console.warn('SENIAT del mes (Inicio):', e?.message || e)
+      }
+    },
 
     async cargarDatos() {
       this.loading = true
@@ -651,6 +668,7 @@ export default {
   async mounted() {
     this.aplicarQueryRegistrar(this.queryRegistrar)
     await this.cargarDatos()
+    this.cargarSeniatPendiente()
   },
 }
 </script>

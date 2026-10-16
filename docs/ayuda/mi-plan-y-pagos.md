@@ -2,7 +2,7 @@
 titulo: Mi plan y pagos
 resumen: Cómo ver tu plan, elegir otro, reportar un pago y revisar tus facturas de suscripción.
 palabras: plan, suscripción, pagar, pago, reportar pago, comprobante, referencia, zelle, binance, saldo a favor, factura, vencimiento, renovar, prueba gratuita, igtf
-orden: 11
+orden: 12
 ---
 
 # Mi plan y pagos

@@ -92,6 +92,7 @@ export function getMenuCliente({ isServicesCompany = false } = {}) {
   const items = [
     { key: 'cliente-inicio', titulo: 'Inicio', icono: 'mdi-home-variant', to: '/cliente/inicio' },
     { key: 'cliente-facturacion', titulo: 'Mis movimientos', icono: 'mdi-receipt-text-outline', to: { name: 'ClienteFacturacion', query: { tab: 'all' } } },
+    { key: 'cliente-seniat', titulo: 'SENIAT del mes', icono: 'mdi-file-send-outline', to: { name: 'ClienteSeniat' } },
     { key: 'cliente-dashboard', titulo: '¿Cómo voy?', icono: 'mdi-chart-line', to: { name: 'ClienteDashboard' } },
     { key: 'cliente-fiscal-360', titulo: 'Mis papeles', icono: 'mdi-file-certificate', to: { name: 'ClienteFiscal360' } },
   ]

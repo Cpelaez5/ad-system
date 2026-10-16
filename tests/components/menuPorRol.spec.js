@@ -8,6 +8,7 @@ describe('menuPorRol', () => {
     expect(keys).toEqual([
       'cliente-inicio',
       'cliente-facturacion',
+      'cliente-seniat',
       'cliente-dashboard',
       'cliente-fiscal-360',
       'cliente-inventario',
@@ -25,6 +26,7 @@ describe('menuPorRol', () => {
     expect(items.map((i) => i.key)).toEqual([
       'cliente-inicio',
       'cliente-facturacion',
+      'cliente-seniat',
       'cliente-dashboard',
       'cliente-fiscal-360',
       'cliente-proveedores',
