@@ -186,6 +186,7 @@ const ICONOS = {
   'mis-clientes': 'mdi-account-group-outline',
   'mi-negocio': 'mdi-domain',
   retenciones: 'mdi-percent-outline',
+  'seniat-retenciones': 'mdi-file-send-outline',
   'mi-plan-y-pagos': 'mdi-crown-outline',
   'preguntas-frecuentes': 'mdi-help-circle-outline',
   api: 'mdi-code-braces',
