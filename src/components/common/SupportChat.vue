@@ -16,7 +16,7 @@
         @click="openChat"
       >
         <v-icon size="28">mdi-chat</v-icon>
-        <span v-if="noLeidos > 0" class="fab-badge" data-test="punto-fab"></span>
+        <span v-if="noLeidos > 0" :key="noLeidos" class="fab-badge" data-test="punto-fab" aria-hidden="true">{{ noLeidos > 9 ? '9+' : noLeidos }}</span>
       </v-btn>
     </transition>
 
@@ -438,14 +438,24 @@ export default {
 }
 .fab-badge {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
   background: rgb(var(--v-theme-error));
+  color: rgb(var(--v-theme-on-error));
   border: 2px solid rgb(var(--v-theme-surface));
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  /* Al llegar un mensaje (cambia el número) late suave 2 veces para llamar la atención. */
+  animation: fabLatido 0.6s ease-out 2;
 }
+@keyframes fabLatido { 0% { transform: scale(0.6); } 50% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .fab-badge { animation: none; } }
 .fab-bounce-enter-active { animation: fabIn 0.25s ease-out; }
 .fab-bounce-leave-active { animation: fabIn 0.15s ease-in reverse; }
 @keyframes fabIn { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }

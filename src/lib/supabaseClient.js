@@ -65,6 +65,38 @@ export const supabase = createClient(
     }
   })
 
+// Tiempo real con la sesión del usuario. Con la sesión guardada (INITIAL_SESSION) el
+// cliente no le pasaba el token al socket: los canales entraban como anónimos y las
+// reglas RLS filtraban TODOS los eventos (p. ej. el punto rojo del chat no aparecía).
+// setAuth también actualiza los canales ya unidos.
+supabase.auth.onAuthStateChange((_evento, session) => {
+  if (session?.access_token) supabase.realtime.setAuth(session.access_token)
+})
+
+/**
+ * Abre un canal de tiempo real CON la sesión del usuario ya puesta en el socket.
+ * Si el canal se une antes de tener el token, el servidor registra la suscripción como
+ * anónima y las reglas RLS filtran todos los eventos para siempre (enviar el token
+ * después no la corrige). `configurar(canal)` agrega los .on(...); devuelve cancelar().
+ */
+export function canalConSesion(nombre, configurar) {
+  let canal = null
+  let cancelado = false
+  ;(async () => {
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data?.session?.access_token
+      if (token) await supabase.realtime.setAuth(token)
+    } catch { /* sin sesión: el canal queda anónimo, como antes */ }
+    if (cancelado) return
+    canal = configurar(supabase.channel(nombre)).subscribe()
+  })()
+  return () => {
+    cancelado = true
+    if (canal) supabase.removeChannel(canal)
+  }
+}
+
 // Función helper para verificar la conexión con Supabase
 export async function testSupabaseConnection() {
   try {
@@ -143,3 +175,6 @@ export function isSupabaseConfigured() {
 
 // Exportar por defecto para compatibilidad
 export default supabase
+
+// Solo en desarrollo: acceso desde la consola para depurar sesión y tiempo real.
+if (import.meta.env.DEV && typeof window !== 'undefined') window.__supabase = supabase

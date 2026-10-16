@@ -6,7 +6,7 @@
  *
  * Devuelve { data, error } (error = mensaje en español o null); no lanza.
  */
-import { supabase } from '@/lib/supabaseClient'
+import { supabase, canalConSesion } from '@/lib/supabaseClient'
 import { logger } from '@/utils/logger'
 
 const COLUMNAS_CLIENTE =
@@ -134,22 +134,16 @@ export async function calificar(conversationId, valor) {
 
 /** Mensajes nuevos de una conversación. Devuelve una función para cancelar. */
 export function suscribirMensajes(conversationId, alRecibir) {
-  const canal = supabase
-    .channel(`soporte-mensajes-${conversationId}`)
+  return canalConSesion(`soporte-mensajes-${conversationId}`, (canal) => canal
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `conversation_id=eq.${conversationId}` },
-      (payload) => alRecibir(payload.new))
-    .subscribe()
-  return () => { supabase.removeChannel(canal) }
+      (payload) => alRecibir(payload.new)))
 }
 
 /** Cambios en las conversaciones de un usuario (no leídos, estado). */
 export function suscribirMisConsultas(userId, alCambiar) {
-  const canal = supabase
-    .channel(`soporte-mis-consultas-${userId}`)
+  return canalConSesion(`soporte-mis-consultas-${userId}`, (canal) => canal
     .on('postgres_changes', { event: '*', schema: 'public', table: 'support_conversations', filter: `user_id=eq.${userId}` },
-      (payload) => alCambiar(payload.new))
-    .subscribe()
-  return () => { supabase.removeChannel(canal) }
+      (payload) => alCambiar(payload.new)))
 }
 
 // ── Equipo (super admin) ────────────────────────────────────────────────────
@@ -228,12 +222,9 @@ export async function enviarComoEquipo(conversationId, texto, { interno = false,
 
 /** Cualquier cambio en las consultas o mensajes (la bandeja se actualiza sola). */
 export function suscribirBandeja(alCambiar) {
-  const canal = supabase
-    .channel('soporte-bandeja')
+  return canalConSesion('soporte-bandeja', (canal) => canal
     .on('postgres_changes', { event: '*', schema: 'public', table: 'support_conversations' }, (p) => alCambiar({ tabla: 'conversaciones', payload: p }))
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages' }, (p) => alCambiar({ tabla: 'mensajes', payload: p }))
-    .subscribe()
-  return () => { supabase.removeChannel(canal) }
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages' }, (p) => alCambiar({ tabla: 'mensajes', payload: p })))
 }
 
 /** Cuántas consultas esperan respuesta del equipo (nuevas o en curso). */
