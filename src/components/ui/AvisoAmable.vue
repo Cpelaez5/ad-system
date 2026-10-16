@@ -10,11 +10,13 @@
     @click:close="$emit('cerrar')"
   >
     {{ mensaje }}
-    <template v-if="textoAccion" #append>
-      <v-btn variant="text" size="small" :color="colorBoton" @click="$emit('accion')">
+    <!-- La acción va debajo del texto (no a la derecha): en el teléfono, a la derecha
+         apretaba el mensaje en una columna angosta. -->
+    <div v-if="textoAccion" class="aviso-amable__accion">
+      <v-btn variant="text" :color="colorBoton" class="text-none" @click="$emit('accion')">
         {{ textoAccion }}
       </v-btn>
-    </template>
+    </div>
   </v-alert>
 </template>
 
@@ -71,3 +73,7 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.aviso-amable__accion { margin: 4px 0 -6px -16px; }
+</style>

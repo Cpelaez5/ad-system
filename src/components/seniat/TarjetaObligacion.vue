@@ -9,14 +9,14 @@
 
     <p v-if="resumen" class="tarjeta-obligacion__resumen">{{ resumen }}</p>
 
-    <v-chip :color="meta.color" variant="tonal" size="default" :prepend-icon="meta.icono" class="tarjeta-obligacion__estado">
+    <v-chip :color="meta.color" variant="tonal" size="default" :prepend-icon="meta.icono" class="tarjeta-obligacion__estado" :class="{ 'tarjeta-obligacion__estado--aviso': meta.color === 'warning' }">
       {{ textoEstado }}
     </v-chip>
 
     <v-btn
       v-if="accionPrincipal"
-      :color="estado === 'faltan_datos' ? 'warning' : 'primary'"
-      :variant="estado === 'faltan_datos' ? 'tonal' : 'flat'"
+      color="primary"
+      variant="flat"
       size="large"
       block
       class="text-none tarjeta-obligacion__boton"
@@ -77,6 +77,10 @@ const textoEstado = computed(() =>
 </script>
 
 <style scoped>
+/* El dorado nunca va como color de texto (contraste): texto oscuro, ícono dorado. */
+.tarjeta-obligacion__estado--aviso { color: rgb(var(--v-theme-on-surface)) !important; }
+.tarjeta-obligacion__estado--aviso :deep(.v-icon) { color: rgb(var(--v-theme-warning)); }
+.tarjeta-obligacion__estado--aviso :deep(.v-chip__underlay) { background: rgb(var(--v-theme-warning)); opacity: 0.18; }
 .tarjeta-obligacion {
   display: flex;
   flex-direction: column;

@@ -65,6 +65,9 @@ create policy declaraciones_seniat_tenant on public.declaraciones_seniat for all
 -- conceptos_islr.codigo es una numeración INTERNA (y los catálogos sembrados antes se
 -- contradicen entre sí: p. ej. '011' es "Arrendamiento" en una carga y "Comisiones" en otra),
 -- así que NO sirve como código del XML. codigo_seniat es el que se escribe en <CodigoConcepto>.
+grant select, insert, update on public.declaraciones_seniat to authenticated;
+comment on table public.declaraciones_seniat is 'SENIAT del mes: estado por obligación y período. SIN FK a propósito (una FK a clients y otra a users crearía otra ruta users<->clients y rompe los embeds del login).';
+
 alter table public.conceptos_islr add column if not exists codigo_seniat text;
 comment on column public.conceptos_islr.codigo_seniat is
   'Código oficial del SENIAT para el XML de retenciones de ISLR (<CodigoConcepto>). NULL = sin verificar: la revisión de "SENIAT del mes" lo marca como problema del equipo.';
