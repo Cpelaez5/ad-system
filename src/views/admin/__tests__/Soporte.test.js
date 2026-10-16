@@ -22,6 +22,7 @@ const servicio = vi.hoisted(() => ({
   suscribirBandeja: vi.fn(() => vi.fn()),
 }))
 vi.mock('@/services/soporteService', () => servicio)
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }), useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
 
 import Soporte from '../Soporte.vue'
 
